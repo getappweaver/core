@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
-// Writes minimal valid PNGs into web/public for PWA manifest (replace with real art later).
-import { mkdirSync, writeFileSync } from 'fs';
+// Ensures PWA icon files exist in web/public without overwriting real assets.
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 const dmBotRoot = join(import.meta.dir, '..');
 const publicDir = join(dmBotRoot, 'web', 'public');
+const docsDir = join(dmBotRoot, 'docs');
 
 const png1x1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -12,7 +13,30 @@ const png1x1 = Buffer.from(
 );
 
 mkdirSync(publicDir, { recursive: true });
-writeFileSync(join(publicDir, 'pwa-192.png'), png1x1);
-writeFileSync(join(publicDir, 'pwa-512.png'), png1x1);
 
-console.log('Wrote web/public/pwa-192.png and pwa-512.png (1x1 placeholders).');
+const iconSources = [
+  {
+    target: join(publicDir, 'appweaver-pwa-192.png'),
+    preferredSource: join(docsDir, 'appweaver-logo192x192.png'),
+  },
+  {
+    target: join(publicDir, 'appweaver-pwa-512.png'),
+    preferredSource: join(docsDir, 'appweaver-logo512x512.png'),
+  },
+];
+
+for (const icon of iconSources) {
+  if (existsSync(icon.target)) {
+    console.log(`Keeping existing ${icon.target}`);
+    continue;
+  }
+
+  if (existsSync(icon.preferredSource)) {
+    copyFileSync(icon.preferredSource, icon.target);
+    console.log(`Copied ${icon.preferredSource} -> ${icon.target}`);
+    continue;
+  }
+
+  writeFileSync(icon.target, png1x1);
+  console.log(`Wrote placeholder ${icon.target}`);
+}

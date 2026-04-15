@@ -1,6 +1,6 @@
 # Plugin System
 
-The bot supports plugins that extend its functionality with new commands and AI tools. Plugins are self-contained packages hosted on Nostr (via ngit) or GitHub, installed and managed via built-in scripts.
+AppWeaver supports plugins that extend the core with new commands, AI tools, and installable capabilities. Plugins are self-contained packages hosted on Nostr (via ngit) or GitHub, installed and managed via built-in scripts.
 
 ---
 
@@ -15,7 +15,7 @@ bun run plugin:install
 This opens an interactive discovery flow:
 
 1. Queries well-known Nostr relays for available plugins
-2. Lists them with compatibility status against your bot version
+2. Lists them with compatibility status against your AppWeaver core version
 3. You pick one and choose a short **alias** (e.g. `todo`, `jobs`)
 4. The plugin is cloned into `plugins/<alias>/`
 5. `plugins.json` is updated
@@ -33,7 +33,7 @@ Pass the alias of an already-installed plugin. The script fetches the latest com
 
 ### Listing installed plugins
 
-Check `plugins.json` in the bot root:
+Check `plugins.json` in the AppWeaver root:
 
 ```json
 {
@@ -63,7 +63,7 @@ Plugin AI features work through your configured agent backend and the generated 
 
 ### Version compatibility
 
-Each plugin declares which bot core major version it supports. If your bot is on core `5` and the plugin only has a ref for core `4`, the installer will warn you and offer to install the older compatible version, or suggest upgrading the bot.
+Each plugin declares which core major version it supports. If your AppWeaver core is on `5` and the plugin only has a ref for core `4`, the installer will warn you and offer to install the older compatible version, or suggest upgrading the core.
 
 ### Uninstalling a plugin
 
@@ -71,7 +71,7 @@ Currently manual:
 
 1. Delete the `plugins/<alias>/` folder
 2. Remove the entry from `plugins.json`
-3. Run `bun run plugin:generate` to regenerate bot registration and CLI/skill outputs
+3. Run `bun run plugin:generate` to regenerate core registration and CLI/skill outputs
 
 ---
 
@@ -89,7 +89,7 @@ The script prompts for:
 
 - **Alias** (required) — folder name and command token (e.g. `todo` → `plugins/todo/`, `/todo …` with default DM prefix)
 - **Short description** (optional) — defaults to a sensible string from the alias
-- **Core API version** (optional) — defaults from the bot’s current major version in root `package.json`
+- **Core API version** (optional) — defaults from the current AppWeaver major version in root `package.json`
 
 It copies `scripts/plugin-template/` into `plugins/<alias>/`, expanding placeholders (`{{ALIAS}}`, `{{PASCAL_ALIAS}}`, etc.). It can optionally run `eslint` with `--fix` **only** for that new folder.
 
@@ -197,7 +197,7 @@ export const ExamplePlugin: BotPlugin = {
 };
 ```
 
-- **onInit(ctx)** — called once at bot startup. Store `ctx` in a module-level variable; open your plugin DB (e.g. `plugins/<alias>/db.sqlite`) and run migrations. The core does not pass a database — you create and own it.
+- **onInit(ctx)** — called once at AppWeaver startup. Store `ctx` in a module-level variable; open your plugin DB (e.g. `plugins/<alias>/db.sqlite`) and run migrations. The core does not pass a database — you create and own it.
 - **handler(args, context)** — called for each `<prefix><alias> …` command. Use `PluginInvocationContext` (`source`, `runAgent`, optional `sendReply` / `promptFn`) together with the DB and stored `PluginContext`.
 - **helpText(alias, prefix)** — returns an array of help lines shown under the plugin in **`/help`** (using the user’s configured DM prefix). Identity `description` is used in the plugin list.
 - **commandDefinition** — structured subcommands for `parseCliInput` and global `help <alias>` integration.
@@ -217,7 +217,7 @@ Plugins are allowed to differ in **which** tools they expose, how `<prefix><alia
 
 ### The draft/confirm flow
 
-Plugins that mutate data should use a draft/confirm pattern — the AI proposes a change, the user reviews and accepts it via a bot command. This prevents unintended modifications:
+Plugins that mutate data should use a draft/confirm pattern — the AI proposes a change, the user reviews and accepts it via a command. This prevents unintended modifications:
 
 1. Tool `execute` calls `storeDraft(db, { kind, input, originalPrompt })` and returns a formatted preview with a Draft ID.
 2. User runs a confirm subcommand (e.g. `<prefix><alias> confirm <id>` to apply, `<prefix><alias> revise <id> <corrections>`, or `<prefix><alias> discard <id>` to cancel).
@@ -228,6 +228,7 @@ Plugins that mutate data should use a draft/confirm pattern — the AI proposes 
 #### 1. Tag your release
 
 Bump the version in `package.json`:
+
 ```json
 {
   "version": "1.0.1"
@@ -235,6 +236,7 @@ Bump the version in `package.json`:
 ```
 
 Then tag and push:
+
 ```bash
 git tag -a v1.0.1 -m "Release v1.0.1"
 git push origin v1.0.1
@@ -280,9 +282,9 @@ Users on core `4` will get `v1.2.3`, users on core `5` will get `v2.0.0`. The in
 
 ### Code generation
 
-The bot refreshes plugin registration, CLI registry, and skill docs when you run `bun run plugin:install` or `bun run plugin:generate`:
+AppWeaver refreshes plugin registration, CLI registry, and skill docs when you run `bun run plugin:install` or `bun run plugin:generate`:
 
-**`generated/plugins.ts`** — registers all installed plugins at bot startup:
+**`generated/plugins.ts`** — registers all installed plugins at AppWeaver startup:
 
 ```typescript
 // AUTO-GENERATED
@@ -303,7 +305,7 @@ Paths such as `.claude/skills/dm-bot*/` and `generated/` may be gitignored local
 
 #### SQLite WAL
 
-Plugins open `plugins/<alias>/db.sqlite` through `openDb()` in `db.ts` and run `PRAGMA foreign_keys = ON` plus `PRAGMA journal_mode=WAL`, so bot commands and CLI calls share one DB setup path.
+Plugins open `plugins/<alias>/db.sqlite` through `openDb()` in `db.ts` and run `PRAGMA foreign_keys = ON` plus `PRAGMA journal_mode=WAL`, so AppWeaver commands and CLI calls share one DB setup path.
 
 ### NIP-05 and npub repo URLs
 

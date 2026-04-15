@@ -321,7 +321,7 @@ async function main() {
       notifyAllWebPushSubscriptions({
         db: seenDb,
         config: config.webPush,
-        title: 'dm-bot',
+        title: 'AppWeaver',
         body,
         url: '/',
       });

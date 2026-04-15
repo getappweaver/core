@@ -94,7 +94,7 @@ export function App(): JSX.Element {
 
 function AppInner(): JSX.Element {
   const WS_RECONNECT_DELAY_MS = 1500;
-  const TIMELINE_STORAGE_KEY = 'dm-bot.timeline-id';
+  const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
   const initialTimelineId = (() => {
     const existing = window.localStorage.getItem(TIMELINE_STORAGE_KEY);
     if (existing && existing.trim().length > 0) {
@@ -140,6 +140,8 @@ function AppInner(): JSX.Element {
   let paletteInputEl: HTMLInputElement | undefined;
   let paletteContainerEl: HTMLDivElement | undefined;
   let composerInputEl: HTMLTextAreaElement | undefined;
+  let headerMenuEl: HTMLDivElement | undefined;
+  let headerMenuButtonEl: HTMLButtonElement | undefined;
   let socket: WebSocket | null = null;
   let wsReconnectTimer: number | null = null;
   const pendingRequests = new Map<string, PendingRequest>();
@@ -168,6 +170,7 @@ function AppInner(): JSX.Element {
   const [pendingPromptRequestId, setPendingPromptRequestId] = createSignal<
     string | null
   >(null);
+  const [headerMenuOpen, setHeaderMenuOpen] = createSignal(false);
   const [pushBusy, setPushBusy] = createSignal(false);
   const [timelineId] = createSignal<string>(initialTimelineId);
   const [wsReconnectNonce, setWsReconnectNonce] = createSignal(0);
@@ -920,7 +923,7 @@ function AppInner(): JSX.Element {
   );
 
   createEffect(() => {
-    if (paletteOpen() || activeFormId() !== null) return;
+    if (paletteOpen() || activeFormId() !== null || headerMenuOpen()) return;
     queueMicrotask(() => composerInputEl?.focus());
   });
 
@@ -928,6 +931,11 @@ function AppInner(): JSX.Element {
     queueMicrotask(() => composerInputEl?.focus());
 
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && headerMenuOpen()) {
+        setHeaderMenuOpen(false);
+        return;
+      }
+
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
@@ -947,10 +955,33 @@ function AppInner(): JSX.Element {
       queueMicrotask(() => paletteInputEl?.focus());
     };
 
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!headerMenuOpen()) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (
+        headerMenuEl?.contains(target) ||
+        headerMenuButtonEl?.contains(target)
+      ) {
+        return;
+      }
+
+      setHeaderMenuOpen(false);
+    };
+
     window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('pointerdown', handlePointerDown);
 
     onCleanup(() => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('pointerdown', handlePointerDown);
     });
   });
 
@@ -1630,56 +1661,93 @@ function AppInner(): JSX.Element {
   return (
     <div class="app-shell">
       <header class="topbar compact">
-        <h1>dm-bot</h1>
+        <h1>AppWeaver</h1>
         <div class="topbar-actions">
-          <For each={headerChromeWidgets()}>
-            {(w) => (
+          <button
+            type="button"
+            class="connect-btn topbar-menu-btn"
+            ref={(el) => {
+              headerMenuButtonEl = el;
+            }}
+            aria-label="Open header menu"
+            aria-expanded={headerMenuOpen()}
+            aria-haspopup="menu"
+            onClick={() => setHeaderMenuOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="topbar-menu-icon">
+              <path
+                d="M4 6h16M4 12h16M4 18h16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="square"
+              />
+            </svg>
+          </button>
+          <Show when={headerMenuOpen()}>
+            <div
+              class="topbar-menu-panel panel"
+              ref={(el) => {
+                headerMenuEl = el;
+              }}
+            >
+              <For each={headerChromeWidgets()}>
+                {(w) => (
+                  <button
+                    type="button"
+                    class="connect-btn"
+                    disabled={!wsConnected()}
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      openChromeWidget({
+                        command: w.command,
+                        subcommand: w.subcommand,
+                        title: w.modalTitle,
+                      });
+                    }}
+                    title={
+                      wsConnected()
+                        ? `${w.label} (/${w.command} ${w.subcommand})`
+                        : 'Connect Nostr first — waiting for WebSocket'
+                    }
+                  >
+                    {w.label}
+                  </button>
+                )}
+              </For>
               <button
                 type="button"
                 class="connect-btn"
-                disabled={!wsConnected()}
                 onClick={() => {
-                  openChromeWidget({
-                    command: w.command,
-                    subcommand: w.subcommand,
-                    title: w.modalTitle,
-                  });
+                  setHeaderMenuOpen(false);
+                  setModalOpen(true);
                 }}
                 title={
-                  wsConnected()
-                    ? `${w.label} (/${w.command} ${w.subcommand})`
-                    : 'Connect Nostr first — waiting for WebSocket'
+                  auth.authState().status === 'connected'
+                    ? 'Connected — click to manage'
+                    : 'Connect Nostr signer'
                 }
               >
-                {w.label}
+                {connectLabel()}
               </button>
-            )}
-          </For>
-          <button
-            type="button"
-            class="connect-btn"
-            onClick={() => setModalOpen(true)}
-            title={
-              auth.authState().status === 'connected'
-                ? 'Connected — click to manage'
-                : 'Connect Nostr signer'
-            }
-          >
-            {connectLabel()}
-          </button>
-          <button
-            type="button"
-            class="connect-btn"
-            disabled={
-              auth.authState().status === 'disconnected' ||
-              !wsConnected() ||
-              pushBusy()
-            }
-            onClick={() => void onEnablePush()}
-            title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
-          >
-            {pushBusy() ? '…' : 'Push'}
-          </button>
+              <button
+                type="button"
+                class="connect-btn"
+                disabled={
+                  auth.authState().status === 'disconnected' ||
+                  !wsConnected() ||
+                  pushBusy()
+                }
+                onClick={() => {
+                  setHeaderMenuOpen(false);
+                  void onEnablePush();
+                }}
+                title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
+              >
+                {pushBusy() ? '…' : 'Push'}
+              </button>
+            </div>
+          </Show>
         </div>
       </header>
       <main class="chat-shell">

@@ -104,7 +104,7 @@ export async function runAgentWithLintFollowUp({
     return { output: finalOutput, result: finalResult };
   }
 
-  const lintLabel = currentWorkspace === 'bot' ? 'dm-bot' : 'workspace';
+  const lintLabel = currentWorkspace === 'bot' ? 'AppWeaver core' : 'workspace';
   const lintResult = runPostAgentLint({ cwd, label: lintLabel });
 
   if (!lintResult.available) {

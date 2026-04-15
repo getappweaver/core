@@ -6,7 +6,6 @@ import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 import { appendStatusBlock } from '../shared/with-status';
 
-import { handleBotBrowser } from './browser/handler';
 import { renderBotCli } from './cli-representation';
 import { handleBotIdentity } from './identity/handler';
 import { handleBotLint } from './lint/handler';
@@ -38,16 +37,12 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
 
   if (!sub) {
     return Promise.resolve(
-      `Usage: ${p}bot status | browser | version | ping | identity | workspace | lint | log | ready | push | restart — or ${p}bot help`,
+      `Usage: ${p}bot status | version | ping | identity | workspace | lint | log | ready | push | restart — or ${p}bot help`,
     );
   }
 
   if (sub === 'status') {
     return handleBotStatus(ctx);
-  }
-
-  if (sub === 'browser') {
-    return handleBotBrowser(ctx);
   }
 
   if (sub === 'version') {

@@ -1,8 +1,12 @@
 /// <reference lib="webworker" />
 
+import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 
 declare const self: ServiceWorkerGlobalScope;
+
+clientsClaim();
+self.skipWaiting();
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
@@ -10,7 +14,10 @@ self.addEventListener('message', (event) => {
   }
 });
 
-precacheAndRoute(self.__WB_MANIFEST);
+precacheAndRoute(self.__WB_MANIFEST, {
+  // Chrome installability checks and app launches may append a `source` query param.
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/],
+});
 cleanupOutdatedCaches();
 
 type PushPayload = {
@@ -29,19 +36,22 @@ self.addEventListener('push', (event: PushEvent) => {
   } catch {
     const text = event.data?.text();
 
-    data = { body: text ?? 'dm-bot' };
+    data = { body: text ?? 'AppWeaver' };
   }
 
-  const title = data.title ?? 'dm-bot';
+  const title = data.title ?? 'AppWeaver';
   const body = data.body ?? 'New activity';
   const url = data.url ?? '/';
+
+  const iconUrl = new URL('/appweaver-pwa-192.png', self.location.origin).href;
+  const badgeUrl = new URL('/appweaver-pwa-192.png', self.location.origin).href;
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
       data: { url },
-      icon: '/pwa-192.png',
-      badge: '/pwa-192.png',
+      icon: iconUrl,
+      badge: badgeUrl,
     }),
   );
 });

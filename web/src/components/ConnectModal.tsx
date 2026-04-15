@@ -35,7 +35,9 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
   const [nostrConnectRelays, setNostrConnectRelays] = createSignal(
     'wss://relay.primal.net',
   );
-  const [nostrConnectUri, setNostrConnectUri] = createSignal<string | null>(null);
+  const [nostrConnectUri, setNostrConnectUri] = createSignal<string | null>(
+    null,
+  );
   const [nostrConnectQrSvg, setNostrConnectQrSvg] = createSignal<string | null>(
     null,
   );
@@ -104,13 +106,12 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
     setNostrConnectQrSvg(null);
     setNostrConnectCopied(false);
 
-    const origin =
-      typeof window !== 'undefined' ? window.location.origin : '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
     try {
       const prepared = generateNostrConnectUri({
         relays,
-        name: 'dm-bot web',
+        name: 'AppWeaver',
         url: origin,
       });
 
@@ -296,7 +297,10 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                 </p>
               }
             >
-              <p class="muted" style={{ 'font-size': '0.9rem', 'margin-bottom': '0.9rem' }}>
+              <p
+                class="muted"
+                style={{ 'font-size': '0.9rem', 'margin-bottom': '0.9rem' }}
+              >
                 Sign in with your browser Nostr extension.
               </p>
               <div class="actions-row">
@@ -312,13 +316,21 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
           </Show>
 
           <Show when={tab() === 'nip55'}>
-            <p class="muted" style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}>
-              Direct Android signer via <code>nostrsigner:</code> deep links (NIP-55 style).
-              Best for Amber on mobile when you want to avoid relay-based NIP-46 handshakes.
+            <p
+              class="muted"
+              style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}
+            >
+              Direct Android signer via <code>nostrsigner:</code> deep links
+              (NIP-55 style). Best for Amber on mobile when you want to avoid
+              relay-based NIP-46 handshakes.
             </p>
-            <p class="muted" style={{ 'font-size': '0.82rem', 'margin-bottom': '0.7rem' }}>
-              Tapping connect opens Amber to request your public key. After returning, the app
-              will read the result from the clipboard when possible, or ask you to paste it.
+            <p
+              class="muted"
+              style={{ 'font-size': '0.82rem', 'margin-bottom': '0.7rem' }}
+            >
+              Tapping connect opens Amber to request your public key. After
+              returning, the app will read the result from the clipboard when
+              possible, or ask you to paste it.
             </p>
             <div class="actions-row">
               <button
@@ -332,10 +344,14 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
           </Show>
 
           <Show when={tab() === 'nostrconnect'}>
-            <p class="muted" style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}>
-              Client-initiated NIP-46: we generate a <code>nostrconnect://</code> link.
-              Open it in your remote signer (e.g. Amethyst, Nostr Wallet Connect), then
-              approve the connection. Same session storage as Bunker URL after success.
+            <p
+              class="muted"
+              style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}
+            >
+              Client-initiated NIP-46: we generate a{' '}
+              <code>nostrconnect://</code> link. Open it in your remote signer
+              (e.g. Amethyst, Nostr Wallet Connect), then approve the
+              connection. Same session storage as Bunker URL after success.
             </p>
             <div class="field-row">
               <textarea
@@ -369,7 +385,13 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
             <Show when={nostrConnectUri()}>
               {(uri) => (
                 <div style={{ 'margin-top': '0.75rem' }}>
-                  <p class="muted" style={{ 'font-size': '0.82rem', 'margin-bottom': '0.35rem' }}>
+                  <p
+                    class="muted"
+                    style={{
+                      'font-size': '0.82rem',
+                      'margin-bottom': '0.35rem',
+                    }}
+                  >
                     Scan the QR with your signer, or copy the link:
                   </p>
                   <div class="nostr-connect-qr-wrap">
@@ -391,7 +413,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                               title="Click to copy URI"
                               onClick={() => void copyNostrConnectUri(uri())}
                               innerHTML={svgMarkup()}
-                              />
+                            />
                           )}
                         </Show>
                       }
@@ -441,7 +463,11 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                       href={uri()}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#8ab4ff', 'font-size': '0.85rem', 'align-self': 'center' }}
+                      style={{
+                        color: '#8ab4ff',
+                        'font-size': '0.85rem',
+                        'align-self': 'center',
+                      }}
                     >
                       Open link
                     </a>
@@ -452,8 +478,12 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
           </Show>
 
           <Show when={tab() === 'bunker'}>
-            <p class="muted" style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}>
-              Paste the <code>bunker://</code> URL from your remote signer (NIP-46).
+            <p
+              class="muted"
+              style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}
+            >
+              Paste the <code>bunker://</code> URL from your remote signer
+              (NIP-46).
             </p>
             <div class="field-row">
               <textarea
@@ -487,7 +517,10 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
           </Show>
 
           <Show when={error()}>
-            <p class="error-text" style={{ 'margin-top': '0.7rem', 'font-size': '0.88rem' }}>
+            <p
+              class="error-text"
+              style={{ 'margin-top': '0.7rem', 'font-size': '0.88rem' }}
+            >
               {error()}
             </p>
           </Show>

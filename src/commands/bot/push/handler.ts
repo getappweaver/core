@@ -29,7 +29,7 @@ export function handleBotPush(ctx: RouteCommandContext): Promise<string> {
   notifyAllWebPushSubscriptions({
     db: ctx.seenDb,
     config: ctx.config.webPush,
-    title: 'dm-bot (test)',
+    title: 'AppWeaver (test)',
     body: message,
     url: '/',
   });
@@ -37,6 +37,6 @@ export function handleBotPush(ctx: RouteCommandContext): Promise<string> {
   const preview = message.length > 120 ? `${message.slice(0, 120)}…` : message;
 
   return Promise.resolve(
-    `Queued Web Push test to ${subs.length} subscription(s). Title: dm-bot (test). Body: ${preview}`,
+    `Queued Web Push test to ${subs.length} subscription(s). Title: AppWeaver (test). Body: ${preview}`,
   );
 }

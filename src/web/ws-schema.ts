@@ -207,7 +207,7 @@ export function formatWebSocketClientParseFailure({
       'note' in issue0 &&
       issue0.note === 'No matching discriminator'
     ) {
-      return `Unknown WebSocket message type (${typeDesc}). If you updated the web UI, restart dm-bot so the server matches the client.`;
+      return `Unknown WebSocket message type (${typeDesc}). If you updated the web UI, restart AppWeaver so the server matches the client.`;
     }
 
     const detail = error.issues

@@ -5,7 +5,6 @@
 import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
-import { getBotBrowserSubcommandDefinition } from './browser/definition';
 import { getBotIdentitySubcommandDefinition } from './identity/definition';
 import { getBotLintSubcommandDefinition } from './lint/definition';
 import { getBotLogSubcommandDefinition } from './log/definition';
@@ -29,16 +28,15 @@ export function getBotCommandDefinition({
   return {
     name: 'bot',
     summary:
-      'Bot status, browser demo automation, identity, workspace, lint, logging, ready DM, Web Push test, and watch restart.',
+      'Bot status, identity, workspace, lint, logging, ready DM, Web Push test, and watch restart.',
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'bot', {
         topicArgSummary:
-          'Optional subcommand: status, browser, workspace, lint, log, ready, restart, …',
-        exampleTopics: ['browser', 'workspace', 'lint'],
+          'Optional subcommand: status, workspace, lint, log, ready, restart, …',
+        exampleTopics: ['workspace', 'lint', 'restart'],
       }),
       getBotStatusSubcommandDefinition(p),
-      getBotBrowserSubcommandDefinition(p),
       getBotVersionSubcommandDefinition(p),
       getBotPingSubcommandDefinition(p),
       getBotIdentitySubcommandDefinition(p),

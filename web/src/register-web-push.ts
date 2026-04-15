@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// register-web-push.ts — Subscribe this browser to dm-bot Web Push (VAPID)
+// register-web-push.ts — Subscribe this browser to AppWeaver Web Push (VAPID)
 // ---------------------------------------------------------------------------
 
 import { deleteJson, fetchJsonPublic, postJson } from './utils';
@@ -36,10 +36,7 @@ function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
         .catch(() => []);
       const states = regs.map(
         (r) =>
-          r.active?.state ??
-          r.waiting?.state ??
-          r.installing?.state ??
-          'none',
+          r.active?.state ?? r.waiting?.state ?? r.installing?.state ?? 'none',
       );
 
       reject(

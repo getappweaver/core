@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import solid from 'vite-plugin-solid';
 
+const devHost = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+
 export default defineConfig({
   plugins: [
     solid(),
@@ -11,9 +13,10 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       manifest: {
-        name: 'dm-bot web',
-        short_name: 'dm-bot',
-        description: 'dm-bot command and chat UI',
+        id: '/',
+        name: 'AppWeaver',
+        short_name: 'AppWeaver',
+        description: 'AppWeaver command and chat UI',
         theme_color: '#121218',
         background_color: '#121218',
         display: 'standalone',
@@ -21,16 +24,16 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: 'pwa-192.png',
+            src: 'appweaver-pwa-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'pwa-512.png',
+            src: 'appweaver-pwa-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any',
           },
         ],
       },
@@ -48,9 +51,9 @@ export default defineConfig({
   },
   root: import.meta.dirname,
   server: {
-    host: '127.0.0.1',
+    host: devHost,
     port: 5552,
-    allowedHosts: ['dm-bot.nostrize.me'],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:5551',

@@ -49,12 +49,22 @@ function resolvePort(explicit?: number): number {
   return explicit ?? DEFAULT_PORT;
 }
 
+function resolveHost(explicit?: string): string {
+  const fromEnv = process.env.BOT_WEB_HOST?.trim();
+
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  return explicit ?? DEFAULT_HOST;
+}
+
 export function startLocalWebServer(options: StartLocalWebServerOptions): void {
   if ((process.env.BOT_WEB_ENABLED ?? '1') === '0') {
     return;
   }
 
-  const host = options.host ?? DEFAULT_HOST;
+  const host = resolveHost(options.host);
   const port = resolvePort(options.port);
 
   const ctx: WebRouteContext = {

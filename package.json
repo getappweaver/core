@@ -1,12 +1,18 @@
 {
-  "name": "nostr-dm-bot",
-  "version": "9.0.0",
+  "name": "appweaver",
+  "version": "9.0.1",
+  "description": "Open-source AI-first platform for installable apps, automation, and bot workflows.",
   "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "start": "bun run src/index.ts",
     "watch": "bun run scripts/run-with-restart.ts",
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
+    "landing:dev": "bun run --cwd apps/landing dev",
+    "landing:build": "bun run --cwd apps/landing build",
     "web:pwa-icons": "bun run scripts/write-pwa-placeholder-icons.ts",
     "web:push-vapid": "bunx web-push generate-vapid-keys",
     "lint": "eslint . --fix",

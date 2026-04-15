@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.0.1] - 2026-04-16
+
+- landing page and improved PWA web page (9962389)
+
 ## [v9.0.0] - 2026-04-15
 
-- AppWeaver branding. New web interface (43ec4c8)
+- AppWeaver branding. New web interface (edc304c)
 
 ## [v8.1.1] - 2026-03-31
 

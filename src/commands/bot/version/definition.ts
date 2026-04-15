@@ -7,7 +7,7 @@ export function getBotVersionSubcommandDefinition(
 
   return {
     name: 'version',
-    summary: 'Show git hash (dm-bot project).',
+    summary: 'Show git hash for this AppWeaver core checkout.',
     aliases: [],
     arguments: [],
     options: [],

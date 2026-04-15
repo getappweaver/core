@@ -12,3 +12,4 @@ generated/
 TOOLS.md
 .claude/skills/dm-bot*/
 .logs/
+apps/landing/dist/
