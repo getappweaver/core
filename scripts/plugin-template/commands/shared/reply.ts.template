@@ -1,0 +1,45 @@
+import {
+  createMessageRepresentation,
+  type MessageRepresentation,
+} from './output';
+
+export function toneForPlainReply(text: string): 'info' | 'success' | 'error' {
+  if (text.startsWith('Usage:')) {
+    return 'error';
+  }
+
+  if (text.startsWith('Failed')) {
+    return 'error';
+  }
+
+  if (text.includes('requires an agent backend')) {
+    return 'error';
+  }
+
+  if (text.startsWith('No {{ALIAS}}s.')) {
+    return 'info';
+  }
+
+  if (text.startsWith('No pending drafts.')) {
+    return 'info';
+  }
+
+  if (text.startsWith('Pending drafts:')) {
+    return 'info';
+  }
+
+  return 'success';
+}
+
+export function {{PASCAL_ALIAS}}ReplyMessage(params: {
+  alias: string;
+  subcommand: string;
+  text: string;
+}): MessageRepresentation {
+  return createMessageRepresentation({
+    command: params.alias,
+    subcommand: params.subcommand,
+    tone: toneForPlainReply(params.text),
+    text: params.text,
+  });
+}

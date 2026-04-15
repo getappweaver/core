@@ -1,0 +1,59 @@
+import type { Database } from 'bun:sqlite';
+
+import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import type { CommandDefinition } from '@src/system/command-definition';
+import type { ParsedCliInvocation } from '@src/system/parser-cli';
+
+import { getDraft } from '../drafts/store';
+import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+
+export function adaptReviseCommand(params: {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn;
+  parsed: ParsedCliInvocation;
+  command: CommandDefinition;
+}) {
+  void params.command;
+  void params.source;
+  void params.identity;
+  void params.runAgent;
+
+  const draftIdRaw = params.parsed.arguments.id;
+
+  if (typeof draftIdRaw !== 'number' || Number.isNaN(draftIdRaw)) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'revise',
+      text: `Usage: ${params.prefix}${params.alias} revise <draft_id> <corrections>`,
+    });
+  }
+
+  const entry = getDraft(params.db, draftIdRaw);
+
+  if (!entry) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'revise',
+      text: `Draft not found: #${String(draftIdRaw)}`,
+    });
+  }
+
+  if (entry.kind !== 'create') {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'revise',
+      text: `Revise only applies to create drafts. Use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} and try again.`,
+    });
+  }
+
+  return {{PASCAL_ALIAS}}ReplyMessage({
+    alias: params.alias,
+    subcommand: 'revise',
+    text: `To revise draft #${String(draftIdRaw)}, use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} then ${params.prefix}${params.alias} ai <revised request>. Or implement revise (call runAgent and replace draft).`,
+  });
+}

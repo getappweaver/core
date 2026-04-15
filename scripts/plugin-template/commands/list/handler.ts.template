@@ -1,0 +1,7 @@
+import type { Database } from 'bun:sqlite';
+
+import { list{{PASCAL_ALIAS}}s } from '../../db';
+
+export function handleListCommand(params: { db: Database }) {
+  return { items: list{{PASCAL_ALIAS}}s(params.db) };
+}

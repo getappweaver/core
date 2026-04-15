@@ -1,0 +1,416 @@
+/* Scoped base styles for WebNodeRoot inside Shadow DOM (:root vars inherit from light DOM host). */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Solid mount target: fills host when host is a flex item (e.g. status modal). */
+.web-shadow-mount {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Keep timeline cards transparent to outer scrolling so sticky subheaders can anchor there. */
+  overflow: visible;
+}
+
+/* Opt-in inner scrolling for constrained containers such as command output modals. */
+.web-shadow-mount--scroll-y {
+  overflow: visible;
+}
+
+:host-context(.status-modal-web) .web-shadow-mount--scroll-y {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.web-button {
+  display: inline-block;
+  border: none;
+  border-radius: 0;
+  padding: 1px 10px;
+  background: var(--color-button);
+  color: #000;
+  box-shadow: 6px 6px 0 var(--color-panel-shadow);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    transform 0.05s linear,
+    box-shadow 0.05s linear,
+    background-color 0.05s linear;
+}
+
+.web-button.tone-muted,
+.web-button.tone-success,
+.web-button.tone-warning,
+.web-button.tone-info {
+  color: #000;
+}
+
+.web-button.tone-danger {
+  color: #000;
+}
+
+.web-button.tone-success {
+  background: var(--color-button);
+}
+
+.web-button.tone-success:hover {
+  background: #7fbf7f;
+}
+
+.web-button.tone-success:active {
+  background: #6aa96a;
+}
+
+.web-button.tone-muted {
+  background: #b8b8b8;
+}
+
+.web-button.tone-muted:hover {
+  background: #c6c6c6;
+}
+
+.web-button.tone-muted:active {
+  background: #9d9d9d;
+}
+
+.web-button.tone-danger:hover,
+.web-button.tone-danger:focus-visible {
+  background: var(--color-danger);
+  color: #000;
+}
+
+.web-button.tone-danger:active {
+  background: #d74444;
+  color: #000;
+}
+
+.web-overflow-panel .web-button.tone-danger:hover,
+.web-overflow-panel .web-button.tone-danger:focus-visible {
+  background: var(--color-danger);
+  color: #000;
+}
+
+.web-overflow-panel .web-button.tone-danger:active {
+  background: #d74444;
+  color: #000;
+}
+
+.web-button:hover,
+.web-button:focus-visible {
+  background: var(--color-button-hover);
+}
+
+.web-button:active {
+  background: var(--color-button-active);
+  box-shadow: 2px 2px 0 var(--color-panel-shadow);
+  transform: translate(4px, 4px);
+}
+
+.web-button:disabled {
+  background: #a8a8a8;
+  color: #000;
+  box-shadow: 6px 6px 0 var(--color-panel-shadow);
+  cursor: default;
+}
+
+.web-button.web-button--link {
+  background: transparent;
+  color: var(--color-accent);
+  box-shadow: none;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.web-button.web-button--link:hover {
+  background: transparent;
+  color: #fff;
+}
+
+.web-node {
+  color: var(--color-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.web-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.web-link:hover,
+.web-link:focus-visible {
+  color: #fff;
+}
+
+.web-stack {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.web-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.web-row.todo-item-row {
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.web-row.todo-item-main-row {
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.web-stack.todo-item-content {
+  flex: 1;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.web-row > * {
+  min-width: 0;
+}
+
+.web-tree {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.web-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: start;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.1rem;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding-top: 0.15rem;
+  padding-bottom: 0.35rem;
+  margin-top: -0.15rem;
+  background: #1e1e1e;
+  box-shadow: 0 6px 8px -4px #1e1e1e;
+}
+
+.web-tree-header .web-button.web-button--link {
+  font-size: 0.82rem;
+}
+
+.web-treeItem {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.web-tree-item-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.web-tree-item-summary > .web-node {
+  flex: 1;
+  min-width: 0;
+}
+
+.web-tree-item-children {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.web-tree-item-children.is-children {
+  margin-left: 1.25rem;
+}
+
+.web-tree-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--color-warning);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1;
+  width: 1rem;
+  min-width: 1rem;
+  text-align: center;
+  margin-top: 3px;
+}
+
+.web-tree-toggle:hover,
+.web-tree-toggle:focus-visible {
+  color: var(--color-text);
+}
+
+.web-tree-toggle-spacer {
+  display: inline-block;
+  width: 1rem;
+  min-width: 1rem;
+}
+
+.web-box {
+  border: 0;
+  padding: 0.55rem 0.65rem;
+  background: var(--color-surface-alt);
+}
+
+.web-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  border: 0;
+  border-radius: 0;
+  color: #000;
+  font-size: 0.78rem;
+}
+
+.web-badge.tone-muted {
+  color: #444;
+}
+
+.web-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #0ff;
+  margin-top: 1px;
+}
+
+.web-overflow-menu {
+  position: relative;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.web-overflow-menu.is-open {
+  z-index: 50;
+}
+
+.web-overflow-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.web-overflow-menu.is-open .web-overflow-trigger {
+  position: relative;
+  z-index: 1;
+}
+
+.web-row:hover .web-overflow-trigger,
+.todo-item-row:focus-within .web-overflow-trigger,
+.web-overflow-menu.is-open .web-overflow-trigger {
+  opacity: 1;
+}
+
+.web-overflow-trigger {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  color: #000;
+}
+
+@media (hover: none) {
+  .web-overflow-trigger {
+    opacity: 0;
+  }
+
+  .web-row:hover .web-overflow-trigger,
+  .todo-item-row:focus-within .web-overflow-trigger,
+  .web-overflow-menu.is-open .web-overflow-trigger {
+    opacity: 1;
+  }
+}
+
+.web-overflow-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.35rem;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0;
+  width: max-content;
+  max-width: min(100vw - 1.5rem, 28rem);
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.web-overflow-panel.is-flip-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
+.web-overflow-panel .web-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: #000;
+  font-weight: 700;
+}
+
+.web-node.size-sm {
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.web-node.todo-item-id {
+  white-space: nowrap;
+}
+
+.web-node.weight-medium {
+  font-weight: 700;
+}
+
+.web-node.weight-semibold,
+.web-node.weight-bold {
+  font-weight: 700;
+}
+
+.tone-muted {
+  color: var(--color-text-muted);
+}
+
+.tone-info {
+  color: var(--color-accent);
+}
+
+.tone-success {
+  color: var(--color-success);
+}
+
+.tone-warning {
+  color: var(--color-warning);
+}
+
+.tone-danger {
+  color: var(--color-danger);
+}

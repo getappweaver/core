@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dm-bot — commands</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        line-height: 1.45;
+        color: #e8e8ec;
+        background: #121218;
+      }
+      body {
+        margin: 0;
+        padding: 1rem 1.25rem 2rem;
+        max-width: 52rem;
+      }
+      h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem;
+      }
+      p.meta {
+        margin: 0 0 1rem;
+        color: #9898a8;
+        font-size: 0.9rem;
+      }
+      .layout {
+        display: grid;
+        gap: 1rem;
+      }
+      @media (min-width: 640px) {
+        .layout {
+          grid-template-columns: 11rem 1fr;
+          align-items: start;
+        }
+      }
+      ul.cmds {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border: 1px solid #2a2a34;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #1a1a22;
+      }
+      ul.cmds li button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.45rem 0.65rem;
+        border: none;
+        border-bottom: 1px solid #2a2a34;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      ul.cmds li:last-child button {
+        border-bottom: none;
+      }
+      ul.cmds li button:hover,
+      ul.cmds li button:focus-visible {
+        background: #252530;
+      }
+      ul.cmds li button.active {
+        background: #2d3a52;
+      }
+      .detail {
+        border: 1px solid #2a2a34;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        background: #1a1a22;
+        min-height: 6rem;
+      }
+      .detail h2 {
+        margin: 0 0 0.35rem;
+        font-size: 1.05rem;
+      }
+      .detail .summary {
+        white-space: pre-wrap;
+        margin: 0 0 0.75rem;
+        color: #c4c4d0;
+        font-size: 0.92rem;
+      }
+      .muted {
+        color: #888898;
+        font-size: 0.85rem;
+      }
+      .tag {
+        display: inline-block;
+        margin: 0.15rem 0.35rem 0.15rem 0;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        background: #2a2a34;
+        font-size: 0.8rem;
+      }
+      .tag.mode {
+        background: #23324a;
+        color: #d7e6ff;
+      }
+      .sub-list {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .sub-nav {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 1px solid #2f3340;
+        border-radius: 8px;
+        background: #17171e;
+        color: inherit;
+        padding: 0.65rem 0.75rem;
+        cursor: pointer;
+      }
+      .sub-nav:hover,
+      .sub-nav:focus-visible {
+        background: #20222c;
+      }
+      .sub-nav.active {
+        border-color: #4b6287;
+        background: #1e2a3d;
+      }
+      .sub-nav .name {
+        display: block;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+      .sub-nav .summary {
+        display: block;
+        margin-top: 0.12rem;
+        color: #c4c4d0;
+        font-size: 0.88rem;
+      }
+      .sub-nav .usage {
+        display: block;
+        margin-top: 0.2rem;
+        color: #9090a2;
+        font-size: 0.82rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .sub-detail {
+        margin-top: 0.9rem;
+        padding-top: 0.9rem;
+        border-top: 1px solid #2a2a34;
+      }
+      section.block {
+        margin-top: 0.85rem;
+      }
+      section.block h3 {
+        margin: 0 0 0.35rem;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #888898;
+      }
+      .sub {
+        margin: 0.5rem 0 0;
+        padding-left: 0.75rem;
+        border-left: 2px solid #3a4a6a;
+      }
+      .exec {
+        margin-top: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid #2a2a34;
+        border-radius: 8px;
+        background: #17171e;
+      }
+      .exec-form {
+        display: grid;
+        gap: 0.65rem;
+      }
+      .field {
+        display: grid;
+        gap: 0.2rem;
+      }
+      .field label {
+        font-size: 0.84rem;
+        color: #d6d6df;
+      }
+      .field input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #31313d;
+        border-radius: 6px;
+        background: #101016;
+        color: #ededf2;
+        padding: 0.45rem 0.55rem;
+      }
+      .field.check {
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 0.45rem;
+      }
+      .field.check input {
+        width: auto;
+      }
+      .field .hint {
+        color: #888898;
+        font-size: 0.8rem;
+      }
+      .exec-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .exec-actions button {
+        border: 1px solid #39527a;
+        background: #25354e;
+        color: #f2f6ff;
+        border-radius: 6px;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+      }
+      .exec-output {
+        margin-top: 0.7rem;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        border: 1px solid #2a2a34;
+        border-radius: 6px;
+        background: #101016;
+        padding: 0.65rem;
+        min-height: 1.8rem;
+      }
+      .err {
+        color: #f08080;
+      }
+      .mode-copy {
+        margin: 0.25rem 0 0.6rem;
+      }
+      .help-sub-list {
+        display: grid;
+        gap: 0.55rem;
+      }
+      .help-sub-item {
+        padding-left: 0.2rem;
+      }
+      .help-sub-item code {
+        color: #d9e7ff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Built-in commands</h1>
+    <div class="layout">
+      <nav aria-label="Commands">
+        <ul class="cmds" id="cmd-list"></ul>
+      </nav>
+      <div class="detail" id="detail">
+        <p class="muted">Select a command.</p>
+      </div>
+    </div>
+    <script>
+      const listEl = document.getElementById('cmd-list');
+      const detailEl = document.getElementById('detail');
+
+      /** Full command defs from GET /api/commands (includes subcommands). */
+      let cachedCommandDetails = [];
+
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function renderAliases(aliases) {
+        if (!aliases || !aliases.length) return '';
+        return (
+          '<section class="block"><h3>Aliases</h3>' +
+          aliases
+            .map((a) => '<span class="tag">' + esc(a) + '</span>')
+            .join('') +
+          '</section>'
+        );
+      }
+
+      function renderArg(arg) {
+        const req = arg.required ? 'required' : 'optional';
+        const varia = arg.variadic ? ', variadic' : '';
+        const kind = arg.kind || 'string';
+        return (
+          '<li><code>' +
+          esc(arg.name) +
+          '</code> — ' +
+          esc(arg.summary) +
+          ' <span class="muted">(' +
+          esc(kind) +
+          ', ' +
+          req +
+          varia +
+          ')</span></li>'
+        );
+      }
+
+      function renderOpt(opt) {
+        const short = opt.shortFlag ? esc(opt.shortFlag) + ', ' : '';
+        const req = opt.required ? 'required' : 'optional';
+        const kind = opt.kind || 'string';
+        return (
+          '<li><code>' +
+          short +
+          esc(opt.flag) +
+          '</code> — ' +
+          esc(opt.summary) +
+          ' <span class="muted">(' +
+          esc(kind) +
+          ', ' +
+          req +
+          ')</span></li>'
+        );
+      }
+
+      function renderExamples(examples) {
+        if (!examples || !examples.length) return '';
+        return (
+          '<section class="block"><h3>Examples</h3><ul>' +
+          examples.map((e) => '<li><code>' + esc(e) + '</code></li>').join('') +
+          '</ul></section>'
+        );
+      }
+
+      function renderMode(mode) {
+        if (!mode) return '';
+
+        const copy = {
+          requires_input: 'Needs required input before it can run.',
+          runnable_default:
+            'No input needed. Generated UI can run this immediately.',
+          runnable_customizable:
+            'Can run immediately, with optional inputs available as filters or formatting controls.',
+        };
+
+        return (
+          '<section class="block"><h3>Generated UI</h3>' +
+          '<span class="tag mode">' +
+          esc(mode) +
+          '</span>' +
+          '<p class="muted mode-copy">' +
+          esc(copy[mode] || mode) +
+          '</p></section>'
+        );
+      }
+
+      function renderSub(sub) {
+        const mode = sub.inferredWeb && sub.inferredWeb.executionMode;
+        let h =
+          '<div class="sub"><h4>' +
+          esc(sub.name) +
+          '</h4><p class="summary">' +
+          esc(sub.summary) +
+          '</p>';
+        h +=
+          '<p class="muted"><code>/' +
+          esc(sub.commandName) +
+          ' ' +
+          esc(sub.usage) +
+          '</code></p>';
+        h += renderMode(mode);
+        h += renderAliases(sub.aliases);
+        if (sub.arguments && sub.arguments.length) {
+          h +=
+            '<section class="block"><h3>Arguments</h3><ul>' +
+            sub.arguments.map(renderArg).join('') +
+            '</ul></section>';
+        }
+        if (sub.options && sub.options.length) {
+          h +=
+            '<section class="block"><h3>Options</h3><ul>' +
+            sub.options.map(renderOpt).join('') +
+            '</ul></section>';
+        }
+        h += renderExamples(sub.examples);
+        h +=
+          '<section class="block"><h3>Execute</h3><div class="exec" data-subcommand="' +
+          esc(sub.name) +
+          '" data-mode="' +
+          esc(mode || '') +
+          '"></div></section>';
+        h += '</div>';
+        return h;
+      }
+
+      function renderCommandHelpOverview(def) {
+        return (
+          '<div class="sub-detail"><h3>Subcommands</h3><div class="help-sub-list">' +
+          (def.subcommands || [])
+            .map(
+              (sub) =>
+                '<div class="help-sub-item"><div><code>' +
+                esc(sub.name) +
+                '</code> - ' +
+                esc(sub.summary) +
+                '</div><div class="muted">/' +
+                esc(def.name) +
+                ' ' +
+                esc(sub.usage) +
+                '</div></div>',
+            )
+            .join('') +
+          '</div></div>'
+        );
+      }
+
+      function renderSubcommandList(def) {
+        return (
+          '<section class="block"><h3>Subcommands</h3><div class="sub-list">' +
+          (def.subcommands || [])
+            .map(
+              (sub) =>
+                '<button type="button" class="sub-nav" data-sub-nav="' +
+                esc(sub.name) +
+                '"><span class="name">' +
+                esc(sub.name) +
+                '</span><span class="summary">' +
+                esc(sub.summary) +
+                '</span><span class="usage">/' +
+                esc(def.name) +
+                ' ' +
+                esc(sub.usage) +
+                '</span></button>',
+            )
+            .join('') +
+          '</div></section><div class="sub-detail" id="sub-detail"><p class="muted">Select a subcommand.</p></div>'
+        );
+      }
+
+      function showDetail(def) {
+        let html =
+          '<h2>' +
+          esc(def.name) +
+          '</h2><p class="summary">' +
+          esc(def.summary) +
+          '</p>';
+        html += renderAliases(def.aliases);
+        if (def.subcommands && def.subcommands.length) {
+          html += renderSubcommandList(def);
+        }
+        detailEl.innerHTML = html;
+        wireSubcommands(def);
+      }
+
+      function fieldInputType(kind) {
+        if (kind === 'integer') return 'number';
+        return 'text';
+      }
+
+      function renderExecField(field, source) {
+        const key = source + '.' + field.name;
+        if (field.kind === 'boolean') {
+          return (
+            '<div class="field check"><input id="' +
+            esc(key) +
+            '" data-source="' +
+            esc(source) +
+            '" data-name="' +
+            esc(field.name) +
+            '" data-kind="' +
+            esc(field.kind) +
+            '" type="checkbox"><label for="' +
+            esc(key) +
+            '">' +
+            esc(field.name) +
+            '</label><div></div><div class="hint">' +
+            esc(field.summary) +
+            '</div></div>'
+          );
+        }
+
+        return (
+          '<div class="field"><label for="' +
+          esc(key) +
+          '">' +
+          esc(field.name) +
+          '</label><input id="' +
+          esc(key) +
+          '" data-source="' +
+          esc(source) +
+          '" data-name="' +
+          esc(field.name) +
+          '" data-kind="' +
+          esc(field.kind) +
+          '" type="' +
+          esc(fieldInputType(field.kind)) +
+          '"' +
+          (field.required ? ' required' : '') +
+          '><div class="hint">' +
+          esc(field.summary) +
+          '</div></div>'
+        );
+      }
+
+      function renderExecUi(commandName, sub) {
+        const fields = [];
+        (sub.arguments || []).forEach((arg) => {
+          fields.push(renderExecField(arg, 'arguments'));
+        });
+        (sub.options || []).forEach((opt) => {
+          fields.push(renderExecField(opt, 'options'));
+        });
+
+        const mode = sub.inferredWeb && sub.inferredWeb.executionMode;
+        const actionLabel = mode === 'requires_input' ? 'Run' : 'Run now';
+        const hasFields = fields.length > 0;
+        const showButton = !(mode === 'runnable_default' && !hasFields);
+
+        return (
+          '<form class="exec-form" data-command="' +
+          esc(commandName) +
+          '" data-subcommand="' +
+          esc(sub.name) +
+          '">' +
+          (hasFields
+            ? fields.join('')
+            : '<p class="muted">No inputs required.</p>') +
+          '<div class="exec-actions">' +
+          (showButton
+            ? '<button type="submit">' + esc(actionLabel) + '</button>'
+            : '<span class="muted">Runs automatically when selected.</span>') +
+          '<span class="muted">POST /api/commands/' +
+          esc(commandName) +
+          '/' +
+          esc(sub.name) +
+          '</span></div>' +
+          '<div class="exec-output muted">No result yet.</div></form>'
+        );
+      }
+
+      function renderSubcommandDetail(def, sub) {
+        if (sub.name === 'help') {
+          return renderCommandHelpOverview(def);
+        }
+
+        return renderSub({ ...sub, commandName: def.name });
+      }
+
+      function collectInvocation(form) {
+        const payload = { arguments: {}, options: {} };
+        form.querySelectorAll('[data-source]').forEach((input) => {
+          const source = input.getAttribute('data-source');
+          const name = input.getAttribute('data-name');
+          const kind = input.getAttribute('data-kind');
+          let value;
+
+          if (kind === 'boolean') {
+            value = !!input.checked;
+            if (!value) return;
+          } else {
+            const raw = input.value;
+            if (raw == null || raw === '') return;
+            value = kind === 'integer' ? Number.parseInt(raw, 10) : raw;
+          }
+
+          payload[source][name] = value;
+        });
+        return payload;
+      }
+
+      async function executeForm(form) {
+        const outputEl = form.querySelector('.exec-output');
+        const command = form.getAttribute('data-command');
+        const subcommand = form.getAttribute('data-subcommand');
+        outputEl.textContent = 'Running…';
+        outputEl.classList.add('muted');
+        outputEl.classList.remove('err');
+
+        try {
+          const res = await fetch(
+            '/api/commands/' +
+              encodeURIComponent(command) +
+              '/' +
+              encodeURIComponent(subcommand),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(collectInvocation(form)),
+            },
+          );
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            outputEl.textContent = data.error || 'Request failed';
+            outputEl.classList.add('err');
+            outputEl.classList.remove('muted');
+            return;
+          }
+
+          outputEl.textContent = data.output || '(no output)';
+          outputEl.classList.add('muted');
+          outputEl.classList.remove('err');
+        } catch (err) {
+          outputEl.textContent =
+            err instanceof Error ? err.message : String(err);
+          outputEl.classList.add('err');
+          outputEl.classList.remove('muted');
+        }
+      }
+
+      function mountSubcommandExecution(def, sub) {
+        const mount = detailEl.querySelector(
+          '.exec[data-subcommand="' + CSS.escape(sub.name) + '"]',
+        );
+        if (!mount) return;
+        mount.innerHTML = renderExecUi(def.name, sub);
+        const form = mount.querySelector('form');
+        if (!form) return;
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          executeForm(form);
+        });
+
+        const mode = sub.inferredWeb && sub.inferredWeb.executionMode;
+        if (mode === 'runnable_default' || mode === 'runnable_customizable') {
+          executeForm(form);
+        }
+      }
+
+      function selectSubcommand(def, subName, btn) {
+        detailEl.querySelectorAll('[data-sub-nav]').forEach((node) => {
+          node.classList.toggle('active', node === btn);
+        });
+
+        const sub = (def.subcommands || []).find(
+          (item) => item.name === subName,
+        );
+        const subDetailEl = document.getElementById('sub-detail');
+        if (!sub || !subDetailEl) return;
+        subDetailEl.innerHTML = renderSubcommandDetail(def, sub);
+        if (sub.name !== 'help') {
+          mountSubcommandExecution(def, sub);
+        }
+      }
+
+      function wireSubcommands(def) {
+        const buttons = detailEl.querySelectorAll('[data-sub-nav]');
+        buttons.forEach((button) => {
+          const subName = button.getAttribute('data-sub-nav');
+          button.addEventListener('click', () =>
+            selectSubcommand(def, subName, button),
+          );
+        });
+
+        const first = buttons[0];
+        if (first) {
+          first.click();
+        }
+      }
+
+      async function loadList() {
+        const res = await fetch('/api/commands');
+        if (!res.ok) {
+          detailEl.innerHTML =
+            '<p class="err">Failed to load /api/commands (' +
+            res.status +
+            ')</p>';
+          return;
+        }
+        const data = await res.json();
+        const cmds = data.commands || [];
+        cachedCommandDetails = cmds;
+        listEl.innerHTML = '';
+        cmds.forEach((c) => {
+          const li = document.createElement('li');
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = c.name;
+          btn.addEventListener('click', () => selectCommand(c.name, btn));
+          li.appendChild(btn);
+          listEl.appendChild(li);
+        });
+      }
+
+      async function selectCommand(name, btn) {
+        listEl.querySelectorAll('button').forEach((b) => {
+          b.classList.toggle('active', b === btn);
+        });
+
+        const fromBulk = cachedCommandDetails.find((c) => c.name === name);
+
+        if (fromBulk && fromBulk.subcommands) {
+          showDetail(fromBulk);
+          return;
+        }
+
+        detailEl.innerHTML = '<p class="muted">Loading…</p>';
+        const res = await fetch('/api/commands/' + encodeURIComponent(name));
+        if (!res.ok) {
+          detailEl.innerHTML =
+            '<p class="err">Not found or error (' + res.status + ')</p>';
+          return;
+        }
+        const def = await res.json();
+        showDetail(def);
+      }
+
+      loadList();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,238 @@
+// ---------------------------------------------------------------------------
+// plugins/{{ALIAS}}/adapter.ts — parse CLI + dispatch to command adapters
+// ---------------------------------------------------------------------------
+
+import type { Database } from 'bun:sqlite';
+
+import type {
+  PluginContext,
+  PluginIdentity,
+  RunAgentFn,
+} from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import { parseCliInput } from '@src/system/parser-cli';
+import type { WebNodeRoot } from '@src/web/ui-schema';
+
+import { adaptAcceptCommand } from './commands/accept/adapter';
+import { adaptAddCommand } from './commands/add/adapter';
+import { adaptAiCommand } from './commands/ai/adapter';
+import { adaptDeclineCommand } from './commands/decline/adapter';
+import { adaptDeleteCommand } from './commands/delete/adapter';
+import { adaptDraftsCommand } from './commands/drafts/adapter';
+import { adaptHelpCommand } from './commands/help/adapter';
+import { get{{PASCAL_ALIAS}}CommandDefinition } from './commands/help/module';
+import { adaptListCommand } from './commands/list/adapter';
+import { render{{PASCAL_ALIAS}}ListText } from './commands/list/renderers/text';
+import { render{{PASCAL_ALIAS}}ListWeb } from './commands/list/renderers/web';
+import { adaptReviseCommand } from './commands/revise/adapter';
+import { adaptShowCommand } from './commands/show/adapter';
+import { render{{PASCAL_ALIAS}}ShowText } from './commands/show/renderers/text';
+import { render{{PASCAL_ALIAS}}ShowWeb } from './commands/show/renderers/web';
+import {
+  is{{PASCAL_ALIAS}}ListWebRepresentation,
+  is{{PASCAL_ALIAS}}ShowWebRepresentation,
+  render{{PASCAL_ALIAS}}Text,
+  type {{PASCAL_ALIAS}}Renderable,
+} from './commands/shared/render';
+import { createMessageRepresentation } from './commands/shared/output';
+
+type {{PASCAL_ALIAS}}Subcommand =
+  | 'help'
+  | 'ai'
+  | 'add'
+  | 'list'
+  | 'show'
+  | 'delete'
+  | 'drafts'
+  | 'accept'
+  | 'revise'
+  | 'decline';
+
+type MaybePromise<T> = T | Promise<T>;
+
+type {{PASCAL_ALIAS}}CommandAdapter = (params: {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  parsed: ReturnType<typeof parseCliInput>;
+  command: ReturnType<typeof get{{PASCAL_ALIAS}}CommandDefinition>;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn;
+}) => MaybePromise<{{PASCAL_ALIAS}}Renderable>;
+
+const normalizedDefinitions = new Map<
+  string,
+  ReturnType<typeof get{{PASCAL_ALIAS}}CommandDefinition>
+>();
+
+const subcommandAdapters: Record<{{PASCAL_ALIAS}}Subcommand, {{PASCAL_ALIAS}}CommandAdapter> =
+  {
+    help: adaptHelpCommand,
+    ai: adaptAiCommand,
+    add: adaptAddCommand,
+    list: adaptListCommand,
+    show: adaptShowCommand,
+    delete: adaptDeleteCommand,
+    drafts: adaptDraftsCommand,
+    accept: adaptAcceptCommand,
+    revise: adaptReviseCommand,
+    decline: adaptDeclineCommand,
+  };
+
+function getDefinitionKey(prefix: string, alias: string): string {
+  return `${prefix}:${alias}`;
+}
+
+function getNormalizedDefinition(prefix: string, alias: string) {
+  const key = getDefinitionKey(prefix, alias);
+  const cached = normalizedDefinitions.get(key);
+
+  if (cached) {
+    return cached;
+  }
+
+  const normalized = get{{PASCAL_ALIAS}}CommandDefinition(prefix, alias);
+
+  normalizedDefinitions.set(key, normalized);
+
+  return normalized;
+}
+
+function is{{PASCAL_ALIAS}}Subcommand(value: string): value is {{PASCAL_ALIAS}}Subcommand {
+  return (
+    value === 'help' ||
+    value === 'ai' ||
+    value === 'add' ||
+    value === 'list' ||
+    value === 'show' ||
+    value === 'delete' ||
+    value === 'drafts' ||
+    value === 'accept' ||
+    value === 'revise' ||
+    value === 'decline'
+  );
+}
+
+type Handle{{PASCAL_ALIAS}}AdapterProps = {
+  args: string[];
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  identity: PluginIdentity;
+  storedCtx: PluginContext;
+  runAgent: RunAgentFn;
+};
+
+export async function handle{{PASCAL_ALIAS}}Adapter({
+  args,
+  prefix,
+  alias,
+  db,
+  source,
+  identity,
+  storedCtx,
+  runAgent,
+}: Handle{{PASCAL_ALIAS}}AdapterProps): Promise<string | WebNodeRoot> {
+  void storedCtx;
+
+  const normalizedArgs = args.length === 0 ? ['help'] : args;
+  const subcommand = normalizedArgs[0]?.toLowerCase() ?? '';
+
+  const commandNotFound = createMessageRepresentation({
+    command: alias,
+    subcommand: subcommand || 'unknown',
+    tone: 'error',
+    text: `Unknown command: ${prefix}${alias} ${subcommand || 'unknown'}`,
+  });
+
+  if (!is{{PASCAL_ALIAS}}Subcommand(subcommand)) {
+    return render{{PASCAL_ALIAS}}Text(commandNotFound, { prefix });
+  }
+
+  let representation: {{PASCAL_ALIAS}}Renderable;
+
+  try {
+    const command = getNormalizedDefinition(prefix, alias);
+
+    const parsed = parseCliInput({
+      command,
+      tokens: normalizedArgs,
+      rawInput:
+        `${prefix}${alias} ${normalizedArgs.join(' ')}`.trim(),
+    });
+
+    if (!is{{PASCAL_ALIAS}}Subcommand(parsed.subcommand)) {
+      return render{{PASCAL_ALIAS}}Text(commandNotFound, { prefix });
+    }
+
+    const adapter = subcommandAdapters[parsed.subcommand];
+
+    if (!adapter) {
+      return render{{PASCAL_ALIAS}}Text(commandNotFound, { prefix });
+    }
+
+    representation = await adapter({
+      prefix,
+      alias,
+      db,
+      source,
+      parsed,
+      command,
+      identity,
+      runAgent,
+    });
+  } catch (err) {
+    representation = createMessageRepresentation({
+      command: alias,
+      subcommand: subcommand || 'unknown',
+      tone: 'error',
+      text: String(err instanceof Error ? err.message : err),
+    });
+  }
+
+  if (is{{PASCAL_ALIAS}}ListWebRepresentation(representation)) {
+    if (source === 'web') {
+      return render{{PASCAL_ALIAS}}ListWeb({
+        alias,
+        items: representation.data.items,
+      });
+    }
+
+    const textBody = render{{PASCAL_ALIAS}}ListText({
+      items: representation.data.items,
+    });
+
+    return render{{PASCAL_ALIAS}}Text(
+      createMessageRepresentation({
+        command: alias,
+        subcommand: 'list',
+        tone: representation.data.items.length === 0 ? 'info' : 'success',
+        text: textBody,
+      }),
+      { prefix },
+    );
+  }
+
+  if (is{{PASCAL_ALIAS}}ShowWebRepresentation(representation)) {
+    if (source === 'web') {
+      return render{{PASCAL_ALIAS}}ShowWeb({
+        alias,
+        item: representation.data.item,
+      });
+    }
+
+    return render{{PASCAL_ALIAS}}Text(
+      createMessageRepresentation({
+        command: alias,
+        subcommand: 'show',
+        tone: 'success',
+        text: render{{PASCAL_ALIAS}}ShowText(representation.data.item),
+      }),
+      { prefix },
+    );
+  }
+
+  return render{{PASCAL_ALIAS}}Text(representation, { prefix });
+}

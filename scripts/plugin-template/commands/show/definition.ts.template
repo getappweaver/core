@@ -1,0 +1,21 @@
+import type { SubcommandDefinition } from '@src/system/command-definition';
+
+export const showDefinition = (
+  prefix: string,
+  alias: string,
+): SubcommandDefinition => ({
+  name: 'show',
+  summary: 'Show one {{ALIAS}} row by id.',
+  aliases: [],
+  arguments: [
+    {
+      name: 'id',
+      summary: 'Row id.',
+      kind: 'integer',
+      required: true,
+      variadic: false,
+    },
+  ],
+  options: [],
+  examples: [`${prefix}${alias} show 1`],
+});

@@ -1,8 +1,5 @@
 // ---------------------------------------------------------------------------
 // plugins/{{ALIAS}}/init.ts — {{PASCAL_ALIAS}}Plugin definition
-//
-// This file wires the plugin into the bot. Replace helpText with your real
-// command list once you implement commands in commands.ts.
 // ---------------------------------------------------------------------------
 
 import { basename } from 'path';
@@ -13,9 +10,15 @@ import {
   parsePluginPackageJson,
   type BotPlugin,
   type PluginContext,
+  type PluginInvocationContext,
 } from '@src/core/plugin';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
-import { handle{{PASCAL_ALIAS}} } from './commands';
+import { handle{{PASCAL_ALIAS}}Adapter } from './adapter';
+import {
+  get{{PASCAL_ALIAS}}CommandDefinition,
+  get{{PASCAL_ALIAS}}HelpLines,
+} from './commands/help/module';
 import { openDb } from './db';
 
 const pluginDir = import.meta.dir;
@@ -39,7 +42,10 @@ export const {{PASCAL_ALIAS}}Plugin: BotPlugin = {
     version: {{ALIAS}}Pkg.version,
     description: {{ALIAS}}Pkg.description,
   },
-  handler: (args: string[]) => {
+  handler: async (
+    args: string[],
+    context: PluginInvocationContext,
+  ): Promise<string | WebNodeRoot> => {
     if (!{{PASCAL_ALIAS}}PluginContext) {
       throw new Error('{{PASCAL_ALIAS}}Plugin not initialized');
     }
@@ -48,21 +54,27 @@ export const {{PASCAL_ALIAS}}Plugin: BotPlugin = {
       throw new Error('{{PASCAL_ALIAS}}PluginDb not initialized');
     }
 
-    return handle{{PASCAL_ALIAS}}({
+    return handle{{PASCAL_ALIAS}}Adapter({
       args,
+      prefix: context.prefix,
+      alias,
       db: {{PASCAL_ALIAS}}PluginDb,
+      source: context.source,
       identity: {{PASCAL_ALIAS}}Plugin.identity,
-      runAgent: {{PASCAL_ALIAS}}PluginContext.runAgent,
-      helpText: {{PASCAL_ALIAS}}Plugin.helpText,
+      storedCtx: {{PASCAL_ALIAS}}PluginContext,
+      runAgent: context.runAgent,
     });
   },
   onInit: (ctx: PluginContext) => {
     {{PASCAL_ALIAS}}PluginContext = ctx;
     {{PASCAL_ALIAS}}PluginDb = openDb();
   },
-  // Replace with your real command help lines when you implement commands.
-  helpText: (alias: string) => [
-    `!${alias} help — this message`,
-    `!${alias} ai <prompt> — natural language (implement in ai.ts)`,
+  helpText: (helpAlias: string, prefix: string) => [
+    `{{PASCAL_ALIAS}} scaffold: SQLite rows, draft/accept flow, and ${prefix}${helpAlias} ai. List/show have optional web cards; add stays text-only.`,
+    '',
+    `${prefix}${helpAlias} help [topic] — structured help`,
+    ...get{{PASCAL_ALIAS}}HelpLines(prefix, helpAlias),
   ],
+  commandDefinition: (prefix: string, pluginAlias: string) =>
+    get{{PASCAL_ALIAS}}CommandDefinition(prefix, pluginAlias),
 };

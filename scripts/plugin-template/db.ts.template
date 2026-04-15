@@ -1,18 +1,17 @@
 // ---------------------------------------------------------------------------
-// plugins/{{ALIAS}}/db.ts — Schema and CRUD for the {{ALIAS}} plugin
-//
-// Replace the minimal table and stubs with your real schema and logic:
-// - create{{PASCAL_ALIAS}}Table: define your tables and indexes
-// - get{{PASCAL_ALIAS}}, list{{PASCAL_ALIAS}}s, create{{PASCAL_ALIAS}}, update{{PASCAL_ALIAS}}, delete{{PASCAL_ALIAS}}
-// - If you need a draft tree (e.g. hierarchical create): add create{{PASCAL_ALIAS}}sFromDraftTree
-//   and wire it in commands.ts (accept subcommand).
+// plugins/{{ALIAS}}/db.ts — open SQLite + table creation + CRUD
 // ---------------------------------------------------------------------------
+
 import { join } from 'path';
 
 import { Database, type Database as DatabaseType } from 'bun:sqlite';
 
-import type { {{PASCAL_ALIAS}}, Create{{PASCAL_ALIAS}}Input, Update{{PASCAL_ALIAS}}Input } from './types';
-import { create{{PASCAL_ALIAS}}DraftsTable } from './drafts';
+import { create{{PASCAL_ALIAS}}DraftsTable } from './commands/drafts/store';
+import type {
+  {{PASCAL_ALIAS}},
+  Create{{PASCAL_ALIAS}}Input,
+  Update{{PASCAL_ALIAS}}Input,
+} from './commands/shared/types';
 
 function rowTo{{PASCAL_ALIAS}}(row: Record<string, unknown>): {{PASCAL_ALIAS}} {
   return {
@@ -35,21 +34,23 @@ export function create{{PASCAL_ALIAS}}Table(db: DatabaseType): void {
 export function create{{PASCAL_ALIAS}}(
   db: DatabaseType,
   input: Create{{PASCAL_ALIAS}}Input,
-  _source?: string,
 ): {{PASCAL_ALIAS}} {
   const now = Date.now();
-  
-  const info = db.run(`INSERT INTO {{ALIAS}}s (data, created_at) VALUES (?, ?)`, [
-    input.data,
-    now,
-  ]);
+
+  const info = db.run(
+    `INSERT INTO {{ALIAS}}s (data, created_at) VALUES (?, ?)`,
+    [input.data, now],
+  );
 
   const id = Number(info.lastInsertRowid);
 
   return get{{PASCAL_ALIAS}}(db, id)!;
 }
 
-export function get{{PASCAL_ALIAS}}(db: DatabaseType, id: number): {{PASCAL_ALIAS}} | null {
+export function get{{PASCAL_ALIAS}}(
+  db: DatabaseType,
+  id: number,
+): {{PASCAL_ALIAS}} | null {
   const row = db.prepare('SELECT * FROM {{ALIAS}}s WHERE id = ?').get(id) as
     | Record<string, unknown>
     | undefined;
@@ -66,7 +67,10 @@ export function list{{PASCAL_ALIAS}}s(db: DatabaseType): {{PASCAL_ALIAS}}[] {
   return rows.map(rowTo{{PASCAL_ALIAS}});
 }
 
-export function update{{PASCAL_ALIAS}}(db: DatabaseType, input: Update{{PASCAL_ALIAS}}Input): {{PASCAL_ALIAS}} | null {
+export function update{{PASCAL_ALIAS}}(
+  db: DatabaseType,
+  input: Update{{PASCAL_ALIAS}}Input,
+): {{PASCAL_ALIAS}} | null {
   const existing = get{{PASCAL_ALIAS}}(db, input.id);
 
   if (!existing) {
@@ -74,7 +78,10 @@ export function update{{PASCAL_ALIAS}}(db: DatabaseType, input: Update{{PASCAL_A
   }
 
   if (input.data !== undefined) {
-    db.run('UPDATE {{ALIAS}}s SET data = ? WHERE id = ?', [input.data, input.id]);
+    db.run('UPDATE {{ALIAS}}s SET data = ? WHERE id = ?', [
+      input.data,
+      input.id,
+    ]);
   }
 
   return get{{PASCAL_ALIAS}}(db, input.id);
@@ -86,12 +93,15 @@ export function delete{{PASCAL_ALIAS}}(db: DatabaseType, id: number): boolean {
   return info.changes > 0;
 }
 
-export function openDb(): DatabaseType {
-  const db = new Database(join(import.meta.dir, 'db.sqlite'), { strict: true });
+export function openDb(): Database {
+  const db = new Database(join(import.meta.dir, 'db.sqlite'), {
+    strict: true,
+  });
+
   db.run('PRAGMA foreign_keys = ON');
   db.run('PRAGMA journal_mode=WAL');
   create{{PASCAL_ALIAS}}Table(db);
   create{{PASCAL_ALIAS}}DraftsTable(db);
-  
+
   return db;
 }

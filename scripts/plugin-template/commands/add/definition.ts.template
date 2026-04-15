@@ -1,0 +1,21 @@
+import type { SubcommandDefinition } from '@src/system/command-definition';
+
+export const addDefinition = (
+  prefix: string,
+  alias: string,
+): SubcommandDefinition => ({
+  name: 'add',
+  summary: 'Create a {{ALIAS}} row from plain text.',
+  aliases: [],
+  arguments: [
+    {
+      name: 'text',
+      summary: 'Free-form text stored on the row.',
+      kind: 'string',
+      required: true,
+      variadic: true,
+    },
+  ],
+  options: [],
+  examples: [`${prefix}${alias} add example item`],
+});

@@ -10,8 +10,10 @@ import {
   AgentBackendNameSchema,
   AgentModeSchema,
   DEFAULT_BACKEND,
+  DEFAULT_DM_COMMAND_PREFIX,
   DEFAULT_LINTING,
   DEFAULT_MODE,
+  DmCommandPrefixSchema,
   DEFAULT_PROVIDER,
   DEFAULT_REPLY_TRANSPORT,
   DEFAULT_WORKSPACE_TARGET,
@@ -21,6 +23,7 @@ import {
   STATE_AGENT_BACKEND,
   STATE_CASHU_DEFAULT_MINT_URL,
   STATE_DEFAULT_MODE,
+  STATE_DM_COMMAND_PREFIX,
   STATE_LINTING,
   STATE_MODEL_OVERRIDE,
   STATE_PROVIDER_NAME,
@@ -34,6 +37,7 @@ import {
   type AgentBackendName,
   type AgentMode,
   type CoreDb,
+  type DmCommandPrefix,
   type Linting,
   type Msats,
   type ProviderName,
@@ -263,4 +267,32 @@ export function getLinting(db: CoreDb): Linting {
 
 export function setLinting(db: CoreDb, value: Linting): void {
   setState(db, STATE_LINTING, value);
+}
+
+export function getDmCommandPrefix(db: CoreDb): DmCommandPrefix {
+  const v = getState(db, STATE_DM_COMMAND_PREFIX);
+
+  if (v === null) {
+    return DEFAULT_DM_COMMAND_PREFIX;
+  }
+
+  const parsed = DmCommandPrefixSchema.safeParse(v);
+
+  if (!parsed.success) {
+    return DEFAULT_DM_COMMAND_PREFIX;
+  }
+
+  return parsed.data;
+}
+
+export function setDmCommandPrefix(db: CoreDb, prefix: string): void {
+  const parsed = DmCommandPrefixSchema.safeParse(prefix);
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid DM command prefix "${prefix}": use 1–8 non-whitespace characters.`,
+    );
+  }
+
+  setState(db, STATE_DM_COMMAND_PREFIX, parsed.data);
 }

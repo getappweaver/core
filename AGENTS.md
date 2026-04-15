@@ -23,3 +23,7 @@ Never retry a mutating tool if it returned a Draft ID.
 **All** official agent guidance for this repo lives under `.claude/skills/`. When you work in this workspace, **read every skill** in that directory.
 
 Each skill is a folder: `.claude/skills/<skill_name>/SKILL.md` (OpenCode-compatible YAML frontmatter with `name` matching `<skill_name>`).
+
+## Web command UI
+
+Rich command output uses `WebNodeRoot` and optional per-render `stylesheets` (Shadow DOM). See `docs/WEB_RENDERER.md` (section “Scoped styles”).

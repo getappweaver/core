@@ -1,0 +1,28 @@
+import type { SubcommandDefinition } from '@src/system/command-definition';
+
+export const reviseDefinition = (
+  prefix: string,
+  alias: string,
+): SubcommandDefinition => ({
+  name: 'revise',
+  summary: 'Revise a create draft (stub: points you to decline + ai).',
+  aliases: [],
+  arguments: [
+    {
+      name: 'id',
+      summary: 'Draft id.',
+      kind: 'integer',
+      required: true,
+      variadic: false,
+    },
+    {
+      name: 'corrections',
+      summary: 'Correction text (optional in this stub).',
+      kind: 'string',
+      required: false,
+      variadic: true,
+    },
+  ],
+  options: [],
+  examples: [`${prefix}${alias} revise 7 split this into smaller items`],
+});

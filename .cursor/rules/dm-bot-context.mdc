@@ -12,8 +12,8 @@ When editing or extending the dm-bot (NIP-17 DM bot), use this as the map. The b
 | File | Purpose |
 |------|---------|
 | `index.ts` | Main entry: env, SQLite, Nostr pool, subscription (kind 1059), command handling, agent backend dispatch, DM sending. Version computed at startup with `git rev-parse HEAD` from the project root. |
-| `scripts/run-with-restart.ts` | Watcher: runs the bot and restarts only when `restart.requested` is created/touched (for agent-driven code edits). |
-| `package.json` | Scripts: `start`/`bot`, `watch`, `lint` (dm-bot local eslint). Deps: nostr-tools, @types/bun. |
+| `scripts/run-with-restart.ts` | **`bun run watch`**: runs the Bun bot + optional Vite (`WATCH_WEB_UI=0` to disable). Restarts the **bot only** when `restart.requested` is created/touched — **not** on every code save. Use that file so agents and humans pick a deliberate restart point. |
+| `package.json` | Scripts: `start` (bot), `watch` (bot + watcher above), `web:dev` / `web:build`, `lint`. Deps: nostr-tools, @types/bun. |
 | `.env.example` | Template for BOT_KEY, BOT_MASTER_PUBKEY, BOT_RELAYS, BOT_OPENCODE_SERVE_URL, DEBUG. |
 | `opencode.json` | OpenCode project config: defines `ask`, `plan`, `build` agents with per-agent models and permissions. |
 
@@ -29,7 +29,7 @@ When editing or extending the dm-bot (NIP-17 DM bot), use this as the map. The b
     - `agent_backend` – `cursor` | `opencode`
     - `reply_transport` – `remote` | `local`
     - `workspace_target` – `parent` | `bot`
-- **Restart signal**: file `restart.requested` in the dm-bot dir. Created/touched to request restart; deleted on bot startup.
+- **Restart signal**: file `restart.requested` in the project root. Create/touch it to restart the bot when using `watch`; the watcher removes it and restarts the process. There is **no** auto-restart on file edits — that is intentional.
 
 ## Agent backends
 
@@ -81,8 +81,8 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 
 ## After editing dm-bot code
 
-- Touch `dm-bot/restart.requested` so the watcher restarts the bot (if using `watch`).
-- Run the linter with auto-fix after modifications: from project root `bun run lint`, or from dm-bot `bun run lint`.
+- **`touch restart.requested`** (project root) when `watch` is running so the bot reloads your changes — do **not** expect restarts on every save.
+- Run the linter with auto-fix after modifications: `bun run lint`.
 
 ## Workspace boundary
 

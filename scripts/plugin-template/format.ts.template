@@ -7,7 +7,8 @@
 // - formatCreateDraftList(draft), formatDraftReply(cmd, id, kind) for draft UX
 // - hasDraftChildren(draft) only if you support nested drafts
 // ---------------------------------------------------------------------------
-import type { Create{{PASCAL_ALIAS}}Draft, {{PASCAL_ALIAS}} } from './types';
+import type { {{PASCAL_ALIAS}} } from './commands/shared/types';
+import type { Create{{PASCAL_ALIAS}}Draft } from './commands/drafts/types';
 
 export function hasDraftChildren(_node: Create{{PASCAL_ALIAS}}Draft): boolean {
   return false;

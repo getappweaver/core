@@ -2,6 +2,8 @@ import { Database } from 'bun:sqlite';
 
 import { createConnectionsTable } from '../nostr/connections';
 import { CORE_DB_PATH, RESTART_REQUESTED_PATH } from '../paths';
+import { createTimelineTables } from '../timeline/db';
+import { createWebPushSubscriptionTables } from '../web/push-subscriptions';
 
 import type { CoreDb } from './shared';
 import { createWotTables } from './wot';
@@ -62,7 +64,9 @@ export function openCoreDb(): CoreDb {
   `);
 
   createConnectionsTable(db as CoreDb);
+  createTimelineTables(db as CoreDb);
   createWotTables(db as CoreDb);
+  createWebPushSubscriptionTables(db as CoreDb);
 
   return db as CoreDb;
 }

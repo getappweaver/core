@@ -16,7 +16,6 @@ import type { CoreDb } from '../db';
 import { alreadyHaveEvent, getReplyTransport, markSeen } from '../db';
 import { ensureWss } from '../env';
 import { C, debug, log, stripAnsi } from '../logger';
-import type { MessageSource } from '../messaging';
 
 export const PROFILE_RELAYS = new Set([
   'wss://purplepag.es',
@@ -163,54 +162,6 @@ export async function sendDm({
 
   process.stdout.write(`\n${sentLine}\n`);
   redrawPrompt?.();
-}
-
-export type CreateSendReplyForSourceProps = {
-  seenDb: CoreDb;
-  pool: SimplePool;
-  botRelayUrls: string[];
-  senderSecretKey: Uint8Array;
-  recipientPubkey: string;
-  signAuthEvent: (template: EventTemplate) => Promise<VerifiedEvent>;
-};
-
-export function createSendReplyForSource({
-  seenDb,
-  pool,
-  botRelayUrls,
-  senderSecretKey,
-  recipientPubkey,
-  signAuthEvent,
-}: CreateSendReplyForSourceProps): (
-  source: MessageSource,
-  message: string,
-) => Promise<void> {
-  return async (source: MessageSource, message: string): Promise<void> => {
-    const replyTransport = getReplyTransport(seenDb);
-    const sourceIsLocal = source === 'local';
-    const replyTransportIsLocal = replyTransport === 'local';
-    const shouldBypassNostr = sourceIsLocal || replyTransportIsLocal;
-
-    if (shouldBypassNostr) {
-      log.info(
-        `${C.dim}[bypassing to send as a DM because ${sourceIsLocal ? 'source is local' : 'reply transport is local'}]${C.reset}\n`,
-      );
-
-      console.log(message ?? '(no message)');
-      redrawPrompt?.();
-
-      return;
-    }
-
-    await sendDm({
-      pool,
-      botRelayUrls,
-      senderSecretKey,
-      recipientPubkey,
-      message,
-      signAuthEvent,
-    });
-  };
 }
 
 export type DmFilter = {

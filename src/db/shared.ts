@@ -40,6 +40,18 @@ export const STATE_ROUTSTR_MODELS_CACHE = 'routstr_models_cache';
 export const STATE_ROUTSTR_MODELS_CACHE_TS = 'routstr_models_cache_ts';
 export const STATE_CASHU_DEFAULT_MINT_URL = 'cashu_default_mint_url';
 export const STATE_LINTING = 'linting';
+export const STATE_DM_COMMAND_PREFIX = 'dm_command_prefix';
+
+/** First character(s) of a DM line that mark it as a command (stored in core DB). */
+export const DmCommandPrefixSchema = z
+  .string()
+  .min(1)
+  .max(8)
+  .refine((s) => !/\s/.test(s), {
+    message: 'prefix must not contain whitespace',
+  });
+
+export type DmCommandPrefix = z.infer<typeof DmCommandPrefixSchema>;
 
 export const DEFAULT_MODE: AgentMode = 'ask';
 export const DEFAULT_BACKEND: AgentBackendName = 'cursor';
@@ -47,6 +59,9 @@ export const DEFAULT_REPLY_TRANSPORT: ReplyTransport = 'remote';
 export const DEFAULT_WORKSPACE_TARGET: WorkspaceTarget = 'parent';
 export const DEFAULT_PROVIDER: ProviderName = 'local';
 export const DEFAULT_LINTING: Linting = 'off';
+
+/** Default when `state.dm_command_prefix` is unset (mobile-friendly). */
+export const DEFAULT_DM_COMMAND_PREFIX: DmCommandPrefix = '/';
 
 export type CoreDb = Brand<BunDatabase, 'CoreDb'>;
 export type RoutstrModelCache = {

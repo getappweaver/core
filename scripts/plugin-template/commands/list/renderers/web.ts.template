@@ -1,0 +1,51 @@
+import type { WebNodeRoot } from '@src/web/ui-schema';
+
+import type { {{PASCAL_ALIAS}} } from '../../shared/types';
+
+type Render{{PASCAL_ALIAS}}ListWebProps = {
+  alias: string;
+  items: {{PASCAL_ALIAS}}[];
+};
+
+export function render{{PASCAL_ALIAS}}ListWeb({
+  alias,
+  items,
+}: Render{{PASCAL_ALIAS}}ListWebProps): WebNodeRoot {
+  const emptyMessage = 'No {{ALIAS}}s yet.';
+
+  const header = {
+    type: 'element' as const,
+    tag: 'stack' as const,
+    props: { gap: 'xs' as const },
+    children: [
+      { type: 'text' as const, value: '{{PASCAL_ALIAS}} list (web preview)' },
+      {
+        type: 'text' as const,
+        value: 'Add has no web renderer; it uses plain text only.',
+      },
+    ],
+  };
+
+  const bodyChildren =
+    items.length === 0
+      ? [{ type: 'text' as const, value: emptyMessage }]
+      : items.map((item) => ({
+          type: 'text' as const,
+          value: `#${String(item.id)}  ${item.data}`,
+        }));
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: {
+      command: alias,
+      subcommand: 'list',
+    },
+    tree: {
+      type: 'element',
+      tag: 'stack',
+      props: { gap: 'sm' },
+      children: [header, ...bodyChildren],
+    },
+  };
+}

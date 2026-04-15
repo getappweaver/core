@@ -6,8 +6,13 @@ import { join } from 'path';
 
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
-import type { BotPlugin, PluginContext } from './plugin';
+import type {
+  BotPlugin,
+  PluginContext,
+  PluginInvocationContext,
+} from './plugin';
 
 const byAlias = new Map<string, BotPlugin>();
 
@@ -39,20 +44,35 @@ export function registerPlugin({ plugin, ctx }: RegisterPluginProps) {
   byAlias.set(plugin.identity.alias, plugin);
 }
 
+export function getPluginByAlias(alias: string): BotPlugin | undefined {
+  return byAlias.get(alias);
+}
+
+export function listRegisteredPlugins(): BotPlugin[] {
+  return [...byAlias.values()].sort((a, b) =>
+    a.identity.alias.localeCompare(b.identity.alias),
+  );
+}
+
+export function getRegisteredPluginAliases(): string[] {
+  return [...byAlias.keys()].sort();
+}
+
 export async function dispatchPluginCommand(
   cmd: string,
   args: string[],
-): Promise<string | null> {
+  context: PluginInvocationContext,
+): Promise<string | WebNodeRoot | null> {
   const plugin = byAlias.get(cmd);
 
   if (!plugin) {
     return null;
   }
 
-  return plugin.handler(args);
+  return plugin.handler(args, context);
 }
 
-export function getPluginHelpTexts(): string | null {
+export function getPluginHelpTexts(prefix: string): string | null {
   if (byAlias.size === 0) {
     return null;
   }
@@ -61,7 +81,7 @@ export function getPluginHelpTexts(): string | null {
     const { name, version, description } = plugin.identity;
     const header = ` ▸ ${alias} (${name}) v${version}`;
     const descLine = description ? `\n   ${description}` : '';
-    const helpLines = plugin.helpText(alias).join('\n');
+    const helpLines = plugin.helpText(alias, prefix).join('\n');
 
     return `\n${header}${descLine}\n\n${helpLines}\n`;
   });

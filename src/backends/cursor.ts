@@ -3,12 +3,7 @@
 // ---------------------------------------------------------------------------
 import { spawn, spawnSync } from 'bun';
 
-import type {
-  AgentBackend,
-  AgentRunResult,
-  CreateSessionProps,
-  RunMessageProps,
-} from './types';
+import type { AgentBackend, AgentRunResult, RunMessageProps } from './types';
 
 export function createCursorBackend(
   modelOverride?: string | null,
@@ -19,12 +14,11 @@ export function createCursorBackend(
     name: 'cursor',
     modelName: effectiveModel,
 
-    async createSession({ cwd, env }: CreateSessionProps): Promise<string> {
+    async createSession(cwd: string): Promise<string> {
       const proc = spawnSync(['agent', 'create-chat'], {
         cwd,
         stdout: 'pipe',
         stderr: 'pipe',
-        env,
       });
 
       const out = proc.stdout?.toString().trim() ?? '';
@@ -47,7 +41,8 @@ export function createCursorBackend(
       content,
       mode,
       cwd,
-      env,
+      onAgentStreamChunk: _onAgentStreamChunk,
+      streamAbortSignal: _streamAbortSignal,
     }: RunMessageProps): Promise<AgentRunResult> {
       const baseArgs = [
         'agent',
@@ -76,7 +71,6 @@ export function createCursorBackend(
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'ignore',
-        env,
       });
 
       await proc.exited;

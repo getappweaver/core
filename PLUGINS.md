@@ -21,7 +21,7 @@ This opens an interactive discovery flow:
 5. `plugins.json` is updated
 6. Plugin registration, the CLI tool registry, and generated skill docs are updated automatically
 
-The alias you choose becomes the command prefix (`!todo list`) and the folder name (`plugins/todo/`). Keep it short and memorable.
+The alias you choose (or the user overrides) becomes the first token after your **DM command prefix** (default **`/`**, e.g. `/todo list`) and the folder name (`plugins/todo/`). Keep it short and memorable.
 
 ### Updating a plugin
 
@@ -49,13 +49,15 @@ Check `plugins.json` in the bot root:
 
 ### Using a plugin
 
-Once installed, plugins register their commands under the alias you chose. Run:
+Once installed, plugins register their commands under the alias you chose. Examples below use the default DM prefix **`/`**; substitute yours if you changed it in **`bun run bot:setup`**.
+
+Run:
 
 ```
-!todo help
+/todo help
 ```
 
-to see available commands for that plugin. All plugin commands follow the same `!<alias> <subcommand>` pattern.
+to see available commands for that plugin. All plugin commands follow the same `<prefix><alias> <subcommand>` pattern (e.g. `/todo list`).
 
 Plugin AI features work through your configured agent backend and the generated **skills** / **`bun src/cli.ts`** tool flow: each plugin exposes a `ToolCallSchema` in `ai.ts`, and `bun run plugin:generate` writes `.claude/skills/dm-bot-<alias>/SKILL.md` when the plugin exports `ToolCallSchema` and `skillDescription`.
 
@@ -85,7 +87,7 @@ bun run plugin:new
 
 The script prompts for:
 
-- **Alias** (required) — folder name and command prefix (e.g. `todo` → `plugins/todo/`, `!todo …`)
+- **Alias** (required) — folder name and command token (e.g. `todo` → `plugins/todo/`, `/todo …` with default DM prefix)
 - **Short description** (optional) — defaults to a sensible string from the alias
 - **Core API version** (optional) — defaults from the bot’s current major version in root `package.json`
 
@@ -104,23 +106,36 @@ A plugin is a git repository with this structure (matches `scripts/plugin-templa
 
 ```
 my-plugin/
-  package.json          ← metadata + coreApiVersion
-  init.ts               ← exports the BotPlugin object
-  commands.ts           ← !<alias> subcommand handler
-  ai.ts                 ← !<alias> ai <prompt> handler (optional but typical)
-  tool.ts               ← system prompt + tool-call parsing for AI
-  db.ts                 ← SQLite schema and CRUD
-  format.ts             ← display helpers
-  types/                ← Zod schemas and TypeScript types
+  package.json              ← metadata + coreApiVersion
+  init.ts                   ← exports the BotPlugin object
+  adapter.ts                ← parseCliInput + dispatch to command adapters
+  definition.ts             ← aggregated CommandDefinition
+  ai.ts                     ← ToolCallSchema, executeTool, skillDescription
+  format.ts                 ← display helpers
+  reply-tone.ts             ← tone hints for plain-text replies (optional pattern)
+  renderers/text.ts         ← render*Text + shared representation union
+  __BOTTOMUP.md             ← optional; scope_root for dm-bot-file bottom-up docs
+  commands/
+    help/module.ts          ← get*CommandDefinition + get*HelpLines
+    help/adapter.ts
+    <subcommand>/definition.ts
+    <subcommand>/adapter.ts
+    …                       ← e.g. list/renderers/web.ts for optional WebNodeRoot
+  db/
+    open.ts
+    entities.ts             ← table + CRUD (names vary)
+    drafts.ts               ← draft table + helpers (if using draft flow)
+    index.ts                ← re-exports for `import … from './db'`
+  output/message/           ← message representation + text renderer (optional pattern)
+  types/                    ← Zod schemas and TypeScript types
     index.ts
-    item.ts             ← main entity (rename/stub as needed)
-    draft.ts            ← create-draft shape (draft/confirm flow)
-  drafts.ts             ← draft persistence (if using draft/confirm flow)
+    item.ts
+    draft.ts
   README.md
   .gitignore
 ```
 
-Older plugins may use a single root `types.ts` instead of `types/`; both layouts are valid.
+Older in-tree plugins may add `output/`, web renderers, or extra `db/` modules; both flat and split `types/` layouts are valid.
 
 ### `package.json`
 
@@ -147,32 +162,45 @@ Every plugin exports a `BotPlugin` object:
 export let PluginDb: Database | null = null;
 export let PluginContext: PluginContext | null = null;
 
-export const TodoPlugin: BotPlugin = {
+export const ExamplePlugin: BotPlugin = {
   identity: {
-    name: 'dm-bot-todo-plugin',
-    alias: 'todo',           // default alias (user can override at install time)
-    version: '1.0.1',
-    description: 'Todo management plugin for dm-bot',  // optional, from package.json
+    name: 'dm-bot-example-plugin',
+    alias: 'example',
+    version: '1.0.0',
+    description: '…',
   },
   onInit(ctx: PluginContext): void {
     PluginContext = ctx;
-    PluginDb = new Database(join(pluginDir, 'db.sqlite'), { strict: true });
-    createTodoTable(PluginDb);
-    createTodoDraftsTable(PluginDb);
+    PluginDb = openDb();
   },
-  handler(args: string[]): Promise<string> {
+  handler(
+    args: string[],
+    context: PluginInvocationContext,
+  ): Promise<string | WebNodeRoot> {
     if (!PluginContext || !PluginDb) throw new Error('Plugin not initialized');
-    return handleTodo({ args, db: PluginDb, runAgent: PluginContext.runAgent, identity: TodoPlugin.identity });
+    return handleExampleAdapter({
+      args,
+      prefix: context.prefix,
+      alias: 'example',
+      db: PluginDb,
+      source: context.source,
+      identity: ExamplePlugin.identity,
+      storedCtx: PluginContext,
+      runAgent: context.runAgent,
+    });
   },
-  helpText(alias: string): string[] {
-    return [`!${alias} list — list todos`, `!${alias} ai <prompt> — natural language`];
+  helpText(alias: string, prefix: string): string[] {
+    return [`…`, …getExampleHelpLines(prefix, alias)];
   },
+  commandDefinition: (prefix: string, pluginAlias: string) =>
+    getExampleCommandDefinition(prefix, pluginAlias),
 };
 ```
 
 - **onInit(ctx)** — called once at bot startup. Store `ctx` in a module-level variable; open your plugin DB (e.g. `plugins/<alias>/db.sqlite`) and run migrations. The core does not pass a database — you create and own it.
-- **handler(args)** — called for each `!<alias> ...` command. Only `args` are passed; use the context and DB stored in onInit.
-- **helpText(alias)** — returns an array of help lines shown under the plugin in `!help`. Identity `description` is used in the plugin list.
+- **handler(args, context)** — called for each `<prefix><alias> …` command. Use `PluginInvocationContext` (`source`, `runAgent`, optional `sendReply` / `promptFn`) together with the DB and stored `PluginContext`.
+- **helpText(alias, prefix)** — returns an array of help lines shown under the plugin in **`/help`** (using the user’s configured DM prefix). Identity `description` is used in the plugin list.
+- **commandDefinition** — structured subcommands for `parseCliInput` and global `help <alias>` integration.
 
 ### `ai.ts` — AI/CLI tool definitions
 
@@ -185,14 +213,14 @@ Plugins expose AI/CLI tool calls via:
 
 `src/cli.ts` validates incoming JSON with `ToolCallSchema`, injects `type` from `<toolName>`, then calls `executeTool`.
 
-Pluginsare allowed to differ in **which** tools they expose, how `!<alias> ai` is implemented, and how `executeTool` applies domain rules. What must stay consistent is the **exports above** so `plugin:generate` and the CLI keep working. For **new** plugins, start from `bun run plugin:new` — `scripts/plugin-template/` is kept in sync with that contract.
+Plugins are allowed to differ in **which** tools they expose, how `<prefix><alias> ai` is implemented, and how `executeTool` applies domain rules. What must stay consistent is the **exports above** so `plugin:generate` and the CLI keep working. For **new** plugins, start from `bun run plugin:new` — `scripts/plugin-template/` is kept in sync with that contract.
 
 ### The draft/confirm flow
 
 Plugins that mutate data should use a draft/confirm pattern — the AI proposes a change, the user reviews and accepts it via a bot command. This prevents unintended modifications:
 
 1. Tool `execute` calls `storeDraft(db, { kind, input, originalPrompt })` and returns a formatted preview with a Draft ID.
-2. User runs a confirm subcommand (e.g. `!<alias> confirm <id>` to apply, `!<alias> revise <id> <corrections>`, or `!<alias> discard <id>` to cancel).
+2. User runs a confirm subcommand (e.g. `<prefix><alias> confirm <id>` to apply, `<prefix><alias> revise <id> <corrections>`, or `<prefix><alias> discard <id>` to cancel).
 3. The `handler` in `init.ts` dispatches these subcommands.
 
 ### Publishing a plugin

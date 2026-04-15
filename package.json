@@ -1,10 +1,14 @@
 {
   "name": "nostr-dm-bot",
-  "version": "8.1.1",
+  "version": "9.0.0",
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
     "watch": "bun run scripts/run-with-restart.ts",
+    "web:dev": "bunx vite --config web/vite.config.ts",
+    "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
+    "web:pwa-icons": "bun run scripts/write-pwa-placeholder-icons.ts",
+    "web:push-vapid": "bunx web-push generate-vapid-keys",
     "lint": "eslint . --fix",
     "wallet:setup": "bun run scripts/setup-wallet.ts",
     "nostr:setup": "bun run scripts/nostr-setup.ts",
@@ -14,27 +18,40 @@
     "plugin:install": "bun run scripts/install-plugin.ts",
     "plugin:new": "bun run scripts/new-plugin.ts",
     "plugin:generate": "bun run scripts/generate-tools.ts",
+    "cmd-defs:add-sub-aliases": "bun run scripts/add-explicit-subcommand-aliases.ts",
     "release:changelog": "bun run scripts/release-changelog.ts"
   },
   "dependencies": {
     "@cashu/cashu-ts": "^3.5.0",
     "@noble/ciphers": "^2.1.1",
     "@noble/hashes": "^2.0.1",
-    "@opencode-ai/sdk": "^1.2.16",
+    "@opencode-ai/sdk": "^1.4.3",
     "@scure/bip39": "^2.0.1",
     "croner": "^8.0.0",
+    "highlight.js": "^11.11.1",
     "nostr-tools": "^2.23.3",
+    "playwright": "^1.59.1",
+    "qrcode": "^1.5.4",
+    "solid-js": "^1.9.9",
+    "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "eslint-import-resolver-typescript": "^4.4.4",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/bun": "^1.3.10",
+    "@types/qrcode": "^1.5.5",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.1",
-    "typescript-eslint": "^8.57.0"
+    "typescript-eslint": "^8.57.0",
+    "vite": "^7.1.7",
+    "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-solid": "^2.11.8",
+    "workbox-core": "^7.4.0",
+    "workbox-precaching": "^7.4.0"
   }
 }

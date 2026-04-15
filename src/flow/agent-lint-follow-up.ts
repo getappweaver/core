@@ -81,6 +81,8 @@ export async function runAgentWithLintFollowUp({
       cwd,
       getRoutstrSkKey: () => getRoutstrSkKey(coreDb),
       modelOverride: effectiveModelOverride,
+      onAgentStreamChunk: null,
+      streamAbortSignal: null,
     });
   };
 

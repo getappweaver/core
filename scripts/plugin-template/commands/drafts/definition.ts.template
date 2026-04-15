@@ -1,0 +1,21 @@
+import type { SubcommandDefinition } from '@src/system/command-definition';
+
+export const draftsDefinition = (
+  prefix: string,
+  alias: string,
+): SubcommandDefinition => ({
+  name: 'drafts',
+  summary: 'List pending drafts or show one draft.',
+  aliases: [],
+  arguments: [
+    {
+      name: 'draft_id',
+      summary: 'Optional draft id.',
+      kind: 'integer',
+      required: false,
+      variadic: false,
+    },
+  ],
+  options: [],
+  examples: [`${prefix}${alias} drafts`, `${prefix}${alias} drafts 3`],
+});

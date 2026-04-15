@@ -2,15 +2,21 @@
 // messaging.ts — Message chunking, formatting, and reply sending
 // ---------------------------------------------------------------------------
 
+import type { EventTemplate, SimplePool, VerifiedEvent } from 'nostr-tools';
+
 import type { AgentRunResult } from './backends/types';
+import { redrawPrompt } from './cli/local-cli';
 import type { AgentMode } from './db';
 import { C, log } from './logger';
+import { sendDm } from './nostr/nip17';
+import { assertUnreachable } from './utils';
+import type { WebNodeRoot } from './web/ui-schema';
 
 export const CHUNK_MAX = 4200;
 export const CHUNK_DELAY_BASE_MS = 1500;
 export const CHUNK_DELAY_MAX_MS = 12000;
 
-export type MessageSource = 'nostr' | 'local' | 'plugin';
+export type MessageSource = 'nostr' | 'local' | 'web';
 
 export type SendChunkedReplyProps = {
   source: MessageSource;
@@ -107,4 +113,58 @@ export function tokenFooter(
   const raw = `[tokens: ${input} in / ${output} out${costStr}${modelStr}]`;
 
   return local ? `\n${C.gray}${raw}${C.reset}` : `\n${raw}`;
+}
+
+export type CreateSendReplyForSourceProps = {
+  pool: SimplePool;
+  botRelayUrls: string[];
+  senderSecretKey: Uint8Array;
+  recipientPubkey: string;
+  signAuthEvent: (template: EventTemplate) => Promise<VerifiedEvent>;
+};
+
+export function createSendReplyForSource({
+  pool,
+  botRelayUrls,
+  senderSecretKey,
+  recipientPubkey,
+  signAuthEvent,
+}: CreateSendReplyForSourceProps): (
+  source: MessageSource,
+  message: string | WebNodeRoot,
+) => Promise<void> {
+  return async (
+    source: MessageSource,
+    message: string | WebNodeRoot,
+  ): Promise<void> => {
+    if (source === 'web' || typeof message !== 'string') {
+      // TODO: Implement web reply sending
+
+      return;
+    }
+
+    if (source === 'local') {
+      log.info(
+        `${C.dim}[bypassing to send as a DM because source is local'}]${C.reset}\n`,
+      );
+
+      console.log(message ?? '(no message)');
+      redrawPrompt?.();
+
+      return;
+    }
+
+    if (source === 'nostr') {
+      return sendDm({
+        pool,
+        botRelayUrls,
+        senderSecretKey,
+        recipientPubkey,
+        message,
+        signAuthEvent,
+      });
+    }
+
+    return assertUnreachable(source);
+  };
 }

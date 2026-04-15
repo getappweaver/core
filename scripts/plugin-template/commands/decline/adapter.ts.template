@@ -1,0 +1,51 @@
+import type { Database } from 'bun:sqlite';
+
+import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import type { CommandDefinition } from '@src/system/command-definition';
+import type { ParsedCliInvocation } from '@src/system/parser-cli';
+
+import { deleteDraft, getDraft } from '../drafts/store';
+import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+
+export function adaptDeclineCommand(params: {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn;
+  parsed: ParsedCliInvocation;
+  command: CommandDefinition;
+}) {
+  void params.command;
+  void params.source;
+  void params.identity;
+  void params.runAgent;
+
+  const draftIdRaw = params.parsed.arguments.id;
+
+  if (typeof draftIdRaw !== 'number' || Number.isNaN(draftIdRaw)) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'decline',
+      text: `Usage: ${params.prefix}${params.alias} decline <draft_id>`,
+    });
+  }
+
+  if (!getDraft(params.db, draftIdRaw)) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'decline',
+      text: `Draft not found: #${String(draftIdRaw)}`,
+    });
+  }
+
+  deleteDraft(params.db, draftIdRaw);
+
+  return {{PASCAL_ALIAS}}ReplyMessage({
+    alias: params.alias,
+    subcommand: 'decline',
+    text: `Draft #${String(draftIdRaw)} discarded.`,
+  });
+}

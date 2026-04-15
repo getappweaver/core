@@ -1,13 +1,16 @@
 // ---------------------------------------------------------------------------
 // backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (in-process server)
 // ---------------------------------------------------------------------------
-import type { SessionPromptData } from '@opencode-ai/sdk';
-import { createOpencode } from '@opencode-ai/sdk';
+import { createOpencode } from '@opencode-ai/sdk/v2';
 
 import type { AgentMode } from '../db';
 import { debug, log } from '../logger';
 import type { ProviderName } from '../providers/types';
 
+import {
+  createOpencodeStreamLogState,
+  mapOpencodeSsePayloadToChunk,
+} from './agent-stream-chunk';
 import type { ParseModelProps } from './opencode-common';
 import {
   normalizeModelForProvider,
@@ -18,7 +21,6 @@ import type {
   AgentErrorResult,
   AgentRunResult,
   AgentSuccessResult,
-  CreateSessionProps,
   OutputSegment,
   RunMessageProps,
 } from './types';
@@ -49,21 +51,7 @@ function getPortsToTry(): number[] {
   return DEFAULT_PORTS;
 }
 
-function applyEnvToProcess(env: Record<string, string | undefined>): void {
-  for (const [k, v] of Object.entries(env)) {
-    if (v !== undefined) {
-      process.env[k] = v;
-    }
-  }
-}
-
-async function getOrInitSdk(
-  env?: Record<string, string | undefined>,
-): Promise<SdkInstance> {
-  if (env) {
-    applyEnvToProcess(env);
-  }
-
+async function getOrInitSdk(): Promise<SdkInstance> {
   if (sdk) {
     return sdk;
   }
@@ -98,6 +86,18 @@ async function getOrInitSdk(
   throw new Error(
     `OpenCode SDK server failed to start: ${lastError?.message ?? 'unknown'}.\n${hint}`,
   );
+}
+
+export function disposeOpencodeSdk(): void {
+  if (!sdk) {
+    return;
+  }
+
+  try {
+    sdk.server.close();
+  } finally {
+    sdk = null;
+  }
 }
 
 function parseModel({
@@ -140,6 +140,202 @@ function modelToProviderAndId(modelStr: string): {
   };
 }
 
+type ParsePromptSdkResultProps = {
+  result: {
+    error?: unknown;
+    data?: unknown;
+    response?: Response;
+  };
+  sessionId: string;
+  effectiveModel: string;
+};
+
+function partsFromV2PromptData(data: {
+  parts?: Array<{ type?: string; text?: string; content?: string } | string>;
+  output?: string;
+  content?: string;
+  text?: string;
+  info?: {
+    cost?: number;
+    tokens?: { input: number; output: number };
+    structured_output?: unknown;
+  };
+}): OutputSegment[] {
+  const parts = data.parts ?? [];
+  const outputs: OutputSegment[] = [];
+
+  if (parts.length > 0) {
+    for (const p of parts) {
+      const partType =
+        p &&
+        typeof p === 'object' &&
+        typeof (p as { type?: string }).type === 'string'
+          ? (p as { type: string }).type
+          : '';
+
+      const text =
+        p &&
+        typeof p === 'object' &&
+        typeof (p as { text?: string }).text === 'string'
+          ? (p as { text: string }).text
+          : p &&
+              typeof p === 'object' &&
+              typeof (p as { content?: string }).content === 'string'
+            ? (p as { content: string }).content
+            : typeof p === 'string'
+              ? p
+              : '';
+
+      if (text.length === 0) {
+        continue;
+      }
+
+      if (partType === 'reasoning' || partType === 'thinking') {
+        outputs.push({ type: 'reasoning', value: text });
+      } else {
+        outputs.push({ type: 'text', value: text });
+      }
+    }
+  }
+
+  if (outputs.length === 0) {
+    const fallback =
+      (typeof data.output === 'string' &&
+        data.output.length > 0 &&
+        data.output) ||
+      (typeof data.content === 'string' &&
+        data.content.length > 0 &&
+        data.content) ||
+      (typeof data.text === 'string' && data.text.length > 0 && data.text) ||
+      (data.info?.structured_output != null
+        ? typeof data.info.structured_output === 'string'
+          ? data.info.structured_output
+          : JSON.stringify(data.info.structured_output)
+        : null);
+
+    if (fallback) {
+      outputs.push({ type: 'text', value: fallback });
+    } else {
+      outputs.push({ type: 'text', value: '(no output)' });
+    }
+  }
+
+  return outputs;
+}
+
+function parsePromptSdkResult({
+  result,
+  sessionId,
+  effectiveModel,
+}: ParsePromptSdkResultProps): AgentRunResult {
+  const res = result.response as Response | undefined;
+
+  if (res) {
+    debug('opencode-sdk session.prompt response', {
+      status: res.status,
+      statusText: res.statusText,
+      contentType: res.headers?.get?.('content-type') ?? null,
+      ok: res.ok,
+    });
+  }
+
+  if (result.error) {
+    const err = result.error as
+      | { data?: { message?: string }; statusCode?: number }
+      | undefined;
+
+    debug('opencode-sdk prompt error:', {
+      statusCode: err?.statusCode,
+      data: err?.data,
+      raw: result.error,
+    });
+
+    const output = err?.data?.message ?? String(result.error);
+    const statusCode = err?.statusCode;
+
+    return {
+      type: 'error',
+      output,
+      sessionId,
+      statusCode,
+    } satisfies AgentErrorResult;
+  }
+
+  const rawData = result.data as Record<string, unknown> | undefined;
+
+  const data = (
+    rawData && typeof rawData.data === 'object' && rawData.data !== null
+      ? (rawData.data as Record<string, unknown>)
+      : rawData
+  ) as
+    | {
+        info?: {
+          cost?: number;
+          tokens?: { input: number; output: number };
+          structured_output?: unknown;
+        };
+        parts?: Array<
+          { type?: string; text?: string; content?: string } | string
+        >;
+        output?: string;
+        content?: string;
+        text?: string;
+      }
+    | undefined;
+
+  if (!data) {
+    debug(
+      'opencode-sdk prompt: result.data missing, raw result:',
+      JSON.stringify(result),
+    );
+
+    return {
+      type: 'success',
+      outputs: [{ type: 'text', value: '(no output)' }],
+      sessionId,
+      model: effectiveModel,
+    };
+  }
+
+  const outputs = partsFromV2PromptData(data);
+
+  if (outputs.length === 1 && outputs[0].type === 'text') {
+    const only = outputs[0].value;
+
+    if (only === '(no output)') {
+      debug('opencode-sdk prompt: no text in parts', {
+        responseStatus: res?.status ?? null,
+        partsLength: data.parts?.length ?? 0,
+        parts: data.parts,
+        info: data.info,
+        dataKeys: Object.keys(data),
+        dataSample: JSON.stringify(data).slice(0, 500),
+      });
+    }
+  }
+
+  const info = data.info;
+
+  const tokens = info?.tokens
+    ? {
+        input: info.tokens.input ?? 0,
+        output: info.tokens.output ?? 0,
+        total: (info.tokens.input ?? 0) + (info.tokens.output ?? 0),
+      }
+    : undefined;
+
+  const cost = info?.cost;
+
+  return {
+    type: 'success',
+    outputs,
+    sessionId,
+    model: effectiveModel,
+    tokens,
+    cost,
+  } satisfies AgentSuccessResult;
+}
+
 type CreateOpencodeSDKBackendProps = {
   dmBotRoot: string;
   mode: AgentMode;
@@ -164,12 +360,11 @@ export function createOpencodeSDKBackend({
     name: 'opencode-sdk',
     modelName,
 
-    async createSession({ cwd, env }: CreateSessionProps): Promise<string> {
-      const { client } = await getOrInitSdk(env);
+    async createSession(cwd: string): Promise<string> {
+      const { client } = await getOrInitSdk();
 
       const result = await client.session.create({
-        body: {},
-        query: { directory: cwd },
+        directory: cwd,
       });
 
       if (result.error) {
@@ -197,15 +392,18 @@ export function createOpencodeSDKBackend({
       return session.id;
     },
 
-    async runMessage({
-      sessionId,
-      content,
-      mode,
-      cwd,
-      env,
-      modelOverride,
-    }: RunMessageProps): Promise<AgentRunResult> {
-      const { client } = await getOrInitSdk(env);
+    async runMessage(props: RunMessageProps): Promise<AgentRunResult> {
+      const {
+        sessionId,
+        content,
+        mode,
+        cwd,
+        modelOverride,
+        onAgentStreamChunk,
+        streamAbortSignal,
+      } = props;
+
+      const { client } = await getOrInitSdk();
 
       const normalizedOverride = normalizeModelForProvider(
         modelOverride,
@@ -221,194 +419,137 @@ export function createOpencodeSDKBackend({
         );
       }
 
-      // Send model in both nested (body.model) and flat (body.providerID/modelID) form
-      // so the server respects the override regardless of which shape it expects.
-      const input: SessionPromptData = {
-        path: { id: sessionId },
-        body: {
-          parts: [{ type: 'text', text: content }],
-          model,
-          agent: mode,
-        },
-        query: { directory: cwd },
-        url: '/session/{id}/message',
+      const promptParams = {
+        sessionID: sessionId,
+        directory: cwd,
+        parts: [{ type: 'text' as const, text: content }],
+        model,
+        agent: mode,
       };
 
       debug(
         'opencode-sdk session.prompt input',
-        JSON.stringify(input, null, 2),
+        JSON.stringify(promptParams, null, 2),
       );
 
-      const result = await client.session.prompt(input);
+      const useEventStream =
+        onAgentStreamChunk !== null && streamAbortSignal !== null;
 
-      debug(
-        'opencode-sdk session.prompt result',
-        JSON.stringify(result, null, 2),
-      );
+      if (!useEventStream) {
+        const result = await client.session.prompt(promptParams);
 
-      // Debug: response metadata (body already consumed by SDK into result.data)
-      const res = result.response as Response | undefined;
+        debug(
+          'opencode-sdk session.prompt result',
+          JSON.stringify(result, null, 2),
+        );
 
-      if (res) {
-        debug('opencode-sdk session.prompt response', {
-          status: res.status,
-          statusText: res.statusText,
-          contentType: res.headers?.get?.('content-type') ?? null,
-          ok: res.ok,
+        return parsePromptSdkResult({
+          result,
+          sessionId,
+          effectiveModel,
         });
       }
 
-      if (result.error) {
-        const err = result.error as
-          | { data?: { message?: string }; statusCode?: number }
-          | undefined;
-
-        debug('opencode-sdk prompt error:', {
-          statusCode: err?.statusCode,
-          data: err?.data,
-          raw: result.error,
-        });
-
-        const output = err?.data?.message ?? String(result.error);
-        const statusCode = err?.statusCode;
-
+      if (streamAbortSignal.aborted) {
         return {
           type: 'error',
-          output,
+          output: 'Request aborted',
           sessionId,
-          statusCode,
         } satisfies AgentErrorResult;
       }
 
-      // API contract: 200 body is { info, parts }. Some servers may wrap in .data
-      const rawData = result.data as Record<string, unknown> | undefined;
+      const logState = createOpencodeStreamLogState(sessionId);
 
-      const data = (
-        rawData && typeof rawData.data === 'object' && rawData.data !== null
-          ? (rawData.data as Record<string, unknown>)
-          : rawData
-      ) as
-        | {
-            info?: {
-              cost?: number;
-              tokens?: { input: number; output: number };
-              structured_output?: unknown;
-            };
-            parts?: Array<
-              { type?: string; text?: string; content?: string } | string
-            >;
-            output?: string;
-            content?: string;
-            text?: string;
-          }
-        | undefined;
+      const sse = await client.event.subscribe({
+        directory: cwd,
+      });
 
-      if (!data) {
-        debug(
-          'opencode-sdk prompt: result.data missing, raw result:',
-          JSON.stringify(result),
-        );
+      const stream = sse.stream;
+      let stopConsumer = false;
 
-        return {
-          type: 'success',
-          outputs: [{ type: 'text', value: '(no output)' }],
-          sessionId,
-          model: effectiveModel,
-        };
-      }
+      const onExternalAbort = (): void => {
+        stopConsumer = true;
 
-      const parts = data.parts ?? [];
-      const outputs: OutputSegment[] = [];
-
-      if (parts.length > 0) {
-        for (const p of parts) {
-          const partType =
-            p &&
-            typeof p === 'object' &&
-            typeof (p as { type?: string }).type === 'string'
-              ? (p as { type: string }).type
-              : '';
-
-          const text =
-            p &&
-            typeof p === 'object' &&
-            typeof (p as { text?: string }).text === 'string'
-              ? (p as { text: string }).text
-              : p &&
-                  typeof p === 'object' &&
-                  typeof (p as { content?: string }).content === 'string'
-                ? (p as { content: string }).content
-                : typeof p === 'string'
-                  ? p
-                  : '';
-
-          if (text.length === 0) {
-            continue;
-          }
-
-          if (partType === 'reasoning' || partType === 'thinking') {
-            outputs.push({ type: 'reasoning', value: text });
-          } else {
-            outputs.push({ type: 'text', value: text });
-          }
-        }
-      }
-
-      if (outputs.length === 0) {
-        const fallback =
-          (typeof data.output === 'string' &&
-            data.output.length > 0 &&
-            data.output) ||
-          (typeof data.content === 'string' &&
-            data.content.length > 0 &&
-            data.content) ||
-          (typeof data.text === 'string' &&
-            data.text.length > 0 &&
-            data.text) ||
-          (data.info?.structured_output != null
-            ? typeof data.info.structured_output === 'string'
-              ? data.info.structured_output
-              : JSON.stringify(data.info.structured_output)
-            : null);
-
-        if (fallback) {
-          outputs.push({ type: 'text', value: fallback });
-        } else {
-          const res = result.response as Response | undefined;
-
-          debug('opencode-sdk prompt: no text in parts', {
-            responseStatus: res?.status ?? null,
-            partsLength: parts.length,
-            parts: data.parts,
-            info: data.info,
-            dataKeys: data ? Object.keys(data) : [],
-            dataSample: data ? JSON.stringify(data).slice(0, 500) : 'null',
+        void client.session
+          .abort({
+            sessionID: sessionId,
+            directory: cwd,
+          })
+          .catch((err) => {
+            debug(
+              'opencode-sdk stream: session.abort after external abort failed',
+              String(err),
+            );
           });
 
-          outputs.push({ type: 'text', value: '(no output)' });
+        void stream.return(undefined).catch((err) => {
+          debug(
+            'opencode-sdk stream: stream.return during external abort failed',
+            String(err),
+          );
+        });
+      };
+
+      streamAbortSignal.addEventListener('abort', onExternalAbort, {
+        once: true,
+      });
+
+      const pump = async (): Promise<void> => {
+        try {
+          for await (const evt of stream) {
+            if (stopConsumer || streamAbortSignal.aborted) {
+              break;
+            }
+
+            const chunk = mapOpencodeSsePayloadToChunk(
+              evt,
+              sessionId,
+              logState,
+            );
+
+            if (chunk) {
+              onAgentStreamChunk(chunk);
+            }
+          }
+        } catch (err) {
+          debug(`opencode-sdk stream consumer: ${String(err)}`);
         }
+      };
+
+      const pumpPromise = pump();
+
+      let promptResult: Awaited<ReturnType<typeof client.session.prompt>>;
+
+      try {
+        promptResult = await client.session.prompt(promptParams);
+      } finally {
+        stopConsumer = true;
+        streamAbortSignal.removeEventListener('abort', onExternalAbort);
+
+        try {
+          await stream.return(undefined);
+        } catch (err) {
+          debug(
+            'opencode-sdk stream: stream.return in finally failed',
+            String(err),
+          );
+        }
+
+        await pumpPromise.catch((err) => {
+          debug('opencode-sdk stream: pump promise rejected', String(err));
+        });
       }
 
-      const info = data.info;
+      debug(
+        'opencode-sdk session.prompt result',
+        JSON.stringify(promptResult, null, 2),
+      );
 
-      const tokens = info?.tokens
-        ? {
-            input: info.tokens.input ?? 0,
-            output: info.tokens.output ?? 0,
-            total: (info.tokens.input ?? 0) + (info.tokens.output ?? 0),
-          }
-        : undefined;
-
-      const cost = info?.cost;
-
-      return {
-        type: 'success',
-        outputs,
+      return parsePromptSdkResult({
+        result: promptResult,
         sessionId,
-        model: effectiveModel,
-        tokens,
-        cost,
-      } satisfies AgentSuccessResult;
+        effectiveModel,
+      });
     },
 
     async availableModels(): Promise<string[]> {

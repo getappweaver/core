@@ -1,0 +1,15 @@
+import type { {{PASCAL_ALIAS}} } from '../../shared/types';
+
+type Render{{PASCAL_ALIAS}}ListTextProps = {
+  items: {{PASCAL_ALIAS}}[];
+};
+
+export function render{{PASCAL_ALIAS}}ListText({
+  items,
+}: Render{{PASCAL_ALIAS}}ListTextProps): string {
+  if (items.length === 0) {
+    return 'No {{ALIAS}}s.';
+  }
+
+  return items.map((item) => `  ${String(item.id)} ${item.data}`).join('\n');
+}

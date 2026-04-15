@@ -18,7 +18,6 @@ import type {
   AgentErrorResult,
   AgentRunResult,
   AgentSuccessResult,
-  CreateSessionProps,
   OutputSegment,
   RunMessageProps,
 } from './types';
@@ -349,7 +348,7 @@ export function createOpenCodeBackend({
     name: 'opencode',
     modelName,
 
-    async createSession({ cwd, env }: CreateSessionProps): Promise<string> {
+    async createSession(cwd: string): Promise<string> {
       const args = [
         'opencode',
         'run',
@@ -366,7 +365,6 @@ export function createOpenCodeBackend({
         cwd,
         stdout: 'pipe',
         stderr: 'pipe',
-        env,
       });
 
       const out = proc.stdout?.toString().trim() ?? '';
@@ -390,8 +388,9 @@ export function createOpenCodeBackend({
       content,
       mode: runMode,
       cwd,
-      env,
       modelOverride,
+      onAgentStreamChunk: _onAgentStreamChunk,
+      streamAbortSignal: _streamAbortSignal,
     }: RunMessageProps): Promise<AgentRunResult> {
       const args = [
         'opencode',
@@ -438,7 +437,6 @@ export function createOpenCodeBackend({
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'ignore',
-        env,
       });
 
       await proc.exited;

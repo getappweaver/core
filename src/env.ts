@@ -1,9 +1,16 @@
 // ---------------------------------------------------------------------------
 // env.ts — Environment variable parsing and bot configuration
 // ---------------------------------------------------------------------------
-import { delimiter } from 'path';
+import { delimiter, join } from 'path';
 
 import { log } from './logger';
+import { dmBotRoot } from './paths';
+
+export type WebPushConfig = {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+};
 
 export type BotConfig = {
   botKeyHex: string;
@@ -14,6 +21,11 @@ export type BotConfig = {
   cashuMnemonic: string | null;
   cashuDefaultMintUrl: string | null;
   routstrBaseUrl: string;
+  webPush: WebPushConfig | null;
+  browser: {
+    profileDir: string;
+    headless: boolean;
+  };
 };
 
 /** BOT_KEY + BOT_RELAYS only — for Nostr file share without loading full bot config. */
@@ -75,6 +87,96 @@ export function loadFileShareNostrConfig(): FileShareNostrConfig {
   return { botKeyHex, botRelayUrls: relayUrls };
 }
 
+const VAPID_SUBJECT_PROTOCOLS = new Set(['mailto:', 'https:', 'http:']);
+
+/**
+ * VAPID `subject` must be a URI per RFC 8292 (`mailto:` or `https:` is typical).
+ * `web-push` rejects bare strings like `bot-notifications`.
+ * Exported for `bot:setup` when writing `.env`.
+ */
+export function normalizeVapidSubject(raw: string): string | null {
+  const s = raw.trim();
+
+  if (s.length === 0) {
+    return null;
+  }
+
+  try {
+    const u = new URL(s);
+
+    if (VAPID_SUBJECT_PROTOCOLS.has(u.protocol)) {
+      return s;
+    }
+
+    log.warn(
+      `BOT_WEB_PUSH_SUBJECT must use mailto:, https:, or http: (got ${u.protocol}). Example: mailto:you@example.com`,
+    );
+
+    return null;
+  } catch {
+    /* not a full URL — allow bare email */
+  }
+
+  if (s.includes('@') && !s.includes(' ') && !s.includes('/')) {
+    return `mailto:${s}`;
+  }
+
+  log.warn(
+    `BOT_WEB_PUSH_SUBJECT must be a URI, e.g. mailto:you@example.com or https://example.com/ — not a label like ${JSON.stringify(s)}. Web Push disabled until fixed.`,
+  );
+
+  return null;
+}
+
+/** All three env vars required when enabling Web Push (VAPID). */
+export function loadWebPushConfig(): WebPushConfig | null {
+  const publicKey = process.env.BOT_WEB_PUSH_PUBLIC_KEY?.trim() ?? '';
+  const privateKey = process.env.BOT_WEB_PUSH_PRIVATE_KEY?.trim() ?? '';
+  const subjectRaw = process.env.BOT_WEB_PUSH_SUBJECT?.trim() ?? '';
+
+  if (!publicKey || !privateKey || !subjectRaw) {
+    return null;
+  }
+
+  const subject = normalizeVapidSubject(subjectRaw);
+
+  if (!subject) {
+    return null;
+  }
+
+  return { publicKey, privateKey, subject };
+}
+
+function parseBooleanEnv(
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function loadBrowserConfig(): { profileDir: string; headless: boolean } {
+  return {
+    profileDir:
+      process.env.BOT_BROWSER_PROFILE_DIR?.trim() ||
+      join(dmBotRoot, '.data', 'browser-profile'),
+    headless: parseBooleanEnv(process.env.BOT_BROWSER_HEADLESS, false),
+  };
+}
+
 export function loadBotConfig(): BotConfig {
   const { botKeyHex, botRelayUrls: relayUrls } = loadFileShareNostrConfig();
   const masterPubkey = requireEnv('BOT_MASTER_PUBKEY');
@@ -89,5 +191,7 @@ export function loadBotConfig(): BotConfig {
     cashuDefaultMintUrl: process.env.CASHU_DEFAULT_MINT_URL ?? null,
     routstrBaseUrl:
       process.env.ROUTSTR_BASE_URL ?? 'https://api.routstr.com/v1',
+    webPush: loadWebPushConfig(),
+    browser: loadBrowserConfig(),
   };
 }

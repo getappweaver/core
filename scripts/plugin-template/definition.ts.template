@@ -1,0 +1,37 @@
+import { createHelpSubcommandDefinition } from '@src/commands/help/command';
+import type { CommandDefinition } from '@src/system/command-definition';
+
+import { acceptDefinition } from './commands/accept/definition';
+import { addDefinition } from './commands/add/definition';
+import { aiDefinition } from './commands/ai/definition';
+import { declineDefinition } from './commands/decline/definition';
+import { deleteDefinition } from './commands/delete/definition';
+import { draftsDefinition } from './commands/drafts/definition';
+import { listDefinition } from './commands/list/definition';
+import { reviseDefinition } from './commands/revise/definition';
+import { showDefinition } from './commands/show/definition';
+
+export const commandDefinition = (
+  prefix: string,
+  alias: string,
+): CommandDefinition => ({
+  name: alias,
+  summary: '{{PASCAL_ALIAS}} plugin scaffold: CRUD, drafts, and ai.',
+  aliases: [],
+  subcommands: [
+    createHelpSubcommandDefinition(prefix, alias, {
+      topicArgSummary:
+        'Optional subcommand: add, list, show, delete, drafts, accept, ai, …',
+      exampleTopics: ['list', 'add', 'drafts'],
+    }),
+    aiDefinition(prefix, alias),
+    addDefinition(prefix, alias),
+    listDefinition(prefix, alias),
+    showDefinition(prefix, alias),
+    deleteDefinition(prefix, alias),
+    draftsDefinition(prefix, alias),
+    acceptDefinition(prefix, alias),
+    reviseDefinition(prefix, alias),
+    declineDefinition(prefix, alias),
+  ],
+});

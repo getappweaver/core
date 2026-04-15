@@ -1,0 +1,176 @@
+import type { Database } from 'bun:sqlite';
+
+import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import type { CommandDefinition } from '@src/system/command-definition';
+import type { ParsedCliInvocation } from '@src/system/parser-cli';
+
+import {
+  create{{PASCAL_ALIAS}},
+  delete{{PASCAL_ALIAS}},
+  update{{PASCAL_ALIAS}},
+} from '../../db';
+import { deleteDraft, getDraft, listDrafts } from '../drafts/store';
+import { format{{PASCAL_ALIAS}}Detail } from '../../format';
+import type {
+  Update{{PASCAL_ALIAS}}Input,
+} from '../shared/types';
+import type { Create{{PASCAL_ALIAS}}Draft } from '../drafts/types';
+import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import { stringFromVariadicArgument } from '../shared/variadic-text';
+
+export function adaptAcceptCommand(params: {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn;
+  parsed: ParsedCliInvocation;
+  command: CommandDefinition;
+}) {
+  void params.command;
+  void params.source;
+  void params.identity;
+  void params.runAgent;
+
+  const targetJoined = stringFromVariadicArgument(
+    params.parsed.arguments.target,
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!targetJoined) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`,
+    });
+  }
+
+  if (targetJoined === 'all') {
+    const drafts = listDrafts(params.db);
+
+    if (drafts.length === 0) {
+      return {{PASCAL_ALIAS}}ReplyMessage({
+        alias: params.alias,
+        subcommand: 'accept',
+        text: 'No pending drafts.',
+      });
+    }
+
+    const results: string[] = [];
+
+    for (const draft of drafts) {
+      deleteDraft(params.db, draft.id);
+
+      if (draft.kind === 'create') {
+        const created = create{{PASCAL_ALIAS}}(
+          params.db,
+          draft.input as Create{{PASCAL_ALIAS}}Draft,
+        );
+
+        results.push(`#${String(created.id)} created`);
+      } else if (draft.kind === 'update') {
+        const updated = update{{PASCAL_ALIAS}}(
+          params.db,
+          draft.input as Update{{PASCAL_ALIAS}}Input,
+        );
+
+        results.push(
+          updated
+            ? `#${String(updated.id)} updated`
+            : `#${String(draft.input.id)} not found`,
+        );
+      } else if (draft.kind === 'delete') {
+        const ok = delete{{PASCAL_ALIAS}}(params.db, draft.input.id);
+
+        results.push(
+          ok
+            ? `#${String(draft.input.id)} deleted`
+            : `#${String(draft.input.id)} not found`,
+        );
+      }
+    }
+
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Accepted ${String(results.length)} draft(s):\n  ${results.join('\n  ')}`,
+    });
+  }
+
+  const draftId = parseInt(targetJoined, 10);
+
+  if (Number.isNaN(draftId)) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`,
+    });
+  }
+
+  const entry = getDraft(params.db, draftId);
+
+  if (!entry) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Draft not found: #${String(draftId)}`,
+    });
+  }
+
+  deleteDraft(params.db, draftId);
+
+  if (entry.kind === 'create') {
+    const created = create{{PASCAL_ALIAS}}(
+      params.db,
+      entry.input as Create{{PASCAL_ALIAS}}Draft,
+    );
+
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: [`Created #${String(created.id)}`, format{{PASCAL_ALIAS}}Detail(created)].join(
+        '\n',
+      ),
+    });
+  }
+
+  if (entry.kind === 'update') {
+    const updated = update{{PASCAL_ALIAS}}(
+      params.db,
+      entry.input as Update{{PASCAL_ALIAS}}Input,
+    );
+
+    if (!updated) {
+      return {{PASCAL_ALIAS}}ReplyMessage({
+        alias: params.alias,
+        subcommand: 'accept',
+        text: `Not found: #${String(entry.input.id)}`,
+      });
+    }
+
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Updated.\n${format{{PASCAL_ALIAS}}Detail(updated)}`,
+    });
+  }
+
+  const ok = delete{{PASCAL_ALIAS}}(params.db, entry.input.id);
+
+  if (!ok) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'accept',
+      text: `Not found: #${String(entry.input.id)}`,
+    });
+  }
+
+  return {{PASCAL_ALIAS}}ReplyMessage({
+    alias: params.alias,
+    subcommand: 'accept',
+    text: `Deleted #${String(entry.input.id)}.`,
+  });
+}

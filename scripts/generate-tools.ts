@@ -62,6 +62,7 @@ type PluginGenData = {
   instructions: string;
   skillDescription: string;
   skillNotes: string;
+  skillRules: string[] | null;
   toolCallSchema: ToolCallSchema;
 };
 
@@ -87,6 +88,39 @@ function buildExampleArgs(branch: ToolCallBranch): Record<string, unknown> {
     }
 
     const schema = raw;
+
+    if (schema instanceof z.ZodUnion) {
+      const firstNonNull = schema.options.find(
+        (option) => !(option instanceof z.ZodNull),
+      );
+
+      if (firstNonNull) {
+        if (firstNonNull instanceof z.ZodString) {
+          result[key] =
+            key === 'original_prompt' ? 'user request verbatim' : `<${key}>`;
+        } else if (firstNonNull instanceof z.ZodNumber) {
+          result[key] = 1;
+        } else if (firstNonNull instanceof z.ZodBoolean) {
+          result[key] = true;
+        } else if (firstNonNull instanceof z.ZodArray) {
+          const el = firstNonNull.element;
+
+          if (el instanceof z.ZodString) {
+            result[key] = ['example'];
+          } else if (el instanceof z.ZodNumber) {
+            result[key] = [1];
+          } else if (el instanceof z.ZodBoolean) {
+            result[key] = [true];
+          } else {
+            result[key] = [];
+          }
+        } else {
+          result[key] = `<${key}>`;
+        }
+
+        continue;
+      }
+    }
 
     if (schema instanceof z.ZodString) {
       result[key] =
@@ -147,17 +181,30 @@ function generateSkillMarkdown(params: {
   instructions: string;
   skillDescription: string;
   skillNotes: string;
+  skillRules: string[] | null;
   bashExamples: string;
   jsonSchema: string;
+  pluginDir: string;
 }): string {
   const {
     alias,
     instructions,
     skillDescription,
     skillNotes,
+    skillRules,
     bashExamples,
     jsonSchema,
+    pluginDir,
   } = params;
+
+  const rules = skillRules ?? [
+    `Always wrap the JSON argument in single quotes: \`'{"key":"value"}'\``,
+    'Never use backslash-escaped quotes or double quotes around the JSON argument',
+    `Always call \`${alias} list\` first before update/delete to resolve IDs`,
+    'Every mutating tool returns a Draft ID — show the full output to the user',
+    '`original_prompt` is required on create/update/delete — pass the user request verbatim at the top level of the JSON (same level as `type`)',
+    'Never retry a mutating tool if it returned a Draft ID',
+  ];
 
   return `\
 ---
@@ -170,6 +217,8 @@ allowed-tools: Bash
 
 ${instructions.trim()}
 ${skillNotes ? `\n${skillNotes.trim()}\n` : ''}
+> **Plugin docs root:** \`${pluginDir}\`. Always use \`working_dir: "${pluginDir}"\` as the starting point when exploring this plugin — do not call \`bottomup_context\` with \`working_dir: null\` as the plugin directory is not visible from the workspace root.
+
 ## CLI Interface
 
 Call tools via bash with a single-quoted JSON argument:
@@ -186,12 +235,7 @@ bun src/cli.ts ${alias}
 
 ## Rules
 
-- Always wrap the JSON argument in single quotes: \`'{"key":"value"}'\`
-- Never use backslash-escaped quotes or double quotes around the JSON argument
-- Always call \`${alias} list\` first before update/delete to resolve IDs
-- Every mutating tool returns a Draft ID — show the full output to the user
-- \`original_prompt\` is required on create/update/delete — pass the user request verbatim at the top level of the JSON (same level as \`type\`)
-- Never retry a mutating tool if it returned a Draft ID
+${rules.map((rule) => `- ${rule}`).join('\n')}
 
 ## Full JSON Schema
 
@@ -219,13 +263,16 @@ for (const entry of pluginsJson.plugins) {
 
   const mod = (await import(aiPath)) as {
     ToolCallSchema?: unknown;
-    agentInstructions?: (alias: string) => string;
+    agentInstructions?: (alias: string, prefix: string) => string;
     skillDescription?: string;
     skillNotes?: string;
+    skillRules?: string[];
   };
 
+  const dmPrefix = '!';
+
   const instructions = mod.agentInstructions
-    ? mod.agentInstructions(alias)
+    ? mod.agentInstructions(alias, dmPrefix)
     : `## ${alias} tools\n\nUse bash and \`bun src/cli.ts ${alias} <toolName> '<json>'\`.`;
 
   if (!mod.ToolCallSchema) {
@@ -264,8 +311,10 @@ for (const entry of pluginsJson.plugins) {
     instructions,
     skillDescription: mod.skillDescription,
     skillNotes: mod.skillNotes ?? '',
+    skillRules: mod.skillRules ?? null,
     bashExamples,
     jsonSchema,
+    pluginDir: `plugins/${alias}`,
   });
 
   writeFileSync(join(skillDir, 'SKILL.md'), skillMd, 'utf8');
@@ -279,6 +328,7 @@ for (const entry of pluginsJson.plugins) {
     instructions,
     skillDescription: mod.skillDescription,
     skillNotes: mod.skillNotes ?? '',
+    skillRules: mod.skillRules ?? null,
     toolCallSchema,
   });
 }

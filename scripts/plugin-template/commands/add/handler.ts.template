@@ -1,0 +1,48 @@
+import type { Database } from 'bun:sqlite';
+
+import { create{{PASCAL_ALIAS}} } from '../../db';
+import { format{{PASCAL_ALIAS}}Detail } from '../../format';
+import { Create{{PASCAL_ALIAS}}InputSchema } from '../shared/types';
+import { stringFromVariadicArgument } from '../shared/variadic-text';
+
+type HandleAddCommandProps = {
+  db: Database;
+  prefix: string;
+  alias: string;
+  textRaw: unknown;
+};
+
+export function handleAddCommand({
+  db,
+  prefix,
+  alias,
+  textRaw,
+}: HandleAddCommandProps):
+  | { type: 'error'; message: string }
+  | { type: 'success'; detailText: string; id: number } {
+  const text = stringFromVariadicArgument(textRaw).trim();
+
+  if (!text) {
+    return {
+      type: 'error',
+      message: `Usage: ${prefix}${alias} add <text>`,
+    };
+  }
+
+  const parsed = Create{{PASCAL_ALIAS}}InputSchema.safeParse({ data: text });
+
+  if (!parsed.success) {
+    return {
+      type: 'error',
+      message: `Invalid input: ${parsed.error.message}`,
+    };
+  }
+
+  const item = create{{PASCAL_ALIAS}}(db, parsed.data);
+
+  return {
+    type: 'success',
+    id: item.id,
+    detailText: format{{PASCAL_ALIAS}}Detail(item),
+  };
+}

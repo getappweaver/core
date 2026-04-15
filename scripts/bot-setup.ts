@@ -7,6 +7,7 @@
 // lets user reconfigure workspace, backend, provider, mode, lint, ready.
 // If workspace is "parent", symlinks AGENTS.md, opencode.json, and
 // `.claude/skills/dm-bot*/` skill folders into the parent project.
+// Optionally configures Web Push VAPID keys (BOT_WEB_PUSH_*) in .env via web-push.
 // ---------------------------------------------------------------------------
 
 import {
@@ -22,9 +23,12 @@ import {
 import { basename, dirname, join, resolve } from 'path';
 import * as readline from 'readline';
 
+import { generateVAPIDKeys } from 'web-push';
+
 import type { Linting } from '../src/db';
 import { openCoreDb } from '../src/db';
 import {
+  getDmCommandPrefix,
   getWorkspaceTarget,
   setWorkspaceTarget,
   getAgentBackend,
@@ -35,7 +39,9 @@ import {
   setLinting,
   getProviderName,
   setProviderName,
+  setDmCommandPrefix,
 } from '../src/db';
+import { normalizeVapidSubject } from '../src/env';
 import { getEnvFromFile, setEnvInFile } from '../src/env-file';
 import { dmBotRoot } from '../src/paths';
 
@@ -307,6 +313,7 @@ async function main(): Promise<void> {
   console.log('Press Enter to keep the current value shown in [brackets].\n');
 
   const db = openCoreDb();
+  const envPath = join(dmBotRoot, '.env');
 
   // Read current state
   const currentWorkspace = getWorkspaceTarget(db) ?? 'parent';
@@ -357,7 +364,37 @@ async function main(): Promise<void> {
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Backend
+  // 2. DM command prefix
+  // ---------------------------------------------------------------------------
+
+  console.log('\n── DM command prefix ──');
+
+  console.log(
+    '  Lines starting with this prefix are treated as commands (built-ins + plugins).',
+  );
+
+  console.log(
+    '  Default is /. Examples: /help, .help if you set the prefix to .\n',
+  );
+
+  const currentDmPrefix = getDmCommandPrefix(db);
+
+  const dmPrefixAnswer = await ask(`DM command prefix [${currentDmPrefix}]: `);
+
+  const dmPrefix =
+    dmPrefixAnswer.trim() === '' ? currentDmPrefix : dmPrefixAnswer.trim();
+
+  try {
+    setDmCommandPrefix(db, dmPrefix);
+    console.log(`  ✓ DM command prefix: ${getDmCommandPrefix(db)}`);
+  } catch (err) {
+    console.log(
+      `  ⚠ Invalid prefix, keeping "${currentDmPrefix}": ${String(err)}`,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. Backend
   // ---------------------------------------------------------------------------
 
   console.log('\n── Backend ──');
@@ -374,7 +411,6 @@ async function main(): Promise<void> {
   setAgentBackend(db, backend);
 
   if (backend === 'cursor') {
-    const envPath = join(dmBotRoot, '.env');
     const currentCursorKey = getEnvFromFile(envPath, 'CURSOR_API_KEY');
 
     const cursorKeyUrl =
@@ -402,7 +438,7 @@ async function main(): Promise<void> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Provider
+  // 4. Provider
   // ---------------------------------------------------------------------------
 
   console.log('\n── Provider ──');
@@ -421,7 +457,7 @@ async function main(): Promise<void> {
   setProviderName(db, provider);
 
   // ---------------------------------------------------------------------------
-  // 4. Mode
+  // 5. Mode
   // ---------------------------------------------------------------------------
 
   console.log('\n── Mode ──');
@@ -438,7 +474,7 @@ async function main(): Promise<void> {
   setDefaultMode(db, mode);
 
   // ---------------------------------------------------------------------------
-  // 5. Lint auto
+  // 6. Lint auto
   // ---------------------------------------------------------------------------
 
   console.log('\n── Lint Auto (agent mode only) ──');
@@ -454,7 +490,7 @@ async function main(): Promise<void> {
   setLinting(db, lintAuto);
 
   // ---------------------------------------------------------------------------
-  // 6. Ready notification
+  // 7. Ready notification
   // ---------------------------------------------------------------------------
 
   console.log('\n── Ready Notification ──');
@@ -465,10 +501,91 @@ async function main(): Promise<void> {
     currentReady,
   );
 
-  const envPathForReady = join(dmBotRoot, '.env');
-
   if (ready !== currentReady) {
-    setEnvInFile(envPathForReady, 'READY_ENABLED', ready ? '1' : '0');
+    setEnvInFile(envPath, 'READY_ENABLED', ready ? '1' : '0');
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. Web Push (VAPID) — browser notifications for new DMs
+  // ---------------------------------------------------------------------------
+
+  console.log('\n── Web Push (PWA) ──');
+
+  console.log(
+    '  Writes BOT_WEB_PUSH_PUBLIC_KEY, BOT_WEB_PUSH_PRIVATE_KEY, BOT_WEB_PUSH_SUBJECT to .env.',
+  );
+
+  console.log(
+    '  Subject must be mailto:you@example.com or https://… (bare email is OK).\n',
+  );
+
+  const existingPushPublic = getEnvFromFile(envPath, 'BOT_WEB_PUSH_PUBLIC_KEY');
+
+  const existingPushPrivate = getEnvFromFile(
+    envPath,
+    'BOT_WEB_PUSH_PRIVATE_KEY',
+  );
+
+  const existingPushSubject = getEnvFromFile(envPath, 'BOT_WEB_PUSH_SUBJECT');
+
+  const hasPushKeys = Boolean(
+    existingPushPublic &&
+    existingPushPrivate &&
+    existingPushSubject &&
+    existingPushPublic.length > 0 &&
+    existingPushPrivate.length > 0,
+  );
+
+  const wantsWebPush = await askYesNo(
+    'Configure Web Push (VAPID keys in .env)',
+    false,
+  );
+
+  if (wantsWebPush) {
+    const needNewKeys =
+      !hasPushKeys ||
+      (await askYesNo(
+        'Generate a new VAPID key pair? (yes = existing browsers must click Push again)',
+        false,
+      ));
+
+    const subjectHint = existingPushSubject
+      ? `VAPID subject [${existingPushSubject}]: `
+      : 'VAPID subject (e.g. mailto:you@example.com): ';
+
+    const subjectAnswer = await ask(subjectHint);
+
+    const subjectRaw =
+      subjectAnswer.trim() !== ''
+        ? subjectAnswer.trim()
+        : (existingPushSubject ?? '');
+
+    const subjectNorm = normalizeVapidSubject(subjectRaw);
+
+    if (!subjectNorm) {
+      console.log(
+        '  ⚠ Invalid or empty VAPID subject. Set BOT_WEB_PUSH_SUBJECT manually, or run bot:setup again.',
+      );
+    } else {
+      let publicKey = existingPushPublic ?? '';
+      let privateKey = existingPushPrivate ?? '';
+
+      if (needNewKeys) {
+        const keys = generateVAPIDKeys();
+        publicKey = keys.publicKey;
+        privateKey = keys.privateKey;
+        console.log('  ✓ Generated VAPID key pair');
+      }
+
+      setEnvInFile(envPath, 'BOT_WEB_PUSH_PUBLIC_KEY', publicKey);
+      setEnvInFile(envPath, 'BOT_WEB_PUSH_PRIVATE_KEY', privateKey);
+      setEnvInFile(envPath, 'BOT_WEB_PUSH_SUBJECT', subjectNorm);
+      console.log('  ✓ BOT_WEB_PUSH_* saved to .env');
+
+      console.log(
+        '  After restart, open the web UI and click Push to subscribe this browser.',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -477,11 +594,20 @@ async function main(): Promise<void> {
 
   console.log('\n── Configuration saved ──\n');
   console.log(`  Workspace:         ${workspace}`);
+  console.log(`  DM command prefix: ${getDmCommandPrefix(db)}`);
   console.log(`  Backend:           ${backend}`);
   console.log(`  Provider:          ${provider}`);
   console.log(`  Mode:              ${mode}`);
   console.log(`  Lint auto:         ${lintAuto}`);
   console.log(`  Ready notification: ${ready ? 'on' : 'off'}`);
+
+  console.log(
+    `  Web Push (.env):   ${
+      getEnvFromFile(envPath, 'BOT_WEB_PUSH_PUBLIC_KEY')
+        ? 'VAPID keys set'
+        : 'not set'
+    }`,
+  );
 
   if (isParent) {
     console.log(`\n  Parent root:       ${PARENT_ROOT}`);

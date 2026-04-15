@@ -1,0 +1,31 @@
+import type { WebNodeRoot } from '@src/web/ui-schema';
+
+import type { {{PASCAL_ALIAS}} } from '../../shared/types';
+
+type Render{{PASCAL_ALIAS}}ShowWebProps = {
+  alias: string;
+  item: {{PASCAL_ALIAS}};
+};
+
+export function render{{PASCAL_ALIAS}}ShowWeb({
+  alias,
+  item,
+}: Render{{PASCAL_ALIAS}}ShowWebProps): WebNodeRoot {
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: {
+      command: alias,
+      subcommand: 'show',
+    },
+    tree: {
+      type: 'element',
+      tag: 'stack',
+      props: { gap: 'sm' },
+      children: [
+        { type: 'text', value: `#${String(item.id)}` },
+        { type: 'text', value: item.data },
+      ],
+    },
+  };
+}

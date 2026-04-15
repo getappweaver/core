@@ -1,0 +1,59 @@
+import type { HelpRepresentation } from '@src/commands/help/representation';
+import { renderHelpText } from '@src/commands/help/renderers/text';
+import type { TextRenderContext } from '@src/system/render-context';
+
+import type { MessageRepresentation } from './output';
+import type { {{PASCAL_ALIAS}} } from './types';
+
+export type {{PASCAL_ALIAS}}ListWebRepresentation = {
+  kind: 'list_web';
+  version: 1;
+  meta: {
+    command: string;
+    subcommand: string;
+  };
+  data: {
+    items: {{PASCAL_ALIAS}}[];
+  };
+};
+
+export type {{PASCAL_ALIAS}}ShowWebRepresentation = {
+  kind: 'show_web';
+  version: 1;
+  meta: {
+    command: string;
+    subcommand: string;
+  };
+  data: {
+    item: {{PASCAL_ALIAS}};
+  };
+};
+
+export type {{PASCAL_ALIAS}}Renderable =
+  | HelpRepresentation
+  | MessageRepresentation
+  | {{PASCAL_ALIAS}}ListWebRepresentation
+  | {{PASCAL_ALIAS}}ShowWebRepresentation;
+
+export function is{{PASCAL_ALIAS}}ListWebRepresentation(
+  representation: {{PASCAL_ALIAS}}Renderable,
+): representation is {{PASCAL_ALIAS}}ListWebRepresentation {
+  return representation.kind === 'list_web';
+}
+
+export function is{{PASCAL_ALIAS}}ShowWebRepresentation(
+  representation: {{PASCAL_ALIAS}}Renderable,
+): representation is {{PASCAL_ALIAS}}ShowWebRepresentation {
+  return representation.kind === 'show_web';
+}
+
+export function render{{PASCAL_ALIAS}}Text(
+  representation: HelpRepresentation | MessageRepresentation,
+  context: TextRenderContext,
+): string {
+  if (representation.kind === 'help') {
+    return renderHelpText(representation, context);
+  }
+
+  return representation.data.text;
+}

@@ -16,6 +16,13 @@
  *   LOG                     - Set to 0 to suppress all log()/logError() output. Default 1.
  *   BOT_OPENCODE_SERVE_URL  - Attach to a running opencode server (e.g. http://localhost:4096)
  *   CASHU_DEFAULT_MINT_URL  - Default Cashu mint URL to use for auto-flow
+ *   BOT_WEB_ENABLED         - Set to 0 to skip the local discovery server (default 1)
+ *   BOT_WEB_PORT            - Port for local web (default 5551); binds to 127.0.0.1 only
+ *   BOT_WEB_PUSH_PUBLIC_KEY - VAPID public key for Web Push (optional; all three push vars required to enable)
+ *   BOT_WEB_PUSH_PRIVATE_KEY- VAPID private key (optional)
+ *   BOT_WEB_PUSH_SUBJECT    - VAPID contact, e.g. mailto:you@example.com (optional)
+ *
+ * Command lines: the DM command prefix (default /) is stored in the core DB; run `bun run bot:setup` to set (e.g. . for mobile).
  *
  * Restart: when using watch, touch restart.requested in this directory to restart the bot.
  */
@@ -30,9 +37,14 @@ import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
 import { startLocalCli } from './cli/local-cli';
-import { handleBangCommand, EXIT_COMMAND_SENTINEL } from './commands';
-import { getStatusLines } from './commands/bot';
-import type { PluginContext } from './core/plugin';
+import { renderBotStatusText } from './commands/bot/status/renderers/text';
+import { createBotStatusRepresentation } from './commands/bot/status/representation';
+import { routeCommand } from './commands/dispatch';
+import {
+  getPromptPayloadValue,
+  type PluginContext,
+  type PromptPayload,
+} from './core/plugin';
 import {
   openCoreDb,
   initSkKeyEncryption,
@@ -40,6 +52,7 @@ import {
   getAgentBackend,
   getModelOverride,
   getProviderName,
+  getDmCommandPrefix,
   getWorkspaceTarget,
   getWotScore,
   getRoutstrSkKey,
@@ -47,11 +60,10 @@ import {
 import { loadBotConfig } from './env';
 import { runAgentConversation } from './flow/agent-conversation';
 import { C, debug, log } from './logger';
-import type { MessageSource } from './messaging';
+import { createSendReplyForSource, type MessageSource } from './messaging';
 import { signWithBunkerInteractive } from './nostr/bunker-sign';
 import {
   createDmSubscription,
-  createSendReplyForSource,
   createSignAuthEvent,
   sendDm,
 } from './nostr/nip17';
@@ -61,6 +73,8 @@ import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
 import { openWalletDb } from './wallets/db';
+import { notifyAllWebPushSubscriptions } from './web/push-send';
+import { startLocalWebServer } from './web/server';
 
 async function main() {
   // --- Restart & config ---
@@ -116,7 +130,7 @@ async function main() {
   log.info(`${C.bold}Bot pubkey:${C.reset} ${botPubkey}`);
   log.info(`${C.bold}Master:${C.reset} ${masterPubkey}`);
 
-  const statusLines = getStatusLines({
+  const statusRep = createBotStatusRepresentation({
     botRelayUrls,
     seenDb,
     version: VERSION,
@@ -124,11 +138,28 @@ async function main() {
     attachUrl: opencodeServeUrl,
   });
 
+  const statusLines = renderBotStatusText(statusRep, { prefix: '!' });
+
   for (const line of statusLines.split('\n')) {
     log.info(line);
   }
 
   log.sep();
+
+  startLocalWebServer({
+    prefix: getDmCommandPrefix(seenDb),
+    version: VERSION,
+    botRelayUrls,
+    parentOfBotRoot,
+    dmBotRoot,
+    attachUrl: opencodeServeUrl,
+    botPubkey,
+    seenDb,
+    pool,
+    walletDb,
+    providerDb,
+    config,
+  });
 
   const pwdOutput =
     spawnSync(['pwd'], { stdout: 'pipe', stderr: 'pipe' })
@@ -160,7 +191,6 @@ async function main() {
 
   // --- Reply transport & job engine ---
   const sendReplyForSource = createSendReplyForSource({
-    seenDb,
     pool,
     botRelayUrls,
     senderSecretKey: botSecretKey,
@@ -206,8 +236,17 @@ async function main() {
     masterPubkey,
     runAgent: null, // will set later in the conversation loop
     sendReply: (message: string) => sendReplyForSource(replySource, message),
-    promptFn: async (message: string): Promise<string> => {
-      await sendReplyForSource(replySource, message);
+    sendDm: (message: string) =>
+      sendDm({
+        pool,
+        botRelayUrls,
+        senderSecretKey: botSecretKey,
+        recipientPubkey: masterPubkey,
+        message,
+        signAuthEvent,
+      }),
+    promptFn: async (message: string | PromptPayload): Promise<string> => {
+      await sendReplyForSource(replySource, getPromptPayloadValue(message));
 
       return new Promise((resolve) => {
         pendingPrompt = resolve;
@@ -231,8 +270,8 @@ async function main() {
         eventTemplate,
         sendReply: (message: string) =>
           sendReplyForSource(replySource, message),
-        promptFn: async (message: string): Promise<string> => {
-          await sendReplyForSource(replySource, message);
+        promptFn: async (message: string | PromptPayload): Promise<string> => {
+          await sendReplyForSource(replySource, getPromptPayloadValue(message));
 
           return new Promise((resolve) => {
             pendingPrompt = resolve;
@@ -270,6 +309,24 @@ async function main() {
   ): Promise<void> {
     replySource = source;
 
+    if (source === 'nostr' && config.webPush) {
+      const preview = content.trim();
+      const max = 140;
+
+      const body =
+        preview.length > max
+          ? `${preview.slice(0, max)}…`
+          : preview || '(empty)';
+
+      notifyAllWebPushSubscriptions({
+        db: seenDb,
+        config: config.webPush,
+        title: 'dm-bot',
+        body,
+        url: '/',
+      });
+    }
+
     if (await resolvePendingPromptIfAny(content, source)) {
       return;
     }
@@ -290,30 +347,32 @@ async function main() {
     });
 
     const input = content.trim();
+    const dmPrefix = getDmCommandPrefix(seenDb);
 
     const cwd =
       getWorkspaceTarget(seenDb) === 'bot' ? dmBotRoot : parentOfBotRoot;
 
-    const sessionId = await getOrCreateCurrentSession({
-      db: seenDb,
-      backend,
-      cwd,
-    });
-
     pluginContext.runAgent = async (prompt: string) =>
       backend.runMessage({
-        sessionId,
+        sessionId: await getOrCreateCurrentSession({
+          db: seenDb,
+          backend,
+          cwd,
+        }),
         content: prompt,
         mode,
         cwd,
         getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
         modelOverride,
+        onAgentStreamChunk: null,
+        streamAbortSignal: null,
       });
 
-    // Commands (!help, !backend, etc.)
-    if (input.startsWith('!')) {
-      const reply = await handleBangCommand({
+    // Core built-in commands + plugins (prefix from core DB; default /)
+    if (input.startsWith(dmPrefix)) {
+      const reply = await routeCommand({
         input,
+        prefix: dmPrefix,
         botRelayUrls,
         pool,
         seenDb,
@@ -326,25 +385,20 @@ async function main() {
         walletDb,
         providerDb,
         config,
+        source,
+        sendReply: (message: string) => sendReplyForSource(source, message),
+        sendDm: pluginContext.sendDm,
+        promptFn: pluginContext.promptFn,
       });
 
-      if (reply === EXIT_COMMAND_SENTINEL) {
-        log.info('Exit command received. Shutting down dm-bot.');
-
-        const ack = 'Shutting down dm-bot.';
-
-        await sendReplyForSource(source, ack);
-
-        log.warn('Exit command received. Shutting down dm-bot.');
-        process.exit(0);
-      } else if (reply) {
+      if (reply) {
         await sendReplyForSource(source, reply);
       } else {
         log.warn('No command reply. Sending default reply.');
 
         await sendReplyForSource(
           source,
-          'No response (command may need to start with !). Use !help for commands.',
+          `No response (command may need to start with ${dmPrefix}). Use ${dmPrefix}help for commands.`,
         );
       }
 

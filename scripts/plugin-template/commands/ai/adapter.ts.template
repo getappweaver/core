@@ -1,0 +1,50 @@
+import type { Database } from 'bun:sqlite';
+
+import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import type { CommandDefinition } from '@src/system/command-definition';
+import type { ParsedCliInvocation } from '@src/system/parser-cli';
+
+import { handle{{PASCAL_ALIAS}}Ai } from '../../ai';
+import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import { stringFromVariadicArgument } from '../shared/variadic-text';
+
+export async function adaptAiCommand(params: {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn;
+  parsed: ParsedCliInvocation;
+  command: CommandDefinition;
+}) {
+  void params.command;
+  void params.source;
+
+  const promptText = stringFromVariadicArgument(
+    params.parsed.arguments.prompt,
+  ).trim();
+
+  if (!promptText) {
+    return {{PASCAL_ALIAS}}ReplyMessage({
+      alias: params.alias,
+      subcommand: 'ai',
+      text: `Usage: ${params.prefix}${params.alias} ai <natural language request>`,
+    });
+  }
+
+  const text = await handle{{PASCAL_ALIAS}}Ai({
+    args: [promptText],
+    db: params.db,
+    identity: params.identity,
+    prefix: params.prefix,
+    runAgent: params.runAgent,
+  });
+
+  return {{PASCAL_ALIAS}}ReplyMessage({
+    alias: params.alias,
+    subcommand: 'ai',
+    text,
+  });
+}

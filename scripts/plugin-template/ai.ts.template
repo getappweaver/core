@@ -17,10 +17,13 @@ import type { ParseSettledResult } from '@src/tools/utils';
 import { parseToolCalls } from '@src/tools/utils';
 
 import { get{{PASCAL_ALIAS}}, list{{PASCAL_ALIAS}}s } from './db';
-import { storeDraft } from './drafts';
+import { storeDraft } from './commands/drafts/store';
+import {
+  Create{{PASCAL_ALIAS}}InputSchema,
+  Update{{PASCAL_ALIAS}}InputSchema,
+} from './commands/shared/types';
 import { formatDraftReply } from './format';
 import { format{{PASCAL_ALIAS}}s } from './format';
-import { Create{{PASCAL_ALIAS}}InputSchema, Update{{PASCAL_ALIAS}}InputSchema } from './types';
 
 const {{PASCAL_ALIAS}}ListCallSchema = z.object({ type: z.literal('list') });
 
@@ -69,6 +72,7 @@ export type Handle{{PASCAL_ALIAS}}AiProps = {
   args: string[];
   db: Database;
   identity: PluginIdentity;
+  prefix: string;
   runAgent: (prompt: string) => Promise<AgentRunResult>;
 };
 
@@ -76,13 +80,14 @@ export async function handle{{PASCAL_ALIAS}}Ai({
   args,
   db,
   identity,
+  prefix,
   runAgent,
 }: Handle{{PASCAL_ALIAS}}AiProps): Promise<string> {
   const userPrompt = args.join(' ').trim();
   const alias = identity.alias;
 
   if (!userPrompt) {
-    return `Usage: !${alias} ai <natural language request>`;
+    return `Usage: ${prefix}${alias} ai <natural language request>`;
   }
 
   const items = list{{PASCAL_ALIAS}}s(db);
@@ -115,10 +120,10 @@ export async function handle{{PASCAL_ALIAS}}Ai({
 
   const previews = await Promise.all(
     fulfilled.map(async ({ value }) =>
-      executeTool({ alias, call: value, db }),
+      executeTool({ alias, prefix, call: value, db }),
     ),
   );
-  const cmd = `!${alias}`;
+  const cmd = `${prefix}${alias}`;
 
   if (previews.length === 0) {
     return 'No operations to show.';
@@ -133,14 +138,16 @@ export async function handle{{PASCAL_ALIAS}}Ai({
 
 export async function executeTool({
   alias,
+  prefix,
   call,
   db,
 }: {
   alias: string;
+  prefix: string;
   call: {{PASCAL_ALIAS}}ToolCall;
   db: Database;
 }): Promise<string> {
-  const cmd = `!${alias}`;
+  const cmd = `${prefix}${alias}`;
 
   if (call.type === 'list') {
     const list = list{{PASCAL_ALIAS}}s(db);
@@ -205,7 +212,7 @@ export async function executeTool({
   ].join('\n');
 }
 
-export function agentInstructions(alias: string): string {
+export function agentInstructions(alias: string, _prefix: string): string {
   return `## {{PASCAL_ALIAS}} (${alias} tools)
 
 When the user asks to manage {{ALIAS}}s:

@@ -1,0 +1,9 @@
+import type { {{PASCAL_ALIAS}} } from '../../shared/types';
+
+export function render{{PASCAL_ALIAS}}ShowText(item: {{PASCAL_ALIAS}}): string {
+  return [
+    `ID:   ${String(item.id)}`,
+    `Data: ${item.data}`,
+    `Created: ${new Date(item.created_at).toLocaleString()}`,
+  ].join('\n');
+}

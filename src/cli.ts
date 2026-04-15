@@ -188,6 +188,7 @@ async function main(): Promise<void> {
     openDb: () => Database;
     executeTool: (props: {
       alias: string;
+      prefix: string;
       call: unknown;
       db: Database;
       pool?: SimplePool;
@@ -215,6 +216,7 @@ async function main(): Promise<void> {
 
     const result = await executeTool({
       alias,
+      prefix: '!',
       call: parsed.data,
       db,
       pool,
@@ -268,4 +270,11 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+void main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });

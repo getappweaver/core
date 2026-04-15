@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------
 import type { AgentMode, AgentBackendName } from '../db';
 
+import type { AgentStreamChunk } from './agent-stream-chunk';
+
 export type OutputSegment =
   | { type: 'text'; value: string }
   | { type: 'reasoning'; value: string };
@@ -45,6 +47,8 @@ export type RunMessageProps = {
   cwd: string;
   getRoutstrSkKey: () => string | null;
   modelOverride: string | null;
+  onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
+  streamAbortSignal: AbortSignal | null;
 };
 
 export type AgentBackend = {

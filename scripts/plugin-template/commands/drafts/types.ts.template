@@ -1,0 +1,9 @@
+import type { z } from 'zod';
+
+import { Create{{PASCAL_ALIAS}}InputSchema } from '../shared/types';
+
+export const Create{{PASCAL_ALIAS}}DraftSchema = Create{{PASCAL_ALIAS}}InputSchema;
+
+export type Create{{PASCAL_ALIAS}}Draft = z.infer<
+  typeof Create{{PASCAL_ALIAS}}DraftSchema
+>;

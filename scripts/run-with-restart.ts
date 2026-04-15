@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Runs the bot and restarts it only when restart.requested is touched.
- * Use this when the agent may edit the bot's code: touch restart.requested to restart (no restart on every save).
+ * Runs the bot and optional Vite web UI. Restarts the bot **only** when
+ * `restart.requested` is created/touched — not on arbitrary file saves.
+ * Use this when you want explicit restarts (e.g. agent touches the file after edits).
  */
 
 import { existsSync, unlinkSync, watch } from 'fs';
@@ -17,10 +18,15 @@ const INDEX_TS = join(DM_BOT_DIR, 'src', 'index.ts');
 const RAPID_CRASH_WINDOW_MS = 5_000;
 const MAX_RAPID_CRASHES = 5;
 
-let child: ReturnType<typeof spawn>;
+let botChild: ReturnType<typeof spawn>;
+let webChild: ReturnType<typeof spawn> | null = null;
 let restartRequested = false;
 let rapidCrashCount = 0;
 let lastStartTime = 0;
+
+function isWebUiEnabled(): boolean {
+  return (process.env.WATCH_WEB_UI ?? '1') !== '0';
+}
 
 function runBot(): ReturnType<typeof spawn> {
   return spawn({
@@ -33,11 +39,99 @@ function runBot(): ReturnType<typeof spawn> {
   });
 }
 
+function runWebUi(): ReturnType<typeof spawn> {
+  return spawn({
+    cmd: ['bun', 'run', 'web:dev'],
+    cwd: DM_BOT_DIR,
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: process.env,
+  });
+}
+
+async function forwardStreamWithPrefix(props: {
+  stream: ReadableStream<Uint8Array> | number | null | undefined;
+  prefix: string;
+  target: NodeJS.WriteStream;
+}): Promise<void> {
+  const { stream, prefix, target } = props;
+
+  if (!stream || typeof stream === 'number') {
+    return;
+  }
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffered = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffered += decoder.decode(value, { stream: true });
+    const lines = buffered.split('\n');
+    buffered = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (line.length === 0) {
+        target.write('\n');
+      } else {
+        target.write(`${prefix} ${line}\n`);
+      }
+    }
+  }
+
+  buffered += decoder.decode();
+
+  if (buffered.length > 0) {
+    target.write(`${prefix} ${buffered}\n`);
+  }
+}
+
+function ensureWebUi(): void {
+  if (!isWebUiEnabled() || webChild) {
+    return;
+  }
+
+  console.log('[run-with-restart] Starting web UI dev server...');
+  webChild = runWebUi();
+
+  void forwardStreamWithPrefix({
+    stream: webChild.stdout,
+    prefix: '[web]',
+    target: process.stdout,
+  });
+
+  void forwardStreamWithPrefix({
+    stream: webChild.stderr,
+    prefix: '[web]',
+    target: process.stderr,
+  });
+
+  webChild.exited.then((code) => {
+    webChild = null;
+
+    if (code === 0 || code === null || code === 130) {
+      return;
+    }
+
+    console.error(
+      `[run-with-restart] Web UI exited with code ${code}, respawning...`,
+    );
+
+    ensureWebUi();
+  });
+}
+
 function start(): void {
   lastStartTime = Date.now();
-  child = runBot();
+  botChild = runBot();
 
-  child.exited.then((code) => {
+  botChild.exited.then((code) => {
     if (restartRequested) {
       restartRequested = false;
       rapidCrashCount = 0;
@@ -86,6 +180,33 @@ function start(): void {
 }
 
 start();
+ensureWebUi();
+
+function shutdownAll(): void {
+  try {
+    botChild.kill();
+  } catch {
+    // Ignore if already exited.
+  }
+
+  if (webChild) {
+    try {
+      webChild.kill();
+    } catch {
+      // Ignore if already exited.
+    }
+  }
+}
+
+process.on('SIGINT', () => {
+  shutdownAll();
+  process.exit(130);
+});
+
+process.on('SIGTERM', () => {
+  shutdownAll();
+  process.exit(143);
+});
 
 watch(DM_BOT_DIR, (_, filename) => {
   if (filename === 'restart.requested' && existsSync(RESTART_FILE)) {
@@ -96,6 +217,6 @@ watch(DM_BOT_DIR, (_, filename) => {
       // Ignore if file was already removed.
     }
 
-    child.kill();
+    botChild.kill();
   }
 });
