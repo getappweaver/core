@@ -1,23 +1,9 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
 import { getDraft } from '../drafts/store';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 
-export function adaptReviseCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export function adaptReviseCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   void params.command;
   void params.source;
   void params.identity;
@@ -26,34 +12,18 @@ export function adaptReviseCommand(params: {
   const draftIdRaw = params.parsed.arguments.id;
 
   if (typeof draftIdRaw !== 'number' || Number.isNaN(draftIdRaw)) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'revise',
-      text: `Usage: ${params.prefix}${params.alias} revise <draft_id> <corrections>`,
-    });
+    return `Usage: ${params.prefix}${params.alias} revise <draft_id> <corrections>`;
   }
 
   const entry = getDraft(params.db, draftIdRaw);
 
   if (!entry) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'revise',
-      text: `Draft not found: #${String(draftIdRaw)}`,
-    });
+    return `Draft not found: #${String(draftIdRaw)}`;
   }
 
   if (entry.kind !== 'create') {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'revise',
-      text: `Revise only applies to create drafts. Use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} and try again.`,
-    });
+    return `Revise only applies to create drafts. Use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} and try again.`;
   }
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'revise',
-    text: `To revise draft #${String(draftIdRaw)}, use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} then ${params.prefix}${params.alias} ai <revised request>. Or implement revise (call runAgent and replace draft).`,
-  });
+  return `To revise draft #${String(draftIdRaw)}, use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} then ${params.prefix}${params.alias} ai <revised request>. Or implement revise (call runAgent and replace draft).`;
 }

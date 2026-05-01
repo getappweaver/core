@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // backends/types.ts
 // ---------------------------------------------------------------------------
-import type { AgentMode, AgentBackendName } from '../db';
+import type { AgentBackendName, AgentMode } from '../db';
 
 import type { AgentStreamChunk } from './agent-stream-chunk';
 
@@ -43,7 +43,8 @@ export function getOutputString(result: AgentRunResult): string {
 export type RunMessageProps = {
   sessionId: string;
   content: string;
-  mode: AgentMode;
+  cursorMode: AgentMode;
+  opencodeAgentName: string | null;
   cwd: string;
   getRoutstrSkKey: () => string | null;
   modelOverride: string | null;

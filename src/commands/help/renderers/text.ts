@@ -93,6 +93,10 @@ export function renderHelpText(
     );
   }
 
+  if ((subcommand.details?.length ?? 0) > 0) {
+    lines.push('', 'DETAILS', ...indentLines(subcommand.details ?? []));
+  }
+
   if (subcommand.examples.length > 0) {
     lines.push('', 'EXAMPLES', ...indentLines(subcommand.examples));
   }

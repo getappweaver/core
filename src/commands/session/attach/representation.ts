@@ -13,10 +13,6 @@ export const SessionAttachDataSchema = z.discriminatedUnion('view', [
     activeBackend: z.string().min(1),
   }),
   z.object({
-    view: z.literal('not-implemented'),
-    targetBackend: z.enum(['cursor']),
-  }),
-  z.object({
     view: z.literal('success'),
     sessionId: z.string().min(1),
     attachedToBackend: z.string().min(1),

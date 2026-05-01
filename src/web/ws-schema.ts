@@ -4,8 +4,13 @@ import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { PromptPayload } from '@src/core/plugin';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type { WebCommandListItem } from '@src/web/command-catalog';
-import type { WebNodeRoot } from '@src/web/ui-schema';
-import { WebOptionFieldHintValueSchema } from '@src/web/ui-schema';
+import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
+import {
+  WebArgumentFieldChoiceSchema,
+  WebOptionFieldHintValueSchema,
+} from '@src/web/ui-schema';
+
+import type { ComposerAiState } from './composer-ai-state';
 
 const RequestIdSchema = z.string().min(1);
 
@@ -14,9 +19,13 @@ const CommandPayloadSchema = z.object({
   options: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
-const WebHeaderWidgetSchema = z.object({
-  label: z.string().min(1),
+const WebWidgetSchema = z.object({
+  placement: z.enum(['header', 'fixed']),
+  surface: z.enum(['modal', 'timeline_singleton']),
+  label: z.string().min(1).optional(),
   modalTitle: z.string().min(1),
+  icon: z.string().min(1).optional(),
+  order: z.number().int().optional(),
 });
 
 /** First message when the HTTP upgrade did not include `Authorization: Nostr …` (browser WebSockets). */
@@ -29,6 +38,11 @@ export const AuthenticateClientMessageSchema = z.object({
 
 export const RequestCommandsClientMessageSchema = z.object({
   type: z.literal('request_commands'),
+  requestId: RequestIdSchema,
+});
+
+export const RequestComposerAiStateClientMessageSchema = z.object({
+  type: z.literal('request_composer_ai_state'),
   requestId: RequestIdSchema,
 });
 
@@ -61,6 +75,16 @@ export const RunCommandClientMessageSchema = z.object({
   recordInTimeline: z.boolean().optional().default(true),
 });
 
+export const JsonCommandClientMessageSchema = z.object({
+  type: z.literal('json_command'),
+  requestId: RequestIdSchema,
+  timelineId: z.string().min(1),
+  command: z.string().min(1),
+  subcommand: z.string().min(1),
+  payload: z.unknown(),
+  recordInTimeline: z.boolean().optional().default(true),
+});
+
 export const PromptAnswerClientMessageSchema = z.object({
   type: z.literal('prompt_answer'),
   requestId: RequestIdSchema,
@@ -72,6 +96,11 @@ export const ChatClientMessageSchema = z.object({
   requestId: RequestIdSchema,
   timelineId: z.string().min(1),
   content: z.string().min(1),
+});
+
+export const CancelChatClientMessageSchema = z.object({
+  type: z.literal('cancel_chat'),
+  requestId: RequestIdSchema,
 });
 
 export const SaveTimelineFormClientMessageSchema = z.object({
@@ -126,11 +155,14 @@ export const SaveTimelineFormClientMessageSchema = z.object({
           ]),
         })
         .optional(),
-      webHeaderWidget: WebHeaderWidgetSchema.optional(),
+      webWidget: WebWidgetSchema.optional(),
     }),
     values: CommandPayloadSchema,
     autoRun: z.boolean(),
     optionHints: z.record(z.string(), WebOptionFieldHintValueSchema).optional(),
+    argumentChoices: z
+      .record(z.string(), z.array(WebArgumentFieldChoiceSchema))
+      .optional(),
   }),
 });
 
@@ -144,11 +176,14 @@ export const DeleteTimelineEventClientMessageSchema = z.object({
 export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   AuthenticateClientMessageSchema,
   RequestCommandsClientMessageSchema,
+  RequestComposerAiStateClientMessageSchema,
   LoadTimelineClientMessageSchema,
   LoadTimelineBeforeClientMessageSchema,
   RunCommandClientMessageSchema,
+  JsonCommandClientMessageSchema,
   PromptAnswerClientMessageSchema,
   ChatClientMessageSchema,
+  CancelChatClientMessageSchema,
   SaveTimelineFormClientMessageSchema,
   DeleteTimelineEventClientMessageSchema,
 ]);
@@ -229,8 +264,14 @@ export type AuthenticateClientMessage = z.infer<
 export type RequestCommandsClientMessage = z.infer<
   typeof RequestCommandsClientMessageSchema
 >;
+export type RequestComposerAiStateClientMessage = z.infer<
+  typeof RequestComposerAiStateClientMessageSchema
+>;
 export type RunCommandClientMessage = z.infer<
   typeof RunCommandClientMessageSchema
+>;
+export type JsonCommandClientMessage = z.infer<
+  typeof JsonCommandClientMessageSchema
 >;
 export type LoadTimelineClientMessage = z.infer<
   typeof LoadTimelineClientMessageSchema
@@ -258,6 +299,12 @@ export type CommandsResultServerMessage = {
   commands: WebCommandListItem[];
 };
 
+export type ComposerAiStateResultServerMessage = {
+  type: 'composer_ai_state_result';
+  requestId: string;
+  state: ComposerAiState;
+};
+
 export type TimelineEventsResultServerMessage = {
   type: 'timeline_events_result';
   requestId: string;
@@ -269,7 +316,7 @@ export type TimelineEventsResultServerMessage = {
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
-  output: string | WebNodeRoot;
+  output: string | WebNodeRoot | ClientViewRoot;
 };
 
 export type PromptServerMessage = {
@@ -303,6 +350,7 @@ export type ErrorServerMessage = {
 
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
+  | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
   | CommandResultServerMessage
   | PromptServerMessage
@@ -322,9 +370,20 @@ export function createCommandsResultMessage(params: {
   };
 }
 
+export function createComposerAiStateResultMessage(params: {
+  requestId: string;
+  state: ComposerAiState;
+}): ComposerAiStateResultServerMessage {
+  return {
+    type: 'composer_ai_state_result',
+    requestId: params.requestId,
+    state: params.state,
+  };
+}
+
 export function createCommandResultMessage(params: {
   requestId: string;
-  output: string | WebNodeRoot;
+  output: string | WebNodeRoot | ClientViewRoot;
 }): CommandResultServerMessage {
   return {
     type: 'command_result',

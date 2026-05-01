@@ -5,7 +5,7 @@ import { getInfoLogsEnabled, setInfoLogsEnabled } from '@src/logger';
 
 import type { RouteCommandContext } from '../../dispatch';
 
-import { renderBotLogCli } from './renderers/cli';
+import { renderBotLogText } from './renderers/text';
 import { buildBotLogRepresentation } from './representation';
 
 export function handleBotLog(ctx: RouteCommandContext): Promise<string> {
@@ -25,5 +25,5 @@ export function handleBotLog(ctx: RouteCommandContext): Promise<string> {
     setInfoLogsEnabled(rep.data.enabled);
   }
 
-  return Promise.resolve(renderBotLogCli(rep, { prefix: ctx.prefix }));
+  return Promise.resolve(renderBotLogText(rep, { prefix: ctx.prefix }));
 }

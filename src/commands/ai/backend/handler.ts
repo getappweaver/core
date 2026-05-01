@@ -2,6 +2,7 @@ import { createBackend } from '@src/backends/factory';
 import {
   AgentBackendNameSchema,
   getAgentBackend,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getModelOverride,
   getProviderName,
@@ -71,14 +72,16 @@ export async function handleAiBackend(
 
   const workspace = getWorkspaceTarget(db);
   const cwd = workspace === 'bot' ? dmBotRoot : parentOfBotRoot;
-  const mode = getCurrentOrDefaultMode(db);
+  const executionProfile = getBackendExecutionProfile(db, nextBackendName);
   const modelOverride = getModelOverride(db, nextBackendName);
   const providerName = getProviderName(db);
 
   const newBackend = createBackend({
     backendName: nextBackendName,
     dmBotRoot,
-    mode,
+    cursorMode: getCurrentOrDefaultMode(db),
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     attachUrl,
     modelOverride,
     providerName,

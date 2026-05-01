@@ -1,0 +1,11 @@
+.connect-btn[data-story-target='header-widget:story:list'] {
+  background: var(--color-accent);
+  color: #000;
+}
+
+.connect-btn[data-story-target='header-widget:story:list']:hover,
+.connect-btn[data-story-target='header-widget:story:list']:focus-visible,
+.connect-btn[data-story-target='header-widget:story:list'].topbar-widget-active {
+  background: var(--color-accent);
+  color: #000;
+}

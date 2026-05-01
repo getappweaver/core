@@ -176,7 +176,7 @@ export const ExamplePlugin: BotPlugin = {
   handler(
     args: string[],
     context: PluginInvocationContext,
-  ): Promise<string | WebNodeRoot> {
+  ): Promise<HandlerResult> {
     if (!PluginContext || !PluginDb) throw new Error('Plugin not initialized');
     return handleExampleAdapter({
       args,

@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "9.0.1",
+  "version": "9.1.0",
   "description": "Open-source AI-first platform for installable apps, automation, and bot workflows.",
   "type": "module",
   "workspaces": [
@@ -11,6 +11,8 @@
     "watch": "bun run scripts/run-with-restart.ts",
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
+    "demo:generate": "DEMO_BUILD=1 bun run scripts/generate-demo.ts",
+    "web:demo:build": "bun run demo:generate && bun run landing:build",
     "landing:dev": "bun run --cwd apps/landing dev",
     "landing:build": "bun run --cwd apps/landing build",
     "web:pwa-icons": "bun run scripts/write-pwa-placeholder-icons.ts",
@@ -29,6 +31,7 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^3.5.0",
+    "@cursor/sdk": "^1.0.10",
     "@noble/ciphers": "^2.1.1",
     "@noble/hashes": "^2.0.1",
     "@opencode-ai/sdk": "^1.4.3",
@@ -40,6 +43,7 @@
     "qrcode": "^1.5.4",
     "solid-js": "^1.9.9",
     "web-push": "^3.6.7",
+    "yaml": "^2.8.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

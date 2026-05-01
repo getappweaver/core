@@ -1,7 +1,7 @@
 import { log } from '@src/logger';
-import { CashuWallet } from '@src/wallets/cashu';
-import type { WalletDb } from '@src/wallets/db';
-import { bumpCounters, logWalletOperation } from '@src/wallets/db';
+import { CashuWallet } from '@src/wallet/cashu';
+import type { WalletDb } from '@src/wallet/db';
+import { bumpCounters, logWalletOperation } from '@src/wallet/db';
 
 import type { WalletSendRepresentation } from './representation';
 

@@ -7,7 +7,7 @@ import { getRoutstrSkKey, getWalletDefaultMintUrl } from '../db';
 import { log } from '../logger';
 import type { ProviderDb } from '../providers/db';
 import { refundRoutstr } from '../providers/routstr';
-import type { WalletDb } from '../wallets/db';
+import type { WalletDb } from '../wallet/db';
 
 export type FinalizeAutoFlowRefundProps = {
   isAutoFlow: boolean;

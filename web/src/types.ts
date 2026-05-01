@@ -1,6 +1,15 @@
 import type { MessageSource } from '@src/messaging';
-import type { TimelinePayload } from '@src/timeline/types';
-import type { WebNodeRoot, WebOptionFieldHintValue } from '@src/web/ui-schema';
+import type {
+  TimelineFileDiff,
+  TimelinePayload,
+  TimelineToolCall,
+} from '@src/timeline/types';
+import type {
+  ClientViewRoot,
+  WebArgumentFieldChoice,
+  WebNodeRoot,
+  WebOptionFieldHintValue,
+} from '@src/web/ui-schema';
 
 export type CommandField = {
   name: string;
@@ -15,9 +24,68 @@ export type CommandField = {
   choices?: string[];
 };
 
-export type WebHeaderWidget = {
-  label: string;
+export type WebWidget = {
+  placement: 'header' | 'fixed';
+  surface: 'modal' | 'timeline_singleton';
+  label?: string;
   modalTitle: string;
+  icon?: string;
+  order?: number;
+};
+
+export type PermissionAction = 'allow' | 'ask' | 'deny';
+export type PermissionValue =
+  | PermissionAction
+  | Record<string, PermissionAction>;
+
+export type OpenCodeAgentPermissionConfig =
+  | PermissionAction
+  | Record<string, PermissionValue>
+  | null;
+
+export type OpenCodeAgentDraftConfig = {
+  name: string;
+  description: string | null;
+  model: string | null;
+  color: string | null;
+  steps: number | null;
+  hidden: boolean;
+  disabled: boolean;
+  mode: string | null;
+  permission: OpenCodeAgentPermissionConfig;
+  systemPrompt: string;
+};
+
+export type OpenCodeAgentsDraft = {
+  rootModel: string | null;
+  agents: OpenCodeAgentDraftConfig[];
+};
+
+export type OpenCodeAgentsModalData = {
+  original: OpenCodeAgentsDraft;
+  defaults: OpenCodeAgentsDraft;
+  selectedAgentName: string;
+};
+
+export type AiAgentEditorValues = {
+  name: string;
+  description: string;
+  model: string;
+  color: string;
+  steps: string;
+  mode: string;
+  systemPrompt: string;
+  hidden: boolean;
+  disabled: boolean;
+  permissions: Record<string, '' | PermissionAction>;
+};
+
+export type AiAgentEditorPayload = {
+  mode: 'new' | 'edit';
+  originalName: string | null;
+  values: AiAgentEditorValues;
+  /** From `opencode models` (server); may be `[]` if CLI unavailable. */
+  modelCatalog: WebArgumentFieldChoice[];
 };
 
 export type CommandSubcommand = {
@@ -34,7 +102,7 @@ export type CommandSubcommand = {
       | 'runnable_default'
       | 'runnable_customizable';
   };
-  webHeaderWidget?: WebHeaderWidget;
+  webWidget?: WebWidget;
 };
 
 export type CommandDetail = {
@@ -43,12 +111,13 @@ export type CommandDetail = {
   aliases: string[];
   /** Present on commands from GET /api/commands (bulk or single). */
   source?: 'builtin' | 'plugin';
+  pluginAlias?: string;
   subcommands: CommandSubcommand[];
 };
 
 export type CommandPayload = TimelinePayload;
 
-export type CommandOutput = string | WebNodeRoot;
+export type CommandOutput = string | WebNodeRoot | ClientViewRoot;
 
 export type TimelineItem =
   | {
@@ -70,6 +139,20 @@ export type TimelineItem =
       id: string;
       createdAt?: number;
       source?: MessageSource;
+      type: 'diff';
+      files: TimelineFileDiff[];
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
+      type: 'tool';
+      tool: TimelineToolCall;
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
       type: 'prompt';
       requestId: string;
       text: string | null;
@@ -86,6 +169,9 @@ export type TimelineItem =
       values: CommandPayload | null;
       text: string | null;
       web: WebNodeRoot | null;
+      clientView: ClientViewRoot | null;
+      timelineSingletonKey?: string;
+      timelineSingletonHidden?: boolean;
     }
   | {
       id: string;
@@ -97,6 +183,7 @@ export type TimelineItem =
       values: CommandPayload;
       autoRun: boolean;
       optionHints?: Record<string, WebOptionFieldHintValue>;
+      argumentChoices?: Record<string, WebArgumentFieldChoice[]>;
     };
 
 export function isSystemItem(
@@ -109,6 +196,18 @@ export function isChatItem(
   item: TimelineItem,
 ): item is Extract<TimelineItem, { type: 'chat' }> {
   return item.type === 'chat';
+}
+
+export function isDiffItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'diff' }> {
+  return item.type === 'diff';
+}
+
+export function isToolItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'tool' }> {
+  return item.type === 'tool';
 }
 
 export function isPromptItem(

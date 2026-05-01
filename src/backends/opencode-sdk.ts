@@ -3,7 +3,6 @@
 // ---------------------------------------------------------------------------
 import { createOpencode } from '@opencode-ai/sdk/v2';
 
-import type { AgentMode } from '../db';
 import { debug, log } from '../logger';
 import type { ProviderName } from '../providers/types';
 
@@ -14,8 +13,14 @@ import {
 import type { ParseModelProps } from './opencode-common';
 import {
   normalizeModelForProvider,
-  readModelFromOpencodeConfig,
+  resolveConfiguredModelFromOpencodeConfig,
 } from './opencode-common';
+import { buildOpenCodeRuntimeContent } from './opencode-runtime-context';
+import {
+  createStreamDebugMetrics,
+  logStreamDebugSummary,
+  recordStreamDebugChunk,
+} from './stream-debug';
 import type {
   AgentBackend,
   AgentErrorResult,
@@ -28,8 +33,28 @@ import type {
 type SdkInstance = Awaited<ReturnType<typeof createOpencode>>;
 
 let sdk: SdkInstance | null = null;
+let sdkInitPromise: Promise<SdkInstance> | null = null;
 
-const DEFAULT_PORTS = [4096, 4097, 4098, 4099];
+const DEFAULT_PORT_START = 4099;
+const DEFAULT_PORT_COUNT = 12;
+
+function buildPortRange(start: number, count: number): number[] {
+  const ports: number[] = [];
+
+  for (let port = start; port <= 65535 && ports.length < count; port += 1) {
+    ports.push(port);
+  }
+
+  return ports;
+}
+
+const DEFAULT_PORTS = buildPortRange(DEFAULT_PORT_START, DEFAULT_PORT_COUNT);
+
+export type OpencodeSdkContextStats = {
+  tokensTotal: number;
+  contextLimit: number | null;
+  contextPercent: number | null;
+};
 
 function getPortsToTry(): number[] {
   const envPort = process.env.OPENCODE_SDK_PORT;
@@ -45,17 +70,21 @@ function getPortsToTry(): number[] {
       return DEFAULT_PORTS;
     }
 
-    return [n];
+    if (process.env.OPENCODE_SDK_STRICT_PORT === '1') {
+      return [n];
+    }
+
+    return [
+      n,
+      ...buildPortRange(n + 1, DEFAULT_PORT_COUNT - 1),
+      ...DEFAULT_PORTS,
+    ].filter((port, index, ports) => ports.indexOf(port) === index);
   }
 
   return DEFAULT_PORTS;
 }
 
-async function getOrInitSdk(): Promise<SdkInstance> {
-  if (sdk) {
-    return sdk;
-  }
-
+async function initSdk(): Promise<SdkInstance> {
   const ports = getPortsToTry();
   let lastError: Error | null = null;
 
@@ -81,11 +110,29 @@ async function getOrInitSdk(): Promise<SdkInstance> {
   const hint =
     ports.length === 1
       ? `Port ${ports[0]} may be in use. Set OPENCODE_SDK_PORT to another port, or stop any running "opencode serve".`
-      : `Ports ${ports.join(', ')} failed. Set OPENCODE_SDK_PORT to a free port, or stop any running "opencode serve".`;
+      : `Ports ${ports.join(', ')} failed. Set OPENCODE_SDK_PORT to a free preferred port, set OPENCODE_SDK_STRICT_PORT=1 to disable fallback, or stop unused "opencode serve" processes.`;
 
   throw new Error(
     `OpenCode SDK server failed to start: ${lastError?.message ?? 'unknown'}.\n${hint}`,
   );
+}
+
+async function getOrInitSdk(): Promise<SdkInstance> {
+  if (sdk) {
+    return sdk;
+  }
+
+  if (sdkInitPromise) {
+    return sdkInitPromise;
+  }
+
+  sdkInitPromise = initSdk();
+
+  try {
+    return await sdkInitPromise;
+  } finally {
+    sdkInitPromise = null;
+  }
 }
 
 export function disposeOpencodeSdk(): void {
@@ -97,17 +144,22 @@ export function disposeOpencodeSdk(): void {
     sdk.server.close();
   } finally {
     sdk = null;
+    sdkInitPromise = null;
   }
 }
 
 function parseModel({
   dmBotRoot,
-  mode,
+  agentName,
   modelOverride,
   providerName,
 }: ParseModelProps): string {
-  const fromConfig = readModelFromOpencodeConfig(dmBotRoot, mode);
-  let modelName = modelOverride ?? fromConfig;
+  const configured = resolveConfiguredModelFromOpencodeConfig(
+    dmBotRoot,
+    agentName,
+  );
+
+  let modelName = modelOverride ?? configured.modelName;
 
   if (modelOverride) {
     debug(`opencode-sdk: using model override: ${modelOverride}`);
@@ -137,6 +189,121 @@ function modelToProviderAndId(modelStr: string): {
   return {
     providerID: modelStr.slice(0, slash),
     modelID: modelStr.slice(slash + 1),
+  };
+}
+
+function coerceTokenTotal(tokens: unknown): number | null {
+  if (!tokens || typeof tokens !== 'object') {
+    return null;
+  }
+
+  const t = tokens as {
+    total?: unknown;
+    input?: unknown;
+    output?: unknown;
+    reasoning?: unknown;
+    cache?: { read?: unknown; write?: unknown };
+  };
+
+  if (typeof t.total === 'number' && Number.isFinite(t.total)) {
+    return t.total;
+  }
+
+  const parts = [t.input, t.output, t.reasoning, t.cache?.read, t.cache?.write];
+  let total = 0;
+  let found = false;
+
+  for (const part of parts) {
+    if (typeof part === 'number' && Number.isFinite(part)) {
+      total += part;
+      found = true;
+    }
+  }
+
+  return found ? total : null;
+}
+
+function getMessageCreatedAt(message: unknown): number {
+  if (!message || typeof message !== 'object') {
+    return 0;
+  }
+
+  const time = (message as { time?: { created?: unknown } }).time;
+
+  return typeof time?.created === 'number' ? time.created : 0;
+}
+
+type GetOpencodeSdkContextStatsProps = {
+  sessionId: string;
+  cwd: string;
+  effectiveModel: string;
+};
+
+export async function getOpencodeSdkContextStats({
+  sessionId,
+  cwd,
+  effectiveModel,
+}: GetOpencodeSdkContextStatsProps): Promise<OpencodeSdkContextStats | null> {
+  const { client } = await getOrInitSdk();
+
+  const messagesResult = await client.session.messages({
+    sessionID: sessionId,
+    directory: cwd,
+    limit: 20,
+  });
+
+  if (messagesResult.error || !Array.isArray(messagesResult.data)) {
+    return null;
+  }
+
+  const assistantMessages = messagesResult.data
+    .map((entry) => (entry as { info?: unknown }).info)
+    .filter(
+      (info): info is { role: 'assistant'; tokens: unknown } =>
+        !!info &&
+        typeof info === 'object' &&
+        (info as { role?: unknown }).role === 'assistant' &&
+        'tokens' in info,
+    )
+    .sort((a, b) => getMessageCreatedAt(b) - getMessageCreatedAt(a));
+
+  const latestTokens = assistantMessages.length
+    ? coerceTokenTotal(assistantMessages[0].tokens)
+    : null;
+
+  if (latestTokens === null) {
+    return null;
+  }
+
+  const model = modelToProviderAndId(effectiveModel);
+  const providersResult = await client.config.providers({ directory: cwd });
+
+  const providersData = providersResult.data as
+    | { providers?: Array<{ id?: string; models?: Record<string, unknown> }> }
+    | undefined;
+
+  const provider = providersData?.providers?.find(
+    (p) => p.id === model.providerID,
+  );
+
+  const configuredModel = provider?.models?.[model.modelID] as
+    | { limit?: { context?: unknown } }
+    | undefined;
+
+  const rawContextLimit = configuredModel?.limit?.context;
+
+  const contextLimit =
+    typeof rawContextLimit === 'number' && Number.isFinite(rawContextLimit)
+      ? rawContextLimit
+      : null;
+
+  return {
+    tokensTotal: latestTokens,
+    contextLimit,
+    contextPercent:
+      contextLimit && contextLimit > 0
+        ? Math.min(100, (latestTokens / contextLimit) * 100)
+        : null,
   };
 }
 
@@ -338,26 +505,26 @@ function parsePromptSdkResult({
 
 type CreateOpencodeSDKBackendProps = {
   dmBotRoot: string;
-  mode: AgentMode;
+  agentName: string;
   modelOverride: string | null | undefined;
   providerName: ProviderName | null;
 };
 
 export function createOpencodeSDKBackend({
   dmBotRoot,
-  mode,
+  agentName,
   modelOverride,
   providerName,
 }: CreateOpencodeSDKBackendProps): AgentBackend {
   const modelName = parseModel({
     dmBotRoot,
-    mode,
+    agentName,
     modelOverride,
     providerName,
   });
 
   return {
-    name: 'opencode-sdk',
+    name: 'opencode',
     modelName,
 
     async createSession(cwd: string): Promise<string> {
@@ -396,12 +563,22 @@ export function createOpencodeSDKBackend({
       const {
         sessionId,
         content,
-        mode,
+        opencodeAgentName,
         cwd,
         modelOverride,
         onAgentStreamChunk,
         streamAbortSignal,
       } = props;
+
+      const selectedAgentName = opencodeAgentName ?? agentName;
+
+      const runContent = buildOpenCodeRuntimeContent({
+        backendName: 'opencode',
+        agentName: selectedAgentName,
+        dmBotRoot,
+        cwd,
+        content,
+      });
 
       const { client } = await getOrInitSdk();
 
@@ -422,9 +599,9 @@ export function createOpencodeSDKBackend({
       const promptParams = {
         sessionID: sessionId,
         directory: cwd,
-        parts: [{ type: 'text' as const, text: content }],
+        parts: [{ type: 'text' as const, text: runContent }],
         model,
-        agent: mode,
+        agent: selectedAgentName,
       };
 
       debug(
@@ -459,6 +636,7 @@ export function createOpencodeSDKBackend({
       }
 
       const logState = createOpencodeStreamLogState(sessionId);
+      const streamMetrics = createStreamDebugMetrics('opencode', sessionId);
 
       const sse = await client.event.subscribe({
         directory: cwd,
@@ -508,6 +686,11 @@ export function createOpencodeSDKBackend({
             );
 
             if (chunk) {
+              recordStreamDebugChunk(
+                streamMetrics,
+                chunk.kind === 'text_delta' ? chunk.text : null,
+              );
+
               onAgentStreamChunk(chunk);
             }
           }
@@ -538,6 +721,8 @@ export function createOpencodeSDKBackend({
         await pumpPromise.catch((err) => {
           debug('opencode-sdk stream: pump promise rejected', String(err));
         });
+
+        logStreamDebugSummary(streamMetrics);
       }
 
       debug(

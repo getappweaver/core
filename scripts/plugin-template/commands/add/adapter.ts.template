@@ -1,24 +1,10 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 
 import { handleAddCommand } from './handler';
 
-export function adaptAddCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export function adaptAddCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   void params.command;
   void params.source;
   void params.identity;
@@ -32,16 +18,8 @@ export function adaptAddCommand(params: {
   });
 
   if (result.type === 'error') {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'add',
-      text: result.message,
-    });
+    return result.message;
   }
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'add',
-    text: [`Created #${String(result.id)}`, result.detailText].join('\n'),
-  });
+  return [`Created #${String(result.id)}`, result.detailText].join('\n');
 }

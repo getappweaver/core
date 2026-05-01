@@ -411,7 +411,7 @@ When changing AppWeaver core code:
 If your project rule requires approval for shell commands, you can still allow common project tasks by whitelisting bun scripts.
 This is a practical pattern because the agent can only run commands already defined in `package.json` `scripts` (for example `build`, `lint`, `test`).
 
-Add or update `appweaver/.cursor/rules/agent-cli-permission.mdc` like this:
+Add or update the **CLI permission and workspace boundary** section in `AGENTS.md` (root of this repo) like this:
 
 ```md
 ## Whitelist (no permission required)
@@ -439,4 +439,4 @@ Before running a package script, the agent should:
 
 With this setup, commands such as `bun run build` and `bun run lint` are available to the agent without extra per-command approvals, while still keeping execution bounded to your script definitions.
 
-Full codebase context and extension points are in **.cursor/rules/dm-bot-context.mdc** in this directory.
+Full codebase context and extension points are in **AGENTS.md** (section **dm-bot codebase context**).

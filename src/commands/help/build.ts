@@ -37,6 +37,7 @@ export type HelpCommandInfo = {
 export type HelpSubcommandDetail = {
   name: string;
   summary: string;
+  details: string[];
   aliases: string[];
   arguments: HelpArgument[];
   options: HelpOption[];
@@ -141,6 +142,7 @@ export function buildHelpSubcommandDetail(
   return {
     name: subcommand.name,
     summary: subcommand.summary,
+    details: subcommand.details ?? [],
     aliases: subcommand.aliases,
     arguments: subcommand.arguments.map(buildHelpArgument),
     options: subcommand.options.map(buildHelpOption),
@@ -174,7 +176,9 @@ export function buildCommandHelpOverview(params: {
       name: params.command.name,
       summary: params.command.summary,
     },
-    subcommands: params.command.subcommands.map(buildHelpSubcommandSummary),
+    subcommands: params.command.subcommands
+      .filter((subcommand) => subcommand.textHidden !== true)
+      .map(buildHelpSubcommandSummary),
     examples: params.examples ?? defaultExamples(),
   };
 }

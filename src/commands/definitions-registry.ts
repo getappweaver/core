@@ -8,12 +8,14 @@ import { getAiCommandDefinition } from './ai/definition';
 import { getBotCommandDefinition } from './bot/definition';
 import { getBunkerCommandDefinition } from './bunker/definition';
 import { getSessionCommandDefinition } from './session/definition';
+import { getStoryCommandDefinition } from './story/definition';
 import { getWalletCommandDefinition } from './wallet/definition';
 import { getWotCommandDefinition } from './wot/definition';
 
 export const BUILTIN_ROOT_NAMES = [
   'help',
   'session',
+  'story',
   'bot',
   'ai',
   'wallet',
@@ -82,6 +84,8 @@ export function getBuiltinCommandDefinition({
       return getHelpMetaCommandDefinition({ prefix });
     case 'session':
       return getSessionCommandDefinition({ prefix });
+    case 'story':
+      return getStoryCommandDefinition({ prefix });
     case 'bot':
       return getBotCommandDefinition({ prefix });
     case 'ai':
@@ -108,6 +112,7 @@ export function getBuiltinDefinitionsMap({
   return {
     help: getHelpMetaCommandDefinition({ prefix }),
     session: getSessionCommandDefinition({ prefix }),
+    story: getStoryCommandDefinition({ prefix }),
     bot: getBotCommandDefinition({ prefix }),
     ai: getAiCommandDefinition({ prefix }),
     wallet: getWalletCommandDefinition({ prefix }),

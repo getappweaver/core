@@ -9,6 +9,7 @@ import { C, log } from '../logger';
 export let redrawPrompt: (() => void) | null = null;
 
 export type StartLocalCliProps = {
+  prefix: string;
   onMessage: (content: string) => Promise<void>;
   /**
    * When a plugin interactive session is waiting on `promptFn`, the next line must resolve
@@ -19,11 +20,12 @@ export type StartLocalCliProps = {
 };
 
 export function startLocalCli({
+  prefix,
   onMessage,
   resolvePendingPromptFirst,
 }: StartLocalCliProps): void {
   console.log(
-    `${C.dim}Type a prompt or ${C.reset}${C.white}!help${C.reset}${C.dim} to list commands.${C.reset}\n`,
+    `${C.dim}Type a prompt or ${C.reset}${C.white}${prefix}help${C.reset}${C.dim} to list commands.${C.reset}\n`,
   );
 
   const localCli = readline.createInterface({

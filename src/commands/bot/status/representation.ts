@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
+import { listCachedCursorSdkModelCatalog } from '@src/backends/cursor-sdk';
 import { createBackend } from '@src/backends/factory';
+import { resolveConfiguredModelFromOpencodeConfig } from '@src/backends/opencode-common';
+import {
+  listOpencodeModelCatalog,
+  readOpencodeConfig,
+} from '@src/backends/opencode-config';
 import {
   AgentBackendNameSchema,
   AgentModeSchema,
@@ -9,6 +15,7 @@ import {
   ReplyTransportSchema,
   WorkspaceTargetSchema,
   getAgentBackend,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getLinting,
   getModelOverride,
@@ -36,15 +43,27 @@ export const BotStatusDataSchema = z.object({
   provider: ProviderNameSchema,
   version: z.string().min(1),
   mode: AgentModeSchema,
+  executionProfileKind: z.enum(['mode', 'agent']),
+  executionProfileDisplayName: z.string().min(1),
   linting: LintingSchema,
   modelOverride: z.string().nullable(),
+  opencodeRootModel: z.string().nullable(),
+  opencodeAgentModel: z.string().nullable(),
+  opencodeAgentNames: z.array(z.string()),
   resolvedModelName: z.string().min(1),
+  effectiveModelSource: z.enum(['override', 'agent', 'root', 'default']),
   workspace: WorkspaceTargetSchema,
   transport: ReplyTransportSchema,
   botRelayUrls: z.array(z.string()),
   sessionId: z.string().nullable(),
   opencodeServeUrl: z.string().nullable(),
   routstrBudgetMsatsRaw: z.number().int().nonnegative().nullable(),
+  opencodeModelCatalog: z.array(
+    z.object({
+      value: z.string(),
+      label: z.string(),
+    }),
+  ),
 });
 
 export const BotStatusRepresentationSchema = createRepresentationSchema(
@@ -70,11 +89,32 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
   const serveUrl = process.env.BOT_OPENCODE_SERVE_URL;
   const modelOverride = getModelOverride(seenDb, backendName);
   const providerName = getProviderName(seenDb);
+  const executionProfile = getBackendExecutionProfile(seenDb, backendName);
+
+  const opencodeConfigured =
+    backendName === 'opencode'
+      ? resolveConfiguredModelFromOpencodeConfig(
+          dmBotRoot,
+          executionProfile.kind === 'opencode' ? executionProfile.agent : mode,
+        )
+      : null;
+
+  const opencodeConfig =
+    backendName === 'opencode' ? readOpencodeConfig(dmBotRoot) : null;
+
+  const opencodeModelCatalog =
+    backendName === 'opencode'
+      ? listOpencodeModelCatalog(dmBotRoot)
+      : backendName === 'cursor'
+        ? listCachedCursorSdkModelCatalog()
+        : [];
 
   const backend = createBackend({
     backendName,
     dmBotRoot,
-    mode,
+    cursorMode: mode,
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     attachUrl,
     modelOverride,
     providerName,
@@ -93,15 +133,30 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
     provider: providerName,
     version,
     mode,
+    executionProfileKind:
+      executionProfile.kind === 'cursor' ? 'mode' : ('agent' as const),
+    executionProfileDisplayName:
+      executionProfile.kind === 'opencode'
+        ? executionProfile.agent
+        : mode === 'agent' || mode === 'free'
+          ? 'yolo'
+          : mode,
     linting,
     modelOverride,
+    opencodeRootModel: opencodeConfigured?.rootModel ?? null,
+    opencodeAgentModel: opencodeConfigured?.agentModel ?? null,
+    opencodeAgentNames: opencodeConfig?.agents.map((agent) => agent.name) ?? [],
     resolvedModelName: backend.modelName,
+    effectiveModelSource: modelOverride
+      ? 'override'
+      : (opencodeConfigured?.source ?? 'default'),
     workspace,
     transport: replyTransport,
     botRelayUrls,
     sessionId: cur,
     opencodeServeUrl: opencodeServeUrlAttached,
     routstrBudgetMsatsRaw,
+    opencodeModelCatalog,
   };
 }
 

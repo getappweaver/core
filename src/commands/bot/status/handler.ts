@@ -1,4 +1,4 @@
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import { handleError, type RouteCommandContext } from '../../dispatch';
 import { statusPropsFromContext } from '../../shared/with-status';
@@ -9,7 +9,7 @@ import { createBotStatusRepresentation } from './representation';
 
 export async function handleBotStatus(
   ctx: RouteCommandContext,
-): Promise<string | WebNodeRoot> {
+): Promise<WebHandlerResult> {
   return handleError(async () => {
     const rep = createBotStatusRepresentation(statusPropsFromContext(ctx));
 

@@ -1,0 +1,3792 @@
+[
+  {
+    "name": "help",
+    "summary": "List commands and drill into usage. \n    \nExamples: \n\n/help session [<subcommand>]\n/session help [<subcommand>]\n\nare all valid.\n",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "topic",
+        "summary": "Command name and optional subcommand.",
+        "usage": "topic [<path...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "e.g. session, session new, ai provider",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/help",
+          "/help bot",
+          "/help ai provider"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "session",
+    "summary": "Agent sessions: new, attach, resume, list, and inspect messages.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for session or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand name such as new, attach, list, resume, or messages.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session help",
+          "/session help new",
+          "/session help attach",
+          "/session help list",
+          "/session help resume",
+          "/session help messages"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "new",
+        "summary": "Create a new agent session.",
+        "usage": "new",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/session new"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "attach",
+        "summary": "Attach an external session id and set it as current (opencode only for now).",
+        "usage": "attach <backend> <session_id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "backend",
+            "summary": "External backend: opencode or cursor.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "session_id",
+            "summary": "External session id to attach.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session attach opencode <session_id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "resume-last",
+        "summary": "Resume the latest session for the current backend.",
+        "usage": "resume-last",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/session resume-last"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "resume",
+        "summary": "Resume a session by id (any backend).",
+        "usage": "resume <session_id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "session_id",
+            "summary": "Session id to resume.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session resume <session_id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List all sessions (all backends).",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/session list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "messages",
+        "summary": "Show last N messages for a session (default N=5).",
+        "usage": "messages <session_id> [<n>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "session_id",
+            "summary": "Session id.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "n",
+            "summary": "Number of messages (optional, default 5).",
+            "kind": "integer",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session messages <session_id>",
+          "/session messages <session_id> 10"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "story",
+    "summary": "List and start guided plugin walkthroughs.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "list",
+        "summary": "List available stories.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/story list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Stories",
+          "modalTitle": "Stories",
+          "icon": "/src/commands/story/renderers/help.svg",
+          "order": 40
+        }
+      },
+      {
+        "name": "start",
+        "summary": "Start a story by id.",
+        "usage": "start <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Story id.",
+            "kind": "string",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/story start todo-list-bootstrap"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "bot",
+    "summary": "Bot status, identity, workspace, lint, logging, ready DM, Web Push test, and watch restart.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for bot or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: status, workspace, lint, log, ready, restart, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot help",
+          "/bot help workspace",
+          "/bot help lint",
+          "/bot help restart"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "status",
+        "summary": "Bot status and current session/mode/backend.",
+        "usage": "status",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot status"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "modal",
+          "label": "Status",
+          "modalTitle": "Bot status",
+          "icon": "/src/commands/bot/status/renderers/status.svg",
+          "order": 10
+        }
+      },
+      {
+        "name": "version",
+        "summary": "Show git hash for this AppWeaver core checkout.",
+        "usage": "version",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot version"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "ping",
+        "summary": "Health check (replies pong).",
+        "usage": "ping",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot ping"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "identity",
+        "summary": "Print the bot npub. A trailing literal npub is accepted for compatibility.",
+        "usage": "identity",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot identity",
+          "/bot identity npub"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "workspace",
+        "summary": "Show or set workspace target [parent|bot].",
+        "usage": "workspace [<target>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "target",
+            "summary": "parent or bot",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot workspace",
+          "/bot workspace bot"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "lint",
+        "summary": "Run lint or configure auto-lint after agent.",
+        "usage": "lint [<args...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "args",
+            "summary": "Optional: auto, auto on|off",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot lint",
+          "/bot lint auto",
+          "/bot lint auto [on|off]"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "log",
+        "summary": "Show or set info-level console logs.",
+        "usage": "log [<args...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "args",
+            "summary": "info on|off",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot log info on"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "ready",
+        "summary": "Show or set startup \"Agent is ready\" DM.",
+        "usage": "ready [<state>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "state",
+            "summary": "on or off",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot ready",
+          "/bot ready off"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "push",
+        "summary": "Send a test Web Push to all browsers that clicked Push (requires VAPID in .env).",
+        "usage": "push <message...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "message",
+            "summary": "Notification body text",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bot push Hello from the bot"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "restart",
+        "summary": "Request a process restart when running under watch (creates restart.requested).",
+        "usage": "restart",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot restart"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "ai",
+    "summary": "Agent mode, backend, models, and payment provider (Routstr).",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for ai or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: mode, backend, model, models, provider.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai help",
+          "/ai help mode",
+          "/ai help backend",
+          "/ai help model",
+          "/ai help provider"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "mode",
+        "summary": "Set default agent mode.",
+        "usage": "mode [<mode>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "mode",
+            "summary": "One of: free|ask|plan|agent",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai mode",
+          "/ai mode ask"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "backend",
+        "summary": "Show or set agent backend [cursor|opencode].",
+        "usage": "backend [<name>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Backend name or omit to show current",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai backend",
+          "/ai backend opencode"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "model",
+        "summary": "Show or set the model override for the current backend.",
+        "usage": "model [<name_or_reset>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name_or_reset",
+            "summary": "Model id, reset, or omit to show",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai model",
+          "/ai model reset"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "models",
+        "summary": "List models available for the current backend.",
+        "usage": "models",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/ai models"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "agents",
+        "summary": "Manage OpenCode agents in the web UI.",
+        "usage": "agents",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/ai agents"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "fixed",
+          "surface": "modal",
+          "modalTitle": "OpenCode Agents"
+        }
+      },
+      {
+        "name": "agents-new",
+        "summary": "Create a new OpenCode agent.",
+        "usage": "agents-new <name> [--description, undefined <description>] [--model, undefined <model>] [--color, undefined <color>] [--steps, undefined <steps>] [--mode, undefined <mode>] [--prompt, undefined <system_prompt>] [--hidden, undefined] [--disabled, undefined] [--perm-read, undefined <perm_read>] [--perm-edit, undefined <perm_edit>] [--perm-glob, undefined <perm_glob>] [--perm-grep, undefined <perm_grep>] [--perm-list, undefined <perm_list>] [--perm-bash, undefined <perm_bash>] [--perm-task, undefined <perm_task>] [--perm-external_directory, undefined <perm_external_directory>] [--perm-todowrite, undefined <perm_todowrite>] [--perm-question, undefined <perm_question>] [--perm-webfetch, undefined <perm_webfetch>] [--perm-websearch, undefined <perm_websearch>] [--perm-codesearch, undefined <perm_codesearch>] [--perm-lsp, undefined <perm_lsp>] [--perm-doom_loop, undefined <perm_doom_loop>] [--perm-skill, undefined <perm_skill>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Agent name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "description",
+            "summary": "Optional description",
+            "flag": "--description",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "model",
+            "summary": "Optional model id",
+            "flag": "--model",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "color",
+            "summary": "Optional color",
+            "flag": "--color",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "info",
+              "warning",
+              "danger",
+              "success"
+            ]
+          },
+          {
+            "name": "steps",
+            "summary": "Optional max steps",
+            "flag": "--steps",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "mode",
+            "summary": "Agent mode",
+            "flag": "--mode",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "primary",
+              "subagent",
+              "all"
+            ]
+          },
+          {
+            "name": "system_prompt",
+            "summary": "Markdown system prompt body",
+            "flag": "--prompt",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "hidden",
+            "summary": "Hide agent from normal menus",
+            "flag": "--hidden",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "disabled",
+            "summary": "Disable agent",
+            "flag": "--disabled",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "perm_read",
+            "summary": "read permission (blank = default behavior)",
+            "flag": "--perm-read",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_edit",
+            "summary": "edit permission (blank = default behavior)",
+            "flag": "--perm-edit",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_glob",
+            "summary": "glob permission (blank = default behavior)",
+            "flag": "--perm-glob",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_grep",
+            "summary": "grep permission (blank = default behavior)",
+            "flag": "--perm-grep",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_list",
+            "summary": "list permission (blank = default behavior)",
+            "flag": "--perm-list",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_bash",
+            "summary": "bash permission (blank = default behavior)",
+            "flag": "--perm-bash",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_task",
+            "summary": "task permission (blank = default behavior)",
+            "flag": "--perm-task",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_external_directory",
+            "summary": "external_directory permission (blank = default behavior)",
+            "flag": "--perm-external_directory",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_todowrite",
+            "summary": "todowrite permission (blank = default behavior)",
+            "flag": "--perm-todowrite",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_question",
+            "summary": "question permission (blank = default behavior)",
+            "flag": "--perm-question",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_webfetch",
+            "summary": "webfetch permission (blank = default behavior)",
+            "flag": "--perm-webfetch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_websearch",
+            "summary": "websearch permission (blank = default behavior)",
+            "flag": "--perm-websearch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_codesearch",
+            "summary": "codesearch permission (blank = default behavior)",
+            "flag": "--perm-codesearch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_lsp",
+            "summary": "lsp permission (blank = default behavior)",
+            "flag": "--perm-lsp",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_doom_loop",
+            "summary": "doom_loop permission (blank = default behavior)",
+            "flag": "--perm-doom_loop",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_skill",
+            "summary": "skill permission (blank = default behavior)",
+            "flag": "--perm-skill",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          }
+        ],
+        "examples": [
+          "/ai agents new reviewer --model openai/gpt-5.4"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "agents-edit",
+        "summary": "Edit an existing OpenCode agent.",
+        "usage": "agents-edit <name> [--description, undefined <description>] [--model, undefined <model>] [--color, undefined <color>] [--steps, undefined <steps>] [--mode, undefined <mode>] [--prompt, undefined <system_prompt>] [--hidden, undefined] [--disabled, undefined] [--perm-read, undefined <perm_read>] [--perm-edit, undefined <perm_edit>] [--perm-glob, undefined <perm_glob>] [--perm-grep, undefined <perm_grep>] [--perm-list, undefined <perm_list>] [--perm-bash, undefined <perm_bash>] [--perm-task, undefined <perm_task>] [--perm-external_directory, undefined <perm_external_directory>] [--perm-todowrite, undefined <perm_todowrite>] [--perm-question, undefined <perm_question>] [--perm-webfetch, undefined <perm_webfetch>] [--perm-websearch, undefined <perm_websearch>] [--perm-codesearch, undefined <perm_codesearch>] [--perm-lsp, undefined <perm_lsp>] [--perm-doom_loop, undefined <perm_doom_loop>] [--perm-skill, undefined <perm_skill>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Agent name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "description",
+            "summary": "Optional description",
+            "flag": "--description",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "model",
+            "summary": "Optional model id",
+            "flag": "--model",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "color",
+            "summary": "Optional color",
+            "flag": "--color",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "info",
+              "warning",
+              "danger",
+              "success"
+            ]
+          },
+          {
+            "name": "steps",
+            "summary": "Optional max steps",
+            "flag": "--steps",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "mode",
+            "summary": "Agent mode",
+            "flag": "--mode",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "primary",
+              "subagent",
+              "all"
+            ]
+          },
+          {
+            "name": "system_prompt",
+            "summary": "Markdown system prompt body",
+            "flag": "--prompt",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "hidden",
+            "summary": "Hide agent from normal menus",
+            "flag": "--hidden",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "disabled",
+            "summary": "Disable agent",
+            "flag": "--disabled",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "perm_read",
+            "summary": "read permission (blank = default behavior)",
+            "flag": "--perm-read",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_edit",
+            "summary": "edit permission (blank = default behavior)",
+            "flag": "--perm-edit",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_glob",
+            "summary": "glob permission (blank = default behavior)",
+            "flag": "--perm-glob",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_grep",
+            "summary": "grep permission (blank = default behavior)",
+            "flag": "--perm-grep",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_list",
+            "summary": "list permission (blank = default behavior)",
+            "flag": "--perm-list",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_bash",
+            "summary": "bash permission (blank = default behavior)",
+            "flag": "--perm-bash",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_task",
+            "summary": "task permission (blank = default behavior)",
+            "flag": "--perm-task",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_external_directory",
+            "summary": "external_directory permission (blank = default behavior)",
+            "flag": "--perm-external_directory",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_todowrite",
+            "summary": "todowrite permission (blank = default behavior)",
+            "flag": "--perm-todowrite",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_question",
+            "summary": "question permission (blank = default behavior)",
+            "flag": "--perm-question",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_webfetch",
+            "summary": "webfetch permission (blank = default behavior)",
+            "flag": "--perm-webfetch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_websearch",
+            "summary": "websearch permission (blank = default behavior)",
+            "flag": "--perm-websearch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_codesearch",
+            "summary": "codesearch permission (blank = default behavior)",
+            "flag": "--perm-codesearch",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_lsp",
+            "summary": "lsp permission (blank = default behavior)",
+            "flag": "--perm-lsp",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_doom_loop",
+            "summary": "doom_loop permission (blank = default behavior)",
+            "flag": "--perm-doom_loop",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          },
+          {
+            "name": "perm_skill",
+            "summary": "skill permission (blank = default behavior)",
+            "flag": "--perm-skill",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "",
+              "allow",
+              "ask",
+              "deny"
+            ]
+          }
+        ],
+        "examples": [
+          "/ai agents edit plan"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "agents-delete",
+        "summary": "Delete an OpenCode agent.",
+        "usage": "agents-delete <name>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Agent name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai agents delete plan"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "agents-upsert-json",
+        "summary": "Internal structured save for the AI agent editor.",
+        "usage": "agents-upsert-json",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/ai agents-upsert-json"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "agents-save",
+        "summary": "Save the full OpenCode agents draft config.",
+        "usage": "agents-save <draft_json...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draft_json",
+            "summary": "Serialized OpenCode agents draft JSON",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai agents-save '{\"rootModel\":null,\"agents\":[]}'"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "agent-set",
+        "summary": "Select the current OpenCode agent.",
+        "usage": "agent-set <name>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Agent name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai agent-set ask"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "agent-restore",
+        "summary": "Restore OpenCode agents in opencode.json to the built-in defaults.",
+        "usage": "agent-restore",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/ai agent-restore"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "root-model",
+        "summary": "Show or set the OpenCode root model.",
+        "usage": "root-model [<model_or_reset>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "model_or_reset",
+            "summary": "Model id, reset, or omit to show current value",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai root-model",
+          "/ai root-model opencode/big-pickle"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "provider",
+        "summary": "Payment provider and Routstr (set, deposit, balance, …).",
+        "usage": "provider [<subcommand...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "subcommand",
+            "summary": "set, deposit, refund, balance, budget, status, models, sync-models, add-model",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ai provider set [local|routstr]",
+          "/ai provider deposit <sats> [--new]",
+          "/ai provider balance",
+          "/ai provider models [filter]"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "wallet",
+    "summary": "Cashu wallet: mint, balance, receive, send, history.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for wallet or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: mint, balance, receive, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet help",
+          "/wallet help mint",
+          "/wallet help balance"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "mint",
+        "summary": "Show or set default Cashu mint URL.",
+        "usage": "mint [<url>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "url",
+            "summary": "Mint URL",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet mint",
+          "/wallet mint <url>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "mints",
+        "summary": "List mints in wallet.",
+        "usage": "mints",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/wallet mints"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "balance",
+        "summary": "Show Cashu balance for default mint.",
+        "usage": "balance",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/wallet balance"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "decode",
+        "summary": "Decode a Cashu token (no spend).",
+        "usage": "decode <token>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "token",
+            "summary": "Cashu token",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet decode <token>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "receive",
+        "summary": "Receive a Cashu token.",
+        "usage": "receive <token>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "token",
+            "summary": "Cashu token",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet receive <token>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "send",
+        "summary": "Create and send a Cashu token (sats).",
+        "usage": "send <sats>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "sats",
+            "summary": "Amount in satoshis",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet send <sats>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "history",
+        "summary": "Recent spend history.",
+        "usage": "history [<flags...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "flags",
+            "summary": "Optional --token",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet history",
+          "/wallet history --token"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "bunker",
+    "summary": "Bunker remote signers: list and add connections.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for bunker or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: list or add.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bunker help",
+          "/bunker help list",
+          "/bunker help add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List saved bunker signer connections.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bunker list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Connect and save a bunker signer.",
+        "usage": "add <name> <url>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Connection name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "url",
+            "summary": "bunker:// URL",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bunker add mysigner bunker://..."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "wot",
+    "summary": "Web of Trust: crawl, score, and stats.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for wot or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: crawl, score, stats.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wot help",
+          "/wot help crawl",
+          "/wot help score",
+          "/wot help stats"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "crawl",
+        "summary": "Crawl a root-relative WoT graph.",
+        "usage": "crawl [<args...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "args",
+            "summary": "Optional --pubkey, --depth",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wot crawl",
+          "/wot crawl --depth 3"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "score",
+        "summary": "Inspect WoT score for a pubkey.",
+        "usage": "score [<args...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "args",
+            "summary": "pubkey/npub and optional of <pubkey>",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wot score <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "stats",
+        "summary": "Show stored WoT graph stats for a root.",
+        "usage": "stats [<pubkey>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Optional root pubkey/npub",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wot stats",
+          "/wot stats <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "bm",
+    "summary": "Bookmarks: structured links with categories, tags, media types, drafts, and publish.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "bm",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for bm or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand name (e.g. list, search, ai).",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm help",
+          "/bm help list",
+          "/bm help search",
+          "/bm help ai"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "ai",
+        "summary": "Create bookmark drafts from natural language (accept / revise / decline).",
+        "usage": "ai <prompt...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "prompt",
+            "summary": "What to bookmark or change.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm ai rust async book for weekend reading"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "summarize",
+        "summary": "Fetch a bookmark URL and save a summary (agent).",
+        "usage": "summarize <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm summarize 3"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "next",
+        "summary": "Oldest unconsumed match (prefers queue); optional media type and filters.",
+        "usage": "next [<media_type>] [--tag <tag>] [--tags <tags>] [--category <category>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "media_type",
+            "summary": "Optional media type filter.",
+            "kind": "string"
+          }
+        ],
+        "options": [
+          {
+            "name": "tag",
+            "summary": "Require tag (repeatable).",
+            "flag": "--tag",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "tags",
+            "summary": "Comma-separated tags (all required).",
+            "flag": "--tags",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "category",
+            "summary": "Category path filter.",
+            "flag": "--category",
+            "shortFlag": null,
+            "kind": "string"
+          }
+        ],
+        "examples": [
+          "/bm next",
+          "/bm next video --tag nostr"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "done",
+        "summary": "Mark a bookmark consumed and remove it from the queue.",
+        "usage": "done <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm done 12"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "queue",
+        "summary": "Add a bookmark to the active backlog.",
+        "usage": "queue <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm queue 5"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Explains that bookmarks are added via ai drafts (no direct add here).",
+        "usage": "add",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bm add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List local bookmarks; optional filters and category tree view.",
+        "usage": "list [--by, -b <by>] [--queued] [--no-queued] [--unconsumed] [--consumed] [--type <type>] [--tag <tag>] [--tags <tags>] [--category <category>] [--title <title>] [--url <url>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "by",
+            "summary": "Group results (cats = category tree).",
+            "flag": "--by",
+            "shortFlag": "-b",
+            "kind": "string",
+            "choices": [
+              "cats"
+            ],
+            "webDefaultValue": "cats"
+          },
+          {
+            "name": "queued",
+            "summary": "Only bookmarks in the queue.",
+            "flag": "--queued",
+            "shortFlag": null,
+            "kind": "boolean"
+          },
+          {
+            "name": "no-queued",
+            "summary": "Only bookmarks not in the queue.",
+            "flag": "--no-queued",
+            "shortFlag": null,
+            "kind": "boolean"
+          },
+          {
+            "name": "unconsumed",
+            "summary": "Only unconsumed bookmarks.",
+            "flag": "--unconsumed",
+            "shortFlag": null,
+            "kind": "boolean"
+          },
+          {
+            "name": "consumed",
+            "summary": "Only consumed bookmarks.",
+            "flag": "--consumed",
+            "shortFlag": null,
+            "kind": "boolean"
+          },
+          {
+            "name": "type",
+            "summary": "Media type filter.",
+            "flag": "--type",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "tag",
+            "summary": "Tag filter (repeatable in CLI).",
+            "flag": "--tag",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "tags",
+            "summary": "Comma-separated tags (all required).",
+            "flag": "--tags",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "category",
+            "summary": "Category path filter.",
+            "flag": "--category",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "title",
+            "summary": "Title substring filter.",
+            "flag": "--title",
+            "shortFlag": null,
+            "kind": "string"
+          },
+          {
+            "name": "url",
+            "summary": "URL substring filter.",
+            "flag": "--url",
+            "shortFlag": null,
+            "kind": "string"
+          }
+        ],
+        "examples": [
+          "/bm list",
+          "/bm list --by cats",
+          "/bm list --unconsumed --tag rust"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "BM",
+          "modalTitle": "Bookmarks list",
+          "icon": "/plugins/bm/commands/list/renderers/list.svg",
+          "order": 25
+        }
+      },
+      {
+        "name": "search",
+        "summary": "Search published bookmarks, paginate results, or import a hit (see help search).",
+        "usage": "search [<args...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "args",
+            "summary": "Subcommand and parameters (e.g. title, import <id>, next, prev, page <n>).",
+            "kind": "string",
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm search rust",
+          "/bm search import 2",
+          "/bm search next"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "tags",
+        "summary": "List tags with bookmark counts.",
+        "usage": "tags",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bm tags"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "cats",
+        "summary": "List categories with bookmark counts.",
+        "usage": "cats",
+        "aliases": [
+          "categories"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bm cats"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "types",
+        "summary": "List media types with bookmark counts.",
+        "usage": "types",
+        "aliases": [
+          "media-types"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bm types"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "context",
+        "summary": "Show tags, categories, and media types for ai context.",
+        "usage": "context",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bm context"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Show one bookmark by id.",
+        "usage": "show <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm show 4"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "publish",
+        "summary": "Publish one bookmark via bunker signer.",
+        "usage": "publish <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm publish 4"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "update",
+        "summary": "Draft a single-field update (url, title, summary, description, category, tags, media_type, in_queue).",
+        "usage": "update <id> <field> <value...> [--clear]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          },
+          {
+            "name": "field",
+            "summary": "Field name to change.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "value",
+            "summary": "New value (use --clear on the CLI for nullable fields).",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [
+          {
+            "name": "clear",
+            "summary": "Clear a nullable field (CLI; summary/description).",
+            "flag": "--clear",
+            "shortFlag": null,
+            "kind": "boolean"
+          }
+        ],
+        "examples": [
+          "/bm update 3 title My bookmark",
+          "/bm update 2 summary --clear"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a bookmark.",
+        "usage": "delete <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Bookmark id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm delete 8"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "drafts",
+        "summary": "List drafts or show one draft by id.",
+        "usage": "drafts [<draft_id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draft_id",
+            "summary": "Optional draft id to show.",
+            "kind": "integer"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm drafts",
+          "/bm drafts 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "accept",
+        "summary": "Accept a draft (or all pending drafts).",
+        "usage": "accept <target>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "target",
+            "summary": "Draft id or the word all.",
+            "kind": "string",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm accept 2",
+          "/bm accept all"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "revise",
+        "summary": "Revise a draft with natural-language corrections (agent).",
+        "usage": "revise <draft_id> <corrections...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draft_id",
+            "summary": "Draft id.",
+            "kind": "integer",
+            "required": true
+          },
+          {
+            "name": "corrections",
+            "summary": "What to change.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm revise 1 use category tech/rust"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "decline",
+        "summary": "Discard a draft.",
+        "usage": "decline <draft_id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draft_id",
+            "summary": "Draft id.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bm decline 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "browser",
+    "summary": "AI-driven browser automation with multi-tab task execution.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "browser",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for browser or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: run, list, clear",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser help",
+          "/browser help run",
+          "/browser help list",
+          "/browser help clear"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "run",
+        "summary": "Run a browser task or respond to a waiting task.",
+        "usage": "run <prompt...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "prompt",
+            "summary": "Natural language instruction — what to do, or a response to a waiting task.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser run publish my draft post to LinkedIn and X",
+          "/browser run I logged into LinkedIn",
+          "/browser run stop the Instagram task"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List all browser tasks and their current status.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/browser list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "clear",
+        "summary": "Delete all tasks and events from the database.",
+        "usage": "clear",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/browser clear"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "file",
+    "summary": "Browse the workspace tree, diff and preview files, upload files encrypted for another bot (NIP-17), and download by naddr.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "file",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for file or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand name: upload, download, tree, view, diff, bottomup, bottomup_context, summarize, or topdown.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file help",
+          "/file help upload",
+          "/file help download",
+          "/file help tree",
+          "/file help view",
+          "/file help diff",
+          "/file help bottomup",
+          "/file help bottomup_context",
+          "/file help summarize",
+          "/file help topdown"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "upload",
+        "summary": "Encrypt and upload a workspace file for another bot (Blossom + NIP-17).",
+        "usage": "upload [<filePath>] [<recipientNpub>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "filePath",
+            "summary": "Path relative to the active workspace root.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "recipientNpub",
+            "summary": "Recipient bot npub (npub1…).",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file upload README.md npub1abcdef…",
+          "/file upload docs/notes.md npub1…"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "download",
+        "summary": "Download and decrypt a shared file by naddr into the workspace.",
+        "usage": "download [<naddr>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "naddr",
+            "summary": "Note address (naddr1…) of the file share.",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file download naddr1qqyg8x2xx…",
+          "/file download naddr1…"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "tree",
+        "summary": "Print a text tree of the workspace (depth, folder, extension filter). Web UI loads folders lazily.",
+        "usage": "tree [<rest...>] [--ext, undefined <ext>] [--expanded, undefined <expanded>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "rest",
+            "summary": "Optional max depth, target directory (relative), and other tree tokens.",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [
+          {
+            "name": "ext",
+            "summary": "Comma-separated extensions (e.g. ts,tsx or .ts,.tsx).",
+            "flag": "--ext",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "expanded",
+            "summary": "Web UI internal state for lazily expanded folders.",
+            "flag": "--expanded",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/file tree",
+          "/file tree 0",
+          "/file tree 3 src",
+          "/file tree plugins --ext ts",
+          "/file tree --ext ts,tsx"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "modal",
+          "label": "Tree",
+          "modalTitle": "Workspace tree",
+          "icon": "/plugins/file/commands/tree/renderers/tree.svg"
+        }
+      },
+      {
+        "name": "view",
+        "summary": "Preview a file under the workspace (path relative to workspace root).",
+        "usage": "view <path> [--previous-dir <previousDir>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "File path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "previousDir",
+            "summary": "Tree directory to return to in the web UI.",
+            "flag": "--previous-dir",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file view README.md",
+          "/file view src/cli.ts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "diff",
+        "summary": "Show a simple git diff preview for one workspace file.",
+        "usage": "diff <path> [--previous-dir <previousDir>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "File path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "previousDir",
+            "summary": "Tree directory to return to in the web UI.",
+            "flag": "--previous-dir",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file diff README.md",
+          "/file diff src/cli.ts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "bottomup",
+        "summary": "Generate local `__BOTTOMUP.md` files depth-first for a folder subtree.",
+        "usage": "bottomup [<workingDir>] [--scope-root <scopeRoot>] [--depth <depth>] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "workingDir",
+            "summary": "Folder relative to workspace root. Omit for the workspace root.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "scopeRoot",
+            "summary": "Logical documentation root relative to workspace root.",
+            "flag": "--scope-root",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "depth",
+            "summary": "Maximum recursive depth. Omit for unlimited.",
+            "flag": "--depth",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "model",
+            "summary": "Override the model used to generate summaries.",
+            "flag": "--model",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "ignore",
+            "summary": "Comma-separated extra ignore patterns.",
+            "flag": "--ignore",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "includeHidden",
+            "summary": "Include hidden files and directories.",
+            "flag": "--include-hidden",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "noGitignore",
+            "summary": "Do not respect `.gitignore` rules.",
+            "flag": "--no-gitignore",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file bottomup",
+          "/file bottomup src",
+          "/file bottomup plugins/file --scope-root plugins/file",
+          "/file bottomup src --depth 2",
+          "/file bottomup docs --model openai/gpt-5.1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "bottomup_context",
+        "summary": "Read existing bottom-up documentation for a folder, its parents, and child status.",
+        "usage": "bottomup_context [<workingDir>] [--scope-root <scopeRoot>] [--parents <parents>] [--children <children>] [--ignore <ignore>] [--include-hidden] [--no-gitignore]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "workingDir",
+            "summary": "Folder relative to workspace root. Omit for the workspace root.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "scopeRoot",
+            "summary": "Logical documentation root relative to workspace root.",
+            "flag": "--scope-root",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "parents",
+            "summary": "How many parent folders to include.",
+            "flag": "--parents",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "children",
+            "summary": "How many child levels to inspect for `__BOTTOMUP.md` presence.",
+            "flag": "--children",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "ignore",
+            "summary": "Comma-separated extra ignore patterns.",
+            "flag": "--ignore",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "includeHidden",
+            "summary": "Include hidden files and directories.",
+            "flag": "--include-hidden",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "noGitignore",
+            "summary": "Do not respect `.gitignore` rules.",
+            "flag": "--no-gitignore",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file bottomup_context",
+          "/file bottomup_context plugins/file --scope-root plugins/file",
+          "/file bottomup_context src --parents 3",
+          "/file bottomup_context plugins/file --children 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "summarize",
+        "summary": "Return a flat AI summary for a folder or subtree without writing files.",
+        "usage": "summarize [<workingDir>] [--scope-root <scopeRoot>] [--depth <depth>] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--write-summary]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "workingDir",
+            "summary": "Folder relative to workspace root. Omit for the workspace root.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "scopeRoot",
+            "summary": "Logical documentation root relative to workspace root.",
+            "flag": "--scope-root",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "depth",
+            "summary": "Maximum recursive depth. Omit for unlimited.",
+            "flag": "--depth",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "model",
+            "summary": "Override the model used to generate summaries.",
+            "flag": "--model",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "ignore",
+            "summary": "Comma-separated extra ignore patterns.",
+            "flag": "--ignore",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "includeHidden",
+            "summary": "Include hidden files and directories.",
+            "flag": "--include-hidden",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "noGitignore",
+            "summary": "Do not respect `.gitignore` rules.",
+            "flag": "--no-gitignore",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "writeSummary",
+            "summary": "Write __BOTTOMUP_SUMMARY.md for later topdown enrichment.",
+            "flag": "--write-summary",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file summarize",
+          "/file summarize plugins/file --scope-root plugins/file",
+          "/file summarize src --depth 2",
+          "/file summarize plugins/file --scope-root plugins/file --write-summary",
+          "/file summarize plugins/file --model openai/gpt-5.1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "topdown",
+        "summary": "Enrich existing __BOTTOMUP.md files using __BOTTOMUP_SUMMARY.md context.",
+        "usage": "topdown [<workingDir>] [--scope-root <scopeRoot>] [--depth <depth>] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--force]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "workingDir",
+            "summary": "Folder relative to workspace root. Omit for the workspace root.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "scopeRoot",
+            "summary": "Logical documentation root relative to workspace root.",
+            "flag": "--scope-root",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "depth",
+            "summary": "Maximum recursive depth. Omit for unlimited.",
+            "flag": "--depth",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "model",
+            "summary": "Override the model used to enrich summaries.",
+            "flag": "--model",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "ignore",
+            "summary": "Comma-separated extra ignore patterns.",
+            "flag": "--ignore",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "includeHidden",
+            "summary": "Include hidden files and directories.",
+            "flag": "--include-hidden",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "noGitignore",
+            "summary": "Do not respect `.gitignore` rules.",
+            "flag": "--no-gitignore",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          },
+          {
+            "name": "force",
+            "summary": "Run even when summary/doc enrichment metadata is stale or present.",
+            "flag": "--force",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/file topdown",
+          "/file topdown plugins/file --scope-root plugins/file",
+          "/file topdown src --depth 2",
+          "/file topdown plugins/file --force"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "job",
+    "summary": "Scheduled agent jobs: one-time or cron, drafts via AI, list/show/history/run.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "job",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for job or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: ai, drafts, list, show, confirm, run, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job help",
+          "/job help ai",
+          "/job help list",
+          "/job help drafts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "ai",
+        "summary": "Create a job draft from natural language (requires an agent backend).",
+        "usage": "ai [<prompt...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "prompt",
+            "summary": "Natural-language description of the schedule and task.",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job ai daily summary every weekday at 9am",
+          "/job ai remind me in 15 minutes to check the logs"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "drafts",
+        "summary": "List pending job drafts (confirm, revise, or discard).",
+        "usage": "drafts",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/job drafts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "confirm",
+        "summary": "Create a job from a pending create draft.",
+        "usage": "confirm [<draftId>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draftId",
+            "summary": "Numeric draft id from drafts list.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job confirm 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "revise",
+        "summary": "Ask the agent to revise a create draft (requires an agent backend).",
+        "usage": "revise [<draftId>] [<corrections...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draftId",
+            "summary": "Numeric draft id.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "corrections",
+            "summary": "What to change in the draft.",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job revise 2 run at 10am instead of 9am"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "discard",
+        "summary": "Delete a pending draft.",
+        "usage": "discard [<draftId>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "draftId",
+            "summary": "Numeric draft id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job discard 3"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List all jobs (markdown table).",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/job list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Jobs",
+          "modalTitle": "Jobs",
+          "icon": "/plugins/job/commands/list/renderers/clock.svg",
+          "order": 30
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Show details for one job.",
+        "usage": "show [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job show 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "enable",
+        "summary": "Enable a job.",
+        "usage": "enable [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job enable 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "disable",
+        "summary": "Disable a job.",
+        "usage": "disable [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job disable 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a job permanently.",
+        "usage": "delete [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job delete 4"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "history",
+        "summary": "Show recent runs for a job (default last 10).",
+        "usage": "history [<id>] [<limit>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "summary": "Max runs to show (1–50, default 10).",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job history 1",
+          "/job history 1 20"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "run",
+        "summary": "Run a job once immediately.",
+        "usage": "run [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Job id.",
+            "kind": "integer",
+            "required": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/job run 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "todo",
+    "summary": "Todo management with nested tasks, AI drafts, and ranking.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "todo",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for todo or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand name such as list or start.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo help",
+          "/todo help list",
+          "/todo help start"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "ai",
+        "summary": "Use AI to list todos or prepare draft todo changes.",
+        "usage": "ai <prompt...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "prompt",
+            "summary": "Natural-language instruction for todo operations.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo ai show my todos",
+          "/todo ai add a todo to take medicine tonight at 9PM"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Add a todo, optionally under a parent todo.",
+        "usage": "add <text...> [--under, undefined <under>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "text",
+            "summary": "Todo text to create.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [
+          {
+            "name": "under",
+            "summary": "Optional parent todo ID.",
+            "flag": "--under",
+            "kind": "integer"
+          }
+        ],
+        "examples": [
+          "/todo add buy oat milk",
+          "/todo add draft release notes --under 12"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "drafts",
+        "summary": "List pending drafts or show a single draft.",
+        "usage": "drafts [<id>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Optional draft ID to inspect.",
+            "kind": "integer"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo drafts",
+          "/todo drafts 7"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "accept",
+        "summary": "Accept one draft or all drafts.",
+        "usage": "accept <target>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "target",
+            "summary": "Draft ID or the word all.",
+            "kind": "string",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo accept 7",
+          "/todo accept all"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "revise",
+        "summary": "Revise a create draft with AI-generated corrections.",
+        "usage": "revise <id> <corrections...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Draft ID to revise.",
+            "kind": "integer",
+            "required": true
+          },
+          {
+            "name": "corrections",
+            "summary": "Correction text for the revised draft.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo revise 7 split this into subtasks"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "decline",
+        "summary": "Discard a pending draft.",
+        "usage": "decline <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Draft ID to discard.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo decline 7"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "duel",
+        "summary": "Rank sibling todos by pairwise comparison.",
+        "usage": "duel [<parentId>] [--reset, undefined]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "parentId",
+            "summary": "Optional scope root todo ID.",
+            "kind": "integer"
+          }
+        ],
+        "options": [
+          {
+            "name": "reset",
+            "summary": "Reset comparisons before starting the duel.",
+            "flag": "--reset",
+            "kind": "boolean"
+          }
+        ],
+        "examples": [
+          "/todo duel",
+          "/todo duel 12",
+          "/todo duel --reset"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "focus",
+        "summary": "Set the current focus todo.",
+        "usage": "focus <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to focus.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo focus 42"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "unfocus",
+        "summary": "Clear the current focus todo.",
+        "usage": "unfocus",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/todo unfocus"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "current",
+        "summary": "Show the current leaf todo in the selected scope.",
+        "usage": "current [<parentId>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "parentId",
+            "summary": "Optional scope root todo ID.",
+            "kind": "integer"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo current",
+          "/todo current 12"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "next",
+        "summary": "Show the next pending leaf after the current one in scope.",
+        "usage": "next [<parentId>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "parentId",
+            "summary": "Optional scope root todo ID.",
+            "kind": "integer"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo next",
+          "/todo next 12"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List todos in the current scope or a selected subtree.",
+        "usage": "list [<rootId>] [--status, undefined <status>] [--flat, undefined] [--desc, undefined] [--level, undefined <level>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "rootId",
+            "summary": "Optional subtree root todo ID.",
+            "kind": "integer"
+          }
+        ],
+        "options": [
+          {
+            "name": "status",
+            "summary": "Filter by status: done|in_progress|pending|all.",
+            "flag": "--status",
+            "kind": "string",
+            "choices": [
+              "done",
+              "in_progress",
+              "pending",
+              "all"
+            ]
+          },
+          {
+            "name": "flat",
+            "summary": "Render a flat list.",
+            "flag": "--flat",
+            "kind": "boolean"
+          },
+          {
+            "name": "desc",
+            "summary": "Include descriptions.",
+            "flag": "--desc",
+            "kind": "boolean"
+          },
+          {
+            "name": "level",
+            "summary": "Limit output to a tree depth.",
+            "flag": "--level",
+            "kind": "integer"
+          }
+        ],
+        "examples": [
+          "/todo list",
+          "/todo list --status in_progress",
+          "/todo list 12 --status done --flat"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Todo",
+          "modalTitle": "Todo list",
+          "icon": "/plugins/todo/commands/list/renderers/list.svg",
+          "order": 20
+        }
+      },
+      {
+        "name": "move",
+        "summary": "Move a todo under a new parent or back to the top level.",
+        "usage": "move <id> [--under, undefined <under>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to move.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [
+          {
+            "name": "under",
+            "summary": "Optional parent todo ID. Omit for top level.",
+            "flag": "--under",
+            "kind": "integer"
+          }
+        ],
+        "examples": [
+          "/todo move 42",
+          "/todo move 42 --under 7"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "done",
+        "summary": "Mark a todo and its descendants as done.",
+        "usage": "done <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to mark done.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo done 42"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a todo and all of its descendants.",
+        "usage": "delete <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to delete.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo delete 42"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Show detail for a single todo.",
+        "usage": "show <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to show.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo show 42"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "start",
+        "summary": "Set a todo to in progress.",
+        "usage": "start <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to start.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo start 42"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "update",
+        "summary": "Update a todo field such as title, status, or description.",
+        "usage": "update <id> <field> <value...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Todo ID to update.",
+            "kind": "integer",
+            "required": true
+          },
+          {
+            "name": "field",
+            "summary": "Field name: todo, title, status, or description.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "value",
+            "summary": "New value for the selected field.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/todo update 42 todo buy oat milk",
+          "/todo update 42 status in_progress",
+          "/todo update 42 description blocked on review"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  }
+]

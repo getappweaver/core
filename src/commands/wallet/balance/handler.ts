@@ -1,5 +1,5 @@
-import type { WalletDb } from '@src/wallets/db';
-import { getBalanceByMint } from '@src/wallets/db';
+import type { WalletDb } from '@src/wallet/db';
+import { getBalanceByMint } from '@src/wallet/db';
 
 import type { WalletBalanceRepresentation } from './representation';
 

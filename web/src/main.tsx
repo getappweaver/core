@@ -14,6 +14,7 @@ function syncAppViewportHeight(): void {
   }
 
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+
   document.documentElement.style.setProperty(
     '--app-viewport-height',
     `${Math.round(viewportHeight)}px`,

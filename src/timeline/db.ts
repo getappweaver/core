@@ -6,8 +6,10 @@ import type {
   TimelineCommandFormState,
   TimelineEventKind,
   TimelineEventRecord,
+  TimelineFileDiff,
   TimelineHistoryItem,
   TimelinePayload,
+  TimelineToolCall,
 } from './types';
 
 type TimelineEventRow = {
@@ -23,6 +25,9 @@ type TimelineEventRow = {
   form_json: string | null;
   text: string | null;
   web_json: string | null;
+  client_view_json: string | null;
+  diff_json: string | null;
+  tool_json: string | null;
   prompt_json: string | null;
   request_id: string | null;
   created_at: number;
@@ -43,6 +48,9 @@ export function createTimelineTables(db: CoreDb): void {
       form_json TEXT,
       text TEXT,
       web_json TEXT,
+      client_view_json TEXT,
+      diff_json TEXT,
+      tool_json TEXT,
       prompt_json TEXT,
       request_id TEXT,
       created_at INTEGER NOT NULL
@@ -51,6 +59,24 @@ export function createTimelineTables(db: CoreDb): void {
 
   try {
     db.run('ALTER TABLE timeline_events ADD COLUMN form_json TEXT');
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.run('ALTER TABLE timeline_events ADD COLUMN client_view_json TEXT');
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.run('ALTER TABLE timeline_events ADD COLUMN diff_json TEXT');
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
+    db.run('ALTER TABLE timeline_events ADD COLUMN tool_json TEXT');
   } catch {
     /* Column already exists */
   }
@@ -70,13 +96,17 @@ export function createTimelineEventId(): string {
 
 export function insertTimelineEvent(
   db: CoreDb,
-  event: Omit<TimelineEventRecord, 'id' | 'createdAt'> & {
+  event: Omit<TimelineEventRecord, 'id' | 'createdAt' | 'diff' | 'tool'> & {
     id?: string;
     createdAt?: number;
+    diff?: TimelineFileDiff[] | null;
+    tool?: TimelineToolCall | null;
   },
 ): TimelineEventRecord {
   const record: TimelineEventRecord = {
     ...event,
+    diff: event.diff ?? null,
+    tool: event.tool ?? null,
     id: event.id ?? createTimelineEventId(),
     createdAt: event.createdAt ?? Date.now(),
   };
@@ -95,10 +125,13 @@ export function insertTimelineEvent(
       form_json,
       text,
       web_json,
+      client_view_json,
+      diff_json,
+      tool_json,
       prompt_json,
       request_id,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       record.id,
       record.timelineId,
@@ -112,6 +145,9 @@ export function insertTimelineEvent(
       record.form ? JSON.stringify(record.form) : null,
       record.text,
       record.web ? JSON.stringify(record.web) : null,
+      record.clientView ? JSON.stringify(record.clientView) : null,
+      record.diff ? JSON.stringify(record.diff) : null,
+      record.tool ? JSON.stringify(record.tool) : null,
       record.prompt ? JSON.stringify(record.prompt) : null,
       record.requestId,
       record.createdAt,
@@ -139,6 +175,13 @@ function rowToTimelineEventRecord(row: TimelineEventRow): TimelineEventRecord {
       : null,
     text: row.text,
     web: row.web_json ? JSON.parse(row.web_json) : null,
+    clientView: row.client_view_json ? JSON.parse(row.client_view_json) : null,
+    diff: row.diff_json
+      ? (JSON.parse(row.diff_json) as TimelineFileDiff[])
+      : null,
+    tool: row.tool_json
+      ? (JSON.parse(row.tool_json) as TimelineToolCall)
+      : null,
     prompt: row.prompt_json
       ? (JSON.parse(row.prompt_json) as PromptPayload)
       : null,
@@ -172,6 +215,26 @@ export function timelineEventToHistoryItem(
             source: event.source,
           }
         : null;
+    case 'diff':
+      return event.diff
+        ? {
+            id: event.id,
+            type: 'diff',
+            files: event.diff,
+            createdAt: event.createdAt,
+            source: event.source,
+          }
+        : null;
+    case 'tool':
+      return event.tool
+        ? {
+            id: event.id,
+            type: 'tool',
+            tool: event.tool,
+            createdAt: event.createdAt,
+            source: event.source,
+          }
+        : null;
     case 'prompt': {
       const prompt = event.prompt;
 
@@ -201,6 +264,7 @@ export function timelineEventToHistoryItem(
             values: event.values,
             text: event.text,
             web: event.web,
+            clientView: event.clientView,
             createdAt: event.createdAt,
             source: event.source,
           }
@@ -216,6 +280,9 @@ export function timelineEventToHistoryItem(
             autoRun: event.form.autoRun,
             ...(event.form.optionHints
               ? { optionHints: event.form.optionHints }
+              : {}),
+            ...(event.form.argumentChoices
+              ? { argumentChoices: event.form.argumentChoices }
               : {}),
             createdAt: event.createdAt,
             source: event.source,
@@ -261,6 +328,7 @@ export function upsertTimelineCommandForm(
     form: params.form,
     text: null,
     web: null,
+    clientView: null,
     prompt: null,
     requestId: null,
     createdAt: params.createdAt,

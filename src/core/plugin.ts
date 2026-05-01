@@ -16,7 +16,9 @@ import type {
 } from '@src/db';
 import { log } from '@src/logger';
 import type { MessageSource } from '@src/messaging';
+import type { AiDefinition } from '@src/system/ai-definition';
 import type { CommandDefinition } from '@src/system/command-definition';
+import type { StoryDefinition } from '@src/system/story-definition';
 import type { WebNodeRoot } from '@src/web/ui-schema';
 
 // ---------------------------------------------------------------------------
@@ -176,7 +178,12 @@ export type PluginInvocationContext = {
   runAgent: RunAgentFn;
   sendReply?: SendReplyFn;
   promptFn?: PromptFn;
+  jsonPayload?: unknown;
 };
+
+export type PluginStoriesProvider =
+  | StoryDefinition<unknown>[]
+  | ((prefix: string, alias: string) => StoryDefinition<unknown>[]);
 
 export type BotPlugin = {
   identity: PluginIdentity;
@@ -190,4 +197,6 @@ export type BotPlugin = {
   commandDefinition:
     | CommandDefinition
     | ((prefix: string, alias: string) => CommandDefinition);
+  stories?: PluginStoriesProvider;
+  aiDefinition?: AiDefinition<z.ZodType, any, any>;
 };

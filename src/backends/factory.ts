@@ -6,15 +6,15 @@ import type { AgentBackendName, AgentMode } from '../db';
 import type { ProviderName } from '../providers/types';
 import { assertUnreachable } from '../utils';
 
-import { createCursorBackend } from './cursor';
-import { createOpenCodeBackend } from './opencode';
+import { createCursorSdkBackend } from './cursor-sdk';
 import { createOpencodeSDKBackend } from './opencode-sdk';
 import type { AgentBackend } from './types';
 
 type CreateBackendProps = {
   backendName: AgentBackendName;
   dmBotRoot: string;
-  mode: AgentMode;
+  cursorMode: AgentMode;
+  opencodeAgentName: string | null;
   attachUrl: string | null;
   modelOverride: string | null;
   providerName: ProviderName | null;
@@ -23,26 +23,18 @@ type CreateBackendProps = {
 export function createBackend({
   backendName,
   dmBotRoot,
-  mode,
-  attachUrl,
+  cursorMode,
+  opencodeAgentName,
   modelOverride,
   providerName,
 }: CreateBackendProps): AgentBackend {
   switch (backendName) {
     case 'cursor':
-      return createCursorBackend(modelOverride);
+      return createCursorSdkBackend(modelOverride);
     case 'opencode':
-      return createOpenCodeBackend({
-        dmBotRoot,
-        mode,
-        attachUrl,
-        modelOverride,
-        providerName,
-      });
-    case 'opencode-sdk':
       return createOpencodeSDKBackend({
         dmBotRoot,
-        mode,
+        agentName: opencodeAgentName ?? cursorMode,
         modelOverride,
         providerName,
       });

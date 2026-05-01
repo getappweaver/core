@@ -3,6 +3,7 @@ import { createBackend } from '@src/backends/factory';
 import { getOutputString } from '@src/backends/types';
 import {
   getAgentBackend,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getModelOverride,
   getProviderName,
@@ -25,12 +26,15 @@ export async function runWebChat(
   const { ctx, content, onStreamChunk, streamAbortSignal } = props;
   const mode = getCurrentOrDefaultMode(ctx.seenDb);
   const backendName = getAgentBackend(ctx.seenDb);
+  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
   const modelOverride = getModelOverride(ctx.seenDb, backendName);
 
   const backend = createBackend({
     backendName,
     dmBotRoot: ctx.dmBotRoot,
-    mode,
+    cursorMode: mode,
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     attachUrl: ctx.attachUrl,
     modelOverride,
     providerName: getProviderName(ctx.seenDb),
@@ -48,14 +52,16 @@ export async function runWebChat(
   });
 
   const useStream =
-    backendName === 'opencode-sdk' &&
+    (backendName === 'opencode' || backendName === 'cursor') &&
     onStreamChunk !== null &&
     streamAbortSignal !== null;
 
   const result = await backend.runMessage({
     sessionId,
     content,
-    mode,
+    cursorMode: mode,
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     cwd,
     getRoutstrSkKey: () => null,
     modelOverride,

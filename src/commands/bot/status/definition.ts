@@ -12,9 +12,13 @@ export function getBotStatusSubcommandDefinition(
     arguments: [],
     options: [],
     examples: [`${p}bot status`],
-    webHeaderWidget: {
+    webWidget: {
+      placement: 'header',
+      surface: 'modal',
       label: 'Status',
       modalTitle: 'Bot status',
+      icon: '/src/commands/bot/status/renderers/status.svg',
+      order: 10,
     },
   };
 }

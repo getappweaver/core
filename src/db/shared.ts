@@ -7,11 +7,7 @@ import type { Brand } from '../types';
 export const AgentModeSchema = z.enum(['free', 'ask', 'plan', 'agent']);
 export type AgentMode = z.infer<typeof AgentModeSchema>;
 
-export const AgentBackendNameSchema = z.enum([
-  'cursor',
-  'opencode',
-  'opencode-sdk',
-]);
+export const AgentBackendNameSchema = z.enum(['cursor', 'opencode']);
 export type AgentBackendName = z.infer<typeof AgentBackendNameSchema>;
 
 export const ProviderNameSchema = z.enum(['local', 'routstr']);
@@ -32,6 +28,7 @@ export const STATE_AGENT_BACKEND = 'agent_backend';
 export const STATE_REPLY_TRANSPORT = 'reply_transport';
 export const STATE_WORKSPACE_TARGET = 'workspace_target';
 export const STATE_MODEL_OVERRIDE = 'model_override';
+export const STATE_OPENCODE_AGENT = 'opencode_agent';
 export const STATE_PROVIDER_NAME = 'provider_name';
 export const STATE_ROUTSTR_BUDGET_MSATS = 'routstr_budget_msats';
 export const STATE_ROUTSTR_SK_KEY = 'routstr_sk_key';
@@ -54,7 +51,7 @@ export const DmCommandPrefixSchema = z
 export type DmCommandPrefix = z.infer<typeof DmCommandPrefixSchema>;
 
 export const DEFAULT_MODE: AgentMode = 'ask';
-export const DEFAULT_BACKEND: AgentBackendName = 'cursor';
+export const DEFAULT_BACKEND: AgentBackendName = 'opencode';
 export const DEFAULT_REPLY_TRANSPORT: ReplyTransport = 'remote';
 export const DEFAULT_WORKSPACE_TARGET: WorkspaceTarget = 'parent';
 export const DEFAULT_PROVIDER: ProviderName = 'local';

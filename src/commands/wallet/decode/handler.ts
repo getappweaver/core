@@ -1,4 +1,4 @@
-import { decodeToken } from '@src/wallets/cashu';
+import { decodeToken } from '@src/wallet/cashu';
 
 import type { WalletDecodeRepresentation } from './representation';
 

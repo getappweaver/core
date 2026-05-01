@@ -22,7 +22,7 @@ import type { ProviderDb } from '../providers/db';
 import { createProvider } from '../providers/factory';
 import { getOrCreateCurrentSession, insertSessionMessage } from '../session';
 import { msatsRaw } from '../types';
-import type { WalletDb } from '../wallets/db';
+import type { WalletDb } from '../wallet/db';
 
 import { runAgentWithLintFollowUp } from './agent-lint-follow-up';
 import { prepareAutoFlowDeposit } from './auto-flow-deposit';

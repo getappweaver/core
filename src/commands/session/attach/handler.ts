@@ -26,15 +26,6 @@ export function handleSessionAttach(
     };
   }
 
-  if (normalizedTarget === 'cursor') {
-    return {
-      kind: 'session.attach',
-      version: 1,
-      meta: { command: 'session', subcommand: 'attach' },
-      data: { view: 'not-implemented', targetBackend: 'cursor' },
-    };
-  }
-
   if (normalizedTarget !== 'opencode') {
     return {
       kind: 'session.attach',
@@ -44,10 +35,7 @@ export function handleSessionAttach(
     };
   }
 
-  const isOpenCodeBackend =
-    activeBackend === 'opencode' || activeBackend === 'opencode-sdk';
-
-  if (!isOpenCodeBackend) {
+  if (activeBackend !== 'opencode') {
     return {
       kind: 'session.attach',
       version: 1,

@@ -7,7 +7,7 @@ export function getAiModelSubcommandDefinition(
 
   return {
     name: 'model',
-    summary: 'Show or set model override (cleared when backend changes).',
+    summary: 'Show or set the model override for the current backend.',
     aliases: [],
     arguments: [
       {

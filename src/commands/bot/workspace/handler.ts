@@ -1,4 +1,5 @@
 import type { AgentBackend } from '@src/backends/types';
+import { handleError, type RouteCommandContext } from '@src/commands/dispatch';
 import {
   type CoreDb,
   type WorkspaceTarget,
@@ -7,7 +8,11 @@ import {
   setWorkspaceTarget,
 } from '@src/db';
 import { createNewSession } from '@src/session';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
+import { appendStatusBlock } from '../../shared/with-status';
+
+import { renderBotWorkspaceText } from './renderers/text';
 import type { BotWorkspaceRepresentation } from './representation';
 
 type HandleBotWorkspaceProps = {
@@ -118,4 +123,24 @@ export async function handleBotWorkspace(
       errorMessage: String(err),
     });
   }
+}
+
+export function handleBotWorkspaceCommand(
+  ctx: RouteCommandContext,
+): Promise<WebHandlerResult> {
+  return handleError(async () => {
+    const rep = await handleBotWorkspace({
+      db: ctx.seenDb,
+      backend: ctx.backend,
+      dmBotRoot: ctx.dmBotRoot,
+      parentOfBotRoot: ctx.parentOfBotRoot,
+      selected: ctx.args[1],
+      prefix: ctx.prefix,
+    });
+
+    // No web renderer for bot workspace yet; fall back to text.
+    const out = renderBotWorkspaceText(rep, { prefix: ctx.prefix });
+
+    return appendStatusBlock(ctx, out);
+  }, 'Failed to switch workspace');
 }

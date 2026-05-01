@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-05-01T13:52:10.627Z",
+  "prefix": "/",
+  "plugins": [
+    {
+      "alias": "todo",
+      "name": "dm-bot-todo-plugin",
+      "repo": "nostr://_@dhalsim.github.io/dm-bot-todo-plugin",
+      "version": "4.0.0",
+      "commandStoryCount": 2,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "job",
+      "name": "dm-bot-job-plugin",
+      "repo": "nostr://_@dhalsim.github.io/dm-bot-job-plugin",
+      "version": "3.0.0",
+      "commandStoryCount": 1,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "bm",
+      "name": "dm-bot-bm-plugin",
+      "repo": "nostr://_@dhalsim.github.io/dm-bot-bm-plugin",
+      "version": "3.0.0",
+      "commandStoryCount": 1,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "file",
+      "name": "dm-bot-file-plugin",
+      "repo": "nostr://_@dhalsim.github.io/dm-bot-file-plugin",
+      "version": "2.0.0",
+      "commandStoryCount": 2,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "browser",
+      "name": "dm-bot-browser-plugin",
+      "repo": "nostr://_@dhalsim.github.io/dm-bot-browser-plugin",
+      "version": "1.0.3",
+      "commandStoryCount": 0,
+      "aiStoryCount": 0
+    }
+  ]
+}

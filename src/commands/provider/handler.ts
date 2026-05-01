@@ -8,7 +8,7 @@ import {
   getWalletDefaultMintUrl,
 } from '@src/db';
 import { msatsRaw } from '@src/types';
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { RouteCommandContext } from '../dispatch';
 import { handleError } from '../dispatch';
@@ -35,7 +35,7 @@ import {
 export async function runProviderCommandsFromArgs(
   input: RouteCommandContext,
   args: string[],
-): Promise<string | WebNodeRoot> {
+): Promise<WebHandlerResult> {
   const p = input.prefix;
   const subcmd = args[0]?.toLowerCase();
 

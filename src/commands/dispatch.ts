@@ -6,12 +6,13 @@ import type { SimplePool } from 'nostr-tools/pool';
 
 import type { PromptFn, RunAgentFn, SendReplyFn } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { AgentBackend } from '../backends/types';
 import { dispatchPluginCommand } from '../core/registry';
 import type { CoreDb } from '../db';
 import {
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getModelOverride,
   getRoutstrSkKey,
@@ -21,7 +22,7 @@ import type { BotConfig } from '../env';
 import { log } from '../logger';
 import type { ProviderDb } from '../providers/db';
 import { getOrCreateCurrentSession } from '../session';
-import type { WalletDb } from '../wallets/db';
+import type { WalletDb } from '../wallet/db';
 
 import { parseBuiltinTokens } from './parse-prefixed';
 import { builtinCommandHandlers } from './prefixed-handlers';
@@ -32,8 +33,8 @@ async function createRunAgentForPluginDispatch(props: {
   cwd: string;
 }): Promise<RunAgentFn> {
   const { seenDb, backend, cwd } = props;
-  const mode = getCurrentOrDefaultMode(seenDb);
   const modelOverride = getModelOverride(seenDb, backend.name);
+  const executionProfile = getBackendExecutionProfile(seenDb, backend.name);
 
   const sessionId = await getOrCreateCurrentSession({
     db: seenDb,
@@ -45,7 +46,12 @@ async function createRunAgentForPluginDispatch(props: {
     backend.runMessage({
       sessionId,
       content: prompt,
-      mode,
+      cursorMode:
+        executionProfile.kind === 'cursor'
+          ? executionProfile.mode
+          : getCurrentOrDefaultMode(seenDb),
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       cwd,
       getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
       modelOverride,
@@ -77,6 +83,7 @@ export type RouteCommandProps = {
   sendReply?: SendReplyFn;
   sendDm?: SendReplyFn;
   promptFn?: PromptFn;
+  jsonPayload?: unknown;
 };
 
 export type RouteCommandContext = RouteCommandProps & {
@@ -87,14 +94,14 @@ export type RouteCommandContext = RouteCommandProps & {
 
 export type BuiltinHandler = (
   ctx: RouteCommandContext,
-) => Promise<string | WebNodeRoot>;
+) => Promise<WebHandlerResult>;
 
 // --- error wrapper
 
 export async function handleError(
-  fn: () => Promise<string | WebNodeRoot>,
+  fn: () => Promise<WebHandlerResult>,
   errorPrefix: string,
-): Promise<string | WebNodeRoot> {
+): Promise<WebHandlerResult> {
   try {
     return await fn();
   } catch (err) {
@@ -106,25 +113,16 @@ export async function handleError(
 
 export async function routeCommand(
   props: RouteCommandProps,
-): Promise<string | WebNodeRoot | null> {
+): Promise<WebHandlerResult | null> {
   const {
     input,
     prefix,
-    botRelayUrls,
-    pool,
     seenDb,
-    providerDb,
-    version,
     parentOfBotRoot,
     dmBotRoot,
-    attachUrl,
     backend,
-    botPubkey,
-    walletDb,
-    config,
     source,
     sendReply,
-    sendDm,
     promptFn,
   } = props;
 
@@ -142,27 +140,10 @@ export async function routeCommand(
     getWorkspaceTarget(seenDb) === 'bot' ? dmBotRoot : parentOfBotRoot;
 
   const ctx = {
-    input,
-    prefix,
-    botRelayUrls,
-    pool,
-    seenDb,
-    providerDb,
-    version,
-    parentOfBotRoot,
-    dmBotRoot,
-    attachUrl,
-    backend,
-    botPubkey,
-    walletDb,
-    config,
+    ...props,
     cmd,
     args,
     cwd,
-    source,
-    sendReply,
-    sendDm,
-    promptFn,
   };
 
   const builtIn = builtinCommandHandlers[cmd];

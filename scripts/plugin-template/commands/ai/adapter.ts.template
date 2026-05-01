@@ -1,37 +1,23 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
 import { handle{{PASCAL_ALIAS}}Ai } from '../../ai';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 import { stringFromVariadicArgument } from '../shared/variadic-text';
 
-export async function adaptAiCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export async function adaptAiCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): Promise<string> {
   void params.command;
   void params.source;
+
+  if (!params.runAgent) {
+    return `${params.prefix}${params.alias} ai requires an agent backend. Set backend and try again.`;
+  }
 
   const promptText = stringFromVariadicArgument(
     params.parsed.arguments.prompt,
   ).trim();
 
   if (!promptText) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'ai',
-      text: `Usage: ${params.prefix}${params.alias} ai <natural language request>`,
-    });
+    return `Usage: ${params.prefix}${params.alias} ai <natural language request>`;
   }
 
   const text = await handle{{PASCAL_ALIAS}}Ai({
@@ -42,9 +28,5 @@ export async function adaptAiCommand(params: {
     runAgent: params.runAgent,
   });
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'ai',
-    text,
-  });
+  return text;
 }

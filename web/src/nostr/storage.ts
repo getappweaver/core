@@ -53,12 +53,8 @@ function parseBunkerSignerData(parsed: unknown): BunkerSignerData | null {
     return null;
   }
 
-  const {
-    ephemeralSecret,
-    ephemeralPubkey,
-    remoteSignerPubkey,
-    userPubkey,
-  } = o;
+  const { ephemeralSecret, ephemeralPubkey, remoteSignerPubkey, userPubkey } =
+    o;
 
   if (
     !isHex64(ephemeralSecret) ||
@@ -85,6 +81,8 @@ function parseBunkerSignerData(parsed: unknown): BunkerSignerData | null {
 const STORAGE_KEY = 'dm-bot:bunker-connection';
 const NIP07_KEY = 'dm-bot:nip07-pubkey';
 const NIP55_KEY = 'dm-bot:nip55-pubkey';
+const NIP49_NCRYPTSEC_KEY = 'dm-bot:nip49-ncryptsec';
+const NIP49_PUBKEY_KEY = 'dm-bot:nip49-pubkey';
 
 // ---------------------------------------------------------------------------
 // NIP-07 / NIP-55 pubkey persistence
@@ -150,13 +148,83 @@ export function loadBunkerData(): BunkerSignerData | null {
     }
 
     clearBunkerData();
+
     return null;
   } catch {
     clearBunkerData();
+
     return null;
   }
 }
 
 export function clearBunkerData(): void {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// ---------------------------------------------------------------------------
+// NIP-49 (ncryptsec) — ciphertext + pubkey only; decrypted key is never stored
+// ---------------------------------------------------------------------------
+
+function isNcryptsecShape(value: string): boolean {
+  const t = value.trim();
+
+  return t.startsWith('ncryptsec1') && t.length >= 16;
+}
+
+export function saveNip49Bundle(ncryptsec: string, pubkeyHex: string): void {
+  localStorage.setItem(NIP49_NCRYPTSEC_KEY, ncryptsec.trim());
+  localStorage.setItem(NIP49_PUBKEY_KEY, pubkeyHex);
+}
+
+export function loadNip49Ncryptsec(): string | null {
+  const raw = localStorage.getItem(NIP49_NCRYPTSEC_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  return isNcryptsecShape(raw) ? raw.trim() : null;
+}
+
+export function loadNip49Pubkey(): string | null {
+  const raw = localStorage.getItem(NIP49_PUBKEY_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  return /^[a-fA-F0-9]{64}$/.test(raw) ? raw : null;
+}
+
+export function loadNip49Bundle(): {
+  ncryptsec: string;
+  pubkey: string;
+} | null {
+  const ncryptsec = loadNip49Ncryptsec();
+  const pubkey = loadNip49Pubkey();
+
+  if (!ncryptsec || !pubkey) {
+    if (ncryptsec === null && pubkey === null) {
+      return null;
+    }
+
+    clearNip49Bundle();
+
+    return null;
+  }
+
+  return { ncryptsec, pubkey };
+}
+
+export function clearNip49Bundle(): void {
+  localStorage.removeItem(NIP49_NCRYPTSEC_KEY);
+  localStorage.removeItem(NIP49_PUBKEY_KEY);
+}
+
+/** Clears bunker, NIP-07, NIP-55, and NIP-49 signer data from localStorage. */
+export function clearAllNostrSignerStorage(): void {
+  clearBunkerData();
+  clearNip07Pubkey();
+  clearNip55Pubkey();
+  clearNip49Bundle();
 }

@@ -1,6 +1,6 @@
 import { getWalletDefaultMintUrl, setProviderName } from '@src/db';
 import { depositOrTopup } from '@src/providers/routstr';
-import { getBalanceByMint } from '@src/wallets/db';
+import { getBalanceByMint } from '@src/wallet/db';
 
 import type { RouteCommandContext } from '../../dispatch';
 

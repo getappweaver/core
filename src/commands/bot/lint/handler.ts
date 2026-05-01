@@ -1,6 +1,6 @@
 import type { RouteCommandContext } from '../../dispatch';
 
-import { renderBotLintCli } from './renderers/cli';
+import { renderBotLintText } from './renderers/text';
 import { buildBotLintRepresentationFromArgs } from './representation';
 
 export function handleBotLint(ctx: RouteCommandContext): Promise<string> {
@@ -11,5 +11,5 @@ export function handleBotLint(ctx: RouteCommandContext): Promise<string> {
     prefix: ctx.prefix,
   });
 
-  return Promise.resolve(renderBotLintCli(rep, { prefix: ctx.prefix }));
+  return Promise.resolve(renderBotLintText(rep, { prefix: ctx.prefix }));
 }

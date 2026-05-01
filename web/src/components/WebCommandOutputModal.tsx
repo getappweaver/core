@@ -2,11 +2,12 @@
 // web/src/components/WebCommandOutputModal.tsx — generic WebNode / text output
 // ---------------------------------------------------------------------------
 
-import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
+import { Show } from 'solid-js';
 
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
+import { WebButton } from './WebButton';
 import { WebNodeShadowRoot } from './WebNodeShadowRoot';
 
 type WebCommandOutputModalProps = {
@@ -18,12 +19,18 @@ type WebCommandOutputModalProps = {
   text: string | null;
   web: WebNodeRoot | null;
   onReplaceWeb: (root: WebNodeRoot) => void;
+  isWebUiBusy: (sourceId: string) => boolean;
+  chromeWebCommandSourceId: string;
   onRunWebAction: (
     action: WebAction,
     params?: {
       onReplaceRoot?: (root: WebNodeRoot) => void;
       promptRequestId?: string;
-      recordInTimeline?: boolean;
+      uiExecutionPolicy?: {
+        recordInTimeline?: boolean;
+        suppressSystemMessage?: boolean;
+      };
+      webCommandSourceId?: string;
     },
   ) => void;
   /** When set, a prompt from a chrome command is shown above the main body. */
@@ -57,14 +64,14 @@ export function WebCommandOutputModal(
       <div class="modal panel status-modal-panel">
         <div class="modal-header">
           <span class="modal-title">{props.title}</span>
-          <button
+          <WebButton
             type="button"
             class="close-btn"
             onClick={props.onClose}
             aria-label="Close"
           >
             ✕
-          </button>
+          </WebButton>
         </div>
 
         <div class="modal-body status-modal-body">
@@ -85,6 +92,8 @@ export function WebCommandOutputModal(
               <div class="status-modal-web">
                 <WebNodeShadowRoot
                   root={getWeb()}
+                  renderSurface="modal"
+                  busy={props.isWebUiBusy(props.chromeWebCommandSourceId)}
                   onRunAction={(action, params) =>
                     props.onRunWebAction(action, {
                       ...params,

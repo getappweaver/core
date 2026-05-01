@@ -2,6 +2,8 @@
 
 import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { NetworkOnly } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -18,7 +20,14 @@ precacheAndRoute(self.__WB_MANIFEST, {
   // Chrome installability checks and app launches may append a `source` query param.
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^source$/],
 });
+
 cleanupOutdatedCaches();
+
+registerRoute(
+  ({ url }) =>
+    url.origin === self.location.origin && url.pathname.startsWith('/api/'),
+  new NetworkOnly(),
+);
 
 type PushPayload = {
   title?: string;
@@ -58,10 +67,12 @@ self.addEventListener('push', (event: PushEvent) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   const rawUrl =
     event.notification.data && typeof event.notification.data.url === 'string'
       ? event.notification.data.url
       : '/';
+
   const targetUrl = new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(

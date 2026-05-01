@@ -23,6 +23,7 @@ type ChatMarkdownProps = {
 
 export function ChatMarkdown(props: ChatMarkdownProps) {
   const [codeEl, setCodeEl] = createSignal<HTMLElement | null>(null);
+
   const html = createMemo(() => {
     const src = props.text ?? '';
 

@@ -35,7 +35,7 @@ export function handleSessionList(
       view: 'rows',
       rows: rows.map((r) => ({
         id: r.id,
-        backend: r.backend ?? 'cursor',
+        backend: r.backend ?? 'opencode',
         createdAtIso: new Date(r.created_at * 1000).toISOString(),
         isCurrent: r.id === cur,
       })),

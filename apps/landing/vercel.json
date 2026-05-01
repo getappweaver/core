@@ -1,5 +1,14 @@
 {
-  "framework": "vite",
-  "buildCommand": "bun run build",
-  "outputDirectory": "dist"
+  "redirects": [
+    {
+      "source": "/demo",
+      "destination": "/demo/",
+      "permanent": false
+    },
+    {
+      "source": "/demo/app",
+      "destination": "/demo/app/",
+      "permanent": false
+    }
+  ]
 }

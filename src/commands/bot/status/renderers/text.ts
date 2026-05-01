@@ -14,7 +14,7 @@ import type { BotStatusRepresentation } from '../representation';
 
 const STATUS_EMOJI = {
   backend: (v: AgentBackendName) =>
-    v === 'cursor' ? '🖱️' : v === 'opencode-sdk' ? '📦 (SDK)' : '📦',
+    v === 'cursor' ? '🖱️' : v === 'opencode' ? '📦' : '📦',
   provider: (v: ProviderName) => (v === 'local' ? '💻' : '🌐'),
   mode: (v: AgentMode) =>
     ({ free: '🆓', ask: '💬', plan: '📋', agent: '🤖' })[v],

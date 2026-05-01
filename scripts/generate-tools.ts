@@ -7,8 +7,9 @@
 // Idempotent: all outputs are recreated each run.
 //
 // SKILL.md files under .claude/skills/dm-bot-*/ are auto-generated; edit each
-// plugin’s plugins/<alias>/ai.ts (agentInstructions, skillDescription, skillNotes,
-// ToolCallSchema) and re-run plugin:generate — do not edit SKILL.md by hand.
+// plugin’s plugins/<alias>/ai.ts (via aiDefinition: toolCallSchema,
+// skillDescription, optional agentInstructions/skillNotes/skillRules)
+// and re-run plugin:generate — do not edit SKILL.md by hand.
 // ---------------------------------------------------------------------------
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -164,7 +165,7 @@ function buildBashExamples(alias: string, schema: ToolCallSchema): string {
 
       if (!(typeSchema instanceof z.ZodLiteral)) {
         throw new Error(
-          `[generate-tools] ${alias}: ToolCallSchema branch is missing literal "type"`,
+          `[generate-tools] ${alias}: toolCallSchema branch is missing literal "type"`,
         );
       }
 
@@ -213,7 +214,7 @@ description: ${skillDescription}
 allowed-tools: Bash
 ---
 
-> **Note:** This file is auto-generated — do not edit by hand. Change \`plugins/${alias}/ai.ts\` (\`agentInstructions\`, \`skillDescription\`, optional \`skillNotes\`, and \`ToolCallSchema\`), then run \`bun run plugin:generate\` (this script: \`scripts/generate-tools.ts\`).
+> **Note:** This file is auto-generated — do not edit by hand. Change \`plugins/${alias}/ai.ts\` (via \`aiDefinition\`: \`toolCallSchema\`, \`skillDescription\`, optional \`agentInstructions\`, \`skillNotes\`, and \`skillRules\`), then run \`bun run plugin:generate\` (this script: \`scripts/generate-tools.ts\`).
 
 ${instructions.trim()}
 ${skillNotes ? `\n${skillNotes.trim()}\n` : ''}
@@ -262,44 +263,48 @@ for (const entry of pluginsJson.plugins) {
   }
 
   const mod = (await import(aiPath)) as {
-    ToolCallSchema?: unknown;
-    agentInstructions?: (alias: string, prefix: string) => string;
-    skillDescription?: string;
-    skillNotes?: string;
-    skillRules?: string[];
+    aiDefinition?: {
+      toolCallSchema?: unknown;
+      agentInstructions?: (alias: string, prefix: string) => string;
+      skillDescription?: string;
+      skillNotes?: string;
+      skillRules?: string[];
+    };
   };
 
-  const dmPrefix = '!';
+  const aiDefinition = mod.aiDefinition;
 
-  const instructions = mod.agentInstructions
-    ? mod.agentInstructions(alias, dmPrefix)
+  const dmPrefix = '/';
+
+  const instructions = aiDefinition?.agentInstructions
+    ? aiDefinition.agentInstructions(alias, dmPrefix)
     : `## ${alias} tools\n\nUse bash and \`bun src/cli.ts ${alias} <toolName> '<json>'\`.`;
 
-  if (!mod.ToolCallSchema) {
+  if (!aiDefinition?.toolCallSchema) {
     console.warn(
-      `[generate-tools] Skipping skill/CLI generation for ${alias}: ToolCallSchema is missing`,
+      `[generate-tools] Skipping skill/CLI generation for ${alias}: aiDefinition.toolCallSchema is missing`,
     );
 
     continue;
   }
 
-  if (!mod.skillDescription) {
+  if (!aiDefinition.skillDescription) {
     console.warn(
-      `[generate-tools] Skipping skill/CLI generation for ${alias}: no skillDescription export in ai.ts`,
+      `[generate-tools] Skipping skill/CLI generation for ${alias}: aiDefinition.skillDescription is missing`,
     );
 
     continue;
   }
 
-  if (!(mod.ToolCallSchema instanceof z.ZodDiscriminatedUnion)) {
+  if (!(aiDefinition.toolCallSchema instanceof z.ZodDiscriminatedUnion)) {
     console.warn(
-      `[generate-tools] Skipping skill/CLI generation for ${alias}: ToolCallSchema is not a ZodDiscriminatedUnion`,
+      `[generate-tools] Skipping skill/CLI generation for ${alias}: aiDefinition.toolCallSchema is not a ZodDiscriminatedUnion`,
     );
 
     continue;
   }
 
-  const toolCallSchema = mod.ToolCallSchema as ToolCallSchema;
+  const toolCallSchema = aiDefinition.toolCallSchema as ToolCallSchema;
   const bashExamples = buildBashExamples(alias, toolCallSchema);
   const jsonSchema = JSON.stringify(z.toJSONSchema(toolCallSchema), null, 2);
 
@@ -309,9 +314,9 @@ for (const entry of pluginsJson.plugins) {
   const skillMd = generateSkillMarkdown({
     alias,
     instructions,
-    skillDescription: mod.skillDescription,
-    skillNotes: mod.skillNotes ?? '',
-    skillRules: mod.skillRules ?? null,
+    skillDescription: aiDefinition.skillDescription,
+    skillNotes: aiDefinition.skillNotes ?? '',
+    skillRules: aiDefinition.skillRules ?? null,
     bashExamples,
     jsonSchema,
     pluginDir: `plugins/${alias}`,
@@ -326,9 +331,9 @@ for (const entry of pluginsJson.plugins) {
   pluginGenData.push({
     alias,
     instructions,
-    skillDescription: mod.skillDescription,
-    skillNotes: mod.skillNotes ?? '',
-    skillRules: mod.skillRules ?? null,
+    skillDescription: aiDefinition.skillDescription,
+    skillNotes: aiDefinition.skillNotes ?? '',
+    skillRules: aiDefinition.skillRules ?? null,
     toolCallSchema,
   });
 }
@@ -342,7 +347,7 @@ function aliasToSchemaImport(alias: string): string {
     alias
       .split('-')
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-      .join('') + 'ToolCallSchema'
+      .join('') + 'AiDefinition'
   );
 }
 
@@ -363,14 +368,14 @@ function toolNamesFrom(schema: ToolCallSchema): string {
 const cliImports = pluginGenData
   .map(
     (e) =>
-      `import { ToolCallSchema as ${aliasToSchemaImport(e.alias)} } from '../plugins/${e.alias}/ai';`,
+      `import { aiDefinition as ${aliasToSchemaImport(e.alias)} } from '../plugins/${e.alias}/ai';`,
   )
   .join('\n');
 
 const cliEntries = pluginGenData
   .map(
     (e) =>
-      `  { alias: '${e.alias}', toolNames: [${toolNamesFrom(e.toolCallSchema)}], toolCallSchema: ${aliasToSchemaImport(e.alias)} },`,
+      `  { alias: '${e.alias}', toolNames: [${toolNamesFrom(e.toolCallSchema)}], toolCallSchema: ${aliasToSchemaImport(e.alias)}.toolCallSchema },`,
   )
   .join('\n');
 

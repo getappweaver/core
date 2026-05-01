@@ -8,6 +8,7 @@ import { handleBunkerRoot } from './bunker/handler';
 import type { BuiltinHandler } from './dispatch';
 import { handleHelpRoot } from './help/handlers';
 import { handleSessionRoot } from './session/handler';
+import { handleStoryRoot } from './story/handler';
 import { handleWalletRoot } from './wallet/handler';
 import { handleWotRoot } from './wot/handlers';
 
@@ -18,6 +19,7 @@ import { handleWotRoot } from './wot/handlers';
 export const builtinCommandHandlers: Record<string, BuiltinHandler> = {
   help: handleHelpRoot,
   session: handleSessionRoot,
+  story: handleStoryRoot,
   bot: handleBotRoot,
   ai: handleAiRoot,
   wallet: handleWalletRoot,

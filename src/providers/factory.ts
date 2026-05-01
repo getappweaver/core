@@ -1,6 +1,6 @@
 import type { CoreDb } from '../db';
 import type { BotConfig } from '../env';
-import type { WalletDb } from '../wallets/db';
+import type { WalletDb } from '../wallet/db';
 
 import type { ProviderDb } from './db';
 import { createLocalProvider } from './local';

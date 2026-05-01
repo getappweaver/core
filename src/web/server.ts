@@ -8,7 +8,7 @@ import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
-import type { WalletDb } from '@src/wallets/db';
+import type { WalletDb } from '@src/wallet/db';
 
 import { verifyNip98Authorization } from './nip98-verify';
 import { createWebFetchHandler, type WebRouteContext } from './routes';

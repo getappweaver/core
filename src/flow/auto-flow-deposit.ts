@@ -7,8 +7,8 @@ import { getWalletDefaultMintUrl } from '../db';
 import { log } from '../logger';
 import type { ProviderDb } from '../providers/db';
 import { depositOrTopup } from '../providers/routstr';
-import type { WalletDb } from '../wallets/db';
-import { InsufficientFundsError } from '../wallets/types';
+import type { WalletDb } from '../wallet/db';
+import { InsufficientFundsError } from '../wallet/types';
 
 export type PrepareAutoFlowDepositProps = {
   seenDb: CoreDb;

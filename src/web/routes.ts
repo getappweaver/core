@@ -16,7 +16,7 @@ import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
 import { getSubcommandDefinition } from '@src/system/command-definition';
-import type { WalletDb } from '@src/wallets/db';
+import type { WalletDb } from '@src/wallet/db';
 
 import { runWebChat } from './chat';
 import {
@@ -340,6 +340,31 @@ export function createWebFetchHandler(
       return new Response(Bun.file(shellPath), {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       });
+    }
+
+    if (req.method === 'GET') {
+      const rel = path.startsWith('/') ? path.slice(1) : path;
+
+      if (rel.includes('..')) {
+        return jsonResponse({ error: 'not_found' }, { status: 404 });
+      }
+
+      // Let `/` fall through to the dist / shell HTML handling below.
+      if (rel) {
+        const candidateRels = [rel];
+
+        if (rel.startsWith('plugins/')) {
+          candidateRels.push(`plugin-icons/${rel.slice('plugins/'.length)}`);
+        }
+
+        for (const candidate of candidateRels) {
+          const publicPath = join(ctx.dmBotRoot, 'web', 'public', candidate);
+
+          if (existsSync(publicPath)) {
+            return new Response(Bun.file(publicPath));
+          }
+        }
+      }
     }
 
     if (req.method === 'GET') {

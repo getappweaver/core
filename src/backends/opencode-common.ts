@@ -1,40 +1,53 @@
-// ---------------------------------------------------------------------------
-// backends/opencode-common.ts — Shared helpers for opencode and opencode-sdk
-// ---------------------------------------------------------------------------
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-
-import type { AgentMode } from '../db';
 import type { ProviderName } from '../providers/types';
+
+import { getOpencodeAgentModel, readOpencodeConfig } from './opencode-config';
 
 const DEFAULT_MODEL = 'opencode/big-pickle';
 
+export type OpencodeConfiguredModelSource = 'agent' | 'root' | 'default';
+
+export type OpencodeConfiguredModelResolution = {
+  modelName: string;
+  source: OpencodeConfiguredModelSource;
+  rootModel: string | null;
+  agentModel: string | null;
+};
+
 /**
- * Read model from opencode.json for the given mode, or return the default.
+ * Read model from opencode.json for the given mode, then fall back to the root
+ * model, then the built-in default.
  */
-export function readModelFromOpencodeConfig(
+export function resolveConfiguredModelFromOpencodeConfig(
   dmBotRoot: string,
-  mode: AgentMode,
-): string {
-  try {
-    const cfgPath = join(dmBotRoot, 'opencode.json');
+  agentName: string,
+): OpencodeConfiguredModelResolution {
+  const config = readOpencodeConfig(dmBotRoot);
+  const agentModel = getOpencodeAgentModel(config, agentName);
 
-    if (existsSync(cfgPath)) {
-      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8')) as {
-        agent?: Record<string, { model?: string }>;
-      };
-
-      const configured = cfg.agent?.[mode]?.model;
-
-      if (configured) {
-        return configured;
-      }
-    }
-  } catch {
-    // use default
+  if (agentModel) {
+    return {
+      modelName: agentModel,
+      source: 'agent',
+      rootModel: config.rootModel,
+      agentModel,
+    };
   }
 
-  return DEFAULT_MODEL;
+  if (config.rootModel) {
+    return {
+      modelName: config.rootModel,
+      source: 'root',
+      rootModel: config.rootModel,
+      agentModel: null,
+    };
+  }
+
+  return {
+    modelName: DEFAULT_MODEL,
+    source: 'default',
+    rootModel: null,
+    agentModel: null,
+  };
 }
 
 /**
@@ -58,7 +71,7 @@ export function normalizeModelForProvider(
 
 export type ParseModelProps = {
   dmBotRoot: string;
-  mode: AgentMode;
+  agentName: string;
   modelOverride: string | null | undefined;
   providerName: ProviderName | null;
 };

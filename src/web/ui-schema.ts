@@ -41,7 +41,26 @@ export type WebOptionFieldHintValue = z.infer<
   typeof WebOptionFieldHintValueSchema
 >;
 
+/** Labeled choices for a command argument in web forms (`provider/model` ids, etc.). */
+export const WebArgumentFieldChoiceSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+});
+
+export type WebArgumentFieldChoice = z.infer<
+  typeof WebArgumentFieldChoiceSchema
+>;
+
 export const WebActionSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('reveal'),
+    targetId: z.string().min(1),
+  }),
+  z.object({
+    /** Collapse a previously revealed node (removes matching `targetId` from local reveal state). */
+    type: z.literal('hideReveal'),
+    targetId: z.string().min(1),
+  }),
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
@@ -56,10 +75,25 @@ export const WebActionSchema = z.discriminatedUnion('type', [
      * Use `{ hint: "…" }` for integer ids; the form shows `#<value> = <hint>`. A plain string is shown as-is.
      */
     optionHints: z.record(z.string(), WebOptionFieldHintValueSchema).optional(),
+    /**
+     * Suggested values for positional arguments (key = argument `name` from the command definition).
+     * Rendered as a text field with datalist; users may still enter values not in the list.
+     */
+    argumentChoices: z
+      .record(z.string(), z.array(WebArgumentFieldChoiceSchema))
+      .optional(),
+    /** Whether this web-triggered command should create timeline entries. */
+    recordInTimeline: z.boolean().optional(),
+    /** How to present command execution in web clients. */
+    surface: z.enum(['timeline', 'modal']).optional(),
+    /** Optional title when `surface` is `modal`. */
+    modalTitle: z.string().min(1).optional(),
   }),
   z.object({
     type: z.literal('prompt_answer'),
     value: z.string(),
+    /** Optional form field whose value is appended to `value` with a space. */
+    valueFromField: z.string().min(1).optional(),
   }),
 ]);
 
@@ -95,13 +129,47 @@ export const WebPropsSchema = z.object({
   whiteSpace: WebWhiteSpaceSchema.optional(),
   /** Compact square-ish control; maps to shared client styles, not plugin CSS. */
   buttonVariant: WebButtonVariantSchema.optional(),
+  /** Enables built-in client-side filtering for supported collection elements. */
+  filterable: z.literal(true).optional(),
+  /** Text searched by a parent filter; plugins choose the fields included here. */
+  filterText: z.string().optional(),
+  /** Stable display name for structured filtering/glob matching. */
+  filterName: z.string().optional(),
+  /** Stable path/key for structured filtering/glob matching. */
+  filterPath: z.string().optional(),
+  /** Cache key for a client-built filter index. */
+  filterIndexKey: z.string().optional(),
+  /** Placeholder for built-in filter inputs. */
+  filterPlaceholder: z.string().optional(),
   defaultExpanded: z.boolean().optional(),
   label: z.string().optional(),
   checked: z.boolean().optional(),
   /** Native checkbox indeterminate (e.g. in-progress); set via DOM, not HTML attribute. */
   indeterminate: z.literal(true).optional(),
   disabled: z.boolean().optional(),
+  /** `treeItem`: action to run the first time an unloaded branch is expanded. */
+  lazyLoadAction: WebActionSchema.optional(),
+  /** `treeItem`: true once this branch's lazy children are represented in the current tree. */
+  lazyLoaded: z.boolean().optional(),
+  /** `treeItem`: loading label shown while `lazyLoadAction` is running. */
+  lazyLoadingLabel: z.string().optional(),
+  /** Hide this node until `{ type: "reveal", targetId }`; `{ type: "hideReveal", targetId }` collapses again. */
+  revealId: z.string().min(1).optional(),
+  hiddenUntilRevealed: z.literal(true).optional(),
   action: WebActionSchema.optional(),
+  stopPropagation: z.boolean().optional(),
+  /** `textField`: name submitted with parent `form` (FormData / merge into command `arguments`). */
+  formFieldName: z.string().min(1).optional(),
+  /** `textField`: placeholder; display-only, not a command option hint. */
+  inputPlaceholder: z.string().optional(),
+  /** `textArea`: maximum auto-grown visible rows before internal scrolling. */
+  maxRows: z.number().int().positive().optional(),
+  /** `textField`: focus the input when it is mounted. */
+  autoFocus: z.literal(true).optional(),
+  /** Stable target id used by story walkthrough focus/fill steps. */
+  storyTargetId: z.string().min(1).optional(),
+  /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
+  htmlType: z.enum(['button', 'submit']).optional(),
 });
 
 export const WebTextNodeSchema = z.object({
@@ -125,8 +193,18 @@ export const WebElementTagSchema = z.enum([
   'menuItem',
   /** Generic hierarchical container rendered with local expand/collapse state. */
   'tree',
-  /** First child is the item summary; remaining children are collapsible body/subtree. */
+  /** Hierarchical item. Prefer `summary` for the row and `children` for child items. */
   'treeItem',
+  /** One-line text input; use `formFieldName` with parent `form`. */
+  'textField',
+  /** Multi-line text input with auto-growing height; use `formFieldName` with parent `form`. */
+  'textArea',
+  /**
+   * Group fields and submit: `action` is merged with `FormData` on the client.
+   * - `command`: FormData keys map into `arguments`
+   * - `prompt_answer`: `valueFromField` appends one field value to `value`
+   */
+  'form',
 ]);
 
 export type WebTextNode = z.infer<typeof WebTextNodeSchema>;
@@ -135,6 +213,8 @@ export type WebElementNode = {
   type: 'element';
   tag: z.infer<typeof WebElementTagSchema>;
   props?: z.infer<typeof WebPropsSchema>;
+  /** Optional tree item summary; if omitted, first child is used for backward compatibility. */
+  summary?: WebNode;
   children?: WebNode[];
 };
 
@@ -145,6 +225,7 @@ export const WebElementNodeSchema: z.ZodType<WebElementNode> = z.lazy(() =>
     type: z.literal('element'),
     tag: WebElementTagSchema,
     props: WebPropsSchema.optional(),
+    summary: WebNodeSchema.optional(),
     children: z.array(WebNodeSchema).optional(),
   }),
 );
@@ -180,10 +261,21 @@ export const WebRenderResultSchema = z.object({
   shadowMountOverflow: WebShadowMountOverflowSchema.optional(),
 });
 
+export const ClientViewResultSchema = z.object({
+  kind: z.literal('client_view'),
+  version: z.literal(1),
+  view: z.string().min(1),
+  meta: WebRenderMetaSchema,
+  payload: z.unknown(),
+});
+
 export type WebAction = z.infer<typeof WebActionSchema>;
 export type WebProps = z.infer<typeof WebPropsSchema>;
 export type WebRenderMeta = z.infer<typeof WebRenderMetaSchema>;
 export type WebNodeRoot = z.infer<typeof WebRenderResultSchema>;
+export type ClientViewRoot = z.infer<typeof ClientViewResultSchema>;
+/** Union of all possible return types from command handlers. */
+export type WebHandlerResult = string | WebNodeRoot | ClientViewRoot;
 export type WebShadowMountOverflow = z.infer<
   typeof WebShadowMountOverflowSchema
 >;

@@ -1,23 +1,9 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
 import { delete{{PASCAL_ALIAS}} } from '../../db';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 
-export function adaptDeleteCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export function adaptDeleteCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   void params.command;
   void params.source;
   void params.identity;
@@ -26,24 +12,12 @@ export function adaptDeleteCommand(params: {
   const id = params.parsed.arguments.id;
 
   if (typeof id !== 'number' || Number.isNaN(id)) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'delete',
-      text: `Usage: ${params.prefix}${params.alias} delete <id>`,
-    });
+    return `Usage: ${params.prefix}${params.alias} delete <id>`;
   }
 
   if (!delete{{PASCAL_ALIAS}}(params.db, id)) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'delete',
-      text: `Not found: #${String(id)}`,
-    });
+    return `Not found: #${String(id)}`;
   }
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'delete',
-    text: `Deleted #${String(id)}.`,
-  });
+  return `Deleted #${String(id)}.`;
 }

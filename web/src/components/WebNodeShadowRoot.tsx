@@ -2,18 +2,41 @@
 // web/src/components/WebNodeShadowRoot.tsx — Shadow DOM island for WebNodeRoot
 // ---------------------------------------------------------------------------
 
+import hljsGithubDarkCss from 'highlight.js/styles/github-dark.css?raw';
+import type { JSX } from 'solid-js';
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js';
 import { render } from 'solid-js/web';
-import type { JSX } from 'solid-js';
 
 import type { WebAction, WebNodeRoot, WebStyleSheet } from '@src/web/ui-schema';
 
 import baseWebUiCss from '../webview/base-web-ui.css?raw';
-import hljsGithubDarkCss from 'highlight.js/styles/github-dark.css?raw';
-import { WebNodeRenderer } from './WebNodeRenderer';
+import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
+
+import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
+import {
+  getTreeItemExpandedStateForScope,
+  TreeItemExpandedStateContext,
+  WebNodeRenderer,
+  WebRevealContext,
+  type WebRevealContextValue,
+  WebRenderMetaContext,
+  WebRenderSurfaceContext,
+  WebTreeHeaderElCallbackContext,
+  WebTreeToolbarRegisterContext,
+  type WebTreeToolbarRegistration,
+} from './WebNodeRenderer';
 
 type WebNodeShadowRootProps = {
   root: WebNodeRoot;
+  stateScopeId?: string;
+  renderSurface?: 'modal' | 'timeline';
+  busy?: boolean;
+  /** When set, root-level `tree` UI registers handlers so the host can render toolbar in light DOM. */
+  onWebTreeToolbarChange?: (
+    registration: WebTreeToolbarRegistration | null,
+  ) => void;
+  /** Root `tree` reports its `.web-tree-header` for timeline scroll / sticky duplicate controls. */
+  onWebTreeHeaderEl?: (el: HTMLElement | null) => void;
   onReplaceRoot?: (root: WebNodeRoot) => void;
   onError?: (message: string) => void;
   promptRequestId?: string;
@@ -22,11 +45,16 @@ type WebNodeShadowRootProps = {
     params?: {
       onReplaceRoot?: (root: WebNodeRoot) => void;
       promptRequestId?: string;
+      uiExecutionPolicy?: {
+        recordInTimeline?: boolean;
+        suppressSystemMessage?: boolean;
+      };
+      webCommandSourceId?: string;
     },
   ) => void;
 };
 
-const BASE_STYLE_TEXT = `${baseWebUiCss}\n${hljsGithubDarkCss}`;
+const BASE_STYLE_TEXT = `${baseWebUiCss}\n${webOverflowPanelCss}\n${hljsGithubDarkCss}`;
 
 type ShadowMountContext = {
   shadow: ShadowRoot;
@@ -76,6 +104,41 @@ function syncPayloadStylesheets(props: SyncPayloadStylesheetsProps): void {
 export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   let hostEl: HTMLDivElement | undefined;
   const [ctx, setCtx] = createSignal<ShadowMountContext | null>(null);
+  const [currentRoot, setCurrentRoot] = createSignal<WebNodeRoot>(props.root);
+
+  const treeItemExpandedById = getTreeItemExpandedStateForScope(
+    props.stateScopeId,
+  );
+
+  const [revealedIds, setRevealedIds] = createSignal<Set<string>>(new Set());
+
+  const revealContext: WebRevealContextValue = {
+    isRevealed: (id) => revealedIds().has(id),
+    reveal: (id) => {
+      setRevealedIds((prev) => {
+        if (prev.has(id)) {
+          return prev;
+        }
+
+        const next = new Set(prev);
+        next.add(id);
+
+        return next;
+      });
+    },
+    hideReveal: (id) => {
+      setRevealedIds((prev) => {
+        if (!prev.has(id)) {
+          return prev;
+        }
+
+        const next = new Set(prev);
+        next.delete(id);
+
+        return next;
+      });
+    },
+  };
 
   onMount(() => {
     const host = hostEl;
@@ -96,39 +159,75 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   });
 
   createEffect(() => {
+    setCurrentRoot(props.root);
+  });
+
+  createEffect(() => {
     const c = ctx();
 
     if (!c) {
       return;
     }
 
-    const root = props.root;
-    const onReplaceRoot = props.onReplaceRoot;
-    const onError = props.onError;
-    const promptRequestId = props.promptRequestId;
-    const onRunAction = props.onRunAction;
-
     syncPayloadStylesheets({
       shadow: c.shadow,
       mount: c.mount,
-      stylesheets: root.stylesheets,
+      stylesheets: currentRoot().stylesheets,
     });
+  });
 
-    const mountScrollY = root.shadowMountOverflow !== 'hidden';
+  createEffect(() => {
+    const c = ctx();
+
+    if (!c) {
+      return;
+    }
+
+    const mountScrollY = currentRoot().shadowMountOverflow !== 'hidden';
 
     c.mount.className = mountScrollY
       ? 'web-shadow-mount web-shadow-mount--scroll-y'
       : 'web-shadow-mount';
+  });
+
+  createEffect(() => {
+    const c = ctx();
+
+    if (!c) {
+      return;
+    }
+
+    const busyAccessor = () => props.busy === true;
 
     const dispose = render(
       () => (
-        <WebNodeRenderer
-          root={root}
-          onReplaceRoot={onReplaceRoot}
-          onError={onError}
-          promptRequestId={promptRequestId}
-          onRunAction={onRunAction}
-        />
+        <WebShadowUiBusyContext.Provider value={busyAccessor}>
+          <TreeItemExpandedStateContext.Provider value={treeItemExpandedById}>
+            <WebRenderMetaContext.Provider value={() => currentRoot().meta}>
+              <WebRenderSurfaceContext.Provider
+                value={() => props.renderSurface ?? null}
+              >
+                <WebTreeToolbarRegisterContext.Provider
+                  value={props.onWebTreeToolbarChange ?? null}
+                >
+                  <WebTreeHeaderElCallbackContext.Provider
+                    value={props.onWebTreeHeaderEl ?? null}
+                  >
+                    <WebRevealContext.Provider value={revealContext}>
+                      <WebNodeRenderer
+                        root={currentRoot()}
+                        onReplaceRoot={props.onReplaceRoot}
+                        onError={props.onError}
+                        promptRequestId={props.promptRequestId}
+                        onRunAction={props.onRunAction}
+                      />
+                    </WebRevealContext.Provider>
+                  </WebTreeHeaderElCallbackContext.Provider>
+                </WebTreeToolbarRegisterContext.Provider>
+              </WebRenderSurfaceContext.Provider>
+            </WebRenderMetaContext.Provider>
+          </TreeItemExpandedStateContext.Provider>
+        </WebShadowUiBusyContext.Provider>
       ),
       c.mount,
     );
@@ -138,12 +237,31 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     });
   });
 
+  const busy = () => props.busy === true;
+
   return (
     <div
-      class="web-ui-shadow-host"
-      ref={(el) => {
-        hostEl = el;
+      classList={{
+        'web-ui-shadow-host-wrap': true,
+        'web-ui-shadow-host-wrap--busy': busy(),
       }}
-    />
+      aria-busy={busy() ? 'true' : undefined}
+    >
+      <div
+        class="web-ui-shadow-host"
+        classList={{
+          'web-ui-shadow-host--timeline': props.renderSurface === 'timeline',
+          'web-ui-shadow-host--modal': props.renderSurface === 'modal',
+        }}
+        ref={(el) => {
+          hostEl = el;
+        }}
+      />
+      {busy() ? (
+        <div class="web-ui-shadow-busy-overlay" aria-hidden="true">
+          <span class="web-ui-shadow-busy-label">Working…</span>
+        </div>
+      ) : null}
+    </div>
   );
 }

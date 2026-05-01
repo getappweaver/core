@@ -1,0 +1,21 @@
+import type { Database } from 'bun:sqlite';
+
+import type {
+  PluginIdentity,
+  RunAgentFn,
+} from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
+import type { ParsedCliInvocation } from '@src/system/parser-cli';
+
+import type { get{{PASCAL_ALIAS}}CommandDefinition } from '../commands/help/module';
+
+export type {{PASCAL_ALIAS}}CommandAdapterParams = {
+  prefix: string;
+  alias: string;
+  db: Database;
+  source: MessageSource;
+  parsed: ParsedCliInvocation;
+  command: ReturnType<typeof get{{PASCAL_ALIAS}}CommandDefinition>;
+  identity: PluginIdentity;
+  runAgent: RunAgentFn | null;
+};

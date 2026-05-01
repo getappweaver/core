@@ -1,10 +1,3 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
 import { getDraft, listDrafts } from './store';
 import {
   formatCreateDraftList,
@@ -12,18 +5,11 @@ import {
 } from '../../format';
 import type { Update{{PASCAL_ALIAS}}Input } from '../shared/types';
 import type { Create{{PASCAL_ALIAS}}Draft } from './types';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 
-export function adaptDraftsCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export function adaptDraftsCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   void params.command;
   void params.source;
   void params.identity;
@@ -35,81 +21,53 @@ export function adaptDraftsCommand(params: {
 
   if (draftIdRaw !== undefined) {
     if (typeof draftIdRaw !== 'number' || Number.isNaN(draftIdRaw)) {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'drafts',
-        text: `Usage: ${params.prefix}${params.alias} drafts [draft_id]`,
-      });
+      return `Usage: ${params.prefix}${params.alias} drafts [draft_id]`;
     }
 
     const entry = getDraft(params.db, draftIdRaw);
 
     if (!entry) {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'drafts',
-        text: `Draft not found: #${String(draftIdRaw)}`,
-      });
+      return `Draft not found: #${String(draftIdRaw)}`;
     }
 
     if (entry.kind === 'create') {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'drafts',
-        text: [
-          `Draft #${String(draftIdRaw)} [create]:`,
-          '',
-          formatCreateDraftList(entry.input as Create{{PASCAL_ALIAS}}Draft),
-          '',
-          formatDraftReply(cmd, draftIdRaw, 'create'),
-        ].join('\n'),
-      });
+      return [
+        `Draft #${String(draftIdRaw)} [create]:`,
+        '',
+        formatCreateDraftList(entry.input as Create{{PASCAL_ALIAS}}Draft),
+        '',
+        formatDraftReply(cmd, draftIdRaw, 'create'),
+      ].join('\n');
     }
 
     if (entry.kind === 'update') {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'drafts',
-        text: [
-          `Draft #${String(draftIdRaw)} [update]:`,
-          `  target id: ${String((entry.input as Update{{PASCAL_ALIAS}}Input).id)}`,
-          '',
-          formatDraftReply(cmd, draftIdRaw, 'update'),
-        ].join('\n'),
-      });
+      return [
+        `Draft #${String(draftIdRaw)} [update]:`,
+        `  target id: ${String((entry.input as Update{{PASCAL_ALIAS}}Input).id)}`,
+        '',
+        formatDraftReply(cmd, draftIdRaw, 'update'),
+      ].join('\n');
     }
 
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'drafts',
-      text: [
-        `Draft #${String(draftIdRaw)} [delete]:`,
-        `  target id: ${String((entry.input as { id: number }).id)}`,
-        '',
-        formatDraftReply(cmd, draftIdRaw, 'delete'),
-      ].join('\n'),
-    });
+    return [
+      `Draft #${String(draftIdRaw)} [delete]:`,
+      `  target id: ${String((entry.input as { id: number }).id)}`,
+      '',
+      formatDraftReply(cmd, draftIdRaw, 'delete'),
+    ].join('\n');
   }
 
   if (drafts.length === 0) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'drafts',
-      text: 'No pending drafts.',
-    });
+    return 'No pending drafts.';
   }
 
   const lines = drafts.map((d) => `#${String(d.id)} [${d.kind}]`);
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'drafts',
-    text: [
-      'Pending drafts:',
-      '',
-      ...lines,
-      '',
-      `Accept all: ${cmd} accept all`,
-    ].join('\n'),
-  });
+  return [
+    'Pending drafts:',
+    '',
+    ...lines,
+    '',
+    `Accept all: ${cmd} accept all`,
+  ].join('\n');
 }

@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { cliRegistry } from '../generated/cli-registry';
 
-import { getWotScore, openCoreDb } from './db';
+import { getDmCommandPrefix, getWotScore, openCoreDb } from './db';
 import { loadBotConfig } from './env';
 import { dmBotRoot } from './paths';
 
@@ -184,20 +184,27 @@ async function main(): Promise<void> {
 
   const module = await import(`../plugins/${alias}/ai`);
 
-  const { openDb, executeTool } = module as {
-    openDb: () => Database;
-    executeTool: (props: {
-      alias: string;
-      prefix: string;
-      call: unknown;
-      db: Database;
-      pool?: SimplePool;
-      masterPubkey?: string;
-      getWotScore?: (pubkey: string, rootPubkey?: string) => number | null;
-    }) => Promise<string>;
+  const { aiDefinition } = module as {
+    aiDefinition?: {
+      openDb: () => Database;
+      executeTool: (props: {
+        alias: string;
+        prefix: string;
+        call: unknown;
+        db: Database;
+        pool?: SimplePool;
+        masterPubkey?: string;
+        getWotScore?: (pubkey: string, rootPubkey?: string) => number | null;
+      }) => Promise<string>;
+    };
   };
 
-  const db = openDb();
+  if (!aiDefinition) {
+    console.error(`Plugin ${alias} does not export aiDefinition`);
+    process.exit(1);
+  }
+
+  const db = aiDefinition.openDb();
   const coreDb = openCoreDb();
   const config = loadBotConfig();
   const pool = new SimplePool();
@@ -214,9 +221,11 @@ async function main(): Promise<void> {
       },
     });
 
-    const result = await executeTool({
+    const prefix = getDmCommandPrefix(coreDb);
+
+    const result = await aiDefinition.executeTool({
       alias,
-      prefix: '!',
+      prefix,
       call: parsed.data,
       db,
       pool,

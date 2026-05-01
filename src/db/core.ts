@@ -21,17 +21,31 @@ export function openCoreDb(): CoreDb {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       created_at INTEGER NOT NULL,
-      backend TEXT NOT NULL DEFAULT 'cursor'
+      backend TEXT NOT NULL DEFAULT 'opencode'
     )
   `);
 
   try {
     db.run(
-      "ALTER TABLE sessions ADD COLUMN backend TEXT NOT NULL DEFAULT 'cursor'",
+      "ALTER TABLE sessions ADD COLUMN backend TEXT NOT NULL DEFAULT 'opencode'",
     );
   } catch {
     /* Column already exists */
   }
+
+  db.run("UPDATE sessions SET backend = 'cursor' WHERE backend = 'cursor-sdk'");
+
+  db.run(
+    "UPDATE sessions SET backend = 'opencode' WHERE backend = 'opencode-sdk'",
+  );
+
+  db.run(
+    "UPDATE state SET value = 'cursor' WHERE key = 'agent_backend' AND value = 'cursor-sdk'",
+  );
+
+  db.run(
+    "UPDATE state SET value = 'opencode' WHERE key = 'agent_backend' AND value = 'opencode-sdk'",
+  );
 
   db.run(`
     CREATE TABLE IF NOT EXISTS session_messages (

@@ -1,10 +1,3 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
 import {
   create{{PASCAL_ALIAS}},
   delete{{PASCAL_ALIAS}},
@@ -16,19 +9,12 @@ import type {
   Update{{PASCAL_ALIAS}}Input,
 } from '../shared/types';
 import type { Create{{PASCAL_ALIAS}}Draft } from '../drafts/types';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 import { stringFromVariadicArgument } from '../shared/variadic-text';
 
-export function adaptAcceptCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
+export function adaptAcceptCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   void params.command;
   void params.source;
   void params.identity;
@@ -41,22 +27,14 @@ export function adaptAcceptCommand(params: {
     .toLowerCase();
 
   if (!targetJoined) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`,
-    });
+    return `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`;
   }
 
   if (targetJoined === 'all') {
     const drafts = listDrafts(params.db);
 
     if (drafts.length === 0) {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'accept',
-        text: 'No pending drafts.',
-      });
+      return 'No pending drafts.';
     }
 
     const results: string[] = [];
@@ -93,31 +71,19 @@ export function adaptAcceptCommand(params: {
       }
     }
 
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Accepted ${String(results.length)} draft(s):\n  ${results.join('\n  ')}`,
-    });
+    return `Accepted ${String(results.length)} draft(s):\n  ${results.join('\n  ')}`;
   }
 
   const draftId = parseInt(targetJoined, 10);
 
   if (Number.isNaN(draftId)) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`,
-    });
+    return `Usage: ${params.prefix}${params.alias} accept <draft_id> | ${params.prefix}${params.alias} accept all`;
   }
 
   const entry = getDraft(params.db, draftId);
 
   if (!entry) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Draft not found: #${String(draftId)}`,
-    });
+    return `Draft not found: #${String(draftId)}`;
   }
 
   deleteDraft(params.db, draftId);
@@ -128,13 +94,9 @@ export function adaptAcceptCommand(params: {
       entry.input as Create{{PASCAL_ALIAS}}Draft,
     );
 
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: [`Created #${String(created.id)}`, format{{PASCAL_ALIAS}}Detail(created)].join(
-        '\n',
-      ),
-    });
+    return [`Created #${String(created.id)}`, format{{PASCAL_ALIAS}}Detail(created)].join(
+      '\n',
+    );
   }
 
   if (entry.kind === 'update') {
@@ -144,33 +106,17 @@ export function adaptAcceptCommand(params: {
     );
 
     if (!updated) {
-      return {{PASCAL_ALIAS}}ReplyMessage({
-        alias: params.alias,
-        subcommand: 'accept',
-        text: `Not found: #${String(entry.input.id)}`,
-      });
+      return `Not found: #${String(entry.input.id)}`;
     }
 
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Updated.\n${format{{PASCAL_ALIAS}}Detail(updated)}`,
-    });
+    return `Updated.\n${format{{PASCAL_ALIAS}}Detail(updated)}`;
   }
 
   const ok = delete{{PASCAL_ALIAS}}(params.db, entry.input.id);
 
   if (!ok) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'accept',
-      text: `Not found: #${String(entry.input.id)}`,
-    });
+    return `Not found: #${String(entry.input.id)}`;
   }
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'accept',
-    text: `Deleted #${String(entry.input.id)}.`,
-  });
+  return `Deleted #${String(entry.input.id)}.`;
 }

@@ -38,21 +38,34 @@ export type CommandOptionDefinition = {
   choices?: string[] | null;
 };
 
-/** Optional header chrome for the web UI (discovered via command catalog). */
-export type WebHeaderWidget = {
-  label: string;
+/** Optional widget metadata for the web UI (discovered via command catalog). */
+export type WebWidget = {
+  placement: 'header' | 'fixed';
+  surface: 'modal' | 'timeline_singleton';
+  label?: string;
   modalTitle: string;
+  /** Optional icon key used by web header chrome widget buttons. */
+  icon?: string;
+  /** Optional header sort order (ascending), defaults to definition order. */
+  order?: number;
 };
 
 export type SubcommandDefinition = {
   name: string;
   summary: string;
+  details?: string[];
+  textHidden?: boolean;
   aliases: string[];
   arguments: CommandArgumentDefinition[];
   options: CommandOptionDefinition[];
   examples: string[];
-  /** When set, the web app may show a header control that opens a shared modal for this subcommand. */
-  webHeaderWidget?: WebHeaderWidget;
+  /** When set, the web app may expose a shared modal/widget target for this subcommand. */
+  webWidget?: WebWidget;
+  /** Override generated web behavior for commands that are safe to run with provided action values. */
+  webExecutionMode?:
+    | 'requires_input'
+    | 'runnable_default'
+    | 'runnable_customizable';
 };
 
 export type CommandDefinition = {

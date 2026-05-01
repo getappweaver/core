@@ -23,6 +23,35 @@
   word-break: break-word;
 }
 
+.chat-thinking {
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+  opacity: 0.78;
+}
+
+.chat-thinking strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.chat-thinking .chat-md,
+.chat-thinking .chat-md code.hljs,
+.chat-thinking .chat-md .hljs-section,
+.chat-thinking .chat-md .hljs-bullet,
+.chat-thinking .chat-md .hljs-strong,
+.chat-thinking .chat-md .hljs-emphasis,
+.chat-thinking .chat-md .hljs-code,
+.chat-thinking .chat-md .hljs-link,
+.chat-thinking .chat-md .hljs-quote,
+.chat-thinking .chat-md .hljs-string,
+.chat-thinking .chat-md .hljs-symbol,
+.chat-thinking .chat-md .hljs-tag,
+.chat-thinking .chat-md .hljs-name,
+.chat-thinking .chat-md .hljs-attr {
+  color: var(--color-text-muted);
+}
+
 /* Assistant: token colors on dark */
 .chat-card.assistant .chat-md .hljs-section {
   color: var(--color-accent);

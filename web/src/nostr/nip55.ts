@@ -10,6 +10,7 @@ function buildNip55GetPublicKeyUri(): string {
 
 function buildNip55SignEventUri(event: EventTemplate): string {
   const encodedEvent = encodeURIComponent(JSON.stringify(event));
+
   return `nostrsigner:${encodedEvent}?${BASE_NIP55_PARAMS}&returnType=event&type=sign_event`;
 }
 
@@ -17,10 +18,12 @@ function waitForVisibilityReturn(): Promise<void> {
   return new Promise((resolve) => {
     if (typeof document === 'undefined') {
       resolve();
+
       return;
     }
 
     let sawHidden = document.visibilityState === 'hidden';
+
     const timer = window.setTimeout(() => {
       cleanup();
       resolve();
@@ -29,6 +32,7 @@ function waitForVisibilityReturn(): Promise<void> {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         sawHidden = true;
+
         return;
       }
 
@@ -67,6 +71,7 @@ async function readClipboardText(): Promise<string | null> {
 
   try {
     const text = await navigator.clipboard.readText();
+
     return text.trim().length > 0 ? text.trim() : null;
   } catch {
     return null;
@@ -95,7 +100,10 @@ async function requestNip55Result({
     return clipboardResult;
   }
 
-  const pasted = window.prompt(`Paste the ${promptLabel} result from Amber:`, '');
+  const pasted = window.prompt(
+    `Paste the ${promptLabel} result from Amber:`,
+    '',
+  );
 
   if (!pasted || pasted.trim().length === 0) {
     throw new Error(`Missing ${promptLabel} result from Amber`);

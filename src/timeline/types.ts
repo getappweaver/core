@@ -1,11 +1,23 @@
+import type {
+  AgentFileDiff,
+  AgentToolCall,
+} from '@src/backends/agent-stream-chunk';
 import type { PromptPayload } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
-import type { WebNodeRoot, WebOptionFieldHintValue } from '@src/web/ui-schema';
+import type {
+  ClientViewRoot,
+  WebArgumentFieldChoice,
+  WebNodeRoot,
+  WebOptionFieldHintValue,
+} from '@src/web/ui-schema';
 
 export type TimelinePayload = {
   arguments: Record<string, unknown>;
   options: Record<string, unknown>;
 };
+
+export type TimelineFileDiff = AgentFileDiff;
+export type TimelineToolCall = AgentToolCall;
 
 export type TimelineCommandField = {
   name: string;
@@ -40,11 +52,15 @@ export type TimelineCommandFormState = {
   autoRun: boolean;
   /** Web-only hints for options; never sent as command payload. */
   optionHints?: Record<string, WebOptionFieldHintValue>;
+  /** Web-only suggested values for arguments (e.g. OpenCode models from opencode.json). */
+  argumentChoices?: Record<string, WebArgumentFieldChoice[]>;
 };
 
 export type TimelineEventKind =
   | 'system'
   | 'chat'
+  | 'diff'
+  | 'tool'
   | 'prompt'
   | 'command_result'
   | 'command_form';
@@ -67,6 +83,20 @@ export type TimelineHistoryItem =
     }
   | {
       id: string;
+      type: 'diff';
+      files: TimelineFileDiff[];
+      createdAt: number;
+      source: MessageSource;
+    }
+  | {
+      id: string;
+      type: 'tool';
+      tool: TimelineToolCall;
+      createdAt: number;
+      source: MessageSource;
+    }
+  | {
+      id: string;
       type: 'prompt';
       requestId: string;
       text: string | null;
@@ -83,6 +113,7 @@ export type TimelineHistoryItem =
       values: TimelinePayload | null;
       text: string | null;
       web: WebNodeRoot | null;
+      clientView: ClientViewRoot | null;
       createdAt: number;
       source: MessageSource;
     }
@@ -94,6 +125,7 @@ export type TimelineHistoryItem =
       values: TimelinePayload;
       autoRun: boolean;
       optionHints?: Record<string, WebOptionFieldHintValue>;
+      argumentChoices?: Record<string, WebArgumentFieldChoice[]>;
       createdAt: number;
       source: MessageSource;
     };
@@ -111,6 +143,9 @@ export type TimelineEventRecord = {
   form: TimelineCommandFormState | null;
   text: string | null;
   web: WebNodeRoot | null;
+  clientView: ClientViewRoot | null;
+  diff: TimelineFileDiff[] | null;
+  tool: TimelineToolCall | null;
   prompt: PromptPayload | null;
   requestId: string | null;
   createdAt: number;

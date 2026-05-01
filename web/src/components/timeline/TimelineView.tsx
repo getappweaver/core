@@ -1,0 +1,351 @@
+import { For, Match, Switch } from 'solid-js';
+
+import { CommandFormCard } from '../../commands/CommandFormCard';
+import type { TimelineItem } from '../../types';
+import {
+  isChatItem,
+  isCommandFormItem,
+  isCommandResultItem,
+  isDiffItem,
+  isPromptItem,
+  isSystemItem,
+  isToolItem,
+} from '../../types';
+
+import { ChatMarkdown } from '../ChatMarkdown';
+
+import { TimelineCommandResultCard } from './TimelineCommandResultCard';
+import { TimelinePromptCard } from './TimelinePromptCard';
+import type { TimelineViewProps } from './types';
+
+export function TimelineView(props: TimelineViewProps) {
+  return (
+    <div
+      class="timeline panel"
+      classList={{ 'timeline--bottom-fade': props.showBottomFade }}
+      ref={(el) => props.setTimelineRef(el)}
+    >
+      <For each={props.timeline}>
+        {(item) => (
+          <Switch>
+            <Match when={isSystemItem(item)}>
+              <TimelineSystemCard
+                text={(item as Extract<TimelineItem, { type: 'system' }>).text}
+              />
+            </Match>
+
+            <Match when={isChatItem(item)}>
+              <TimelineChatCard
+                role={(item as Extract<TimelineItem, { type: 'chat' }>).role}
+                text={(item as Extract<TimelineItem, { type: 'chat' }>).text}
+              />
+            </Match>
+
+            <Match when={isDiffItem(item)}>
+              <TimelineDiffCard
+                files={(item as Extract<TimelineItem, { type: 'diff' }>).files}
+              />
+            </Match>
+
+            <Match when={isToolItem(item)}>
+              <TimelineToolCard
+                tool={(item as Extract<TimelineItem, { type: 'tool' }>).tool}
+              />
+            </Match>
+
+            <Match when={isPromptItem(item)}>
+              <TimelinePromptCard
+                item={item as Extract<TimelineItem, { type: 'prompt' }>}
+                isWebUiBusy={props.isWebUiBusy}
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
+                onRunWebAction={props.onRunWebAction}
+                onAppendSystem={props.onAppendSystem}
+              />
+            </Match>
+
+            <Match when={isCommandResultItem(item)}>
+              <div
+                classList={{
+                  'timeline-item-visually-hidden':
+                    props.isTimelineItemHidden?.(
+                      item as Extract<TimelineItem, { type: 'command_result' }>,
+                    ) === true,
+                }}
+              >
+                <TimelineCommandResultCard
+                  item={
+                    item as Extract<TimelineItem, { type: 'command_result' }>
+                  }
+                  onOpenCommand={props.onOpenCommand}
+                  onRepeatSubcommand={props.onRepeatSubcommand}
+                  onDeleteTimelineItem={props.onDeleteTimelineItem}
+                  onReplaceCommandWeb={props.onReplaceCommandWeb}
+                  isWebUiBusy={props.isWebUiBusy}
+                  onRunWebAction={props.onRunWebAction}
+                  onRunJsonCommand={props.onRunJsonCommand}
+                  onAppendSystem={props.onAppendSystem}
+                />
+              </div>
+            </Match>
+
+            <Match when={isCommandFormItem(item)}>
+              <CommandFormCard
+                active={props.activeFormId === item.id}
+                formItem={
+                  item as Extract<TimelineItem, { type: 'command_form' }>
+                }
+                onOpenCommand={props.onOpenCommand}
+                onRepeatSubcommand={props.onRepeatSubcommand}
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
+                onUpdateFormValue={props.onUpdateFormValue}
+                onSubmitForm={props.onSubmitForm}
+              />
+            </Match>
+          </Switch>
+        )}
+      </For>
+    </div>
+  );
+}
+
+type TimelineSystemCardProps = {
+  text: string;
+};
+
+export function TimelineSystemCard(props: TimelineSystemCardProps) {
+  return <div class="card system-card">{props.text}</div>;
+}
+
+type TimelineChatCardProps = {
+  role: 'user' | 'assistant';
+  text: string;
+};
+
+function splitThinkingBlock(text: string): {
+  thinking: string | null;
+  output: string;
+} {
+  const prefix = '**Thinking:**\n';
+
+  if (!text.startsWith(prefix)) {
+    return { thinking: null, output: text };
+  }
+
+  const rest = text.slice(prefix.length);
+  const separator = rest.indexOf('\n\n');
+
+  if (separator < 0) {
+    return { thinking: rest, output: '' };
+  }
+
+  return {
+    thinking: rest.slice(0, separator),
+    output: rest.slice(separator + 2),
+  };
+}
+
+export function TimelineChatCard(props: TimelineChatCardProps) {
+  const parts = () => splitThinkingBlock(props.text);
+
+  return (
+    <div
+      class={`card chat-card ${props.role === 'user' ? 'user' : 'assistant'}`}
+    >
+      {props.role === 'assistant' && parts().thinking !== null ? (
+        <>
+          <div class="chat-thinking">
+            <strong>Thinking:</strong>
+            <ChatMarkdown text={parts().thinking ?? ''} role={props.role} />
+          </div>
+          <ChatMarkdown text={parts().output} role={props.role} />
+        </>
+      ) : (
+        <ChatMarkdown text={props.text} role={props.role} />
+      )}
+    </div>
+  );
+}
+
+type TimelineDiffCardProps = {
+  files: Extract<TimelineItem, { type: 'diff' }>['files'];
+};
+
+function diffLineClass(line: string): string {
+  if (line.startsWith('+++') || line.startsWith('---')) {
+    return 'diff-line diff-line--meta';
+  }
+
+  if (line.startsWith('+')) {
+    return 'diff-line diff-line--add';
+  }
+
+  if (line.startsWith('-')) {
+    return 'diff-line diff-line--del';
+  }
+
+  if (line.startsWith('@@')) {
+    return 'diff-line diff-line--hunk';
+  }
+
+  return 'diff-line';
+}
+
+export function TimelineDiffCard(props: TimelineDiffCardProps) {
+  const additions = () =>
+    props.files.reduce((sum, file) => sum + file.additions, 0);
+
+  const deletions = () =>
+    props.files.reduce((sum, file) => sum + file.deletions, 0);
+
+  return (
+    <div class="card diff-card">
+      <div class="card-head diff-card__head">
+        <span class="tag mode-tag">patch</span>
+        <span class="diff-card__summary">
+          {props.files.length} {props.files.length === 1 ? 'file' : 'files'}
+        </span>
+        <span class="diff-card__stat diff-card__stat--add">+{additions()}</span>
+        <span class="diff-card__stat diff-card__stat--del">-{deletions()}</span>
+      </div>
+
+      <For each={props.files}>
+        {(file) => (
+          <details class="diff-file" open={props.files.length === 1}>
+            <summary class="diff-file__summary">
+              <span class="diff-file__name">{file.file}</span>
+              <span class="diff-file__meta">
+                {file.status ?? 'modified'} · +{file.additions} -
+                {file.deletions}
+              </span>
+            </summary>
+            <pre class="diff-file__patch">
+              <For each={file.patch.split('\n')}>
+                {(line) => (
+                  <span class={diffLineClass(line)}>{line || ' '}</span>
+                )}
+              </For>
+            </pre>
+          </details>
+        )}
+      </For>
+    </div>
+  );
+}
+
+type TimelineToolCardProps = {
+  tool: Extract<TimelineItem, { type: 'tool' }>['tool'];
+};
+
+function toolStatusLabel(
+  status: TimelineToolCardProps['tool']['status'],
+): string {
+  switch (status) {
+    case 'pending':
+      return 'wants to use';
+    case 'running':
+      return 'using';
+    case 'completed':
+      return 'used';
+    case 'error':
+      return 'failed';
+  }
+}
+
+function stringifyToolValue(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return null;
+}
+
+function getToolInputValue(
+  tool: TimelineToolCardProps['tool'],
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = stringifyToolValue(tool.input[key]);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function toolDisplayName(tool: TimelineToolCardProps['tool']): string {
+  const raw = tool.tool.split('.').at(-1) ?? tool.tool;
+
+  return raw.length > 0 ? raw[0].toUpperCase() + raw.slice(1) : tool.tool;
+}
+
+function shortenToolTarget(value: string): string {
+  const workspaceMarker = '/dm-bot-main/';
+  const markerIndex = value.indexOf(workspaceMarker);
+
+  if (markerIndex >= 0) {
+    return value.slice(markerIndex + workspaceMarker.length);
+  }
+
+  return value;
+}
+
+function compactToolSummary(tool: TimelineToolCardProps['tool']): string {
+  const name = toolDisplayName(tool);
+
+  const path = getToolInputValue(tool, [
+    'filePath',
+    'filepath',
+    'path',
+    'file',
+  ]);
+
+  const command = getToolInputValue(tool, ['command', 'cmd']);
+  const pattern = getToolInputValue(tool, ['pattern', 'query']);
+  const url = getToolInputValue(tool, ['url']);
+  const extras: string[] = [];
+
+  for (const key of ['offset', 'limit', 'timeout']) {
+    const value = stringifyToolValue(tool.input[key]);
+
+    if (value) {
+      extras.push(`${key}=${value}`);
+    }
+  }
+
+  const target = path ?? command ?? pattern ?? url ?? tool.title;
+  const suffix = extras.length > 0 ? ` [${extras.join(', ')}]` : '';
+
+  return target ? `${name} ${shortenToolTarget(target)}${suffix}` : name;
+}
+
+function compactToolArrow(tool: TimelineToolCardProps['tool']): string {
+  if (tool.status === 'error') {
+    return '×';
+  }
+
+  if (
+    tool.status === 'completed' &&
+    /patch|edit|write/i.test(`${tool.tool} ${tool.title ?? ''}`)
+  ) {
+    return '←';
+  }
+
+  return '→';
+}
+
+export function TimelineToolCard(props: TimelineToolCardProps) {
+  return (
+    <div class={`card tool-card tool-card--${props.tool.status}`}>
+      <div class="tool-card__line" title={toolStatusLabel(props.tool.status)}>
+        <span class="tool-card__arrow">{compactToolArrow(props.tool)}</span>
+        <span>{compactToolSummary(props.tool)}</span>
+      </div>
+    </div>
+  );
+}

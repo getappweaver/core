@@ -4,9 +4,7 @@
 
 import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
-import { appendStatusBlock } from '../shared/with-status';
 
-import { renderBotCli } from './cli-representation';
 import { handleBotIdentity } from './identity/handler';
 import { handleBotLint } from './lint/handler';
 import { handleBotLog } from './log/handler';
@@ -16,7 +14,7 @@ import { handleBotReady } from './ready/handler';
 import { handleBotRestart } from './restart/handler';
 import { handleBotStatus } from './status/handler';
 import { handleBotVersion } from './version/handler';
-import { handleBotWorkspace } from './workspace/handler';
+import { handleBotWorkspaceCommand } from './workspace/handler';
 
 export const handleBotRoot: BuiltinHandler = (ctx) => {
   const p = ctx.prefix;
@@ -58,20 +56,7 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
   }
 
   if (sub === 'workspace') {
-    return handleError(async () => {
-      const rep = await handleBotWorkspace({
-        db: ctx.seenDb,
-        backend: ctx.backend,
-        dmBotRoot: ctx.dmBotRoot,
-        parentOfBotRoot: ctx.parentOfBotRoot,
-        selected: args[1],
-        prefix: p,
-      });
-
-      const out = renderBotCli(rep, { prefix: p });
-
-      return appendStatusBlock(ctx, out);
-    }, 'Failed to switch workspace');
+    return handleBotWorkspaceCommand(ctx);
   }
 
   if (sub === 'lint') {

@@ -26,6 +26,7 @@ import {
   STATE_DM_COMMAND_PREFIX,
   STATE_LINTING,
   STATE_MODEL_OVERRIDE,
+  STATE_OPENCODE_AGENT,
   STATE_PROVIDER_NAME,
   STATE_REPLY_TRANSPORT,
   STATE_ROUTSTR_BUDGET_MSATS,
@@ -98,10 +99,69 @@ export function setDefaultMode(db: CoreDb, mode: AgentMode): void {
   setState(db, STATE_DEFAULT_MODE, mode);
 }
 
+export function getSelectedOpencodeAgent(db: CoreDb): string {
+  const selected = getState(db, STATE_OPENCODE_AGENT)?.trim();
+
+  if (selected) {
+    return selected;
+  }
+
+  return getCurrentOrDefaultMode(db);
+}
+
+export function setSelectedOpencodeAgent(db: CoreDb, agentName: string): void {
+  const trimmed = agentName.trim();
+
+  if (trimmed.length === 0) {
+    throw new Error('agent name cannot be empty');
+  }
+
+  setState(db, STATE_OPENCODE_AGENT, trimmed);
+}
+
+export type BackendExecutionProfile =
+  | {
+      kind: 'cursor';
+      mode: AgentMode;
+    }
+  | {
+      kind: 'opencode';
+      agent: string;
+    };
+
+export function getBackendExecutionProfile(
+  db: CoreDb,
+  backendName: AgentBackendName,
+): BackendExecutionProfile {
+  if (backendName === 'cursor') {
+    return {
+      kind: 'cursor',
+      mode: getCurrentOrDefaultMode(db),
+    };
+  }
+
+  return {
+    kind: 'opencode',
+    agent: getSelectedOpencodeAgent(db),
+  };
+}
+
+function normalizeBackendName(value: string | null): AgentBackendName | null {
+  if (value === 'cursor-sdk') {
+    return 'cursor';
+  }
+
+  if (value === 'opencode-sdk') {
+    return 'opencode';
+  }
+
+  return AgentBackendNameSchema.safeParse(value).data ?? null;
+}
+
 export function getAgentBackend(db: CoreDb): AgentBackendName {
   const v = getState(db, STATE_AGENT_BACKEND);
 
-  return AgentBackendNameSchema.safeParse(v).data ?? DEFAULT_BACKEND;
+  return normalizeBackendName(v) ?? DEFAULT_BACKEND;
 }
 
 export function setAgentBackend(db: CoreDb, backend: AgentBackendName): void {
@@ -134,7 +194,16 @@ export function getModelOverride(
 ): string | null {
   const key = `${STATE_MODEL_OVERRIDE}:${backendName}`;
 
-  return getState(db, key);
+  const value = getState(db, key);
+
+  if (value !== null) {
+    return value;
+  }
+
+  const legacyBackendName =
+    backendName === 'cursor' ? 'cursor-sdk' : 'opencode-sdk';
+
+  return getState(db, `${STATE_MODEL_OVERRIDE}:${legacyBackendName}`);
 }
 
 export function setModelOverride(

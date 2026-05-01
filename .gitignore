@@ -4,7 +4,7 @@ dm-bot.sqlite-shm
 dm-bot.sqlite-wal
 restart.requested
 node_modules
-.opencode/
+.opencode/*
 .data/browser-profile/
 plugins.json
 plugins/
@@ -13,3 +13,5 @@ TOOLS.md
 .claude/skills/dm-bot*/
 .logs/
 apps/landing/dist/
+web/public/plugin-icons/
+web/public/builtin-icons/

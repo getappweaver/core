@@ -127,16 +127,9 @@ export function draftReviewPrompt(params: {
           tag: 'button',
           props: {
             label: 'Accept',
+            tone: 'success',
+            storyTargetId: 'draft-review-accept',
             action: promptAnswerAction('a'),
-          },
-        },
-        {
-          type: 'element',
-          tag: 'button',
-          props: {
-            label: 'Revise',
-            tone: 'warning',
-            action: promptAnswerAction('r'),
           },
         },
         {
@@ -167,6 +160,47 @@ export function draftReviewPrompt(params: {
           },
         },
       ]),
+      {
+        type: 'element',
+        tag: 'form',
+        props: {
+          action: {
+            type: 'prompt_answer',
+            value: 'r',
+            valueFromField: 'corrections',
+          },
+        },
+        children: [
+          {
+            type: 'element',
+            tag: 'row',
+            props: {
+              gap: 'sm',
+              itemAlign: 'stretch',
+            },
+            children: [
+              {
+                type: 'element',
+                tag: 'textField',
+                props: {
+                  formFieldName: 'corrections',
+                  inputPlaceholder: 'Revise with corrections',
+                  fill: true,
+                },
+              },
+              {
+                type: 'element',
+                tag: 'button',
+                props: {
+                  label: 'Revise',
+                  tone: 'warning',
+                  htmlType: 'submit',
+                },
+              },
+            ],
+          },
+        ],
+      },
     ]),
   };
 }

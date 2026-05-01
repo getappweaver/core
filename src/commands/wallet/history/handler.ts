@@ -1,5 +1,5 @@
-import type { WalletDb } from '@src/wallets/db';
-import { getWalletHistory } from '@src/wallets/db';
+import type { WalletDb } from '@src/wallet/db';
+import { getWalletHistory } from '@src/wallet/db';
 
 import type { WalletHistoryRepresentation } from './representation';
 

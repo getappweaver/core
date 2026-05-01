@@ -4,7 +4,7 @@ import { getEnvFromFile, setEnvInFile } from '@src/env-file';
 
 import type { RouteCommandContext } from '../../dispatch';
 
-import { renderBotReadyCli } from './renderers/cli';
+import { renderBotReadyText } from './renderers/text';
 import { buildBotReadyRepresentation } from './representation';
 
 function getReadyCurrent(dmBotRoot: string): 'on' | 'off' {
@@ -36,5 +36,5 @@ export function handleBotReady(ctx: RouteCommandContext): Promise<string> {
     );
   }
 
-  return Promise.resolve(renderBotReadyCli(rep, { prefix: ctx.prefix }));
+  return Promise.resolve(renderBotReadyText(rep, { prefix: ctx.prefix }));
 }

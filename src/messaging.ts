@@ -10,7 +10,7 @@ import type { AgentMode } from './db';
 import { C, log } from './logger';
 import { sendDm } from './nostr/nip17';
 import { assertUnreachable } from './utils';
-import type { WebNodeRoot } from './web/ui-schema';
+import type { WebHandlerResult } from './web/ui-schema';
 
 export const CHUNK_MAX = 4200;
 export const CHUNK_DELAY_BASE_MS = 1500;
@@ -131,11 +131,11 @@ export function createSendReplyForSource({
   signAuthEvent,
 }: CreateSendReplyForSourceProps): (
   source: MessageSource,
-  message: string | WebNodeRoot,
+  message: string | WebHandlerResult,
 ) => Promise<void> {
   return async (
     source: MessageSource,
-    message: string | WebNodeRoot,
+    message: string | WebHandlerResult,
   ): Promise<void> => {
     if (source === 'web' || typeof message !== 'string') {
       // TODO: Implement web reply sending

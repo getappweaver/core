@@ -1,0 +1,48 @@
+/*
+ * Shared overflow panel layout and menu-item buttons.
+ * Injected into Shadow DOM (concat) and the main app (styles.css @import).
+ */
+
+.web-overflow-panel .web-button.tone-danger:hover,
+.web-overflow-panel .web-button.tone-danger:focus-visible {
+  background: var(--color-danger);
+  color: #000;
+}
+
+.web-overflow-panel .web-button.tone-danger:active {
+  background: #d74444;
+  color: #000;
+}
+
+.web-overflow-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.35rem;
+  z-index: var(--z-web-overflow-stack);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0;
+  width: max-content;
+  max-width: min(100vw - 1.5rem, 28rem);
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.web-overflow-panel.is-flip-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
+.web-overflow-panel .web-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: #000;
+  font-weight: 700;
+}

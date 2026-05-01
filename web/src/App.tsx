@@ -1,88 +1,64 @@
+import type { JSX } from 'solid-js';
 import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   on,
   onCleanup,
   onMount,
   Show,
 } from 'solid-js';
-import type { JSX } from 'solid-js';
 
-import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
-
-import { WebCommandOutputModal } from './components/WebCommandOutputModal';
-import { WebNodeShadowRoot } from './components/WebNodeShadowRoot';
-import { CommandPalette } from './components/CommandPalette';
-import { ConnectModal } from './components/ConnectModal';
+import { useChat } from './chat/useChat';
+import { ChromeOverlay } from './chrome/ChromeOverlay';
+import { HeaderChrome } from './chrome/HeaderChrome';
+import { useChrome } from './chrome/useChrome';
+import {
+  ensureCommandDetail as ensureCommandDetailFromCatalog,
+  resolveCommandDetail as resolveCommandDetailFromCatalog,
+} from './commands/catalog';
+import type { ComposerAiState } from './commands/types';
+import { useCommandForms } from './commands/useCommandForms';
+import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
-import { TimelineView } from './components/TimelineView';
+import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
+import { TimelineView } from './components/timeline/TimelineView';
+import { useComposer } from './composer/useComposer';
+import { ConnectOverlays } from './connect/ConnectOverlays';
+import { useConnect } from './connect/useConnect';
 import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
+import { PaletteView } from './palette/PaletteView';
+import { usePalette } from './palette/usePalette';
 import { registerWebPushNotifications } from './register-web-push';
-import type {
-  CommandDetail,
-  CommandOutput,
-  CommandPayload,
-  CommandSubcommand,
-  TimelineItem,
-} from './types';
-import type {
-  ChatResultServerMessage,
-  ChatStreamChunkServerMessage,
-  CommandResultServerMessage,
-  CommandsResultServerMessage,
-  DoneServerMessage,
-  ErrorServerMessage,
-  PromptPayload,
-  PromptServerMessage,
-  TimelineEventsResultServerMessage,
-} from './ws-types';
+import { useSocket } from './socket/useSocket';
+import { getStoryDomTarget } from './story/dom-targets';
+import {
+  emitStoryWalkthroughChange,
+  emitStoryQuitRequested,
+  emitStoryWidgetOpened,
+  onStoryCloseWidgetRequested,
+  onStoryClearPromptsRequested,
+  onStoryWalkthroughChange,
+} from './story/events';
+import { canStorySandboxHandleCommand } from './story/sandbox';
+import type { StoryWalkthroughState } from './story/types';
+import { WalkthroughOverlay } from './story/WalkthroughOverlay';
+import {
+  appendSystemMessageToTimeline,
+  useTimeline,
+} from './timeline/useTimeline';
+import type { CommandPayload, CommandDetail, TimelineItem } from './types';
 import {
   createId,
   defaultPayload,
-  getResultSubcommandTag,
   getSubcommandQueryFromPalette,
   hasMissingRequiredInputs,
   matchesCommandToken,
   mergeCommandPayload,
   payloadFromPathTokens,
+  scoreCommandMatch,
   scoreSubcommandMatch,
-  summarizeInvocation,
 } from './utils';
-
-type PendingRequest = {
-  /** When false, prompts and prompt answers must not touch the timeline. */
-  recordInTimeline?: boolean;
-  onCommandsResult?: (message: CommandsResultServerMessage) => void;
-  onTimelineEventsResult?: (message: TimelineEventsResultServerMessage) => void;
-  onCommandResult?: (message: CommandResultServerMessage) => void;
-  onPrompt?: (message: PromptServerMessage) => void;
-  onChatResult?: (message: ChatResultServerMessage) => void;
-  onDone?: (message: DoneServerMessage) => void;
-  onError?: (message: ErrorServerMessage) => void;
-};
-
-type ChromeModalState = {
-  command: string;
-  subcommand: string;
-  title: string;
-};
-
-type ChromePromptSession = {
-  requestId: string;
-  prompt: PromptPayload;
-};
-
-type IncomingServerMessage =
-  | CommandsResultServerMessage
-  | TimelineEventsResultServerMessage
-  | CommandResultServerMessage
-  | PromptServerMessage
-  | ChatStreamChunkServerMessage
-  | ChatResultServerMessage
-  | DoneServerMessage
-  | ErrorServerMessage;
 
 export function App(): JSX.Element {
   return (
@@ -92,62 +68,64 @@ export function App(): JSX.Element {
   );
 }
 
+function formatTokenCount(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}m`;
+  }
+
+  if (value >= 10_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
+
+  return String(value);
+}
+
+function formatComposerContextStats(
+  state: ComposerAiState | null,
+): string | null {
+  const stats = state?.contextStats;
+
+  if (!stats) {
+    return null;
+  }
+
+  if (stats.contextPercent === null) {
+    return formatTokenCount(stats.tokensTotal);
+  }
+
+  return `${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
+}
+
 function AppInner(): JSX.Element {
-  const WS_RECONNECT_DELAY_MS = 1500;
   const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
+
   const initialTimelineId = (() => {
     const existing = window.localStorage.getItem(TIMELINE_STORAGE_KEY);
+
     if (existing && existing.trim().length > 0) {
       return existing;
     }
 
     const created = createId();
     window.localStorage.setItem(TIMELINE_STORAGE_KEY, created);
+
     return created;
   })();
+
   const auth = useNostrAuth();
-  const [modalOpen, setModalOpen] = createSignal(false);
-  const [chromeModal, setChromeModal] = createSignal<ChromeModalState | null>(
-    null,
-  );
-  const [wsConnected, setWsConnected] = createSignal(false);
-  const [chromeLoading, setChromeLoading] = createSignal(false);
-  const [chromeError, setChromeError] = createSignal<string | null>(null);
-  const [chromeText, setChromeText] = createSignal<string | null>(null);
-  const [chromeWeb, setChromeWeb] = createSignal<WebNodeRoot | null>(null);
-  const [chromePromptSession, setChromePromptSession] =
-    createSignal<ChromePromptSession | null>(null);
 
-  // Close the connect dialog when login succeeds (covers async / ordering edge cases).
-  createEffect(
-    on(
-      () => auth.authState().status,
-      (status, prevStatus) => {
-        if (prevStatus !== 'disconnected' || status !== 'connected') {
-          return;
-        }
-
-        if (!modalOpen()) {
-          return;
-        }
-
-        setModalOpen(false);
-      },
-    ),
-  );
+  const [composerAiState, setComposerAiState] =
+    createSignal<ComposerAiState | null>(null);
 
   let timelineEl: HTMLDivElement | undefined;
-  let paletteInputEl: HTMLInputElement | undefined;
-  let paletteContainerEl: HTMLDivElement | undefined;
   let composerInputEl: HTMLTextAreaElement | undefined;
-  let headerMenuEl: HTMLDivElement | undefined;
-  let headerMenuButtonEl: HTMLButtonElement | undefined;
-  let socket: WebSocket | null = null;
-  let wsReconnectTimer: number | null = null;
-  const pendingRequests = new Map<string, PendingRequest>();
-  const chatStreamAssistantByRequestId = new Map<string, string>();
 
   const [commands, setCommands] = createSignal<CommandDetail[]>([]);
+
   const [timeline, setTimeline] = createSignal<TimelineItem[]>([
     {
       id: createId(),
@@ -155,44 +133,124 @@ function AppInner(): JSX.Element {
       text: 'Ready. Use the / button to browse commands or type a message below.',
     },
   ]);
+
   const [composerText, setComposerText] = createSignal('');
-  const [paletteOpen, setPaletteOpen] = createSignal(false);
-  const [paletteStep, setPaletteStep] = createSignal<
-    'commands' | 'subcommands'
-  >('commands');
-  const [paletteQuery, setPaletteQuery] = createSignal('');
-  const [paletteSelectedIndex, setPaletteSelectedIndex] = createSignal(0);
-  const [selectedCommand, setSelectedCommand] =
-    createSignal<CommandDetail | null>(null);
-  const [paletteError, setPaletteError] = createSignal<string | null>(null);
   const [loadingCommands, setLoadingCommands] = createSignal(true);
+  const [agentWorking, setAgentWorking] = createSignal(false);
+
+  const [timelineScrolledAwayFromBottom, setTimelineScrolledAwayFromBottom] =
+    createSignal(false);
+
+  let timelineBottomFadeFrame: number | null = null;
+  let timelineBottomScrollFrame: number | null = null;
+
   const [activeFormId, setActiveFormId] = createSignal<string | null>(null);
+
   const [pendingPromptRequestId, setPendingPromptRequestId] = createSignal<
     string | null
   >(null);
-  const [headerMenuOpen, setHeaderMenuOpen] = createSignal(false);
+
+  const [headerMenusOpen, setHeaderMenusOpen] = createSignal(false);
   const [pushBusy, setPushBusy] = createSignal(false);
+
+  const [storyWalkthrough, setStoryWalkthrough] =
+    createSignal<StoryWalkthroughState | null>(null);
+
+  const headerWidgetTargets = new Map<string, HTMLElement>();
+
+  const [taskbarSingletonByKey, setTaskbarSingletonByKey] = createSignal<
+    Record<string, { itemId: string; visible: boolean }>
+  >({});
+
   const [timelineId] = createSignal<string>(initialTimelineId);
-  const [wsReconnectNonce, setWsReconnectNonce] = createSignal(0);
+
+  const appendSystemMessage = (text: string): void => {
+    appendSystemMessageToTimeline(setTimeline, createId, text);
+  };
+
+  const chrome = useChrome();
+
+  const connect = useConnect({
+    auth,
+  });
+
+  const {
+    connectLabel,
+    handleConnectMenuClick,
+    isConnected,
+    isDisconnected,
+    manageTitle,
+  } = connect;
+
+  const {
+    beginWebUiBusy,
+    endWebUiBusy,
+    isWebUiBusyFor,
+    pendingRequests,
+    requestComposerAiState,
+    sendSocketMessage,
+    useSocketLifecycle,
+    webUiBusyDigest,
+    wsConnected,
+  } = useSocket({
+    auth,
+    setTimeline,
+    timelineId,
+    setCommands,
+    setComposerAiState,
+    setLoadingCommands,
+    setAgentWorking,
+    appendSystemMessage,
+    createId,
+    chat: {
+      clearRequest: (requestId) => chat.clearRequest(requestId),
+      handleStreamDiff: (files) => chat.handleStreamDiff(files),
+      handleStreamTool: (requestId, tool) =>
+        chat.handleStreamTool(requestId, tool),
+      handleStreamTextDelta: (requestId, deltaText) =>
+        chat.handleStreamTextDelta(requestId, deltaText),
+    },
+  });
+
+  const chat = useChat({
+    timelineId,
+    setTimeline,
+    createId,
+    pendingRequests,
+    sendSocketMessage,
+    appendSystemMessage,
+    setAgentWorking,
+    onChatResult: requestComposerAiState,
+  });
 
   const headerChromeWidgets = createMemo(() => {
     const out: Array<{
       command: string;
       subcommand: string;
+      source: 'builtin' | 'plugin';
+      pluginAlias?: string;
+      surface: 'modal' | 'timeline_singleton';
       label: string;
       modalTitle: string;
+      icon?: string;
+      order?: number;
     }> = [];
 
     for (const cmd of commands()) {
       for (const sub of cmd.subcommands) {
-        const w = sub.webHeaderWidget;
+        const w = sub.webWidget;
 
-        if (w) {
+        if (w?.placement === 'header' && w.label) {
           out.push({
             command: cmd.name,
             subcommand: sub.name,
+            source: cmd.source ?? 'builtin',
+            pluginAlias: cmd.pluginAlias,
+            surface: w.surface,
             label: w.label,
             modalTitle: w.modalTitle,
+            icon: w.icon,
+            order: w.order,
           });
         }
       }
@@ -201,684 +259,541 @@ function AppInner(): JSX.Element {
     return out;
   });
 
-  function getWebSocketUrl(): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const taskbarWidgets = createMemo(() => {
+    const out: Array<{
+      command: string;
+      subcommand: string;
+      label: string;
+      modalTitle: string;
+      icon?: string;
+      order?: number;
+    }> = [];
 
-    return `${protocol}//${window.location.host}/ws`;
-  }
+    for (const cmd of commands()) {
+      for (const sub of cmd.subcommands) {
+        const w = sub.webWidget;
 
-  function splitPromptPayload(prompt: PromptPayload): {
-    text: string | null;
-    web: WebNodeRoot | null;
-  } {
-    if (prompt.type === 'text-prompt') {
-      return {
-        text: prompt.value,
-        web: null,
-      };
+        if (
+          w?.placement === 'header' &&
+          w.surface === 'timeline_singleton' &&
+          w.label
+        ) {
+          out.push({
+            command: cmd.name,
+            subcommand: sub.name,
+            label: w.label,
+            modalTitle: w.modalTitle,
+            icon: w.icon,
+            order: w.order,
+          });
+        }
+      }
     }
 
-    return {
-      text: null,
-      web: prompt.value,
-    };
+    return out;
+  });
+
+  function taskbarDockKey(command: string, subcommand: string): string {
+    return `${command}:${subcommand}`;
   }
 
-  function sendSocketMessage(message: unknown): void {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket is not connected');
+  function storyTargetHeaderWidgetKey(
+    command: string,
+    subcommand: string,
+  ): string {
+    return `${command}:${subcommand}`;
+  }
+
+  function storyWalkthroughTargetElement(): HTMLElement | null {
+    const walkthrough = storyWalkthrough();
+
+    if (walkthrough?.target?.type === 'web_node') {
+      return getStoryDomTarget(walkthrough.target.targetId);
     }
 
-    socket.send(JSON.stringify(message));
+    if (walkthrough?.target?.type !== 'header_widget') {
+      return null;
+    }
+
+    const key = storyTargetHeaderWidgetKey(
+      walkthrough.target.command,
+      walkthrough.target.subcommand,
+    );
+
+    const selector = `[data-story-target="header-widget:${CSS.escape(key)}"]`;
+
+    const visibleTarget = [
+      ...document.querySelectorAll<HTMLElement>(selector),
+    ].find((el) => el.offsetParent !== null);
+
+    return visibleTarget ?? headerWidgetTargets.get(key) ?? null;
   }
 
-  function clearSocketReconnectTimer(): void {
-    if (wsReconnectTimer === null) {
+  function isTaskbarSubcommand(command: string, subcommand: string): boolean {
+    return taskbarWidgets().some(
+      (w) => w.command === command && w.subcommand === subcommand,
+    );
+  }
+
+  function isHeaderWidgetActive(widget: {
+    command: string;
+    subcommand: string;
+    surface: 'modal' | 'timeline_singleton';
+  }): boolean {
+    if (widget.surface !== 'timeline_singleton') {
+      return false;
+    }
+
+    const key = taskbarDockKey(widget.command, widget.subcommand);
+
+    return taskbarSingletonByKey()[key]?.visible === true;
+  }
+
+  function isTimelineCommandResultHidden(
+    item: Extract<TimelineItem, { type: 'command_result' }>,
+  ): boolean {
+    const key = item.timelineSingletonKey;
+
+    if (!key) {
+      return false;
+    }
+
+    return taskbarSingletonByKey()[key]?.visible !== true;
+  }
+
+  function scheduleTimelineBottomFadeUpdate(): void {
+    if (timelineBottomFadeFrame !== null) {
       return;
     }
 
-    window.clearTimeout(wsReconnectTimer);
-    wsReconnectTimer = null;
+    timelineBottomFadeFrame = requestAnimationFrame(() => {
+      timelineBottomFadeFrame = null;
+      updateTimelineBottomFade();
+    });
   }
 
-  function scheduleSocketReconnect(): void {
-    if (auth.authState().status !== 'connected' || wsReconnectTimer !== null) {
+  function scrollTimelineToBottomSoon(): void {
+    if (timelineBottomScrollFrame !== null) {
       return;
     }
 
-    wsReconnectTimer = window.setTimeout(() => {
-      wsReconnectTimer = null;
-      setWsReconnectNonce((value) => value + 1);
-    }, WS_RECONNECT_DELAY_MS);
+    timelineBottomScrollFrame = requestAnimationFrame(() => {
+      timelineBottomScrollFrame = null;
+
+      if (timelineEl) {
+        timelineEl.scrollTop = timelineEl.scrollHeight;
+        scheduleTimelineBottomFadeUpdate();
+      }
+    });
   }
 
-  function handleServerMessage(message: IncomingServerMessage): void {
-    const pending = pendingRequests.get(message.requestId);
+  function updateTimelineBottomFade(): void {
+    if (!timelineEl) {
+      if (timelineScrolledAwayFromBottom()) {
+        setTimelineScrolledAwayFromBottom(false);
+      }
 
-    switch (message.type) {
-      case 'commands_result':
-        pending?.onCommandsResult?.(message);
-        return;
-      case 'timeline_events_result':
-        pending?.onTimelineEventsResult?.(message);
-        return;
-      case 'command_result':
-        pending?.onCommandResult?.(message);
-        return;
-      case 'prompt':
-        pending?.onPrompt?.(message);
-        return;
-      case 'chat_stream_chunk': {
-        const chunk = message.chunk;
+      return;
+    }
 
-        if (chunk.kind !== 'text_delta') {
-          return;
+    const remaining =
+      timelineEl.scrollHeight - timelineEl.scrollTop - timelineEl.clientHeight;
+
+    const next = remaining > 2;
+
+    if (timelineScrolledAwayFromBottom() !== next) {
+      setTimelineScrolledAwayFromBottom(next);
+    }
+  }
+
+  function hideAllTaskbarPanels(): void {
+    const bottomTimelineItemId = timeline().at(-1)?.id;
+
+    setTaskbarSingletonByKey((prev) => {
+      const next: Record<string, { itemId: string; visible: boolean }> = {};
+      let changed = false;
+      for (const [key, entry] of Object.entries(prev)) {
+        if (entry.itemId !== bottomTimelineItemId && entry.visible) {
+          changed = true;
+          next[key] = { ...entry, visible: false };
+        } else {
+          next[key] = entry;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }
+
+  function activateSingleTaskbarKey(
+    key: string,
+    itemId: string,
+    visible: boolean,
+  ): void {
+    setTaskbarSingletonByKey((prev) => {
+      const next: Record<string, { itemId: string; visible: boolean }> = {};
+
+      for (const [entryKey, entry] of Object.entries(prev)) {
+        if (entryKey === key) {
+          next[entryKey] = { itemId, visible };
+          continue;
         }
 
-        const rid = message.requestId;
-        const deltaText = chunk.text;
+        next[entryKey] = { ...entry, visible: false };
+      }
 
-        setTimeline((prev) => {
-          let assistantId = chatStreamAssistantByRequestId.get(rid);
+      if (!(key in next)) {
+        next[key] = { itemId, visible };
+      }
 
-          if (!assistantId) {
-            assistantId = createId();
-            chatStreamAssistantByRequestId.set(rid, assistantId);
+      return next;
+    });
+  }
 
-            return [
-              ...prev,
-              {
-                id: assistantId,
-                type: 'chat',
-                role: 'assistant',
-                text: deltaText,
-              },
-            ];
+  function setTaskbarDockResult(params: {
+    command: string;
+    subcommand: string;
+    values: CommandPayload;
+    output: import('./commands/types').SplitCommandOutput;
+    visible: boolean;
+  }): void {
+    const key = taskbarDockKey(params.command, params.subcommand);
+    const existing = taskbarSingletonByKey()[key];
+
+    if (existing) {
+      setTimeline((prev) => {
+        const rest: TimelineItem[] = [];
+        let singleton: Extract<
+          TimelineItem,
+          { type: 'command_result' }
+        > | null = null;
+        for (const item of prev) {
+          if (item.type === 'command_result' && item.id === existing.itemId) {
+            singleton = {
+              ...item,
+              values: params.values,
+              text: params.output.text,
+              web: params.output.web,
+              clientView: params.output.clientView,
+              timelineSingletonKey: key,
+            };
+
+            continue;
           }
 
-          return prev.map((item) =>
-            item.id === assistantId &&
-            item.type === 'chat' &&
-            item.role === 'assistant'
-              ? { ...item, text: item.text + deltaText }
-              : item,
-          );
-        });
+          rest.push(item);
+        }
 
-        return;
-      }
-      case 'chat_result':
-        pending?.onChatResult?.(message);
-        return;
-      case 'done':
-        pending?.onDone?.(message);
-        pendingRequests.delete(message.requestId);
-        chatStreamAssistantByRequestId.delete(message.requestId);
-        return;
-      case 'error':
-        pending?.onError?.(message);
-        pendingRequests.delete(message.requestId);
-        chatStreamAssistantByRequestId.delete(message.requestId);
-        appendSystemMessage(message.message);
-        return;
-    }
-  }
-
-  function saveTimelineForm(
-    item: Extract<TimelineItem, { type: 'command_form' }>,
-  ): void {
-    const requestId = createId();
-
-    pendingRequests.set(requestId, {});
-
-    try {
-      sendSocketMessage({
-        type: 'save_timeline_form',
-        requestId,
-        timelineId: timelineId(),
-        eventId: item.id,
-        command: item.command,
-        form: {
-          subcommand: item.subcommand,
-          values: item.values,
-          autoRun: item.autoRun,
-          ...(item.optionHints ? { optionHints: item.optionHints } : {}),
-        },
+        return singleton ? [...rest, singleton] : prev;
       });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-    }
-  }
 
-  function deleteTimelineItem(itemId: string): void {
-    setTimeline((prev) => prev.filter((item) => item.id !== itemId));
-
-    const requestId = createId();
-    pendingRequests.set(requestId, {});
-
-    try {
-      sendSocketMessage({
-        type: 'delete_timeline_event',
-        requestId,
-        timelineId: timelineId(),
-        eventId: itemId,
-      });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  function connectSocket(): void {
-    if (socket && socket.readyState !== WebSocket.CLOSED) {
-      if (socket.readyState === WebSocket.OPEN) {
-        setWsConnected(true);
-      }
+      activateSingleTaskbarKey(key, existing.itemId, params.visible);
+      scrollTimelineToBottomSoon();
 
       return;
     }
 
-    socket = new WebSocket(getWebSocketUrl());
+    const itemId = createId();
 
-    socket.addEventListener('open', () => {
-      void (async () => {
-        const sock = socket;
-        const wsSignUrl = new URL('/ws', window.location.origin).href;
-        const rawToken = await auth.getNip98Token(wsSignUrl, 'GET');
+    setTimeline((prev) => [
+      ...prev,
+      {
+        id: itemId,
+        type: 'command_result',
+        command: params.command,
+        subcommand: params.subcommand,
+        subcommandTag: params.subcommand,
+        values: params.values,
+        text: params.output.text,
+        web: params.output.web,
+        clientView: params.output.clientView,
+        timelineSingletonKey: key,
+      },
+    ]);
 
-        if (!rawToken) {
-          appendSystemMessage(
-            'WebSocket: could not get NIP-98 token (connect Nostr first).',
-          );
-          sock?.close();
-          setWsConnected(false);
-
-          return;
-        }
-
-        const authRequestId = createId();
-
-        pendingRequests.set(authRequestId, {
-          onDone: () => {
-            if (
-              sock !== socket ||
-              !socket ||
-              socket.readyState !== WebSocket.OPEN
-            ) {
-              return;
-            }
-
-            clearSocketReconnectTimer();
-            setWsConnected(true);
-
-            const commandsRequestId = createId();
-            const timelineRequestId = createId();
-
-            pendingRequests.set(commandsRequestId, {
-              onCommandsResult: (message) => {
-                setCommands(message.commands);
-              },
-              onDone: () => {
-                setLoadingCommands(false);
-              },
-              onError: (message) => {
-                setPaletteError(message.message);
-                setLoadingCommands(false);
-              },
-            });
-
-            pendingRequests.set(timelineRequestId, {
-              onTimelineEventsResult: (message) => {
-                if (message.timelineId !== timelineId()) {
-                  return;
-                }
-
-                if (message.items.length > 0) {
-                  setTimeline(message.items as TimelineItem[]);
-                }
-              },
-            });
-
-            try {
-              sendSocketMessage({
-                type: 'request_commands',
-                requestId: commandsRequestId,
-              });
-
-              sendSocketMessage({
-                type: 'load_timeline',
-                requestId: timelineRequestId,
-                timelineId: timelineId(),
-                limit: 100,
-              });
-            } catch (err) {
-              setLoadingCommands(false);
-              appendSystemMessage(
-                err instanceof Error ? err.message : String(err),
-              );
-            }
-          },
-        });
-
-        try {
-          sendSocketMessage({
-            type: 'authenticate',
-            requestId: authRequestId,
-            authorization: `Nostr ${rawToken}`,
-          });
-        } catch (err) {
-          pendingRequests.delete(authRequestId);
-          appendSystemMessage(err instanceof Error ? err.message : String(err));
-          sock?.close();
-          setWsConnected(false);
-        }
-      })();
-    });
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const message = JSON.parse(String(event.data)) as IncomingServerMessage;
-        handleServerMessage(message);
-      } catch (err) {
-        appendSystemMessage(err instanceof Error ? err.message : String(err));
-      }
-    });
-
-    socket.addEventListener('close', () => {
-      socket = null;
-      setWsConnected(false);
-      pendingRequests.clear();
-
-      if (auth.authState().status === 'connected') {
-        scheduleSocketReconnect();
-      }
-    });
-
-    socket.addEventListener('error', () => {
-      setWsConnected(false);
-      appendSystemMessage('WebSocket connection failed.');
-    });
+    activateSingleTaskbarKey(key, itemId, params.visible);
+    scrollTimelineToBottomSoon();
   }
 
-  function runWebAction(
-    action: WebAction,
-    params?: {
-      onReplaceRoot?: (root: WebNodeRoot) => void;
-      promptRequestId?: string;
-      recordInTimeline?: boolean;
-    },
-  ): void {
-    if (action.type === 'prompt_answer') {
-      const promptRequestId =
-        params?.promptRequestId ?? pendingPromptRequestId();
+  function closeTaskbarWidget(command: string, subcommand: string): void {
+    const key = taskbarDockKey(command, subcommand);
+    const existing = taskbarSingletonByKey()[key];
 
-      if (!promptRequestId) {
-        appendSystemMessage('No pending prompt to answer.');
-        return;
-      }
+    setTaskbarSingletonByKey((prev) => {
+      const next = { ...prev };
+      delete next[key];
 
-      setPendingPromptRequestId((current) =>
-        current === promptRequestId ? null : current,
+      return next;
+    });
+
+    if (!existing) {
+      return;
+    }
+
+    setTimeline((prev) => prev.filter((item) => item.id !== existing.itemId));
+  }
+
+  async function toggleTaskbarWidget(widget: {
+    command: string;
+    subcommand: string;
+    label: string;
+  }): Promise<void> {
+    const key = taskbarDockKey(widget.command, widget.subcommand);
+
+    if (canStorySandboxHandleCommand(widget.command, widget.subcommand)) {
+      setTaskbarSingletonByKey((prev) => {
+        const rest = { ...prev };
+        delete rest[key];
+
+        return rest;
+      });
+
+      setTimeline((prev) =>
+        prev.filter(
+          (item) =>
+            item.type !== 'command_result' || item.timelineSingletonKey !== key,
+        ),
       );
 
-      try {
-        sendSocketMessage({
-          type: 'prompt_answer',
-          requestId: promptRequestId,
-          answer: action.value,
-        });
-      } catch (err) {
-        appendSystemMessage(err instanceof Error ? err.message : String(err));
-      }
+      const commandDetail = await ensureCommandDetail(widget.command);
 
-      return;
-    }
+      const subcommand = commandDetail?.subcommands.find(
+        (entry) => entry.name === widget.subcommand,
+      );
 
-    if (action.type !== 'command') {
-      return;
-    }
+      if (!subcommand) {
+        appendSystemMessage(
+          `Unable to open /${widget.command} ${widget.subcommand} taskbar widget.`,
+        );
 
-    if (action.presentation === 'form') {
-      void openCommandFormFromWebCommand(action).catch((err) => {
-        appendSystemMessage(err instanceof Error ? err.message : String(err));
-      });
-
-      return;
-    }
-
-    const requestId = createId();
-    const recordTl = params?.recordInTimeline ?? true;
-
-    pendingRequests.set(requestId, {
-      recordInTimeline: recordTl,
-      onCommandResult: (message) => {
-        const output = splitCommandOutput(message.output);
-
-        if (params?.onReplaceRoot && output.web && !action.refresh) {
-          params.onReplaceRoot(output.web);
-        }
-
-        const refresh = action.refresh;
-
-        if (!refresh || !params?.onReplaceRoot) {
-          return;
-        }
-
-        const refreshRequestId = createId();
-
-        pendingRequests.set(refreshRequestId, {
-          recordInTimeline: recordTl,
-          onCommandResult: (refreshMessage) => {
-            const refreshOutput = splitCommandOutput(refreshMessage.output);
-
-            if (refreshOutput.web) {
-              params?.onReplaceRoot?.(refreshOutput.web);
-            }
-          },
-        });
-
-        try {
-          sendSocketMessage({
-            type: 'run_command',
-            requestId: refreshRequestId,
-            timelineId: timelineId(),
-            command: refresh.command,
-            subcommand: refresh.subcommand,
-            payload: {
-              arguments: refresh.arguments ?? {},
-              options: refresh.options ?? {},
-            },
-            recordInTimeline: recordTl,
-          });
-        } catch (err) {
-          pendingRequests.delete(refreshRequestId);
-          appendSystemMessage(err instanceof Error ? err.message : String(err));
-        }
-      },
-      onPrompt: (message) => {
-        const prompt = splitPromptPayload(message.prompt);
-
-        setPendingPromptRequestId(message.requestId);
-
-        if (!recordTl) {
-          setChromePromptSession({
-            requestId: message.requestId,
-            prompt: message.prompt,
-          });
-
-          return;
-        }
-
-        setTimeline((prev) => [
-          ...prev,
-          {
-            id: createId(),
-            type: 'prompt',
-            requestId: message.requestId,
-            text: prompt.text,
-            web: prompt.web,
-          },
-        ]);
-      },
-      onDone: () => {
-        if (pendingPromptRequestId() === requestId) {
-          setPendingPromptRequestId(null);
-        }
-
-        if (!recordTl) {
-          setChromePromptSession(null);
-        }
-      },
-      onError: () => {
-        if (pendingPromptRequestId() === requestId) {
-          setPendingPromptRequestId(null);
-        }
-
-        if (!recordTl) {
-          setChromePromptSession(null);
-        }
-      },
-    });
-
-    try {
-      sendSocketMessage({
-        type: 'run_command',
-        requestId,
-        timelineId: timelineId(),
-        command: action.command,
-        subcommand: action.subcommand,
-        payload: {
-          arguments: action.arguments ?? {},
-          options: action.options ?? {},
-        },
-        recordInTimeline: recordTl,
-      });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  function replaceCommandResultWeb(itemId: string, web: WebNodeRoot): void {
-    setTimeline((prev) =>
-      prev.map((entry) =>
-        entry.id === itemId && entry.type === 'command_result'
-          ? { ...entry, web, text: null }
-          : entry,
-      ),
-    );
-  }
-
-  function appendSystemMessage(text: string): void {
-    setTimeline((prev) => [...prev, { id: createId(), type: 'system', text }]);
-  }
-
-  function splitCommandOutput(output: CommandOutput | undefined): {
-    text: string | null;
-    web: Extract<CommandOutput, { kind: 'ui' }> | null;
-  } {
-    if (typeof output === 'string') {
-      return {
-        text: output,
-        web: null,
-      };
-    }
-
-    if (output?.kind === 'ui') {
-      return {
-        text: null,
-        web: output,
-      };
-    }
-
-    return {
-      text: '(no output)',
-      web: null,
-    };
-  }
-
-  type RequestChromeCommandProps = {
-    command: string;
-    subcommand: string;
-    title: string;
-    payload: CommandPayload;
-  };
-
-  function requestChromeCommand(props: RequestChromeCommandProps): void {
-    setChromeLoading(true);
-    setChromeWeb(null);
-    setChromeText(null);
-    setChromeError(null);
-    setChromePromptSession(null);
-
-    if (!wsConnected()) {
-      setChromeLoading(false);
-      setChromeError('WebSocket is not connected.');
-
-      return;
-    }
-
-    const requestId = createId();
-
-    pendingRequests.set(requestId, {
-      recordInTimeline: false,
-      onCommandResult: (message) => {
-        const output = splitCommandOutput(message.output);
-
-        setChromeLoading(false);
-        setChromeWeb(output.web);
-        setChromeText(output.text);
-      },
-      onPrompt: (message) => {
-        setPendingPromptRequestId(message.requestId);
-        setChromePromptSession({
-          requestId: message.requestId,
-          prompt: message.prompt,
-        });
-      },
-      onError: (message) => {
-        setChromeLoading(false);
-        setChromeError(message.message);
-        setChromePromptSession(null);
-      },
-      onDone: () => {
-        if (pendingPromptRequestId() === requestId) {
-          setPendingPromptRequestId(null);
-        }
-
-        setChromePromptSession(null);
-      },
-    });
-
-    try {
-      sendSocketMessage({
-        type: 'run_command',
-        requestId,
-        timelineId: timelineId(),
-        command: props.command,
-        subcommand: props.subcommand,
-        payload: props.payload,
-        recordInTimeline: false,
-      });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      setChromeLoading(false);
-      setChromeError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  function openChromeWidget(props: {
-    command: string;
-    subcommand: string;
-    title: string;
-  }): void {
-    setChromeModal({
-      command: props.command,
-      subcommand: props.subcommand,
-      title: props.title,
-    });
-    requestChromeCommand({
-      command: props.command,
-      subcommand: props.subcommand,
-      title: props.title,
-      payload: { arguments: {}, options: {} },
-    });
-  }
-
-  function closeChromeModal(): void {
-    setChromeModal(null);
-    setChromeLoading(false);
-    setChromeError(null);
-    setChromeText(null);
-    setChromeWeb(null);
-    setChromePromptSession(null);
-  }
-
-  const filteredCommands = createMemo(() => {
-    const query = paletteQuery().trim().toLowerCase();
-    if (!query) return commands();
-    return commands().filter((command) =>
-      [command.name, command.summary, ...command.aliases].some((value) =>
-        value.toLowerCase().includes(query),
-      ),
-    );
-  });
-
-  const filteredSubcommands = createMemo(() => {
-    const command = selectedCommand();
-    if (!command) return [] as CommandSubcommand[];
-
-    if (command.name === 'help') {
-      const query = getSubcommandQueryFromPalette(command, paletteQuery())
-        .trim()
-        .toLowerCase();
-
-      return commands()
-        .filter((entry) => entry.name !== 'help')
-        .filter((entry) => {
-          if (!query) return true;
-
-          return [entry.name, entry.summary, ...entry.aliases].some((value) =>
-            value.toLowerCase().includes(query),
-          );
-        })
-        .map((entry) => ({
-          name: 'topic',
-          summary: entry.summary,
-          usage: `topic ${entry.name}`,
-          aliases: entry.aliases,
-          arguments: command.subcommands[0]?.arguments ?? [],
-          options: [],
-          examples: [`/help ${entry.name}`],
-          inferredWeb: { executionMode: 'requires_input' as const },
-        }));
-    }
-
-    const query = getSubcommandQueryFromPalette(command, paletteQuery());
-    if (!query) return command.subcommands;
-    return command.subcommands
-      .map((subcommand) => ({
-        subcommand,
-        score: scoreSubcommandMatch(subcommand, query),
-      }))
-      .filter((item) => item.score >= 0)
-      .sort((a, b) => b.score - a.score)
-      .map((item) => item.subcommand);
-  });
-
-  createEffect(() => {
-    wsReconnectNonce();
-
-    if (auth.authState().status !== 'connected') {
-      clearSocketReconnectTimer();
-
-      if (socket && socket.readyState !== WebSocket.CLOSED) {
-        socket.close();
-        socket = null;
-      }
-
-      setWsConnected(false);
-
-      return;
-    }
-
-    connectSocket();
-  });
-
-  createEffect(
-    on([paletteOpen, paletteStep, paletteSelectedIndex], ([open]) => {
-      if (!open) {
         return;
       }
 
-      queueMicrotask(() => {
-        paletteContainerEl
-          ?.querySelector<HTMLButtonElement>('.palette-item.selected')
-          ?.scrollIntoView({ block: 'nearest' });
+      await runCommand(widget.command, subcommand, defaultPayload(subcommand));
+
+      emitStoryWidgetOpened({
+        type: 'widget_opened',
+        command: widget.command,
+        subcommand: widget.subcommand,
       });
-    }),
-  );
+
+      return;
+    }
+
+    const existing = taskbarSingletonByKey()[key];
+
+    const hasTimelineItem =
+      existing !== undefined &&
+      timeline().some(
+        (item) => item.type === 'command_result' && item.id === existing.itemId,
+      );
+
+    if (existing && !hasTimelineItem) {
+      setTaskbarSingletonByKey((prev) => {
+        const rest = { ...prev };
+        delete rest[key];
+
+        return rest;
+      });
+    }
+
+    if (existing && hasTimelineItem) {
+      const nextVisible = !existing.visible;
+
+      if (nextVisible) {
+        setTimeline((prev) => {
+          const rest: TimelineItem[] = [];
+          let singleton: Extract<
+            TimelineItem,
+            { type: 'command_result' }
+          > | null = null;
+          for (const item of prev) {
+            if (item.type === 'command_result' && item.id === existing.itemId) {
+              singleton = item;
+              continue;
+            }
+
+            rest.push(item);
+          }
+
+          return singleton ? [...rest, singleton] : prev;
+        });
+
+        scrollTimelineToBottomSoon();
+      }
+
+      activateSingleTaskbarKey(key, existing.itemId, nextVisible);
+
+      if (nextVisible) {
+        emitStoryWidgetOpened({
+          type: 'widget_opened',
+          command: widget.command,
+          subcommand: widget.subcommand,
+        });
+      }
+
+      return;
+    }
+
+    const commandDetail = await ensureCommandDetail(widget.command);
+
+    const subcommand = commandDetail?.subcommands.find(
+      (entry) => entry.name === widget.subcommand,
+    );
+
+    if (!subcommand) {
+      appendSystemMessage(
+        `Unable to open /${widget.command} ${widget.subcommand} taskbar widget.`,
+      );
+
+      return;
+    }
+
+    await runCommand(widget.command, subcommand, defaultPayload(subcommand));
+
+    emitStoryWidgetOpened({
+      type: 'widget_opened',
+      command: widget.command,
+      subcommand: widget.subcommand,
+    });
+  }
+
+  async function refreshComposerAiState(): Promise<void> {
+    if (auth.authState().status !== 'connected' || !wsConnected()) {
+      setComposerAiState(null);
+
+      return;
+    }
+
+    requestComposerAiState();
+  }
+
+  function saveTimelineFormBridge(
+    item: Extract<TimelineItem, { type: 'command_form' }>,
+  ): void {
+    saveTimelineForm(item);
+  }
+
+  const {
+    closeChromeModal,
+    openChromeWidget,
+    runCommand,
+    runJsonCommand,
+    runWebAction,
+  } = useCommands({
+    authStatus: () => auth.authState().status,
+    wsConnected,
+    timelineId,
+    pendingPromptRequestId,
+    setPendingPromptRequestId,
+    setComposerText,
+    chromePromptSession: chrome.chromePromptSession,
+    setChromePromptSession: chrome.setChromePromptSession,
+    setChromeModal: chrome.setChromeModal,
+    setChromeLoading: chrome.setChromeLoading,
+    setChromeError: chrome.setChromeError,
+    setChromeText: chrome.setChromeText,
+    setChromeWeb: chrome.setChromeWeb,
+    setTimeline,
+    setComposerAiState,
+    appendSystemMessage,
+    createId,
+    requestComposerAiState,
+    beginWebUiBusy,
+    endWebUiBusy,
+    pendingRequests,
+    sendSocketMessage,
+    runOpenCommandFormFromWebCommand: (action) =>
+      openCommandFormFromWebCommand(action),
+    isTaskbarSubcommand,
+    setTaskbarDockResult,
+  });
+
+  const resolveCommandDetail = (name: string) =>
+    resolveCommandDetailFromCatalog(commands, name);
+
+  const ensureCommandDetail = (name: string) =>
+    ensureCommandDetailFromCatalog(commands, name);
+
+  const {
+    deleteTimelineItem,
+    repeatTimelineSubcommand,
+    replaceCommandResultWeb,
+    saveTimelineForm,
+    submitForm,
+    updateFormValue,
+  } = useTimeline({
+    timeline,
+    timelineId,
+    setTimeline,
+    setActiveFormId,
+    createId,
+    pendingRequests,
+    sendSocketMessage,
+    runCommand,
+    defaultPayload,
+    resolveCommandDetail,
+  });
+
+  const palette = usePalette({
+    commands,
+    setComposerText,
+    ensureCommandDetail,
+    matchesCommandToken,
+    scoreCommandMatch,
+    getSubcommandQueryFromPalette,
+    scoreSubcommandMatch,
+    payloadFromPathTokens,
+    openSubcommand: (...args) => openSubcommand(...args),
+  });
+
+  const {
+    closePalette,
+    openPalette,
+    openPaletteForCommand,
+    paletteOpen,
+    selectedCommand,
+  } = palette;
+
+  const { chooseSubcommand, openCommandFormFromWebCommand, openSubcommand } =
+    useCommandForms({
+      selectedCommand,
+      composerAiState,
+      setTimeline,
+      setComposerText,
+      setActiveFormId,
+      appendSystemMessage,
+      createId,
+      closePalette,
+      runCommand,
+      saveTimelineForm: saveTimelineFormBridge,
+      defaultPayload,
+      mergeCommandPayload,
+      hasMissingRequiredInputs,
+      ensureCommandDetail,
+    });
+
+  const { submitComposer, useComposerFocus } = useComposer({
+    composerText,
+    pendingPromptRequestId,
+    setComposerText,
+    setPendingPromptRequestId,
+    appendSystemMessage,
+    chat,
+    chrome,
+    palette,
+    ensureCommandDetail,
+    openSubcommand: (...args) => openSubcommand(...args),
+    payloadFromPathTokens,
+  });
+
+  useComposerFocus({
+    blocked: () =>
+      paletteOpen() || activeFormId() !== null || headerMenusOpen(),
+    focusInput: () => composerInputEl?.focus(),
+  });
+
+  useSocketLifecycle();
 
   let previousTimelineLength = 0;
 
@@ -888,59 +803,39 @@ function AppInner(): JSX.Element {
       const grew = length > previousTimelineLength;
       previousTimelineLength = length;
 
+      if (!timelineScrolledAwayFromBottom()) {
+        scrollTimelineToBottomSoon();
+      }
+
       if (!grew) {
         return;
       }
 
-      queueMicrotask(() => {
-        if (timelineEl) timelineEl.scrollTop = timelineEl.scrollHeight;
-      });
+      hideAllTaskbarPanels();
     }),
   );
 
   createEffect(
-    on([paletteOpen, paletteStep], ([open]) => {
-      if (!open) return;
-      queueMicrotask(() => paletteInputEl?.focus());
+    on(timeline, () => {
+      scheduleTimelineBottomFadeUpdate();
     }),
   );
-
-  createEffect(
-    on(activeFormId, (formId) => {
-      if (!formId) return;
-      queueMicrotask(() => {
-        const formEl = document.querySelector(
-          `[data-form-id="${CSS.escape(formId)}"]`,
-        );
-        if (!(formEl instanceof HTMLElement)) return;
-        /** Skip `.card-head` controls — focus the first real form field (e.g. todo `text`). */
-        const firstInput = formEl.querySelector(
-          '.field-list input:not([type="checkbox"]):not([type="hidden"]), .field-list textarea, .field-list select',
-        );
-        if (firstInput instanceof HTMLElement) firstInput.focus();
-      });
-    }),
-  );
-
-  createEffect(() => {
-    if (paletteOpen() || activeFormId() !== null || headerMenuOpen()) return;
-    queueMicrotask(() => composerInputEl?.focus());
-  });
 
   onMount(() => {
-    queueMicrotask(() => composerInputEl?.focus());
+    timelineEl?.addEventListener('scroll', scheduleTimelineBottomFadeUpdate, {
+      passive: true,
+    });
+
+    window.addEventListener('resize', scheduleTimelineBottomFadeUpdate);
+    updateTimelineBottomFade();
 
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && headerMenuOpen()) {
-        setHeaderMenuOpen(false);
-        return;
-      }
-
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
 
       const target = event.target;
+
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
@@ -952,673 +847,95 @@ function AppInner(): JSX.Element {
 
       event.preventDefault();
       openPalette();
-      queueMicrotask(() => paletteInputEl?.focus());
     };
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!headerMenuOpen()) {
-        return;
-      }
-
-      const target = event.target;
-
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      if (
-        headerMenuEl?.contains(target) ||
-        headerMenuButtonEl?.contains(target)
-      ) {
-        return;
-      }
-
-      setHeaderMenuOpen(false);
+    const handleComposerAiStateRefreshRequest = () => {
+      void refreshComposerAiState();
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
-    window.addEventListener('pointerdown', handlePointerDown);
+
+    window.addEventListener(
+      'composer-ai-state-refresh-requested',
+      handleComposerAiStateRefreshRequest,
+    );
+
+    const stopStoryWalkthroughListener = onStoryWalkthroughChange((state) => {
+      setStoryWalkthrough(state);
+    });
+
+    const stopStoryCloseWidgetListener = onStoryCloseWidgetRequested(
+      (event) => {
+        closeTaskbarWidget(event.command, event.subcommand);
+      },
+    );
+
+    const stopStoryClearPromptsListener = onStoryClearPromptsRequested(() => {
+      setTimeline((prev) => prev.filter((item) => item.type !== 'prompt'));
+    });
 
     onCleanup(() => {
+      if (timelineBottomFadeFrame !== null) {
+        cancelAnimationFrame(timelineBottomFadeFrame);
+        timelineBottomFadeFrame = null;
+      }
+
+      if (timelineBottomScrollFrame !== null) {
+        cancelAnimationFrame(timelineBottomScrollFrame);
+        timelineBottomScrollFrame = null;
+      }
+
+      timelineEl?.removeEventListener(
+        'scroll',
+        scheduleTimelineBottomFadeUpdate,
+      );
+
+      window.removeEventListener('resize', scheduleTimelineBottomFadeUpdate);
+
       window.removeEventListener('keydown', handleGlobalKeyDown);
-      window.removeEventListener('pointerdown', handlePointerDown);
+
+      window.removeEventListener(
+        'composer-ai-state-refresh-requested',
+        handleComposerAiStateRefreshRequest,
+      );
+
+      stopStoryWalkthroughListener();
+      stopStoryCloseWidgetListener();
+      stopStoryClearPromptsListener();
     });
   });
 
-  onCleanup(() => {
-    clearSocketReconnectTimer();
-    socket?.close();
+  createEffect(() => {
+    const status = auth.authState().status;
+
+    if (status !== 'connected' || !wsConnected()) {
+      return;
+    }
+
+    void refreshComposerAiState();
   });
 
-  function resolveCommandDetail(name: string): CommandDetail | null {
-    const normalized = name.trim().toLowerCase();
+  createEffect(() => {
+    setTaskbarSingletonByKey((prev) => {
+      const liveIds = new Set(
+        timeline()
+          .filter((item) => item.type === 'command_result')
+          .map((item) => item.id),
+      );
 
-    for (const c of commands()) {
-      if (c.name.toLowerCase() === normalized) {
-        return c;
-      }
-
-      if (c.aliases.some((a) => a.toLowerCase() === normalized)) {
-        return c;
-      }
-    }
-
-    return null;
-  }
-
-  async function ensureCommandDetail(name: string): Promise<CommandDetail> {
-    const fromList = resolveCommandDetail(name);
-
-    if (fromList) {
-      return fromList;
-    }
-
-    throw new Error(`Command not found: ${name}`);
-  }
-
-  function openPalette(): void {
-    setPaletteError(null);
-    setPaletteStep('commands');
-    setSelectedCommand(null);
-    setPaletteQuery('');
-    setPaletteSelectedIndex(0);
-    setPaletteOpen(true);
-  }
-
-  function closePalette(): void {
-    setPaletteOpen(false);
-    setPaletteError(null);
-  }
-
-  function goPaletteRoot(): void {
-    setPaletteError(null);
-    setPaletteStep('commands');
-    setSelectedCommand(null);
-    setPaletteQuery('');
-    setPaletteSelectedIndex(0);
-    queueMicrotask(() => paletteInputEl?.focus());
-  }
-
-  function goPaletteCommandLevel(): void {
-    const command = selectedCommand();
-
-    if (!command) {
-      goPaletteRoot();
-      return;
-    }
-
-    setPaletteStep('commands');
-    setPaletteQuery(command.name);
-    setPaletteSelectedIndex(
-      Math.max(
-        0,
-        commands().findIndex((item) => item.name === command.name),
-      ),
-    );
-    queueMicrotask(() => paletteInputEl?.focus());
-  }
-
-  async function chooseCommand(name: string): Promise<void> {
-    await chooseCommandInternal(name, false);
-  }
-
-  async function openPaletteForCommand(name: string): Promise<void> {
-    openPalette();
-    await chooseCommandInternal(name, true);
-    queueMicrotask(() => paletteInputEl?.focus());
-  }
-
-  async function chooseCommandInternal(
-    name: string,
-    preserveQuery: boolean,
-  ): Promise<void> {
-    setPaletteError(null);
-    try {
-      const detail = await ensureCommandDetail(name);
-      setSelectedCommand(detail);
-      setPaletteStep('subcommands');
-      setPaletteSelectedIndex(0);
-      if (!preserveQuery) {
-        setPaletteQuery('');
-        setComposerText('');
-      }
-    } catch (err) {
-      setPaletteError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function handlePaletteFilterInput(value: string): Promise<void> {
-    setPaletteQuery(value);
-    setPaletteSelectedIndex(0);
-    if (paletteStep() === 'commands') {
-      const trimmedStart = value.trimStart();
-      const firstSpace = trimmedStart.indexOf(' ');
-      if (firstSpace > 0) {
-        const commandToken = trimmedStart.slice(0, firstSpace);
-        const remainder = trimmedStart.slice(firstSpace + 1).trimStart();
-        const command = commands().find((item) =>
-          matchesCommandToken(item, commandToken),
-        );
-        if (command) {
-          await chooseCommandInternal(command.name, true);
-          if (remainder.length === 0) setPaletteQuery(`${commandToken} `);
-          return;
+      let changed = false;
+      const next: Record<string, { itemId: string; visible: boolean }> = {};
+      for (const [key, entry] of Object.entries(prev)) {
+        if (liveIds.has(entry.itemId)) {
+          next[key] = entry;
+        } else {
+          changed = true;
         }
       }
-    }
-    if (paletteStep() === 'subcommands' && value.endsWith(' ')) {
-      const command = selectedCommand();
-      const first = filteredSubcommands()[0];
-      if (!command || !first) return;
-      const current = getSubcommandQueryFromPalette(command, value);
-      if (!current) return;
-      const tokens = value.trim().split(/\s+/).filter(Boolean);
-      const commandTokens = [command.name, ...command.aliases];
-      if (tokens.length > 0 && commandTokens.includes(tokens[0]!))
-        tokens.shift();
-      if (tokens.length <= 1) setPaletteQuery(`${command.name} ${first.name} `);
-    }
-  }
 
-  async function submitPalette(): Promise<void> {
-    if (paletteStep() === 'commands') {
-      const commandsList = filteredCommands();
-      const first = commandsList[paletteSelectedIndex()] ?? commandsList[0];
-      if (first) await chooseCommand(first.name);
-      return;
-    }
-
-    const command = selectedCommand();
-    if (!command) return;
-
-    const trimmed = paletteQuery().trim();
-    const tokens =
-      trimmed.length > 0 ? trimmed.split(/\s+/).filter(Boolean) : [];
-    const commandTokens = [command.name, ...command.aliases];
-    if (tokens.length > 0 && commandTokens.includes(tokens[0]!)) tokens.shift();
-
-    const subcommandToken = tokens[0] ?? '';
-    const argTokens = tokens.slice(1);
-    const subcommand =
-      (subcommandToken
-        ? command.subcommands.find(
-            (item) =>
-              item.name === subcommandToken ||
-              item.aliases.includes(subcommandToken),
-          )
-        : null) ??
-      filteredSubcommands()[paletteSelectedIndex()] ??
-      filteredSubcommands()[0];
-    if (!subcommand) return;
-
-    if (command.name === 'help' && subcommand.name === 'topic') {
-      const explicitTopic =
-        argTokens.length > 0
-          ? argTokens.join(' ')
-          : subcommand.usage.replace(/^topic\s+/, '');
-
-      await chooseSubcommand(subcommand, {
-        arguments: { path: explicitTopic },
-        options: {},
-      });
-      return;
-    }
-
-    await openSubcommand(
-      command,
-      subcommand,
-      payloadFromPathTokens(subcommand, argTokens),
-      {
-        preferRun: true,
-      },
-    );
-  }
-
-  async function runCommand(
-    command: string,
-    subcommand: CommandSubcommand,
-    values: CommandPayload,
-  ): Promise<void> {
-    const requestId = createId();
-
-    setTimeline((prev) => [
-      ...prev,
-      {
-        id: createId(),
-        type: 'chat',
-        role: 'user',
-        text: summarizeInvocation(command, subcommand.name, values),
-      },
-    ]);
-
-    pendingRequests.set(requestId, {
-      recordInTimeline: true,
-      onCommandResult: (message) => {
-        const output = splitCommandOutput(message.output);
-
-        setTimeline((prev) => [
-          ...prev,
-          {
-            id: createId(),
-            type: 'command_result',
-            command,
-            subcommand: subcommand.name,
-            subcommandTag: getResultSubcommandTag(
-              command,
-              subcommand.name,
-              values,
-            ),
-            values,
-            text: output.text,
-            web: output.web,
-          },
-        ]);
-      },
-      onPrompt: (message) => {
-        const prompt = splitPromptPayload(message.prompt);
-
-        setPendingPromptRequestId(message.requestId);
-        setTimeline((prev) => [
-          ...prev,
-          {
-            id: createId(),
-            type: 'prompt',
-            requestId: message.requestId,
-            text: prompt.text,
-            web: prompt.web,
-          },
-        ]);
-      },
-      onDone: () => {
-        if (pendingPromptRequestId() === requestId) {
-          setPendingPromptRequestId(null);
-        }
-      },
-      onError: () => {
-        if (pendingPromptRequestId() === requestId) {
-          setPendingPromptRequestId(null);
-        }
-      },
+      return changed ? next : prev;
     });
-
-    try {
-      sendSocketMessage({
-        type: 'run_command',
-        requestId,
-        timelineId: timelineId(),
-        command,
-        subcommand: subcommand.name,
-        payload: values,
-      });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function openSubcommand(
-    command: CommandDetail,
-    subcommand: CommandSubcommand,
-    initialValues?: CommandPayload,
-    opts?: { preferRun?: boolean },
-  ): Promise<void> {
-    const preferRun = opts?.preferRun === true;
-
-    if (
-      command.name === 'help' &&
-      subcommand.name === 'topic' &&
-      initialValues == null
-    ) {
-      await chooseSubcommand(subcommand, {
-        arguments: {
-          path: subcommand.usage.replace(/^topic\s+/, ''),
-        },
-        options: {},
-      });
-      return;
-    }
-
-    if (command.name === 'help' && subcommand.name === 'topic') {
-      closePalette();
-      setComposerText('');
-      await runCommand(
-        command.name,
-        subcommand,
-        initialValues ?? defaultPayload(subcommand),
-      );
-      return;
-    }
-
-    closePalette();
-    setComposerText('');
-
-    if (subcommand.name === 'help') {
-      setTimeline((prev) => [
-        ...prev,
-        {
-          id: createId(),
-          type: 'command_result',
-          command: command.name,
-          subcommand: subcommand.name,
-          subcommandTag: 'help',
-          values: null,
-          text: command.subcommands
-            .map((item) => `/${command.name} ${item.usage} - ${item.summary}`)
-            .join('\n'),
-          web: null,
-        },
-      ]);
-      return;
-    }
-
-    const mode = subcommand.inferredWeb?.executionMode ?? 'requires_input';
-
-    if (
-      preferRun &&
-      !hasMissingRequiredInputs(
-        subcommand,
-        initialValues ?? defaultPayload(subcommand),
-      )
-    ) {
-      await runCommand(
-        command.name,
-        subcommand,
-        initialValues ?? defaultPayload(subcommand),
-      );
-      return;
-    }
-
-    if (mode === 'runnable_default') {
-      await runCommand(
-        command.name,
-        subcommand,
-        initialValues ?? defaultPayload(subcommand),
-      );
-      return;
-    }
-
-    const formId = createId();
-    const formItem: Extract<TimelineItem, { type: 'command_form' }> = {
-      id: formId,
-      type: 'command_form',
-      command: command.name,
-      subcommand,
-      values: mergeCommandPayload(subcommand, initialValues),
-      autoRun: mode === 'runnable_customizable',
-    };
-    setTimeline((prev) => [...prev, formItem]);
-    saveTimelineForm(formItem);
-    setActiveFormId(formId);
-  }
-
-  async function chooseSubcommand(
-    subcommand: CommandSubcommand,
-    initialValues?: CommandPayload,
-  ): Promise<void> {
-    const command = selectedCommand();
-    if (!command) return;
-
-    await openSubcommand(command, subcommand, initialValues);
-  }
-
-  async function openCommandFormFromWebCommand(
-    action: Extract<WebAction, { type: 'command' }>,
-  ): Promise<void> {
-    let command: CommandDetail;
-
-    try {
-      command = await ensureCommandDetail(action.command);
-    } catch (err) {
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-
-      return;
-    }
-
-    const subcommand = command.subcommands.find(
-      (entry) =>
-        entry.name === action.subcommand ||
-        entry.aliases.includes(action.subcommand),
-    );
-
-    if (!subcommand) {
-      appendSystemMessage(
-        `Unknown subcommand: ${action.subcommand} for /${command.name}`,
-      );
-
-      return;
-    }
-
-    const values = mergeCommandPayload(subcommand, {
-      arguments: { ...(action.arguments ?? {}) },
-      options: { ...(action.options ?? {}) },
-    });
-
-    const mode = subcommand.inferredWeb?.executionMode ?? 'requires_input';
-
-    if (mode === 'runnable_default') {
-      await runCommand(command.name, subcommand, values);
-
-      return;
-    }
-
-    closePalette();
-    setComposerText('');
-
-    const formId = createId();
-    const formItem: Extract<TimelineItem, { type: 'command_form' }> = {
-      id: formId,
-      type: 'command_form',
-      command: command.name,
-      subcommand,
-      values,
-      autoRun: mode === 'runnable_customizable',
-      ...(action.optionHints ? { optionHints: action.optionHints } : {}),
-    };
-    setTimeline((prev) => [...prev, formItem]);
-    saveTimelineForm(formItem);
-    setActiveFormId(formId);
-  }
-
-  function updateFormValue(
-    itemId: string,
-    source: 'arguments' | 'options',
-    name: string,
-    value: unknown,
-  ): void {
-    setTimeline((prev) => {
-      const form = prev.find(
-        (entry): entry is Extract<TimelineItem, { type: 'command_form' }> =>
-          entry.type === 'command_form' && entry.id === itemId,
-      );
-
-      if (!form) {
-        return prev;
-      }
-
-      // Mutate in place so timeline row object identity stays stable. `<For>` in
-      // TimelineView reconciles by reference; replacing the form object each
-      // keystroke remounted inputs and dropped focus.
-      form.values[source][name] = value;
-      saveTimelineForm(form);
-
-      return [...prev];
-    });
-  }
-
-  async function submitForm(itemId: string): Promise<void> {
-    const item = timeline().find((entry) => entry.id === itemId);
-    if (!item || item.type !== 'command_form') return;
-    setActiveFormId(null);
-    if (document.activeElement instanceof HTMLElement)
-      document.activeElement.blur();
-    await runCommand(item.command, item.subcommand, item.values);
-  }
-
-  async function repeatTimelineSubcommand(
-    item: Extract<TimelineItem, { type: 'command_result' | 'command_form' }>,
-  ): Promise<void> {
-    if (item.type === 'command_form') {
-      await runCommand(item.command, item.subcommand, item.values);
-      return;
-    }
-
-    const command = resolveCommandDetail(item.command);
-    const subcommand = command?.subcommands.find(
-      (entry) => entry.name === item.subcommand,
-    );
-
-    if (!command || !subcommand) {
-      appendSystemMessage(
-        `Unable to rerun /${item.command} ${item.subcommand}`,
-      );
-      return;
-    }
-
-    await runCommand(
-      item.command,
-      subcommand,
-      item.values ?? defaultPayload(subcommand),
-    );
-  }
-
-  async function submitComposer(): Promise<void> {
-    const text = composerText().trim();
-    if (!text) return;
-
-    const promptRequestId = pendingPromptRequestId();
-
-    if (promptRequestId) {
-      const chrome = chromePromptSession();
-
-      if (!chrome) {
-        setTimeline((prev) => [
-          ...prev,
-          { id: createId(), type: 'chat', role: 'user', text },
-        ]);
-      }
-
-      setComposerText('');
-      setPendingPromptRequestId(null);
-
-      if (chrome !== null && chrome.requestId === promptRequestId) {
-        setChromePromptSession(null);
-      }
-
-      try {
-        sendSocketMessage({
-          type: 'prompt_answer',
-          requestId: promptRequestId,
-          answer: text,
-        });
-      } catch (err) {
-        appendSystemMessage(err instanceof Error ? err.message : String(err));
-      }
-      return;
-    }
-
-    if (text === '/') {
-      openPalette();
-      setComposerText('');
-      return;
-    }
-    if (text.startsWith('/')) {
-      try {
-        const [commandToken, ...rest] = text.slice(1).trim().split(/\s+/);
-        if (!commandToken) {
-          openPalette();
-          setComposerText('');
-          return;
-        }
-        const subcommandToken = rest[0];
-        const detail = await ensureCommandDetail(commandToken);
-        if (!subcommandToken) {
-          setSelectedCommand(detail);
-          setPaletteStep('subcommands');
-          setPaletteQuery('');
-          setPaletteOpen(true);
-          return;
-        }
-        const subcommand = detail.subcommands.find(
-          (item) =>
-            item.name === subcommandToken ||
-            item.aliases.includes(subcommandToken),
-        );
-        if (!subcommand)
-          throw new Error(`Unknown subcommand: ${subcommandToken}`);
-        await openSubcommand(
-          detail,
-          subcommand,
-          payloadFromPathTokens(subcommand, rest.slice(1)),
-          {
-            preferRun: true,
-          },
-        );
-        setComposerText('');
-        return;
-      } catch (err) {
-        setTimeline((prev) => [
-          ...prev,
-          {
-            id: createId(),
-            type: 'system',
-            text: err instanceof Error ? err.message : String(err),
-          },
-        ]);
-        return;
-      }
-    }
-
-    setTimeline((prev) => [
-      ...prev,
-      { id: createId(), type: 'chat', role: 'user', text },
-    ]);
-    setComposerText('');
-    const requestId = createId();
-
-    pendingRequests.set(requestId, {
-      onChatResult: (message) => {
-        const assistantId = chatStreamAssistantByRequestId.get(requestId);
-        chatStreamAssistantByRequestId.delete(requestId);
-        setTimeline((prev) => {
-          if (assistantId) {
-            return prev.map((item) =>
-              item.id === assistantId &&
-              item.type === 'chat' &&
-              item.role === 'assistant'
-                ? {
-                    ...item,
-                    text: message.output || '(no output)',
-                  }
-                : item,
-            );
-          }
-
-          return [
-            ...prev,
-            {
-              id: createId(),
-              type: 'chat',
-              role: 'assistant',
-              text: message.output || '(no output)',
-            },
-          ];
-        });
-      },
-    });
-
-    try {
-      sendSocketMessage({
-        type: 'chat',
-        requestId,
-        timelineId: timelineId(),
-        content: text,
-      });
-    } catch (err) {
-      pendingRequests.delete(requestId);
-      chatStreamAssistantByRequestId.delete(requestId);
-      appendSystemMessage(err instanceof Error ? err.message : String(err));
-    }
-  }
+  });
 
   async function onEnablePush(): Promise<void> {
     setPushBusy(true);
@@ -1652,107 +969,61 @@ function AppInner(): JSX.Element {
     }
   }
 
-  function connectLabel(): string {
-    const state = auth.authState();
-    if (state.status === 'disconnected') return 'Connect';
-    return `${state.pubkey.slice(0, 8)}…`;
-  }
-
   return (
-    <div class="app-shell">
-      <header class="topbar compact">
-        <h1>AppWeaver</h1>
-        <div class="topbar-actions">
-          <button
-            type="button"
-            class="connect-btn topbar-menu-btn"
-            ref={(el) => {
-              headerMenuButtonEl = el;
-            }}
-            aria-label="Open header menu"
-            aria-expanded={headerMenuOpen()}
-            aria-haspopup="menu"
-            onClick={() => setHeaderMenuOpen((open) => !open)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="topbar-menu-icon">
-              <path
-                d="M4 6h16M4 12h16M4 18h16"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="square"
-              />
-            </svg>
-          </button>
-          <Show when={headerMenuOpen()}>
-            <div
-              class="topbar-menu-panel panel"
-              ref={(el) => {
-                headerMenuEl = el;
-              }}
-            >
-              <For each={headerChromeWidgets()}>
-                {(w) => (
-                  <button
-                    type="button"
-                    class="connect-btn"
-                    disabled={!wsConnected()}
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      openChromeWidget({
-                        command: w.command,
-                        subcommand: w.subcommand,
-                        title: w.modalTitle,
-                      });
-                    }}
-                    title={
-                      wsConnected()
-                        ? `${w.label} (/${w.command} ${w.subcommand})`
-                        : 'Connect Nostr first — waiting for WebSocket'
-                    }
-                  >
-                    {w.label}
-                  </button>
-                )}
-              </For>
-              <button
-                type="button"
-                class="connect-btn"
-                onClick={() => {
-                  setHeaderMenuOpen(false);
-                  setModalOpen(true);
-                }}
-                title={
-                  auth.authState().status === 'connected'
-                    ? 'Connected — click to manage'
-                    : 'Connect Nostr signer'
-                }
-              >
-                {connectLabel()}
-              </button>
-              <button
-                type="button"
-                class="connect-btn"
-                disabled={
-                  auth.authState().status === 'disconnected' ||
-                  !wsConnected() ||
-                  pushBusy()
-                }
-                onClick={() => {
-                  setHeaderMenuOpen(false);
-                  void onEnablePush();
-                }}
-                title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
-              >
-                {pushBusy() ? '…' : 'Push'}
-              </button>
-            </div>
-          </Show>
-        </div>
-      </header>
+    <div class="app-shell" data-web-ui-busy-digest={webUiBusyDigest()}>
+      <HeaderChrome
+        widgets={headerChromeWidgets}
+        isWidgetActive={isHeaderWidgetActive}
+        wsConnected={wsConnected}
+        isConnected={isConnected}
+        isDisconnected={isDisconnected}
+        connectLabel={connectLabel}
+        manageTitle={manageTitle}
+        pushBusy={pushBusy}
+        onWidgetElement={(widget, el) => {
+          const key = storyTargetHeaderWidgetKey(
+            widget.command,
+            widget.subcommand,
+          );
+
+          if (el) {
+            headerWidgetTargets.set(key, el);
+          } else {
+            headerWidgetTargets.delete(key);
+          }
+        }}
+        onOpenWidget={(w) => {
+          if (w.surface === 'timeline_singleton') {
+            void toggleTaskbarWidget(w);
+
+            return;
+          }
+
+          openChromeWidget({
+            command: w.command,
+            subcommand: w.subcommand,
+            title: w.modalTitle,
+          });
+
+          emitStoryWidgetOpened({
+            type: 'widget_opened',
+            command: w.command,
+            subcommand: w.subcommand,
+          });
+        }}
+        onConnect={handleConnectMenuClick}
+        onLogout={() => auth.logout()}
+        onEnablePush={() => {
+          void onEnablePush();
+        }}
+        onAnyMenuOpenChange={setHeaderMenusOpen}
+      />
       <main class="chat-shell">
         <TimelineView
+          activeFormId={activeFormId()}
           timeline={timeline()}
+          showBottomFade={timelineScrolledAwayFromBottom()}
+          isTimelineItemHidden={isTimelineCommandResultHidden}
           setTimelineRef={(el) => {
             timelineEl = el;
           }}
@@ -1761,7 +1032,9 @@ function AppInner(): JSX.Element {
           onDeleteTimelineItem={deleteTimelineItem}
           onReplaceCommandWeb={replaceCommandResultWeb}
           onAppendSystem={appendSystemMessage}
+          isWebUiBusy={isWebUiBusyFor}
           onRunWebAction={runWebAction}
+          onRunJsonCommand={runJsonCommand}
           onUpdateFormValue={updateFormValue}
           onSubmitForm={(itemId) => void submitForm(itemId)}
         />
@@ -1770,11 +1043,83 @@ function AppInner(): JSX.Element {
             composerInputEl = el;
           }}
           value={composerText()}
+          footer={
+            <div class="composer-meta">
+              <button
+                type="button"
+                class="composer-chip"
+                classList={{
+                  'composer-chip--info':
+                    composerAiState()?.executionProfileColor === 'info',
+                  'composer-chip--warning':
+                    composerAiState()?.executionProfileColor === 'warning',
+                  'composer-chip--danger':
+                    composerAiState()?.executionProfileColor === 'danger',
+                  'composer-chip--success':
+                    composerAiState()?.executionProfileColor === 'success',
+                }}
+                disabled={!wsConnected()}
+                onClick={() => {
+                  openChromeWidget({
+                    command: 'ai',
+                    subcommand: 'agents',
+                    title: 'OpenCode Agents',
+                  });
+                }}
+                title={
+                  wsConnected()
+                    ? 'Open OpenCode agent manager'
+                    : 'Connect WebSocket first'
+                }
+              >
+                {composerAiState()
+                  ? composerAiState()!.executionProfileName
+                  : 'Agent'}
+              </button>
+              <Show when={composerAiState() !== null}>
+                <ComposerModelOverrideButton
+                  state={composerAiState()!}
+                  wsConnected={wsConnected()}
+                  onRunWebAction={runWebAction}
+                />
+                <span class="composer-meta-text composer-meta-text--muted">
+                  {composerAiState()!.provider}
+                </span>
+                <Show when={formatComposerContextStats(composerAiState())}>
+                  {(contextLabel) => (
+                    <span
+                      class="composer-meta-text composer-meta-text--muted composer-meta-text--context"
+                      title="Latest OpenCode SDK assistant-message token total and model context usage"
+                    >
+                      {contextLabel()}
+                    </span>
+                  )}
+                </Show>
+              </Show>
+              <Show when={agentWorking()}>
+                <span class="composer-working" aria-live="polite">
+                  AI
+                  <span class="composer-working-dots" aria-hidden="true" />
+                  <button
+                    class="composer-working-cancel"
+                    type="button"
+                    aria-label="Cancel"
+                    onClick={() => chat.cancelChat()}
+                  >
+                    ×
+                  </button>
+                </span>
+              </Show>
+            </div>
+          }
           onOpenPalette={openPalette}
           onInput={(event) => {
             const value = event.currentTarget.value;
             setComposerText(value);
-            if (value.startsWith('/')) openPalette();
+
+            if (value.startsWith('/')) {
+              openPalette();
+            }
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -1784,112 +1129,53 @@ function AppInner(): JSX.Element {
           }}
         />
       </main>
-      <CommandPalette
-        open={paletteOpen()}
-        step={paletteStep()}
-        query={paletteQuery()}
-        error={paletteError()}
+      <PaletteView
+        palette={palette}
         loadingCommands={loadingCommands()}
-        notConnected={auth.authState().status === 'disconnected'}
-        selectedCommand={selectedCommand()}
-        filteredCommands={filteredCommands()}
-        filteredSubcommands={filteredSubcommands()}
-        setInputRef={(el) => {
-          paletteInputEl = el;
-        }}
-        setContainerRef={(el) => {
-          paletteContainerEl = el;
-        }}
-        onClose={closePalette}
-        onGoRoot={goPaletteRoot}
-        onGoCommandLevel={goPaletteCommandLevel}
-        onInput={(value) => void handlePaletteFilterInput(value)}
-        selectedIndex={paletteSelectedIndex()}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            if (paletteQuery().length > 0) setPaletteQuery('');
-            else closePalette();
-            return;
-          }
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const count =
-              paletteStep() === 'commands'
-                ? filteredCommands().length
-                : filteredSubcommands().length;
-            if (count === 0) return;
-            setPaletteSelectedIndex((current) => {
-              if (event.key === 'ArrowDown') {
-                return (current + 1) % count;
-              }
-              return (current - 1 + count) % count;
-            });
-            return;
-          }
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            void submitPalette();
-          }
-        }}
-        onChooseCommand={(name) => void chooseCommand(name)}
+        notConnected={auth.authState().status !== 'connected'}
         onChooseSubcommand={(subcommand) => void chooseSubcommand(subcommand)}
       />
-      {modalOpen() && (
-        <ConnectModal auth={auth} onClose={() => setModalOpen(false)} />
-      )}
-      {chromeModal() !== null && (
-        <WebCommandOutputModal
-          title={chromeModal()!.title}
-          ariaLabel={chromeModal()!.title}
-          onClose={closeChromeModal}
-          loading={chromeLoading()}
-          error={chromeError()}
-          text={chromeText()}
-          web={chromeWeb()}
-          onReplaceWeb={(root) => setChromeWeb(root)}
-          onRunWebAction={(action, params) =>
-            runWebAction(action, {
-              ...params,
-              recordInTimeline: false,
-            })
-          }
-          chromePromptOverlay={() => {
-            const session = chromePromptSession();
+      <ConnectOverlays auth={auth} connect={connect} />
+      <ChromeOverlay
+        chrome={chrome}
+        isWebUiBusy={isWebUiBusyFor}
+        onClose={closeChromeModal}
+        onRunWebAction={runWebAction}
+      />
+      <Show when={storyWalkthrough()}>
+        {(walkthrough) => (
+          <WalkthroughOverlay
+            state={walkthrough()}
+            targetEl={storyWalkthroughTargetElement()}
+            onQuit={() => {
+              emitStoryQuitRequested(walkthrough().storyId);
+              emitStoryWalkthroughChange(null);
+            }}
+            onStartStory={(storyId) => {
+              emitStoryWalkthroughChange(null);
 
-            if (session === null) {
-              return null;
-            }
+              void (async () => {
+                const command = await ensureCommandDetail('story');
 
-            const payload = splitPromptPayload(session.prompt);
+                const subcommand = command?.subcommands.find(
+                  (entry) => entry.name === 'start',
+                );
 
-            return (
-              <div class="chrome-prompt-panel">
-                <Show when={payload.text !== null && payload.text !== ''}>
-                  <pre class="status-modal-text">{payload.text}</pre>
-                </Show>
-                <Show when={payload.web !== null}>
-                  <div class="status-modal-web">
-                    <WebNodeShadowRoot
-                      root={payload.web!}
-                      promptRequestId={session.requestId}
-                      onRunAction={(action, params) =>
-                        runWebAction(action, {
-                          ...params,
-                          recordInTimeline: false,
-                        })
-                      }
-                    />
-                  </div>
-                </Show>
-                <p class="chrome-prompt-hint muted">
-                  Reply in the composer and press Enter.
-                </p>
-              </div>
-            );
-          }}
-        />
-      )}
+                if (!subcommand) {
+                  appendSystemMessage('Unable to start the next story.');
+
+                  return;
+                }
+
+                await runCommand('story', subcommand, {
+                  arguments: { id: storyId },
+                  options: {},
+                });
+              })();
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 }

@@ -155,6 +155,7 @@ export function payloadFromPathTokens(
 
     payload.options[option.name] =
       option.kind === 'integer' ? Number.parseInt(next, 10) : next;
+
     i += 1;
   }
 
@@ -174,6 +175,7 @@ export function payloadFromPathTokens(
       argument.kind === 'integer'
         ? Number.parseInt(positional[index] ?? '', 10)
         : (positional[index] ?? '');
+
     index += 1;
   }
 
@@ -241,6 +243,47 @@ export function getSubcommandQueryFromPalette(
   return query;
 }
 
+export function scoreCommandMatch(
+  command: CommandDetail,
+  query: string,
+): number {
+  const q = query.trim().toLowerCase();
+
+  if (!q) {
+    return 0;
+  }
+
+  const names = [command.name, ...command.aliases].map((value) =>
+    value.toLowerCase(),
+  );
+
+  const summary = command.summary.toLowerCase();
+
+  if (names.includes(q)) {
+    return 1000;
+  }
+
+  if (names.some((value) => value.startsWith(q))) {
+    return 800;
+  }
+
+  if (names.some((value) => value.includes(q))) {
+    return 650;
+  }
+
+  if (summary.includes(q)) {
+    return 100;
+  }
+
+  const subcommandScore = Math.max(
+    ...command.subcommands.map((subcommand) =>
+      scoreSubcommandMatch(subcommand, q),
+    ),
+  );
+
+  return subcommandScore;
+}
+
 export function scoreSubcommandMatch(
   subcommand: CommandSubcommand,
   query: string,
@@ -254,24 +297,30 @@ export function scoreSubcommandMatch(
   const names = [subcommand.name, ...subcommand.aliases].map((value) =>
     value.toLowerCase(),
   );
+
   const summary = subcommand.summary.toLowerCase();
   const usage = subcommand.usage.toLowerCase();
 
   if (names.includes(q)) {
     return 1000;
   }
+
   if (names.some((value) => value.startsWith(q))) {
     return 800;
   }
+
   if (names.some((value) => value.includes(q))) {
     return 650;
   }
+
   if (usage.startsWith(q)) {
     return 500;
   }
+
   if (usage.includes(q)) {
     return 350;
   }
+
   if (summary.includes(q)) {
     return 100;
   }
@@ -318,6 +367,7 @@ export function getResultSubcommandTag(
     if (Array.isArray(path)) {
       return path.join(' ');
     }
+
     if (typeof path === 'string' && path.trim().length > 0) {
       return path.trim();
     }
@@ -426,6 +476,7 @@ export async function fetchJsonPublic<T>(url: string): Promise<T> {
 
 export async function postJson<T>(url: string, body: unknown): Promise<T> {
   const authHeaders = await buildAuthHeaders(url, 'POST');
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders },
@@ -450,6 +501,7 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 export async function deleteJson<T>(url: string, body: unknown): Promise<T> {
   const authHeaders = await buildAuthHeaders(url, 'DELETE');
+
   const res = await fetch(url, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...authHeaders },

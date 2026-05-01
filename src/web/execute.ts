@@ -5,6 +5,7 @@ import { routeCommand } from '@src/commands/dispatch';
 import type { PromptFn, SendReplyFn } from '@src/core/plugin';
 import {
   getAgentBackend,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getModelOverride,
   getProviderName,
@@ -17,7 +18,7 @@ import type {
 } from '@src/system/command-definition';
 
 import type { WebRouteContext } from './routes';
-import type { WebNodeRoot } from './ui-schema';
+import type { ClientViewRoot, WebNodeRoot } from './ui-schema';
 
 const ExecuteCommandRequestSchema = z.object({
   arguments: z.record(z.string(), z.unknown()).optional().default({}),
@@ -133,7 +134,7 @@ export async function executeBuiltinCommand({
 }: ExecuteBuiltinCommandProps): Promise<{
   invocation: ExecuteCommandRequest;
   input: string;
-  output: string | WebNodeRoot;
+  output: string | WebNodeRoot | ClientViewRoot;
 }> {
   const request = ExecuteCommandRequestSchema.parse(payload);
 
@@ -145,11 +146,14 @@ export async function executeBuiltinCommand({
   });
 
   const backendName = getAgentBackend(ctx.seenDb);
+  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
 
   const backend = createBackend({
     backendName,
     dmBotRoot: ctx.dmBotRoot,
-    mode: getCurrentOrDefaultMode(ctx.seenDb),
+    cursorMode: getCurrentOrDefaultMode(ctx.seenDb),
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     attachUrl: ctx.attachUrl,
     modelOverride: getModelOverride(ctx.seenDb, backendName),
     providerName: getProviderName(ctx.seenDb),
@@ -180,4 +184,47 @@ export async function executeBuiltinCommand({
     input,
     output: output ?? '',
   };
+}
+
+export async function executeBuiltinJsonCommand(params: {
+  ctx: WebRouteContext;
+  command: CommandDefinition;
+  subcommand: SubcommandDefinition;
+  payload: unknown;
+}): Promise<string | WebNodeRoot | ClientViewRoot> {
+  const { ctx, command, subcommand, payload } = params;
+  const backendName = getAgentBackend(ctx.seenDb);
+  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
+
+  const input = `${ctx.prefix}${command.name} ${subcommand.name}`;
+
+  const output = await routeCommand({
+    input,
+    prefix: ctx.prefix,
+    botRelayUrls: ctx.botRelayUrls,
+    version: ctx.version,
+    parentOfBotRoot: ctx.parentOfBotRoot,
+    dmBotRoot: ctx.dmBotRoot,
+    attachUrl: ctx.attachUrl,
+    backend: createBackend({
+      backendName,
+      dmBotRoot: ctx.dmBotRoot,
+      cursorMode: getCurrentOrDefaultMode(ctx.seenDb),
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
+      attachUrl: ctx.attachUrl,
+      modelOverride: getModelOverride(ctx.seenDb, backendName),
+      providerName: getProviderName(ctx.seenDb),
+    }),
+    botPubkey: ctx.botPubkey,
+    seenDb: ctx.seenDb,
+    pool: ctx.pool,
+    walletDb: ctx.walletDb,
+    providerDb: ctx.providerDb,
+    config: ctx.config,
+    source: 'web',
+    jsonPayload: payload,
+  });
+
+  return output ?? '';
 }

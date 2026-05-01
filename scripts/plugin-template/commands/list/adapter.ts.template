@@ -1,27 +1,14 @@
-import type { Database } from 'bun:sqlite';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
-import type { {{PASCAL_ALIAS}}Renderable } from '../shared/render';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 import { render{{PASCAL_ALIAS}}ListText } from './renderers/text';
+import { render{{PASCAL_ALIAS}}ListWeb } from './renderers/web';
 
 import { handleListCommand } from './handler';
 
-export function adaptListCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}): {{PASCAL_ALIAS}}Renderable {
-  void params.prefix;
+export function adaptListCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string | WebNodeRoot {
   void params.parsed;
   void params.command;
   void params.identity;
@@ -30,22 +17,11 @@ export function adaptListCommand(params: {
   const { items } = handleListCommand({ db: params.db });
 
   if (params.source === 'web') {
-    return {
-      kind: 'list_web',
-      version: 1,
-      meta: {
-        command: params.alias,
-        subcommand: 'list',
-      },
-      data: { items },
-    };
+    return render{{PASCAL_ALIAS}}ListWeb({
+      alias: params.alias,
+      items,
+    });
   }
 
-  const text = render{{PASCAL_ALIAS}}ListText({ items });
-
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'list',
-    text,
-  });
+  return render{{PASCAL_ALIAS}}ListText({ items });
 }

@@ -53,6 +53,7 @@ type Nip46ResponsePayload = {
 function generateRandomHex(length: number): string {
   const bytes = new Uint8Array(Math.ceil(length / 2));
   crypto.getRandomValues(bytes);
+
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
@@ -66,14 +67,17 @@ function encryptRequest(
   remoteSignerPubkey: string,
 ): { encrypted: string; id: string } {
   const id = generateRandomHex(16);
+
   const conversationKey = nip44.v2.utils.getConversationKey(
     clientSecret,
     remoteSignerPubkey,
   );
+
   const encrypted = nip44.encrypt(
     JSON.stringify({ id, method, params }),
     conversationKey,
   );
+
   return { encrypted, id };
 }
 
@@ -86,10 +90,12 @@ async function decryptContent(
     if (content.includes('?iv=')) {
       return await nip04.decrypt(ephemeralSecret, senderPubkey, content);
     }
+
     const conversationKey = nip44.v2.utils.getConversationKey(
       ephemeralSecret,
       senderPubkey,
     );
+
     return nip44.decrypt(content, conversationKey);
   } catch {
     return null;
@@ -112,8 +118,13 @@ type SendNip46RequestParams = {
 function sendNip46Request(
   args: SendNip46RequestParams,
 ): Promise<Nip46ResponsePayload> {
-  const { relays, ephemeralSecret, ephemeralPubkey, remoteSignerPubkey, method } =
-    args;
+  const {
+    relays,
+    ephemeralSecret,
+    ephemeralPubkey,
+    remoteSignerPubkey,
+    method,
+  } = args;
 
   const { encrypted, id } = encryptRequest(
     method,
@@ -164,6 +175,7 @@ function sendNip46Request(
             clearTimeout(timer);
             sub.close();
             reject(new Error('Failed to decrypt NIP-46 response'));
+
             return;
           }
 
@@ -174,6 +186,7 @@ function sendNip46Request(
             clearTimeout(timer);
             sub.close();
             reject(e);
+
             return;
           }
 
@@ -186,6 +199,7 @@ function sendNip46Request(
 
           if (parsed.error) {
             reject(new Error(parsed.error));
+
             return;
           }
 
@@ -316,6 +330,7 @@ export function connectBunker(bunkerUrl: string): Promise<BunkerSignerData> {
             clearTimeout(timer);
             sub.close();
             reject(new Error(parsed.error));
+
             return;
           }
 
@@ -339,6 +354,7 @@ export function connectBunker(bunkerUrl: string): Promise<BunkerSignerData> {
 
               if (!/^[a-fA-F0-9]{64}$/.test(userPubkey)) {
                 reject(new Error('Invalid get_public_key result'));
+
                 return;
               }
 

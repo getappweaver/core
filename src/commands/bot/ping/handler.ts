@@ -1,10 +1,10 @@
 import type { RouteCommandContext } from '../../dispatch';
 
-import { renderBotPingCli } from './renderers/cli';
+import { renderBotPingText } from './renderers/text';
 import { createBotPingRepresentation } from './representation';
 
 export function handleBotPing(ctx: RouteCommandContext): Promise<string> {
   const rep = createBotPingRepresentation();
 
-  return Promise.resolve(renderBotPingCli(rep, { prefix: ctx.prefix }));
+  return Promise.resolve(renderBotPingText(rep, { prefix: ctx.prefix }));
 }

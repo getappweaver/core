@@ -1,28 +1,11 @@
-import type { Database } from 'bun:sqlite';
-
 import { buildHelpSubcommandRepresentation } from '@src/commands/help/command';
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
+import { renderHelpText } from '@src/commands/help/renderers/text';
 
-import { createMessageRepresentation } from '../shared/output';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 
-export function adaptHelpCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}) {
-  void params.db;
-  void params.source;
-  void params.identity;
-  void params.runAgent;
-
+export function adaptHelpCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string {
   const result = buildHelpSubcommandRepresentation({
     prefix: params.prefix,
     alias: params.alias,
@@ -31,13 +14,8 @@ export function adaptHelpCommand(params: {
   });
 
   if (result.type === 'error') {
-    return createMessageRepresentation({
-      command: params.alias,
-      subcommand: 'help',
-      tone: 'error',
-      text: result.message,
-    });
+    return result.message;
   }
 
-  return result.representation;
+  return renderHelpText(result.representation, { prefix: params.prefix });
 }

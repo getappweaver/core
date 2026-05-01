@@ -4,8 +4,30 @@
 
 import { log } from '../logger';
 
+export type AgentFileDiff = {
+  file: string;
+  patch: string;
+  additions: number;
+  deletions: number;
+  status: 'added' | 'deleted' | 'modified' | null;
+};
+
+export type AgentToolCall = {
+  id: string;
+  callId: string;
+  tool: string;
+  status: 'pending' | 'running' | 'completed' | 'error';
+  input: Record<string, unknown>;
+  title: string | null;
+  raw: string | null;
+  output: string | null;
+  error: string | null;
+};
+
 export type AgentStreamChunk =
   | { kind: 'text_delta'; text: string }
+  | { kind: 'diff'; files: AgentFileDiff[] }
+  | { kind: 'tool'; tool: AgentToolCall }
   | { kind: 'status'; phase: 'started' | 'completed'; message: string | null }
   | { kind: 'error'; message: string };
 
@@ -71,6 +93,123 @@ function extractSessionErrorMessage(error: unknown): string {
   }
 
   return 'Session error';
+}
+
+function coerceFileDiff(value: unknown): AgentFileDiff | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const rec = value as Record<string, unknown>;
+
+  if (typeof rec.file !== 'string' || typeof rec.patch !== 'string') {
+    return null;
+  }
+
+  const status =
+    rec.status === 'added' ||
+    rec.status === 'deleted' ||
+    rec.status === 'modified'
+      ? rec.status
+      : null;
+
+  return {
+    file: rec.file,
+    patch: rec.patch,
+    additions: typeof rec.additions === 'number' ? rec.additions : 0,
+    deletions: typeof rec.deletions === 'number' ? rec.deletions : 0,
+    status,
+  };
+}
+
+function coerceRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function coerceToolCall(value: unknown): AgentToolCall | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const part = value as Record<string, unknown>;
+
+  if (
+    part.type !== 'tool' ||
+    typeof part.id !== 'string' ||
+    typeof part.callID !== 'string' ||
+    typeof part.tool !== 'string'
+  ) {
+    return null;
+  }
+
+  const state = coerceRecord(part.state);
+  const status = state.status;
+
+  if (
+    status !== 'pending' &&
+    status !== 'running' &&
+    status !== 'completed' &&
+    status !== 'error'
+  ) {
+    return null;
+  }
+
+  return {
+    id: part.id,
+    callId: part.callID,
+    tool: part.tool,
+    status,
+    input: coerceRecord(state.input),
+    title: typeof state.title === 'string' ? state.title : null,
+    raw: typeof state.raw === 'string' ? state.raw : null,
+    output: typeof state.output === 'string' ? state.output : null,
+    error: typeof state.error === 'string' ? state.error : null,
+  };
+}
+
+function isMatchingSession(
+  properties: Record<string, unknown>,
+  sessionId: string,
+): boolean {
+  const directSessionId = properties.sessionID;
+
+  if (typeof directSessionId === 'string') {
+    return directSessionId === sessionId;
+  }
+
+  const part = properties.part;
+
+  if (part && typeof part === 'object') {
+    const partSessionId = (part as { sessionID?: unknown }).sessionID;
+
+    if (typeof partSessionId === 'string') {
+      return partSessionId === sessionId;
+    }
+  }
+
+  return true;
+}
+
+function getPartType(properties: Record<string, unknown>): string {
+  const directType = properties.type;
+
+  if (typeof directType === 'string') {
+    return directType;
+  }
+
+  const part = properties.part;
+
+  if (part && typeof part === 'object') {
+    const partType = (part as { type?: unknown }).type;
+
+    if (typeof partType === 'string') {
+      return partType;
+    }
+  }
+
+  return '';
 }
 
 /**
@@ -174,6 +313,44 @@ export function mapOpencodeSsePayloadToChunk(
     return { kind: 'status', phase: 'completed', message: null };
   }
 
+  if (eventType === 'message.part.updated') {
+    if (!properties || typeof properties !== 'object') {
+      logUnknownOnce(logState, eventType, raw);
+
+      return null;
+    }
+
+    const p = properties as Record<string, unknown>;
+
+    if (!isMatchingSession(p, sessionId)) {
+      return null;
+    }
+
+    const partType = getPartType(p);
+
+    if (partType === 'tool') {
+      const tool = coerceToolCall(p.part);
+
+      if (!tool) {
+        logUnknownOnce(logState, eventType, raw);
+
+        return null;
+      }
+
+      return { kind: 'tool', tool };
+    }
+
+    if (
+      partType === 'step-finish' ||
+      partType === 'step_finish' ||
+      partType === 'step.finish'
+    ) {
+      return { kind: 'status', phase: 'completed', message: null };
+    }
+
+    return null;
+  }
+
   if (eventType === 'session.error') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
@@ -190,6 +367,32 @@ export function mapOpencodeSsePayloadToChunk(
     const message = extractSessionErrorMessage(p.error);
 
     return { kind: 'error', message };
+  }
+
+  if (eventType === 'session.diff') {
+    if (!properties || typeof properties !== 'object') {
+      logUnknownOnce(logState, eventType, raw);
+
+      return null;
+    }
+
+    const p = properties as Record<string, unknown>;
+
+    if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      return null;
+    }
+
+    if (!Array.isArray(p.diff)) {
+      logUnknownOnce(logState, eventType, raw);
+
+      return null;
+    }
+
+    const files = p.diff
+      .map(coerceFileDiff)
+      .filter((file): file is AgentFileDiff => file !== null);
+
+    return files.length > 0 ? { kind: 'diff', files } : null;
   }
 
   const ignoredPrefixes = [
@@ -218,14 +421,12 @@ export function mapOpencodeSsePayloadToChunk(
   }
 
   const sessionScoped = [
-    'session.diff',
     'session.compacted',
     'session.created',
     'session.updated',
     'session.deleted',
     'message.updated',
     'message.removed',
-    'message.part.updated',
     'message.part.removed',
   ];
 

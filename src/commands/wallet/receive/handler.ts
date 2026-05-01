@@ -1,11 +1,11 @@
 import { log } from '@src/logger';
-import { CashuWallet } from '@src/wallets/cashu';
-import type { WalletDb } from '@src/wallets/db';
+import { CashuWallet } from '@src/wallet/cashu';
+import type { WalletDb } from '@src/wallet/db';
 import {
   bumpCounters,
   getBalanceByMint,
   logWalletOperation,
-} from '@src/wallets/db';
+} from '@src/wallet/db';
 
 import type { WalletReceiveRepresentation } from './representation';
 

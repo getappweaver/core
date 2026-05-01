@@ -1,65 +1,35 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginIdentity, RunAgentFn } from '@src/core/plugin';
-import type { MessageSource } from '@src/messaging';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import { get{{PASCAL_ALIAS}} } from '../../db';
-import type { {{PASCAL_ALIAS}}Renderable } from '../shared/render';
-import { {{PASCAL_ALIAS}}ReplyMessage } from '../shared/reply';
+import type { {{PASCAL_ALIAS}}CommandAdapterParams } from '../../types/adapter-params';
 import { render{{PASCAL_ALIAS}}ShowText } from './renderers/text';
+import { render{{PASCAL_ALIAS}}ShowWeb } from './renderers/web';
 
-export function adaptShowCommand(params: {
-  prefix: string;
-  alias: string;
-  db: Database;
-  source: MessageSource;
-  identity: PluginIdentity;
-  runAgent: RunAgentFn;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-}): {{PASCAL_ALIAS}}Renderable {
+export function adaptShowCommand(
+  params: {{PASCAL_ALIAS}}CommandAdapterParams,
+): string | WebNodeRoot {
   void params.command;
-  void params.source;
   void params.identity;
   void params.runAgent;
 
   const id = params.parsed.arguments.id;
 
   if (typeof id !== 'number' || Number.isNaN(id)) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'show',
-      text: `Usage: ${params.prefix}${params.alias} show <id>`,
-    });
+    return `Usage: ${params.prefix}${params.alias} show <id>`;
   }
 
   const item = get{{PASCAL_ALIAS}}(params.db, id);
 
   if (!item) {
-    return {{PASCAL_ALIAS}}ReplyMessage({
-      alias: params.alias,
-      subcommand: 'show',
-      text: `Not found: #${String(id)}`,
-    });
+    return `Not found: #${String(id)}`;
   }
 
   if (params.source === 'web') {
-    return {
-      kind: 'show_web',
-      version: 1,
-      meta: {
-        command: params.alias,
-        subcommand: 'show',
-      },
-      data: { item },
-    };
+    return render{{PASCAL_ALIAS}}ShowWeb({
+      alias: params.alias,
+      item,
+    });
   }
 
-  return {{PASCAL_ALIAS}}ReplyMessage({
-    alias: params.alias,
-    subcommand: 'show',
-    text: render{{PASCAL_ALIAS}}ShowText(item),
-  });
+  return render{{PASCAL_ALIAS}}ShowText(item);
 }

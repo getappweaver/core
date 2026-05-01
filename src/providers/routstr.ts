@@ -11,9 +11,9 @@ import type { BotConfig } from '../env';
 import { debug, debugAsync, log } from '../logger';
 import type { Msats } from '../types';
 import { formatMsats, msats, msatsRaw } from '../types';
-import { CashuWallet } from '../wallets/cashu';
-import type { WalletDb } from '../wallets/db';
-import { getBalanceByMint, logWalletOperation } from '../wallets/db';
+import { CashuWallet } from '../wallet/cashu';
+import type { WalletDb } from '../wallet/db';
+import { getBalanceByMint, logWalletOperation } from '../wallet/db';
 
 import type { ProviderDb } from './db';
 import { logSpend } from './db';

@@ -13,6 +13,7 @@ export default [
     ignores: [
       'dist/**',
       'web/dist/**',
+      'apps/*/dist/**',
       'public/**',
       'node_modules/**',
       'scripts/plugin-template/**',
@@ -23,6 +24,7 @@ export default [
       'src/**/*.{ts,tsx}',
       'scripts/**/*.{ts,tsx}',
       'plugins/**/*.{ts,tsx}',
+      'web/src/**/*.{ts,tsx}',
     ],
     languageOptions: {
       ecmaVersion: 'latest',
@@ -45,8 +47,8 @@ export default [
         typescript: {},
         node: true,
       },
-      'import/internal-regex': '^@src/',
-      'import/external-regex': '^(?!@src/)',
+      'import/internal-regex': '^@(core|src|web|plugins)/',
+      'import/external-regex': '^(?!@(core|src|web|plugins)/)',
     },
     rules: {
       'import/order': [
@@ -56,6 +58,16 @@ export default [
           pathGroups: [
             {
               pattern: '@src/**',
+              group: 'internal',
+              position: 'after',
+            },
+            {
+              pattern: '@web/**',
+              group: 'internal',
+              position: 'after',
+            },
+            {
+              pattern: '@plugins/**',
               group: 'internal',
               position: 'after',
             },

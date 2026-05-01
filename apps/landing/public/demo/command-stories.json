@@ -1,0 +1,48 @@
+[
+  {
+    "pluginAlias": "todo",
+    "pluginName": "dm-bot-todo-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "dm-bot-todo-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "todo-add",
+      "todo-add-ai-prompt"
+    ]
+  },
+  {
+    "pluginAlias": "job",
+    "pluginName": "dm-bot-job-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "dm-bot-job-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "job-schedule-ai"
+    ]
+  },
+  {
+    "pluginAlias": "bm",
+    "pluginName": "dm-bot-bm-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "dm-bot-bm-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "bm-save-ai"
+    ]
+  },
+  {
+    "pluginAlias": "file",
+    "pluginName": "dm-bot-file-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "dm-bot-file-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "file-tree-read-markdown",
+      "file-tree-git-diff"
+    ]
+  }
+]

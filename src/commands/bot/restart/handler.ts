@@ -1,4 +1,4 @@
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import { handleError } from '../../dispatch';
 
@@ -7,7 +7,7 @@ import {
   writeRestartRequestedFile,
 } from '../request-watch-restart';
 
-export function handleBotRestart(): Promise<string | WebNodeRoot> {
+export function handleBotRestart(): Promise<WebHandlerResult> {
   return handleError(async () => {
     writeRestartRequestedFile();
 

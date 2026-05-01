@@ -14,7 +14,8 @@ import {
   getCommandDefinitionForWeb,
   listAllCommandsDetailForWeb,
 } from './command-catalog';
-import { executeBuiltinCommand } from './execute';
+import { getComposerAiState } from './composer-ai-state';
+import { executeBuiltinCommand, executeBuiltinJsonCommand } from './execute';
 import { verifyNip98Authorization } from './nip98-verify';
 import type { WebRouteContext } from './routes';
 import type { WebSocketPromptSession } from './ws-prompt-session';
@@ -24,12 +25,14 @@ import {
   createChatResultMessage,
   createChatStreamChunkMessage,
   createCommandResultMessage,
+  createComposerAiStateResultMessage,
   createCommandsResultMessage,
   createDoneMessage,
   createErrorMessage,
   createTimelineEventsResultMessage,
   type DeleteTimelineEventClientMessage,
   formatWebSocketClientParseFailure,
+  type JsonCommandClientMessage,
   type LoadTimelineBeforeClientMessage,
   type LoadTimelineClientMessage,
   type RunCommandClientMessage,
@@ -64,6 +67,24 @@ function normalizeIncomingMessage(
   }
 
   return message.toString('utf8');
+}
+
+function combineStreamedThinkingWithOutput(
+  streamedText: string,
+  output: string,
+): string {
+  const thinking = streamedText.trim();
+  const finalOutput = output.trim();
+
+  if (!thinking || !finalOutput || thinking === finalOutput) {
+    return output;
+  }
+
+  if (thinking.includes(finalOutput) || finalOutput.includes(thinking)) {
+    return output;
+  }
+
+  return `**Thinking:**\n${thinking}\n\n${output}`;
 }
 
 function summarizeInvocation(
@@ -247,6 +268,7 @@ async function handleRunCommand(params: {
           form: null,
           text: null,
           web: null,
+          clientView: null,
           prompt: serverMessage.prompt,
           requestId: serverMessage.requestId,
         });
@@ -273,6 +295,7 @@ async function handleRunCommand(params: {
         message.payload,
       ),
       web: null,
+      clientView: null,
       prompt: null,
       requestId: null,
     });
@@ -299,8 +322,9 @@ async function handleRunCommand(params: {
           ),
           values: message.payload,
           form: null,
-          text: typeof reply === 'string' ? reply : null,
-          web: typeof reply === 'string' ? null : reply,
+          text: reply,
+          web: null,
+          clientView: null,
           prompt: null,
           requestId: null,
         });
@@ -333,7 +357,15 @@ async function handleRunCommand(params: {
       values: message.payload,
       form: null,
       text: typeof result.output === 'string' ? result.output : null,
-      web: typeof result.output === 'string' ? null : result.output,
+      web:
+        typeof result.output === 'string' ||
+        result.output.kind === 'client_view'
+          ? null
+          : result.output,
+      clientView:
+        typeof result.output === 'string' || result.output.kind === 'ui'
+          ? null
+          : result.output,
       prompt: null,
       requestId: null,
     });
@@ -350,6 +382,58 @@ async function handleRunCommand(params: {
   sendMessage(ws, createDoneMessage(message.requestId));
 }
 
+async function handleJsonCommand(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  ctx: WebRouteContext;
+  message: JsonCommandClientMessage;
+}): Promise<void> {
+  const { ws, ctx, message } = params;
+  const command = getCommandDefinitionForWeb(ctx.prefix, message.command);
+
+  if (!command) {
+    sendMessage(
+      ws,
+      createErrorMessage({
+        requestId: message.requestId,
+        message: 'command_not_found',
+      }),
+    );
+
+    return;
+  }
+
+  const subcommand = getSubcommandDefinition(command, message.subcommand);
+
+  if (!subcommand) {
+    sendMessage(
+      ws,
+      createErrorMessage({
+        requestId: message.requestId,
+        message: 'subcommand_not_found',
+      }),
+    );
+
+    return;
+  }
+
+  const output = await executeBuiltinJsonCommand({
+    ctx,
+    command,
+    subcommand,
+    payload: message.payload,
+  });
+
+  sendMessage(
+    ws,
+    createCommandResultMessage({
+      requestId: message.requestId,
+      output,
+    }),
+  );
+
+  sendMessage(ws, createDoneMessage(message.requestId));
+}
+
 async function handleChat(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
@@ -357,7 +441,8 @@ async function handleChat(params: {
 }): Promise<void> {
   const { ws, ctx, message } = params;
   const backendName = getAgentBackend(ctx.seenDb);
-  const useStream = backendName === 'opencode-sdk';
+
+  const useStream = backendName === 'opencode' || backendName === 'cursor';
 
   ws.data.currentChatAbort?.abort();
   const chatAbort = new AbortController();
@@ -375,11 +460,13 @@ async function handleChat(params: {
     form: null,
     text: message.content,
     web: null,
+    clientView: null,
     prompt: null,
     requestId: null,
   });
 
   let result: { output: string; sessionId: string };
+  let streamedText = '';
 
   try {
     result = await runWebChat({
@@ -387,6 +474,51 @@ async function handleChat(params: {
       content: message.content,
       onStreamChunk: useStream
         ? (chunk) => {
+            if (chunk.kind === 'diff') {
+              insertTimelineEvent(ctx.seenDb, {
+                timelineId: message.timelineId,
+                source: 'web',
+                kind: 'diff',
+                role: null,
+                command: null,
+                subcommand: null,
+                subcommandTag: null,
+                values: null,
+                form: null,
+                text: null,
+                web: null,
+                clientView: null,
+                diff: chunk.files,
+                prompt: null,
+                requestId: null,
+              });
+            }
+
+            if (chunk.kind === 'tool') {
+              insertTimelineEvent(ctx.seenDb, {
+                id: `${message.requestId}-tool-${chunk.tool.callId}`,
+                timelineId: message.timelineId,
+                source: 'web',
+                kind: 'tool',
+                role: null,
+                command: null,
+                subcommand: null,
+                subcommandTag: null,
+                values: null,
+                form: null,
+                text: null,
+                web: null,
+                clientView: null,
+                tool: chunk.tool,
+                prompt: null,
+                requestId: null,
+              });
+            }
+
+            if (chunk.kind === 'text_delta') {
+              streamedText += chunk.text;
+            }
+
             sendMessage(
               ws,
               createChatStreamChunkMessage({
@@ -407,6 +539,8 @@ async function handleChat(params: {
     }
   }
 
+  const output = combineStreamedThinkingWithOutput(streamedText, result.output);
+
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
     source: 'web',
@@ -417,8 +551,9 @@ async function handleChat(params: {
     subcommandTag: null,
     values: null,
     form: null,
-    text: result.output,
+    text: output,
     web: null,
+    clientView: null,
     prompt: null,
     requestId: null,
   });
@@ -427,7 +562,7 @@ async function handleChat(params: {
     ws,
     createChatResultMessage({
       requestId: message.requestId,
-      output: result.output,
+      output,
     }),
   );
 
@@ -562,6 +697,20 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
               return;
             }
 
+            case 'request_composer_ai_state': {
+              sendMessage(
+                ws,
+                createComposerAiStateResultMessage({
+                  requestId: message.requestId,
+                  state: await getComposerAiState(ctx),
+                }),
+              );
+
+              sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
             case 'load_timeline': {
               await handleLoadTimeline({ ws, ctx, message });
 
@@ -576,6 +725,16 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
             case 'run_command': {
               await handleRunCommand({
+                ws,
+                ctx,
+                message,
+              });
+
+              return;
+            }
+
+            case 'json_command': {
+              await handleJsonCommand({
                 ws,
                 ctx,
                 message,
@@ -612,6 +771,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                   form: null,
                   text: message.answer,
                   web: null,
+                  clientView: null,
                   prompt: null,
                   requestId: null,
                 });
@@ -626,6 +786,13 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ctx,
                 message,
               });
+
+              return;
+            }
+
+            case 'cancel_chat': {
+              ws.data.currentChatAbort?.abort();
+              sendMessage(ws, createDoneMessage(message.requestId));
 
               return;
             }

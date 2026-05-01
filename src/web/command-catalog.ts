@@ -16,7 +16,7 @@ import type {
   CommandDefinition,
   CommandOptionDefinition,
   SubcommandDefinition,
-  WebHeaderWidget,
+  WebWidget,
 } from '@src/system/command-definition';
 
 export type InferredWebExecutionMode =
@@ -41,13 +41,15 @@ export type WebSubcommandDetail = {
   options: WebCommandOption[];
   examples: string[];
   inferredWeb: InferredWebSupport;
-  webHeaderWidget?: WebHeaderWidget;
+  webWidget?: WebWidget;
 };
 
 export type WebCommandDetail = {
   name: string;
   summary: string;
   aliases: string[];
+  source?: 'builtin' | 'plugin';
+  pluginAlias?: string;
   subcommands: WebSubcommandDetail[];
 };
 
@@ -77,6 +79,10 @@ function hasAnyInputs(subcommand: SubcommandDefinition): boolean {
 export function inferWebExecutionMode(
   subcommand: SubcommandDefinition,
 ): InferredWebExecutionMode {
+  if (subcommand.webExecutionMode) {
+    return subcommand.webExecutionMode;
+  }
+
   if (hasRequiredInputs(subcommand)) {
     return 'requires_input';
   }
@@ -105,18 +111,26 @@ function serializeSubcommandForWeb(
     },
   };
 
-  if (subcommand.webHeaderWidget !== undefined) {
-    return { ...base, webHeaderWidget: subcommand.webHeaderWidget };
+  if (subcommand.webWidget !== undefined) {
+    return { ...base, webWidget: subcommand.webWidget };
   }
 
   return base;
 }
 
-function serializeCommandForWeb(def: CommandDefinition): WebCommandDetail {
+function serializeCommandForWeb(params: {
+  def: CommandDefinition;
+  source: 'builtin' | 'plugin';
+  pluginAlias?: string;
+}): WebCommandDetail {
+  const { def, source, pluginAlias } = params;
+
   return {
     name: def.name,
     summary: def.summary,
     aliases: def.aliases,
+    source,
+    ...(pluginAlias ? { pluginAlias } : {}),
     subcommands: def.subcommands.map(serializeSubcommandForWeb),
   };
 }
@@ -179,21 +193,26 @@ export function listAllCommandsDetailForWeb(
     const def = map[root];
 
     return {
-      ...serializeCommandForWeb(def),
+      ...serializeCommandForWeb({ def, source: 'builtin' }),
       source: 'builtin' as const,
     };
   });
 
   const plugins = listRegisteredPlugins()
     .map((plugin) => ({
+      alias: plugin.identity.alias,
       definition: resolvePluginCommandDefinition(plugin, prefix),
     }))
     .filter(
-      (item): item is { definition: CommandDefinition } =>
+      (item): item is { alias: string; definition: CommandDefinition } =>
         item.definition !== null,
     )
-    .map(({ definition }) => ({
-      ...serializeCommandForWeb(definition),
+    .map(({ definition, alias }) => ({
+      ...serializeCommandForWeb({
+        def: definition,
+        source: 'plugin',
+        pluginAlias: alias,
+      }),
       source: 'plugin' as const,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -226,7 +245,7 @@ export function getCommandDetailForWeb(
     const def = map[root];
 
     if (matchesCommandNameInsensitive(def, nameParam)) {
-      return serializeCommandForWeb(def);
+      return serializeCommandForWeb({ def, source: 'builtin' });
     }
   }
 
@@ -234,7 +253,11 @@ export function getCommandDetailForWeb(
     const def = resolvePluginCommandDefinition(plugin, prefix);
 
     if (def && matchesCommandNameInsensitive(def, nameParam)) {
-      return serializeCommandForWeb(def);
+      return serializeCommandForWeb({
+        def,
+        source: 'plugin',
+        pluginAlias: plugin.identity.alias,
+      });
     }
   }
 

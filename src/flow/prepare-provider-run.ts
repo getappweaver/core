@@ -7,7 +7,7 @@ import {
   ZeroRoutstrBalanceError,
 } from '../providers/routstr';
 import type { AnyProvider } from '../providers/types';
-import { InsufficientFundsError } from '../wallets/types';
+import { InsufficientFundsError } from '../wallet/types';
 
 export type PrepareProviderRunProps = {
   provider: AnyProvider;

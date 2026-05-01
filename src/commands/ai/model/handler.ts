@@ -1,8 +1,7 @@
 import { getAgentBackend, getModelOverride, setModelOverride } from '@src/db';
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult } from '@src/web/ui-schema';
 
-import type { RouteCommandContext } from '../../dispatch';
-import { handleError } from '../../dispatch';
+import { handleError, type RouteCommandContext } from '../../dispatch';
 import { appendStatusBlock } from '../../shared/with-status';
 
 import { renderAiModelCli } from './renderers/cli';
@@ -10,7 +9,7 @@ import { buildAiModelRepresentation } from './representation';
 
 export async function handleAiModel(
   ctx: RouteCommandContext,
-): Promise<string | WebNodeRoot> {
+): Promise<WebHandlerResult> {
   return handleError(async () => {
     const backendName = getAgentBackend(ctx.seenDb);
     const currentOverride = getModelOverride(ctx.seenDb, backendName);

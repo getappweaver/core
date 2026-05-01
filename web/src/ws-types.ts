@@ -1,7 +1,8 @@
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { TimelineHistoryItem } from '@src/timeline/types';
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
 
+import type { ComposerAiState } from './commands/types';
 import type { CommandDetail } from './types';
 
 export type PromptPayload =
@@ -20,10 +21,16 @@ export type CommandsResultServerMessage = {
   commands: CommandDetail[];
 };
 
+export type ComposerAiStateResultServerMessage = {
+  type: 'composer_ai_state_result';
+  requestId: string;
+  state: ComposerAiState;
+};
+
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
-  output: string | WebNodeRoot;
+  output: string | WebNodeRoot | ClientViewRoot;
 };
 
 export type TimelineEventsResultServerMessage = {
@@ -62,3 +69,14 @@ export type ErrorServerMessage = {
   requestId: string;
   message: string;
 };
+
+export type WebSocketServerMessage =
+  | CommandsResultServerMessage
+  | ComposerAiStateResultServerMessage
+  | TimelineEventsResultServerMessage
+  | CommandResultServerMessage
+  | PromptServerMessage
+  | ChatStreamChunkServerMessage
+  | ChatResultServerMessage
+  | DoneServerMessage
+  | ErrorServerMessage;

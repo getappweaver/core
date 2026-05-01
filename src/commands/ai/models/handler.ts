@@ -1,6 +1,7 @@
 import { createBackend } from '@src/backends/factory';
 import {
   getAgentBackend,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getModelOverride,
   getProviderName,
@@ -33,6 +34,7 @@ export async function handleAiModels(
   const { seenDb, dmBotRoot, attachUrl } = props;
   const backendName = getAgentBackend(seenDb);
   const mode = getCurrentOrDefaultMode(seenDb);
+  const executionProfile = getBackendExecutionProfile(seenDb, backendName);
   const modelOverride = getModelOverride(seenDb, backendName);
   const providerName = getProviderName(seenDb);
 
@@ -41,7 +43,9 @@ export async function handleAiModels(
   const backend = createBackend({
     backendName,
     dmBotRoot,
-    mode,
+    cursorMode: mode,
+    opencodeAgentName:
+      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     attachUrl,
     modelOverride,
     providerName,

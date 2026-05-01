@@ -8,6 +8,7 @@ import { getOutputString } from '../backends/types';
 import type { AgentBackendName, AgentMode, CoreDb } from '../db';
 import {
   getAgentBackend,
+  getBackendExecutionProfile,
   getLinting,
   getModelOverride,
   getRoutstrModel,
@@ -63,12 +64,19 @@ export async function runAgentWithLintFollowUp({
         ? routstrModel
         : (modelOverride ?? null);
 
+    const executionProfile = getBackendExecutionProfile(
+      coreDb,
+      backendNameFromDb,
+    );
+
     log.info(`effectiveModelOverride: ${effectiveModelOverride}`);
 
     const roundBackend = createBackend({
       backendName: backendNameFromDb,
       dmBotRoot,
-      mode,
+      cursorMode: mode,
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       attachUrl,
       modelOverride: effectiveModelOverride,
       providerName: configuredProviderName,
@@ -77,7 +85,9 @@ export async function runAgentWithLintFollowUp({
     return roundBackend.runMessage({
       sessionId,
       content: roundContent,
-      mode,
+      cursorMode: mode,
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       cwd,
       getRoutstrSkKey: () => getRoutstrSkKey(coreDb),
       modelOverride: effectiveModelOverride,

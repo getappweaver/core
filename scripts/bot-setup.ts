@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -48,6 +49,14 @@ import { dmBotRoot } from '../src/paths';
 const PARENT_ROOT = resolve(join(dmBotRoot, '..'));
 const BOT_DIR_NAME = basename(dmBotRoot);
 const DM_BOT_SKILLS_DIR = join(dmBotRoot, '.claude', 'skills');
+const AGENT_TEMPLATES_DIR = join(dmBotRoot, 'templates', 'opencode-agents');
+
+const DEFAULT_AGENT_TEMPLATE_FILES = [
+  'agent.md',
+  'ask.md',
+  'free.md',
+  'plan.md',
+];
 
 type SymlinkTarget = {
   label: string;
@@ -254,6 +263,45 @@ function removeParentGitignoreEntries(): void {
   }
 }
 
+function ensureAgentTemplatesInstalled(targetRoot: string): void {
+  if (!existsSync(AGENT_TEMPLATES_DIR)) {
+    console.log(
+      `  ⚠ Agent templates missing, skipping .opencode/agents install for ${targetRoot}`,
+    );
+
+    return;
+  }
+
+  const targetDir = join(targetRoot, '.opencode', 'agents');
+  mkdirSync(targetDir, { recursive: true });
+
+  let copied = 0;
+  let kept = 0;
+
+  for (const fileName of DEFAULT_AGENT_TEMPLATE_FILES) {
+    const src = join(AGENT_TEMPLATES_DIR, fileName);
+    const dest = join(targetDir, fileName);
+
+    if (!existsSync(src)) {
+      continue;
+    }
+
+    if (existsSync(dest)) {
+      kept += 1;
+      continue;
+    }
+
+    copyFileSync(src, dest);
+    copied += 1;
+  }
+
+  if (copied > 0 || kept > 0) {
+    console.log(
+      `  .opencode/agents in ${targetRoot}: copied ${copied}, kept existing ${kept}`,
+    );
+  }
+}
+
 async function removeSymlinks(): Promise<void> {
   for (const target of getSymlinkTargets()) {
     if (isSymlink(target.dest)) {
@@ -317,7 +365,7 @@ async function main(): Promise<void> {
 
   // Read current state
   const currentWorkspace = getWorkspaceTarget(db) ?? 'parent';
-  const currentBackend = getAgentBackend(db) ?? 'opencode-sdk';
+  const currentBackend = getAgentBackend(db) ?? 'opencode';
   const currentProvider = getProviderName(db) ?? 'local';
   const currentMode = getCurrentOrDefaultMode(db) ?? 'ask';
   const currentLintAuto = getLinting(db) ?? 'off';
@@ -345,6 +393,7 @@ async function main(): Promise<void> {
   if (isParent) {
     console.log('\nSetting up symlinks for parent workspace...');
     await createSymlinks();
+    ensureAgentTemplatesInstalled(PARENT_ROOT);
   } else if (wasParent && !isParent) {
     const remove = await ask(
       '\nWorkspace changed from parent to bot. Remove symlinks from parent project? (y/N): ',
@@ -362,6 +411,8 @@ async function main(): Promise<void> {
       }
     }
   }
+
+  ensureAgentTemplatesInstalled(dmBotRoot);
 
   // ---------------------------------------------------------------------------
   // 2. DM command prefix
@@ -398,14 +449,14 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   console.log('\n── Backend ──');
-  console.log('  opencode-sdk — in-process OpenCode server (recommended)');
-  console.log('  opencode     — shells out to opencode CLI');
-  console.log('  cursor       — shells out to Cursor agent CLI\n');
+  console.log('  opencode — OpenCode SDK backend (recommended)');
+  console.log('  cursor   — Cursor TypeScript SDK backend');
+  console.log('');
 
   const backend = await askWithDefault(
     'Backend',
-    currentBackend as 'opencode-sdk' | 'opencode' | 'cursor',
-    ['opencode-sdk', 'opencode', 'cursor'],
+    currentBackend as 'opencode' | 'cursor',
+    ['opencode', 'cursor'],
   );
 
   setAgentBackend(db, backend);
@@ -445,7 +496,7 @@ async function main(): Promise<void> {
   console.log('  local   — use models local to the backend selected');
 
   console.log(
-    '  routstr — (opencode / opencode-sdk only) routstr models, pay per request with sats via Cashu\n',
+    '  routstr — (opencode only) routstr models, pay per request with sats via Cashu\n',
   );
 
   const provider = await askWithDefault(

@@ -42,12 +42,14 @@ import { createBotStatusRepresentation } from './commands/bot/status/representat
 import { routeCommand } from './commands/dispatch';
 import {
   getPromptPayloadValue,
+  type PluginDefaults,
   type PluginContext,
   type PromptPayload,
 } from './core/plugin';
 import {
   openCoreDb,
   initSkKeyEncryption,
+  getBackendExecutionProfile,
   getCurrentOrDefaultMode,
   getAgentBackend,
   getModelOverride,
@@ -72,7 +74,8 @@ import { dmBotRoot, RESTART_REQUESTED_PATH } from './paths';
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
-import { openWalletDb } from './wallets/db';
+import { openWalletDb } from './wallet/db';
+import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
 
@@ -138,7 +141,9 @@ async function main() {
     attachUrl: opencodeServeUrl,
   });
 
-  const statusLines = renderBotStatusText(statusRep, { prefix: '!' });
+  const prefix = getDmCommandPrefix(seenDb);
+
+  const statusLines = renderBotStatusText(statusRep, { prefix });
 
   for (const line of statusLines.split('\n')) {
     log.info(line);
@@ -147,7 +152,7 @@ async function main() {
   log.sep();
 
   startLocalWebServer({
-    prefix: getDmCommandPrefix(seenDb),
+    prefix,
     version: VERSION,
     botRelayUrls,
     parentOfBotRoot,
@@ -198,7 +203,17 @@ async function main() {
     signAuthEvent,
   });
 
-  const backendName = getAgentBackend(seenDb);
+  function getCurrentPluginDefaults(): PluginDefaults {
+    const currentBackendName = getAgentBackend(seenDb);
+
+    return {
+      backend: currentBackendName,
+      provider: getProviderName(seenDb),
+      model: getModelOverride(seenDb, currentBackendName),
+      mode: getCurrentOrDefaultMode(seenDb),
+      workspace_target: getWorkspaceTarget(seenDb),
+    };
+  }
 
   let pendingPrompt: ((answer: string) => void) | null = null;
 
@@ -282,13 +297,7 @@ async function main() {
       }),
 
     getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
-    defaults: {
-      backend: backendName,
-      provider: getProviderName(seenDb),
-      model: getModelOverride(seenDb, backendName),
-      mode: getCurrentOrDefaultMode(seenDb),
-      workspace_target: getWorkspaceTarget(seenDb),
-    },
+    defaults: getCurrentPluginDefaults(),
   };
 
   // Register plugins if generated/plugins.ts exists (created by install-plugin script)
@@ -301,6 +310,8 @@ async function main() {
     log.error(`Failed to register plugins: ${String(err)}`);
     log.error(`Run 'bun run scripts/install-plugin.ts' to install plugins`);
   }
+
+  publishWidgetIcons(getDmCommandPrefix(seenDb));
 
   // --- Message handler: commands, session, agent run, reply ---
   async function handleUserMessage(
@@ -335,12 +346,17 @@ async function main() {
 
     const mode = getCurrentOrDefaultMode(seenDb);
     const backendName = getAgentBackend(seenDb);
+    const executionProfile = getBackendExecutionProfile(seenDb, backendName);
     const modelOverride = getModelOverride(seenDb, backendName);
+
+    pluginContext.defaults = getCurrentPluginDefaults();
 
     const backend = createBackend({
       backendName,
       dmBotRoot,
-      mode,
+      cursorMode: mode,
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       attachUrl: opencodeServeUrl,
       modelOverride,
       providerName: getProviderName(seenDb),
@@ -360,7 +376,9 @@ async function main() {
           cwd,
         }),
         content: prompt,
-        mode,
+        cursorMode: mode,
+        opencodeAgentName:
+          executionProfile.kind === 'opencode' ? executionProfile.agent : null,
         cwd,
         getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
         modelOverride,
@@ -438,6 +456,7 @@ async function main() {
   if (process.stdin.isTTY) {
     readyDmPromise.finally(() =>
       startLocalCli({
+        prefix,
         onMessage: (input) => handleUserMessage(input, 'local'),
         resolvePendingPromptFirst: (line) =>
           resolvePendingPromptIfAny(line, 'local'),

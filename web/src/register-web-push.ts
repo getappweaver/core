@@ -34,6 +34,7 @@ function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
       const regs = await navigator.serviceWorker
         .getRegistrations()
         .catch(() => []);
+
       const states = regs.map(
         (r) =>
           r.active?.state ?? r.waiting?.state ?? r.installing?.state ?? 'none',
@@ -98,6 +99,7 @@ export async function registerWebPushNotifications(): Promise<RegisterWebPushOut
       userVisibleOnly: true,
       applicationServerKey: decodeBase64UrlToArrayBuffer(vapid.publicKey),
     });
+
     const json = sub.toJSON();
 
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
