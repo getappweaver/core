@@ -35,6 +35,7 @@ type ShowcaseStoryStep = {
 type ShowcaseStoryEntry = {
   pluginAlias: string;
   pluginName: string;
+  iconUrl?: string;
   story: {
     id: string;
     title: string;
@@ -183,6 +184,7 @@ function railKey(item: ShowcaseRailItem): string {
 function App() {
   let demoFrameEl: HTMLIFrameElement | undefined;
   let railViewportEl: HTMLDivElement | undefined;
+  let storySelectorEl: HTMLDivElement | undefined;
 
   const [showcaseStories, setShowcaseStories] = createSignal<
     ShowcaseStoryEntry[]
@@ -478,7 +480,20 @@ function App() {
         return;
       }
 
-      setActiveShowcaseStep(data.state ?? null);
+      const state = data.state ?? null;
+      setActiveShowcaseStep(state);
+
+      if (!state) {
+        return;
+      }
+
+      const storyIndex = showcaseStories().findIndex(
+        (entry) => entry.story.id === state.storyId,
+      );
+
+      if (storyIndex >= 0 && storyIndex !== activeShowcaseIndex()) {
+        setActiveShowcaseIndex(storyIndex);
+      }
     };
 
     window.addEventListener('message', handleDemoMessage);
@@ -509,6 +524,24 @@ function App() {
     isWideLandingLayout();
     isFrameReady();
     postLandingChromeWideToDemoFrame();
+  });
+
+  createEffect(() => {
+    if (!isWideLandingLayout()) {
+      return;
+    }
+
+    activeShowcaseIndex();
+
+    const activeStoryEl = storySelectorEl?.querySelector<HTMLElement>(
+      '.story-selector-item.is-active',
+    );
+
+    activeStoryEl?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
   });
 
   return (
@@ -633,7 +666,7 @@ function App() {
             </Show>
             <Show when={isWideLandingLayout()}>
               <div class="demo-stage-controls">
-                <div class="story-selector">
+                <div ref={storySelectorEl} class="story-selector">
                   <For each={showcaseStories()}>
                     {(story, index) => {
                       const isActive = () =>
@@ -657,6 +690,24 @@ function App() {
                               }}
                             />
                           </Show>
+                          <span class="story-selector-icon-box">
+                            <Show
+                              when={story.iconUrl}
+                              fallback={
+                                <span class="story-selector-icon-fallback">
+                                  {story.pluginAlias.slice(0, 2).toUpperCase()}
+                                </span>
+                              }
+                            >
+                              {(iconUrl) => (
+                                <img
+                                  src={iconUrl()}
+                                  alt=""
+                                  class="story-selector-icon"
+                                />
+                              )}
+                            </Show>
+                          </span>
                           <span class="story-selector-label">
                             {showcaseTitle(story)}
                           </span>

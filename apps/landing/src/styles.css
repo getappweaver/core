@@ -346,6 +346,7 @@ a {
   justify-content: flex-start;
   align-items: start;
   min-width: 0;
+  width: 100%;
 }
 
 .demo-eyebrow {
@@ -501,24 +502,40 @@ a {
 }
 
 .story-selector {
+  position: relative;
   display: flex;
+  width: 100%;
   min-width: 0;
-  max-width: min(46vw, 640px);
   gap: 0.5rem;
   overflow-x: auto;
-  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.45rem;
+  scrollbar-color: rgb(103 232 249 / 35%) rgb(255 255 255 / 8%);
+  scrollbar-width: thin;
+  mask-image: linear-gradient(to right, black 0, black calc(100% - 3rem), transparent 100%);
 }
 
 .story-selector::-webkit-scrollbar {
-  display: none;
+  height: 0.35rem;
+}
+
+.story-selector::-webkit-scrollbar-track {
+  background: rgb(255 255 255 / 8%);
+}
+
+.story-selector::-webkit-scrollbar-thumb {
+  background: rgb(103 232 249 / 35%);
 }
 
 .story-selector-item {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   flex: 0 0 auto;
-  width: min(200px, 34vw);
+  width: min(224px, 34vw);
   min-height: 3.4rem;
-  max-width: 200px;
+  max-width: 224px;
   overflow: hidden;
   padding: 0.45rem 0.55rem;
   background: rgb(255 255 255 / 4%);
@@ -527,10 +544,14 @@ a {
   font-size: 0.78rem;
   line-height: 1.4;
   text-align: left;
-  transition: color 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
 }
 
 .story-selector-item.is-active {
+  background: color-mix(in srgb, var(--color-accent, rgb(103 232 249)) 72%, white 12%);
+  color: #020617;
   cursor: default;
 }
 
@@ -538,19 +559,49 @@ a {
   position: absolute;
   inset: 0;
   transform-origin: left;
-  background: rgb(255 255 255 / 10%);
+  background: rgb(2 6 23 / 10%);
 }
 
 .story-selector-label {
   position: relative;
   z-index: 1;
   display: block;
+  min-width: 0;
   white-space: normal;
+}
+
+.story-selector-icon-box {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  background: rgb(103 232 249);
+  color: #020617;
+}
+
+.story-selector-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.story-selector-icon-fallback {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .story-selector-item:hover,
 .story-selector-item.is-active {
   color: white;
+}
+
+.story-selector-item.is-active,
+.story-selector-item.is-active:hover {
+  color: #020617;
 }
 
 .demo-frame-toolbar {

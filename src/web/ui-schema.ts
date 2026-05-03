@@ -143,6 +143,8 @@ export const WebPropsSchema = z.object({
   filterPlaceholder: z.string().optional(),
   defaultExpanded: z.boolean().optional(),
   label: z.string().optional(),
+  src: z.string().min(1).optional(),
+  alt: z.string().optional(),
   checked: z.boolean().optional(),
   /** Native checkbox indeterminate (e.g. in-progress); set via DOM, not HTML attribute. */
   indeterminate: z.literal(true).optional(),
@@ -170,6 +172,8 @@ export const WebPropsSchema = z.object({
   storyTargetId: z.string().min(1).optional(),
   /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
   htmlType: z.enum(['button', 'submit']).optional(),
+  /** Optional plain text that generic clients may expose through read-aloud controls. */
+  ttsText: z.string().optional(),
 });
 
 export const WebTextNodeSchema = z.object({
@@ -184,6 +188,7 @@ export const WebElementTagSchema = z.enum([
   'text',
   'link',
   'badge',
+  'image',
   'button',
   'checkbox',
   'divider',

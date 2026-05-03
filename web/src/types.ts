@@ -1,5 +1,6 @@
 import type { MessageSource } from '@src/messaging';
 import type {
+  TimelineDiffSummary,
   TimelineFileDiff,
   TimelinePayload,
   TimelineToolCall,
@@ -146,6 +147,13 @@ export type TimelineItem =
       id: string;
       createdAt?: number;
       source?: MessageSource;
+      type: 'diff_summary';
+      summary: TimelineDiffSummary;
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
       type: 'tool';
       tool: TimelineToolCall;
     }
@@ -202,6 +210,12 @@ export function isDiffItem(
   item: TimelineItem,
 ): item is Extract<TimelineItem, { type: 'diff' }> {
   return item.type === 'diff';
+}
+
+export function isDiffSummaryItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'diff_summary' }> {
+  return item.type === 'diff_summary';
 }
 
 export function isToolItem(

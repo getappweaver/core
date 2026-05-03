@@ -19,6 +19,22 @@ export type TimelinePayload = {
 export type TimelineFileDiff = AgentFileDiff;
 export type TimelineToolCall = AgentToolCall;
 
+export type TimelineDiffSummary = {
+  fileCount: number;
+  additions: number;
+  deletions: number;
+};
+
+export function summarizeTimelineDiffFiles(
+  files: TimelineFileDiff[],
+): TimelineDiffSummary {
+  return {
+    fileCount: files.length,
+    additions: files.reduce((sum, file) => sum + file.additions, 0),
+    deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+  };
+}
+
 export type TimelineCommandField = {
   name: string;
   summary: string;
@@ -60,6 +76,7 @@ export type TimelineEventKind =
   | 'system'
   | 'chat'
   | 'diff'
+  | 'diff_summary'
   | 'tool'
   | 'prompt'
   | 'command_result'
@@ -85,6 +102,13 @@ export type TimelineHistoryItem =
       id: string;
       type: 'diff';
       files: TimelineFileDiff[];
+      createdAt: number;
+      source: MessageSource;
+    }
+  | {
+      id: string;
+      type: 'diff_summary';
+      summary: TimelineDiffSummary;
       createdAt: number;
       source: MessageSource;
     }
@@ -145,6 +169,7 @@ export type TimelineEventRecord = {
   web: WebNodeRoot | null;
   clientView: ClientViewRoot | null;
   diff: TimelineFileDiff[] | null;
+  diffSummary: TimelineDiffSummary | null;
   tool: TimelineToolCall | null;
   prompt: PromptPayload | null;
   requestId: string | null;

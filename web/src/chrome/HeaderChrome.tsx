@@ -32,6 +32,8 @@ type HeaderChromeProps = {
   connectLabel: Accessor<string>;
   manageTitle: Accessor<string>;
   pushBusy: Accessor<boolean>;
+  piperTtsBusy: Accessor<boolean>;
+  piperTtsEnabled: Accessor<boolean>;
   onOpenWidget: (widget: HeaderChromeWidget) => void;
   onWidgetElement?: (
     widget: HeaderChromeWidget,
@@ -40,6 +42,7 @@ type HeaderChromeProps = {
   onConnect: () => void;
   onLogout: () => void;
   onEnablePush: () => void;
+  onEnablePiperTts: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
 
@@ -476,6 +479,22 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
                           <WebButton
                             type="button"
                             class="connect-btn"
+                            disabled={props.piperTtsBusy()}
+                            onClick={() => {
+                              closeAllMenus();
+                              props.onEnablePiperTts();
+                            }}
+                            title="Download and enable Piper TTS for local speech playback"
+                          >
+                            {props.piperTtsBusy()
+                              ? 'Piper TTS …'
+                              : props.piperTtsEnabled()
+                                ? 'Piper TTS ✓'
+                                : 'Piper TTS'}
+                          </WebButton>
+                          <WebButton
+                            type="button"
+                            class="connect-btn"
                             disabled={
                               !props.isConnected() ||
                               !props.wsConnected() ||
@@ -593,6 +612,22 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               </WebButton>
               <Show when={accountSettingsOpen()}>
                 <div class="topbar-submenu-section topbar-submenu-section--nested">
+                  <WebButton
+                    type="button"
+                    class="connect-btn"
+                    disabled={props.piperTtsBusy()}
+                    onClick={() => {
+                      closeAllMenus();
+                      props.onEnablePiperTts();
+                    }}
+                    title="Download and enable Piper TTS for local speech playback"
+                  >
+                    {props.piperTtsBusy()
+                      ? 'Piper TTS …'
+                      : props.piperTtsEnabled()
+                        ? 'Piper TTS ✓'
+                        : 'Piper TTS'}
+                  </WebButton>
                   <WebButton
                     type="button"
                     class="connect-btn"

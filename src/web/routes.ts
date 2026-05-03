@@ -25,6 +25,7 @@ import {
   listAllCommandsDetailForWeb,
 } from './command-catalog';
 import { executeBuiltinCommand } from './execute';
+import { synthesizeNativePiper } from './native-tts';
 import { verifyNip98Authorization } from './nip98-verify';
 import {
   PushSubscriptionBodySchema,
@@ -157,6 +158,52 @@ export function createWebFetchHandler(
 
           const status =
             message === 'invalid_json' || message === 'invalid_chat_content'
+              ? 400
+              : 500;
+
+          return jsonResponse({ error: message }, { status });
+        });
+    }
+
+    if (req.method === 'POST' && path === '/api/tts/piper') {
+      return parseJsonBody(req)
+        .then((payload) => {
+          const text =
+            payload && typeof payload === 'object' && 'text' in payload
+              ? (payload as { text?: unknown }).text
+              : null;
+
+          const lengthScale =
+            payload && typeof payload === 'object' && 'lengthScale' in payload
+              ? (payload as { lengthScale?: unknown }).lengthScale
+              : null;
+
+          if (typeof text !== 'string') {
+            throw new Error('invalid_tts_text');
+          }
+
+          return synthesizeNativePiper({
+            dmBotRoot: ctx.dmBotRoot,
+            text,
+            lengthScale: typeof lengthScale === 'number' ? lengthScale : 1.2,
+          });
+        })
+        .then(
+          (audio) =>
+            new Response(audio, {
+              headers: {
+                'Cache-Control': 'no-store',
+                'Content-Type': 'audio/wav',
+              },
+            }),
+        )
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+
+          const status =
+            message === 'invalid_json' ||
+            message === 'invalid_tts_text' ||
+            message === 'tts_text_too_long'
               ? 400
               : 500;
 

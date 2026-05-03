@@ -37,6 +37,9 @@ type WebNodeRendererProps = {
   onReplaceRoot?: (root: WebNodeRoot) => void;
   onError?: (message: string) => void;
   promptRequestId?: string;
+  speechSentences?: string[];
+  activeSpeechSentenceIndex?: number | null;
+  onSpeechSentenceClick?: ((index: number) => void) | null;
   onRunAction?: (
     action: WebAction,
     params?: {
@@ -54,6 +57,187 @@ type HljsHighlightedSpanProps = {
   element: WebElementNode;
   language: string | null;
 };
+
+type SentenceRange = {
+  index: number;
+  start: number;
+  end: number;
+};
+
+const WEB_SPEECH_HIGHLIGHT_NAME = 'web-speech-active';
+const WEB_SPEECH_HOVER_HIGHLIGHT_NAME = 'web-speech-hover';
+
+function sentenceRangesInText(
+  text: string,
+  sentences: string[],
+): SentenceRange[] {
+  const ranges: SentenceRange[] = [];
+  let cursor = 0;
+
+  sentences.forEach((sentence, index) => {
+    const start = text.indexOf(sentence, cursor);
+
+    if (start < 0) {
+      return;
+    }
+
+    const end = start + sentence.length;
+    ranges.push({ index, start, end });
+    cursor = end;
+  });
+
+  return ranges;
+}
+
+function caretRangeFromPoint(x: number, y: number): Range | null {
+  const doc = document as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    caretPositionFromPoint?: (
+      x: number,
+      y: number,
+    ) => { offsetNode: Node; offset: number } | null;
+  };
+
+  if (doc.caretRangeFromPoint) {
+    return doc.caretRangeFromPoint(x, y);
+  }
+
+  const position = doc.caretPositionFromPoint?.(x, y);
+
+  if (!position) {
+    return null;
+  }
+
+  const range = document.createRange();
+  range.setStart(position.offsetNode, position.offset);
+  range.collapse(true);
+
+  return range;
+}
+
+function highlightApi(): Map<string, Highlight> | null {
+  const api = CSS as typeof CSS & { highlights?: Map<string, Highlight> };
+
+  return api.highlights ?? null;
+}
+
+type SpeechTextSegment = {
+  node: Text;
+  start: number;
+  end: number;
+};
+
+function textNodesUnder(root: HTMLElement): Text[] {
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+
+  while (node != null) {
+    nodes.push(node as Text);
+    node = walker.nextNode();
+  }
+
+  return nodes;
+}
+
+function speechTextSegments(root: HTMLElement): SpeechTextSegment[] {
+  const codeTextEls = [...root.querySelectorAll('.web-file-view-code-text')];
+  const segments: SpeechTextSegment[] = [];
+  let offset = 0;
+
+  if (codeTextEls.length > 0) {
+    codeTextEls.forEach((codeEl, index) => {
+      for (const node of textNodesUnder(codeEl as HTMLElement)) {
+        const start = offset;
+        offset += node.data.length;
+        segments.push({ node, start, end: offset });
+      }
+
+      if (index + 1 < codeTextEls.length) {
+        offset += 1;
+      }
+    });
+
+    return segments;
+  }
+
+  for (const node of textNodesUnder(root)) {
+    const start = offset;
+    offset += node.data.length;
+    segments.push({ node, start, end: offset });
+  }
+
+  return segments;
+}
+
+function speechTextForElement(root: HTMLElement): string {
+  const codeTextEls = [...root.querySelectorAll('.web-file-view-code-text')];
+
+  if (codeTextEls.length > 0) {
+    return codeTextEls.map((el) => el.textContent ?? '').join('\n');
+  }
+
+  return root.textContent ?? '';
+}
+
+function boundaryForSpeechOffset(
+  segments: SpeechTextSegment[],
+  offset: number,
+  preferPrevious: boolean,
+): { node: Text; offset: number } | null {
+  for (const segment of segments) {
+    if (offset >= segment.start && offset <= segment.end) {
+      return { node: segment.node, offset: offset - segment.start };
+    }
+  }
+
+  if (preferPrevious) {
+    const previous = [...segments]
+      .reverse()
+      .find((segment) => segment.end < offset);
+
+    return previous == null
+      ? null
+      : { node: previous.node, offset: previous.node.data.length };
+  }
+
+  const next = segments.find((segment) => segment.start > offset);
+
+  return next == null ? null : { node: next.node, offset: 0 };
+}
+
+function domRangeForSpeechOffsets(
+  root: HTMLElement,
+  start: number,
+  end: number,
+): Range | null {
+  const segments = speechTextSegments(root);
+  const startBoundary = boundaryForSpeechOffset(segments, start, false);
+  const endBoundary = boundaryForSpeechOffset(segments, end, true);
+
+  if (startBoundary == null || endBoundary == null) {
+    return null;
+  }
+
+  const range = document.createRange();
+  range.setStart(startBoundary.node, startBoundary.offset);
+  range.setEnd(endBoundary.node, endBoundary.offset);
+
+  return range;
+}
+
+function textOffsetForSpeechRange(
+  root: HTMLElement,
+  target: Range,
+): number | null {
+  for (const segment of speechTextSegments(root)) {
+    if (segment.node === target.startContainer) {
+      return segment.start + target.startOffset;
+    }
+  }
+
+  return null;
+}
 
 function HljsHighlightedSpan(props: HljsHighlightedSpanProps): JSX.Element {
   let spanEl: HTMLSpanElement | undefined;
@@ -100,6 +284,134 @@ function HljsHighlightedSpan(props: HljsHighlightedSpanProps): JSX.Element {
       data-ui={elementUi(props.element)}
       style={elementStyle(props.element)}
     />
+  );
+}
+
+type SpeechHighlightBoxProps = {
+  element: WebElementNode;
+  onRunAction: WebNodeRendererProps['onRunAction'];
+  onReplaceRoot: WebNodeRendererProps['onReplaceRoot'];
+  onError: WebNodeRendererProps['onError'];
+  promptRequestId: string | undefined;
+  speechSentences: string[] | undefined;
+  activeSpeechSentenceIndex: number | null | undefined;
+  onSpeechSentenceClick: ((index: number) => void) | null | undefined;
+};
+
+function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
+  let el: HTMLDivElement | undefined;
+
+  const sentenceAtEvent = (event: MouseEvent): SentenceRange | null => {
+    if (el == null || !props.speechSentences?.length) {
+      return null;
+    }
+
+    const range = caretRangeFromPoint(event.clientX, event.clientY);
+
+    if (range == null || !el.contains(range.startContainer)) {
+      return null;
+    }
+
+    const offset = textOffsetForSpeechRange(el, range);
+
+    if (offset == null) {
+      return null;
+    }
+
+    return (
+      sentenceRangesInText(
+        speechTextForElement(el),
+        props.speechSentences,
+      ).find(
+        (candidate) => offset >= candidate.start && offset <= candidate.end,
+      ) ?? null
+    );
+  };
+
+  const setHighlight = (name: string, sentence: SentenceRange | null): void => {
+    const highlights = highlightApi();
+
+    if (highlights == null || el == null || sentence == null) {
+      highlights?.delete(name);
+
+      return;
+    }
+
+    const range = domRangeForSpeechOffsets(el, sentence.start, sentence.end);
+
+    if (range == null) {
+      highlights.delete(name);
+
+      return;
+    }
+
+    highlights.set(name, new Highlight(range));
+  };
+
+  createEffect(() => {
+    const highlights = highlightApi();
+    const activeIndex = props.activeSpeechSentenceIndex;
+    const sentences = props.speechSentences ?? [];
+
+    highlights?.delete(WEB_SPEECH_HIGHLIGHT_NAME);
+
+    if (el == null || activeIndex == null || sentences.length === 0) {
+      return;
+    }
+
+    const sentence = sentenceRangesInText(
+      speechTextForElement(el),
+      sentences,
+    ).find((candidate) => candidate.index === activeIndex);
+
+    setHighlight(WEB_SPEECH_HIGHLIGHT_NAME, sentence ?? null);
+  });
+
+  onCleanup(() => {
+    const highlights = highlightApi();
+    highlights?.delete(WEB_SPEECH_HIGHLIGHT_NAME);
+    highlights?.delete(WEB_SPEECH_HOVER_HIGHLIGHT_NAME);
+  });
+
+  return (
+    <div
+      ref={el}
+      class={elementClass(props.element)}
+      classList={{
+        'web-speech-clickable': Boolean(props.onSpeechSentenceClick),
+      }}
+      data-ui={elementUi(props.element)}
+      data-story-target={props.element.props?.storyTargetId}
+      style={elementStyle(props.element)}
+      onMouseMove={(event) => {
+        setHighlight(WEB_SPEECH_HOVER_HIGHLIGHT_NAME, sentenceAtEvent(event));
+      }}
+      onMouseLeave={() => {
+        highlightApi()?.delete(WEB_SPEECH_HOVER_HIGHLIGHT_NAME);
+      }}
+      onClick={(event) => {
+        const sentence = sentenceAtEvent(event);
+
+        if (sentence != null && props.onSpeechSentenceClick != null) {
+          props.onSpeechSentenceClick(sentence.index);
+        }
+      }}
+    >
+      <For each={props.element.children ?? []}>
+        {(child) => (
+          <WebNodeRenderer
+            node={child}
+            onReplaceRoot={props.onReplaceRoot}
+            onError={props.onError}
+            promptRequestId={props.promptRequestId}
+            speechSentences={props.speechSentences}
+            activeSpeechSentenceIndex={props.activeSpeechSentenceIndex}
+            onSpeechSentenceClick={props.onSpeechSentenceClick}
+            onRunAction={props.onRunAction}
+          />
+        )}
+      </For>
+    </div>
   );
 }
 
@@ -1127,9 +1439,9 @@ function WebTreeElement(props: WebTreeElementProps) {
       return;
     }
 
-    const timeoutId = window.setTimeout(build, 0);
+    const timeoutId = setTimeout(build, 0);
 
-    onCleanup(() => window.clearTimeout(timeoutId));
+    onCleanup(() => clearTimeout(timeoutId));
   });
 
   function setDebouncedFilterQuery(value: string): void {
@@ -1920,6 +2232,17 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                 </span>
               </Match>
 
+              <Match when={element.tag === 'image'}>
+                <img
+                  class={elementClass(element)}
+                  data-ui={elementUi(element)}
+                  style={elementStyle(element)}
+                  src={element.props?.src ?? ''}
+                  alt={element.props?.alt ?? ''}
+                  aria-hidden={element.props?.alt ? undefined : 'true'}
+                />
+              </Match>
+
               <Match when={element.tag === 'text'}>
                 {(() => {
                   const ui = element.props?.ui ?? '';
@@ -1963,53 +2286,91 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
               </Match>
 
               <Match when={true}>
-                <div
-                  class={elementClass(element)}
-                  data-ui={elementUi(element)}
-                  data-story-target={element.props?.storyTargetId}
-                  ref={(el) =>
-                    element.props?.storyTargetId
-                      ? registerStoryDomTarget(element.props.storyTargetId, el)
-                      : undefined
-                  }
-                  style={elementStyle(element)}
-                  role={element.props?.action ? 'button' : undefined}
-                  tabIndex={element.props?.action ? 0 : undefined}
-                  onMouseEnter={() => {
-                    if (element.props?.storyTargetId) {
-                      emitStoryTargetHovered(element.props.storyTargetId);
-                    }
-                  }}
-                  onClick={() => {
-                    if (element.props?.storyTargetId) {
-                      emitStoryTargetClicked(element.props.storyTargetId);
-                    }
-
-                    runAction(element.props?.action);
-                  }}
-                  onKeyDown={(e) => {
-                    if (!element.props?.action) {
-                      return;
-                    }
-
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      runAction(element.props.action);
-                    }
-                  }}
-                >
-                  <For each={element.children ?? []}>
-                    {(child) => (
-                      <WebNodeRenderer
-                        node={child}
+                {(() => {
+                  if (element.props?.ttsText != null) {
+                    return (
+                      <SpeechHighlightBox
+                        element={element}
                         onReplaceRoot={props.onReplaceRoot}
                         onError={props.onError}
                         promptRequestId={props.promptRequestId}
+                        speechSentences={props.speechSentences}
+                        activeSpeechSentenceIndex={
+                          props.activeSpeechSentenceIndex
+                        }
+                        onSpeechSentenceClick={props.onSpeechSentenceClick}
                         onRunAction={props.onRunAction}
                       />
-                    )}
-                  </For>
-                </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      class={elementClass(element)}
+                      data-ui={elementUi(element)}
+                      data-story-target={element.props?.storyTargetId}
+                      ref={(el) => {
+                        if (element.props?.storyTargetId) {
+                          registerStoryDomTarget(
+                            element.props.storyTargetId,
+                            el,
+                          );
+                        }
+
+                        if (element.props?.autoFocus === true) {
+                          queueMicrotask(() => el.focus());
+                        }
+                      }}
+                      style={elementStyle(element)}
+                      role={element.props?.action ? 'button' : undefined}
+                      tabIndex={
+                        element.props?.action ||
+                        element.props?.autoFocus === true
+                          ? 0
+                          : undefined
+                      }
+                      onMouseEnter={() => {
+                        if (element.props?.storyTargetId) {
+                          emitStoryTargetHovered(element.props.storyTargetId);
+                        }
+                      }}
+                      onClick={() => {
+                        if (element.props?.storyTargetId) {
+                          emitStoryTargetClicked(element.props.storyTargetId);
+                        }
+
+                        runAction(element.props?.action);
+                      }}
+                      onKeyDown={(e) => {
+                        if (!element.props?.action) {
+                          return;
+                        }
+
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          runAction(element.props.action);
+                        }
+                      }}
+                    >
+                      <For each={element.children ?? []}>
+                        {(child) => (
+                          <WebNodeRenderer
+                            node={child}
+                            onReplaceRoot={props.onReplaceRoot}
+                            onError={props.onError}
+                            promptRequestId={props.promptRequestId}
+                            speechSentences={props.speechSentences}
+                            activeSpeechSentenceIndex={
+                              props.activeSpeechSentenceIndex
+                            }
+                            onSpeechSentenceClick={props.onSpeechSentenceClick}
+                            onRunAction={props.onRunAction}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  );
+                })()}
               </Match>
             </Switch>
           );

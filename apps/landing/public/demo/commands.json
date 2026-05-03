@@ -2428,7 +2428,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name: upload, download, tree, view, diff, bottomup, bottomup_context, summarize, or topdown.",
+            "summary": "Optional subcommand name: upload, download, tree, search, view, diff, bottomup, bottomup_context, summarize, or topdown.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2440,6 +2440,7 @@
           "/file help upload",
           "/file help download",
           "/file help tree",
+          "/file help search",
           "/file help view",
           "/file help diff",
           "/file help bottomup",
@@ -2554,9 +2555,51 @@
         }
       },
       {
+        "name": "search",
+        "summary": "Search file contents under the workspace with optional extension and folder filters.",
+        "usage": "search <keyword> [--ext <ext>] [--path <path>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "keyword",
+            "summary": "Text or regex pattern to search for.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "ext",
+            "summary": "Comma-separated extensions (e.g. txt,md or .ts,.tsx).",
+            "flag": "--ext",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null
+          },
+          {
+            "name": "path",
+            "summary": "Directory to search, relative to workspace root.",
+            "flag": "--path",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null
+          }
+        ],
+        "examples": [
+          "/file search TODO",
+          "/file search nostr --ext md,txt",
+          "/file search WebNode --path src --ext ts,tsx"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
         "name": "view",
         "summary": "Preview a file under the workspace (path relative to workspace root).",
-        "usage": "view <path> [--previous-dir <previousDir>]",
+        "usage": "view <path> [--previous-dir <previousDir>] [--line <line>]",
         "aliases": [],
         "arguments": [
           {
@@ -2574,8 +2617,15 @@
             "flag": "--previous-dir",
             "kind": "string",
             "required": false,
-            "shortFlag": null,
-            "choices": null
+            "shortFlag": null
+          },
+          {
+            "name": "line",
+            "summary": "Line number to highlight in the web file viewer.",
+            "flag": "--line",
+            "kind": "integer",
+            "required": false,
+            "shortFlag": null
           }
         ],
         "examples": [
@@ -2589,13 +2639,13 @@
       },
       {
         "name": "diff",
-        "summary": "Show a simple git diff preview for one workspace file.",
-        "usage": "diff <path> [--previous-dir <previousDir>]",
+        "summary": "Show a simple git diff preview for one workspace path.",
+        "usage": "diff <path> [--previous-dir <previousDir>] [--timeline]",
         "aliases": [],
         "arguments": [
           {
             "name": "path",
-            "summary": "File path relative to workspace root.",
+            "summary": "File or folder path relative to workspace root.",
             "kind": "string",
             "required": true,
             "variadic": false
@@ -2607,6 +2657,15 @@
             "summary": "Tree directory to return to in the web UI.",
             "flag": "--previous-dir",
             "kind": "string",
+            "required": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "timeline",
+            "summary": "Render web output with the timeline diff card.",
+            "flag": "--timeline",
+            "kind": "boolean",
             "required": false,
             "shortFlag": null,
             "choices": null

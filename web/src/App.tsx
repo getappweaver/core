@@ -47,6 +47,7 @@ import {
   appendSystemMessageToTimeline,
   useTimeline,
 } from './timeline/useTimeline';
+import { isPiperTtsEnabled, preparePiperTts } from './tts/piper';
 import type { CommandPayload, CommandDetail, TimelineItem } from './types';
 import {
   createId,
@@ -152,6 +153,10 @@ function AppInner(): JSX.Element {
 
   const [headerMenusOpen, setHeaderMenusOpen] = createSignal(false);
   const [pushBusy, setPushBusy] = createSignal(false);
+  const [piperTtsBusy, setPiperTtsBusy] = createSignal(false);
+
+  const [piperTtsEnabled, setPiperTtsEnabled] =
+    createSignal(isPiperTtsEnabled());
 
   const [storyWalkthrough, setStoryWalkthrough] =
     createSignal<StoryWalkthroughState | null>(null);
@@ -969,6 +974,26 @@ function AppInner(): JSX.Element {
     }
   }
 
+  async function onEnablePiperTts(): Promise<void> {
+    if (piperTtsBusy()) {
+      return;
+    }
+
+    setPiperTtsBusy(true);
+
+    try {
+      await preparePiperTts();
+      setPiperTtsEnabled(true);
+      appendSystemMessage('Piper TTS is ready. Speech buttons will use Piper.');
+    } catch (err) {
+      appendSystemMessage(
+        `Piper TTS failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setPiperTtsBusy(false);
+    }
+  }
+
   return (
     <div class="app-shell" data-web-ui-busy-digest={webUiBusyDigest()}>
       <HeaderChrome
@@ -980,6 +1005,8 @@ function AppInner(): JSX.Element {
         connectLabel={connectLabel}
         manageTitle={manageTitle}
         pushBusy={pushBusy}
+        piperTtsBusy={piperTtsBusy}
+        piperTtsEnabled={piperTtsEnabled}
         onWidgetElement={(widget, el) => {
           const key = storyTargetHeaderWidgetKey(
             widget.command,
@@ -1015,6 +1042,9 @@ function AppInner(): JSX.Element {
         onLogout={() => auth.logout()}
         onEnablePush={() => {
           void onEnablePush();
+        }}
+        onEnablePiperTts={() => {
+          void onEnablePiperTts();
         }}
         onAnyMenuOpenChange={setHeaderMenusOpen}
       />

@@ -1,4 +1,5 @@
 import { createBackend } from '@src/backends/factory';
+import { disposeOpencodeSdk } from '@src/backends/opencode-sdk';
 import {
   AgentBackendNameSchema,
   getAgentBackend,
@@ -69,6 +70,10 @@ export async function handleAiBackend(
   }
 
   setAgentBackend(db, nextBackendName);
+
+  if (prevBackendName === 'opencode' && nextBackendName !== 'opencode') {
+    disposeOpencodeSdk();
+  }
 
   const workspace = getWorkspaceTarget(db);
   const cwd = workspace === 'bot' ? dmBotRoot : parentOfBotRoot;

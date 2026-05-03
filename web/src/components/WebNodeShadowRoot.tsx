@@ -37,6 +37,9 @@ type WebNodeShadowRootProps = {
   ) => void;
   /** Root `tree` reports its `.web-tree-header` for timeline scroll / sticky duplicate controls. */
   onWebTreeHeaderEl?: (el: HTMLElement | null) => void;
+  speechSentences?: string[];
+  activeSpeechSentenceIndex?: number | null;
+  onSpeechSentenceClick?: ((index: number) => void) | null;
   onReplaceRoot?: (root: WebNodeRoot) => void;
   onError?: (message: string) => void;
   promptRequestId?: string;
@@ -219,6 +222,11 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                         onReplaceRoot={props.onReplaceRoot}
                         onError={props.onError}
                         promptRequestId={props.promptRequestId}
+                        speechSentences={props.speechSentences}
+                        activeSpeechSentenceIndex={
+                          props.activeSpeechSentenceIndex
+                        }
+                        onSpeechSentenceClick={props.onSpeechSentenceClick}
                         onRunAction={props.onRunAction}
                       />
                     </WebRevealContext.Provider>

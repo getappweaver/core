@@ -1,4 +1,6 @@
-import { Show, createSignal, onCleanup } from 'solid-js';
+import { Show, createMemo, createSignal, onCleanup } from 'solid-js';
+
+import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
 import {
   emitStoryPassivePlaybackPausedChange,
@@ -26,6 +28,7 @@ import {
   cardHeadStoryNextIcon,
 } from './timelineCardHeadIcons';
 import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
+import { TimelineSpeechButton } from './TimelineSpeechButton';
 import { TimelineWebTreeToolbar } from './TimelineWebTreeToolbar';
 import type { TimelineViewProps } from './types';
 
@@ -82,6 +85,12 @@ type TimelineCommandResultCardProps = {
   onAppendSystem: TimelineViewProps['onAppendSystem'];
 };
 
+type SpeechSentenceState = {
+  active: boolean;
+  sentenceIndex: number | null;
+  sentences: string[];
+};
+
 function isPassiveStoryRuntimeItem(
   item: TimelineCommandResultCardProps['item'],
 ): boolean {
@@ -92,6 +101,44 @@ function isPassiveStoryRuntimeItem(
   const payload = item.clientView.payload as StoryRuntimePayload;
 
   return payload.walkthrough === false;
+}
+
+function passiveStoryRuntimeStoryId(
+  item: TimelineCommandResultCardProps['item'],
+): string | null {
+  if (!isPassiveStoryRuntimeItem(item)) {
+    return null;
+  }
+
+  const payload = item.clientView!.payload as StoryRuntimePayload;
+
+  return typeof payload.id === 'string' ? payload.id : null;
+}
+
+function findTtsText(node: WebNode): string | null {
+  if (node.type !== 'element') {
+    return null;
+  }
+
+  const ttsText = node.props?.ttsText;
+
+  if (typeof ttsText === 'string' && ttsText.trim().length > 0) {
+    return ttsText;
+  }
+
+  for (const child of node.children ?? []) {
+    const found = findTtsText(child);
+
+    if (found !== null) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function webRootTtsText(root: WebNodeRoot | null | undefined): string | null {
+  return root == null ? null : findTtsText(root.tree);
 }
 
 function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
@@ -208,6 +255,23 @@ export function TimelineCommandResultCard(
 
   const [treeHeaderInView, setTreeHeaderInView] = createSignal(true);
 
+  const [speechState, setSpeechState] = createSignal<SpeechSentenceState>({
+    active: false,
+    sentenceIndex: null,
+    sentences: [],
+  });
+
+  const [seekSentenceIndex, setSeekSentenceIndex] = createSignal<number | null>(
+    null,
+  );
+
+  const storyRuntimeId = createMemo(() =>
+    passiveStoryRuntimeStoryId(props.item),
+  );
+
+  const ttsText = createMemo(() => webRootTtsText(props.item.web));
+  const speechHighlightActive = () => speechState().active;
+
   attachTimelineTreeHeaderInViewEffect({
     cardEl,
     treeHeaderEl: webTreeHeaderEl,
@@ -258,6 +322,24 @@ export function TimelineCommandResultCard(
       }
       expandedHeadToolbar={
         <>
+          <Show when={ttsText()}>
+            {(text) => (
+              <div
+                class="card-head-tree-toolbar"
+                role="toolbar"
+                aria-label="Read result"
+              >
+                <TimelineSpeechButton
+                  text={text()}
+                  class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
+                  label="result"
+                  seekSentenceIndex={seekSentenceIndex()}
+                  onSeekHandled={() => setSeekSentenceIndex(null)}
+                  onSentenceState={setSpeechState}
+                />
+              </div>
+            )}
+          </Show>
           <Show when={props.item.web}>
             <TimelineWebTreeToolbar
               onScrollToTop={scrollCardToTop}
@@ -266,11 +348,13 @@ export function TimelineCommandResultCard(
               buttonClass="card-head__control"
             />
           </Show>
-          <Show when={isPassiveStoryRuntimeItem(props.item)}>
-            <StoryPlaybackToolbar
-              buttonClass="card-head__control"
-              storyId={props.item.clientView!.payload.id as string}
-            />
+          <Show when={storyRuntimeId()}>
+            {(storyId) => (
+              <StoryPlaybackToolbar
+                buttonClass="card-head__control"
+                storyId={storyId()}
+              />
+            )}
           </Show>
         </>
       }
@@ -316,6 +400,17 @@ export function TimelineCommandResultCard(
               renderSurface="timeline"
               stateScopeId={props.item.id}
               busy={props.isWebUiBusy(props.item.id)}
+              speechSentences={
+                speechHighlightActive() ? speechState().sentences : undefined
+              }
+              activeSpeechSentenceIndex={
+                speechHighlightActive() ? speechState().sentenceIndex : null
+              }
+              onSpeechSentenceClick={
+                speechHighlightActive()
+                  ? (index) => setSeekSentenceIndex(index)
+                  : null
+              }
               onWebTreeToolbarChange={setWebTreeToolbar}
               onWebTreeHeaderEl={setWebTreeHeaderEl}
               onReplaceRoot={(root) =>

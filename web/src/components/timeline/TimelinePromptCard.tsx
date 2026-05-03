@@ -5,6 +5,10 @@ import type { TimelineItem } from '../../types';
 import { WebNodeShadowRoot } from '../WebNodeShadowRoot';
 
 import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
+import {
+  TimelineSpeechButton,
+  readablePromptText,
+} from './TimelineSpeechButton';
 import type { TimelineViewProps } from './types';
 
 /** Shorter than native `behavior: "smooth"` (often 300ms+), still feels animated. */
@@ -59,6 +63,9 @@ type TimelinePromptCardProps = {
 export function TimelinePromptCard(props: TimelinePromptCardProps) {
   const [cardEl, setCardEl] = createSignal<HTMLDivElement | undefined>();
 
+  const speechText = () =>
+    readablePromptText({ text: props.item.text, web: props.item.web });
+
   const scrollCardToTop = () => {
     const el = cardEl();
 
@@ -83,6 +90,15 @@ export function TimelinePromptCard(props: TimelinePromptCardProps) {
             title="Scroll to top of this prompt"
             aria-label="Scroll to top of this prompt"
             onClick={scrollCardToTop}
+          />
+        </div>
+      }
+      expandedHeadToolbar={
+        <div class="card-head-tree-toolbar" role="toolbar" aria-label="Prompt">
+          <TimelineSpeechButton
+            text={speechText()}
+            class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
+            label="prompt"
           />
         </div>
       }

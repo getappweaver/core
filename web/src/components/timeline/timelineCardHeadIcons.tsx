@@ -284,3 +284,28 @@ export function cardHeadStoryNextIcon(
     </svg>
   );
 }
+
+export function cardHeadSpeakerIcon(
+  dims?: CardHeadChromeIconDims,
+): JSX.Element {
+  const { width, height } = resolveDims(dims);
+
+  return (
+    <svg
+      class="card-head-chrome-icon"
+      width={width}
+      height={height}
+      viewBox={`0 0 ${VB} ${VB}`}
+      aria-hidden="true"
+    >
+      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+      <path
+        d="M16 8.5a5 5 0 0 1 0 7M18.4 6a8 8 0 0 1 0 12"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
+    </svg>
+  );
+}

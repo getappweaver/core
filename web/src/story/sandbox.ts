@@ -18,10 +18,12 @@ type PromptAnswerClientMessageLike = {
 type StorySandboxState = {
   payload: StoryRuntimePayload;
   outputIndexes: Record<string, number>;
+  promptIndexes: Record<string, number>;
   activePrompt: {
     requestId: string;
     command: string;
     subcommand: string;
+    key: string;
   } | null;
 };
 
@@ -68,7 +70,12 @@ function isPromptAnswerMessage(
 }
 
 export function activateStorySandbox(payload: StoryRuntimePayload): void {
-  activeSandbox = { payload, outputIndexes: {}, activePrompt: null };
+  activeSandbox = {
+    payload,
+    outputIndexes: {},
+    promptIndexes: {},
+    activePrompt: null,
+  };
 }
 
 function commandKey(command: string, subcommand: string): string {
@@ -90,12 +97,27 @@ function scriptedOutputs(): Record<string, unknown[]> {
     : {};
 }
 
-function scriptedPrompts(): Record<string, PromptPayload> {
+function scriptedPrompts(): Record<string, PromptPayload | PromptPayload[]> {
   const value = sandboxRecord().__prompts;
 
   return value && typeof value === 'object'
-    ? (value as Record<string, PromptPayload>)
+    ? (value as Record<string, PromptPayload | PromptPayload[]>)
     : {};
+}
+
+function promptAtIndex(
+  prompts: PromptPayload | PromptPayload[] | undefined,
+  index: number,
+): PromptPayload | null {
+  if (!prompts) {
+    return null;
+  }
+
+  if (!Array.isArray(prompts)) {
+    return index === 0 ? prompts : null;
+  }
+
+  return prompts[index] ?? null;
 }
 
 function scriptedTransitions(): ScriptedTransition[] {
@@ -118,7 +140,12 @@ export function canStorySandboxHandleCommand(
 ): boolean {
   const output = activeSandbox?.payload.story.commandOutput;
   const outputs = scriptedOutputs()[commandKey(command, subcommand)];
-  const prompt = scriptedPrompts()[commandKey(command, subcommand)];
+
+  const prompt = promptAtIndex(
+    scriptedPrompts()[commandKey(command, subcommand)],
+    0,
+  );
+
   const webMeta = output?.web?.meta;
   const clientViewMeta = output?.clientView?.meta;
 
@@ -149,6 +176,32 @@ export function handleStorySandboxSocketMessage(params: {
     }
 
     sandbox.activePrompt = null;
+    const promptKey = prompt.key;
+
+    sandbox.promptIndexes[promptKey] =
+      (sandbox.promptIndexes[promptKey] ?? 0) + 1;
+
+    const nextPrompt = promptAtIndex(
+      scriptedPrompts()[promptKey],
+      sandbox.promptIndexes[promptKey] ?? 0,
+    );
+
+    if (nextPrompt) {
+      sandbox.activePrompt = {
+        requestId: params.message.requestId,
+        command: prompt.command,
+        subcommand: prompt.subcommand,
+        key: promptKey,
+      };
+
+      params.emit({
+        type: 'prompt',
+        requestId: params.message.requestId,
+        prompt: nextPrompt,
+      });
+
+      return true;
+    }
 
     const transitionTargets = scriptedTransitions().flatMap((transition) => {
       if (
@@ -171,6 +224,18 @@ export function handleStorySandboxSocketMessage(params: {
 
       sandbox.outputIndexes[targetKey] =
         (sandbox.outputIndexes[targetKey] ?? 0) + 1;
+    }
+
+    const outputs = scriptedOutputs()[promptKey];
+    const outputIndex = sandbox.outputIndexes[promptKey] ?? 0;
+    const scriptedOutput = Array.isArray(outputs) ? outputs[outputIndex] : null;
+
+    if (scriptedOutput !== null) {
+      params.emit({
+        type: 'command_result',
+        requestId: params.message.requestId,
+        output: scriptedOutput,
+      });
     }
 
     params.emit({ type: 'done', requestId: params.message.requestId });
@@ -197,13 +262,14 @@ export function handleStorySandboxSocketMessage(params: {
     return false;
   }
 
-  const prompt = scriptedPrompts()[key];
+  const prompt = promptAtIndex(scriptedPrompts()[key], 0);
 
   if (prompt) {
     sandbox.activePrompt = {
       requestId: params.message.requestId,
       command: params.message.command,
       subcommand: params.message.subcommand,
+      key,
     };
 
     params.emit({

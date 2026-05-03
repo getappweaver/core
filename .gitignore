@@ -12,6 +12,7 @@ generated/
 TOOLS.md
 .claude/skills/dm-bot*/
 .logs/
+.piper-test/
 apps/landing/dist/
 web/public/plugin-icons/
 web/public/builtin-icons/

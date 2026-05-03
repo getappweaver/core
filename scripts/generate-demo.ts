@@ -46,6 +46,7 @@ type DemoStoryEntry = {
   pluginName: string;
   sourceType: 'command' | 'ai';
   sourceName: string;
+  iconUrl?: string;
   story: StoryDefinition<unknown>;
 };
 
@@ -199,6 +200,83 @@ function publishWidgetIcon(params: {
   copyFileSync(sourcePath, targetPath);
 }
 
+function publishedWidgetIconUrl(params: {
+  icon: string | undefined;
+  pluginAlias?: string;
+}): string | undefined {
+  const icon = params.icon?.trim();
+
+  if (!icon) {
+    return undefined;
+  }
+
+  const lower = icon.toLowerCase();
+
+  if (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('data:')
+  ) {
+    return icon;
+  }
+
+  const rootedIcon = icon.startsWith('/')
+    ? icon
+    : params.pluginAlias
+      ? `/plugins/${params.pluginAlias}/${icon}`
+      : icon;
+
+  if (!rootedIcon.startsWith('/')) {
+    return undefined;
+  }
+
+  if (rootedIcon.startsWith('/plugins/')) {
+    const rel = rootedIcon.slice('/plugins/'.length);
+    const slashIdx = rel.indexOf('/');
+
+    if (slashIdx <= 0) {
+      return params.pluginAlias
+        ? `/plugin-icons/${params.pluginAlias}/${flattenIconPath(rel)}`
+        : undefined;
+    }
+
+    const alias = rel.slice(0, slashIdx);
+    const iconRel = rel.slice(slashIdx + 1);
+
+    return `/plugin-icons/${alias}/${flattenIconPath(iconRel)}`;
+  }
+
+  return `/builtin-icons/${flattenIconPath(rootedIcon.slice(1))}`;
+}
+
+function storyWidgetIconUrl(params: {
+  story: StoryDefinition<unknown>;
+  definition: CommandDefinition;
+  pluginAlias: string;
+}): string | undefined {
+  const target = params.story.steps.find(
+    (step) =>
+      step.type === 'focus_target' && step.target.type === 'header_widget',
+  );
+
+  if (
+    !target ||
+    target.type !== 'focus_target' ||
+    target.target.type !== 'header_widget'
+  ) {
+    return undefined;
+  }
+
+  const subcommand = params.definition.subcommands.find(
+    (item) => item.name === target.target.subcommand,
+  );
+
+  return publishedWidgetIconUrl({
+    icon: subcommand?.webWidget?.icon,
+    pluginAlias: params.pluginAlias,
+  });
+}
+
 function publishDefinitionIcons(params: {
   definition: CommandDefinition;
   pluginAlias?: string;
@@ -229,6 +307,7 @@ function collectPluginStories(params: {
   pluginAlias: string;
   pluginName: string;
   plugin: BotPlugin;
+  definition: CommandDefinition;
 }): { commands: DemoCommandStoryEntry[]; stories: DemoStoryEntry[] } {
   const pluginStories = resolvePluginStories(
     params.plugin,
@@ -257,6 +336,11 @@ function collectPluginStories(params: {
       pluginName: params.pluginName,
       sourceType: 'command' as const,
       sourceName: 'stories',
+      iconUrl: storyWidgetIconUrl({
+        story,
+        definition: params.definition,
+        pluginAlias: params.pluginAlias,
+      }),
       story,
     })),
   };
@@ -347,6 +431,7 @@ async function main(): Promise<void> {
       pluginAlias: entry.alias,
       pluginName: plugin.identity.name,
       plugin,
+      definition: command,
     });
 
     const aiData = collectAiStories({

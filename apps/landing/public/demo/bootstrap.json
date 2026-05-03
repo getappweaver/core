@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-01T13:52:10.627Z",
+  "generatedAt": "2026-05-03T11:41:34.984Z",
   "prefix": "/",
   "plugins": [
     {
@@ -7,7 +7,7 @@
       "name": "dm-bot-todo-plugin",
       "repo": "nostr://_@dhalsim.github.io/dm-bot-todo-plugin",
       "version": "4.0.0",
-      "commandStoryCount": 2,
+      "commandStoryCount": 3,
       "aiStoryCount": 0
     },
     {

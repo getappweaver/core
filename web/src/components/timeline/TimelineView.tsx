@@ -1,4 +1,4 @@
-import { For, Match, Switch } from 'solid-js';
+import { For, Match, Show, Switch, createSignal } from 'solid-js';
 
 import { CommandFormCard } from '../../commands/CommandFormCard';
 import type { TimelineItem } from '../../types';
@@ -7,6 +7,7 @@ import {
   isCommandFormItem,
   isCommandResultItem,
   isDiffItem,
+  isDiffSummaryItem,
   isPromptItem,
   isSystemItem,
   isToolItem,
@@ -14,8 +15,10 @@ import {
 
 import { ChatMarkdown } from '../ChatMarkdown';
 
+import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
 import { TimelineCommandResultCard } from './TimelineCommandResultCard';
 import { TimelinePromptCard } from './TimelinePromptCard';
+import { TimelineSpeechButton } from './TimelineSpeechButton';
 import type { TimelineViewProps } from './types';
 
 export function TimelineView(props: TimelineViewProps) {
@@ -36,14 +39,26 @@ export function TimelineView(props: TimelineViewProps) {
 
             <Match when={isChatItem(item)}>
               <TimelineChatCard
+                id={(item as Extract<TimelineItem, { type: 'chat' }>).id}
                 role={(item as Extract<TimelineItem, { type: 'chat' }>).role}
                 text={(item as Extract<TimelineItem, { type: 'chat' }>).text}
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
               />
             </Match>
 
             <Match when={isDiffItem(item)}>
               <TimelineDiffCard
-                files={(item as Extract<TimelineItem, { type: 'diff' }>).files}
+                item={item as Extract<TimelineItem, { type: 'diff' }>}
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
+              />
+            </Match>
+
+            <Match when={isDiffSummaryItem(item)}>
+              <TimelineDiffSummaryRow
+                summary={
+                  (item as Extract<TimelineItem, { type: 'diff_summary' }>)
+                    .summary
+                }
               />
             </Match>
 
@@ -117,8 +132,16 @@ export function TimelineSystemCard(props: TimelineSystemCardProps) {
 }
 
 type TimelineChatCardProps = {
+  id: string;
   role: 'user' | 'assistant';
   text: string;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+};
+
+type SpeechSentenceState = {
+  active: boolean;
+  sentenceIndex: number | null;
+  sentences: string[];
 };
 
 function splitThinkingBlock(text: string): {
@@ -145,29 +168,132 @@ function splitThinkingBlock(text: string): {
 }
 
 export function TimelineChatCard(props: TimelineChatCardProps) {
+  let cardEl: HTMLDivElement | undefined;
+
+  const [speechState, setSpeechState] = createSignal<SpeechSentenceState>({
+    active: false,
+    sentenceIndex: null,
+    sentences: [],
+  });
+
+  const [seekSentenceIndex, setSeekSentenceIndex] = createSignal<number | null>(
+    null,
+  );
+
   const parts = () => splitThinkingBlock(props.text);
 
-  return (
-    <div
-      class={`card chat-card ${props.role === 'user' ? 'user' : 'assistant'}`}
-    >
+  const speechText = () =>
+    props.role === 'assistant' ? parts().output.trim() : '';
+
+  const speechHighlightActive = () =>
+    props.role === 'assistant' && speechState().active;
+
+  const scrollCardToTop = () => {
+    cardEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  const body = () => (
+    <div classList={{ 'chat-card-body': props.role === 'assistant' }}>
       {props.role === 'assistant' && parts().thinking !== null ? (
         <>
           <div class="chat-thinking">
             <strong>Thinking:</strong>
             <ChatMarkdown text={parts().thinking ?? ''} role={props.role} />
           </div>
-          <ChatMarkdown text={parts().output} role={props.role} />
+          <ChatMarkdown
+            text={parts().output}
+            role={props.role}
+            speechSentences={
+              speechHighlightActive() ? speechState().sentences : undefined
+            }
+            activeSpeechSentenceIndex={
+              speechHighlightActive() ? speechState().sentenceIndex : null
+            }
+            onSpeechSentenceClick={
+              speechHighlightActive()
+                ? (index) => setSeekSentenceIndex(index)
+                : null
+            }
+          />
         </>
+      ) : props.role === 'assistant' ? (
+        <ChatMarkdown
+          text={props.text}
+          role={props.role}
+          speechSentences={
+            speechHighlightActive() ? speechState().sentences : undefined
+          }
+          activeSpeechSentenceIndex={
+            speechHighlightActive() ? speechState().sentenceIndex : null
+          }
+          onSpeechSentenceClick={
+            speechHighlightActive()
+              ? (index) => setSeekSentenceIndex(index)
+              : null
+          }
+        />
       ) : (
         <ChatMarkdown text={props.text} role={props.role} />
       )}
     </div>
   );
+
+  if (props.role !== 'assistant') {
+    return <div class="card chat-card user">{body()}</div>;
+  }
+
+  return (
+    <TimelineCollapsibleCard
+      class="card chat-card assistant"
+      ref={(el) => {
+        cardEl = el;
+      }}
+      expandedHeadClass="card-head--timeline-sticky"
+      expandedTrailingButtonClass="card-head__control"
+      expandedHead={
+        <>
+          <button
+            type="button"
+            class="card-head__scroll-ledge"
+            tabIndex={-1}
+            title="Scroll to top of this reply"
+            aria-label="Scroll to top of this reply"
+            onClick={scrollCardToTop}
+          />
+          <div class="card-head-leading">
+            <span class="tag mode-tag card-head__control">assistant</span>
+          </div>
+        </>
+      }
+      expandedHeadToolbar={
+        <div class="card-head-tree-toolbar" role="toolbar" aria-label="Reply">
+          <TimelineSpeechButton
+            text={speechText()}
+            class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
+            label="reply"
+            seekSentenceIndex={seekSentenceIndex()}
+            onSeekHandled={() => setSeekSentenceIndex(null)}
+            onSentenceState={setSpeechState}
+          />
+        </div>
+      }
+      collapsedHeadSummary={
+        <span class="tag mode-tag card-head__control">assistant</span>
+      }
+      onDismiss={() => props.onDeleteTimelineItem(props.id)}
+    >
+      {body()}
+    </TimelineCollapsibleCard>
+  );
 }
 
 type TimelineDiffCardProps = {
-  files: Extract<TimelineItem, { type: 'diff' }>['files'];
+  item: Extract<TimelineItem, { type: 'diff' }>;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+};
+
+type TimelineDiffSummaryRowProps = {
+  summary: Extract<TimelineItem, { type: 'diff_summary' }>['summary'];
 };
 
 function diffLineClass(line: string): string {
@@ -191,43 +317,115 @@ function diffLineClass(line: string): string {
 }
 
 export function TimelineDiffCard(props: TimelineDiffCardProps) {
+  let cardEl: HTMLDivElement | undefined;
+
   const additions = () =>
-    props.files.reduce((sum, file) => sum + file.additions, 0);
+    props.item.files.reduce((sum, file) => sum + file.additions, 0);
 
   const deletions = () =>
-    props.files.reduce((sum, file) => sum + file.deletions, 0);
+    props.item.files.reduce((sum, file) => sum + file.deletions, 0);
+
+  const [openFiles, setOpenFiles] = createSignal(new Set<number>());
+
+  function toggleFile(index: number): void {
+    setOpenFiles((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+
+      return next;
+    });
+  }
+
+  const head = () => (
+    <>
+      <span class="tag mode-tag">diff</span>
+      <span class="diff-card__summary">
+        {props.item.files.length}{' '}
+        {props.item.files.length === 1 ? 'file' : 'files'}
+      </span>
+      <span class="diff-card__stat diff-card__stat--add">+{additions()}</span>
+      <span class="diff-card__stat diff-card__stat--del">-{deletions()}</span>
+    </>
+  );
 
   return (
-    <div class="card diff-card">
-      <div class="card-head diff-card__head">
-        <span class="tag mode-tag">patch</span>
-        <span class="diff-card__summary">
-          {props.files.length} {props.files.length === 1 ? 'file' : 'files'}
-        </span>
-        <span class="diff-card__stat diff-card__stat--add">+{additions()}</span>
-        <span class="diff-card__stat diff-card__stat--del">-{deletions()}</span>
-      </div>
-
-      <For each={props.files}>
-        {(file) => (
-          <details class="diff-file" open={props.files.length === 1}>
-            <summary class="diff-file__summary">
+    <TimelineCollapsibleCard
+      class="card diff-card"
+      ref={(el) => {
+        cardEl = el;
+      }}
+      expandedHeadClass="card-head--timeline-sticky"
+      expandedHead={
+        <div class="card-head-leading diff-card__head">
+          <button
+            type="button"
+            class="card-head__scroll-ledge"
+            tabIndex={-1}
+            title="Scroll to top"
+            aria-label="Scroll to top"
+            onClick={() =>
+              cardEl?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+            }
+          />
+          {head()}
+        </div>
+      }
+      collapsedHeadSummary={head()}
+      onDismiss={() => props.onDeleteTimelineItem(props.item.id)}
+    >
+      <For each={props.item.files}>
+        {(file, index) => (
+          <div class="diff-file">
+            <button
+              type="button"
+              class="diff-file__summary"
+              onClick={() => toggleFile(index())}
+              aria-expanded={openFiles().has(index())}
+            >
               <span class="diff-file__name">{file.file}</span>
               <span class="diff-file__meta">
                 {file.status ?? 'modified'} · +{file.additions} -
                 {file.deletions}
               </span>
-            </summary>
-            <pre class="diff-file__patch">
-              <For each={file.patch.split('\n')}>
-                {(line) => (
-                  <span class={diffLineClass(line)}>{line || ' '}</span>
-                )}
-              </For>
-            </pre>
-          </details>
+            </button>
+            <Show when={openFiles().has(index())}>
+              <pre class="diff-file__patch">
+                <For each={file.patch.split('\n')}>
+                  {(line, lineIndex) => (
+                    <span class={diffLineClass(line)}>
+                      <span class="diff-line__number">{lineIndex() + 1}</span>
+                      <span class="diff-line__text">{line || ' '}</span>
+                    </span>
+                  )}
+                </For>
+              </pre>
+            </Show>
+          </div>
         )}
       </For>
+    </TimelineCollapsibleCard>
+  );
+}
+
+function TimelineDiffSummaryRow(props: TimelineDiffSummaryRowProps) {
+  return (
+    <div class="timeline-info timeline-info--diff">
+      <span class="tag mode-tag">diff</span>
+      <span class="diff-card__summary">
+        {props.summary.fileCount}{' '}
+        {props.summary.fileCount === 1 ? 'file' : 'files'}
+      </span>
+      <span class="diff-card__stat diff-card__stat--add">
+        +{props.summary.additions}
+      </span>
+      <span class="diff-card__stat diff-card__stat--del">
+        -{props.summary.deletions}
+      </span>
     </div>
   );
 }

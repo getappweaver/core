@@ -5,12 +5,14 @@ import type { TimelineItem } from '../types';
 import type { ChatAdapters, ChatHook } from './types';
 
 export function useChat(adapters: ChatAdapters): ChatHook {
+  const STREAM_TEXT_FLUSH_MS = 80;
+
   const chatStreamAssistantByRequestId = new Map<string, string>();
   const pendingStreamTextByRequestId = new Map<string, string>();
-  const streamFlushFrameByRequestId = new Map<string, number>();
+  const streamFlushTimerByRequestId = new Map<string, number>();
 
   function flushStreamTextDelta(requestId: string): void {
-    streamFlushFrameByRequestId.delete(requestId);
+    streamFlushTimerByRequestId.delete(requestId);
 
     const deltaText = pendingStreamTextByRequestId.get(requestId);
     pendingStreamTextByRequestId.delete(requestId);
@@ -60,12 +62,16 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       (pendingStreamTextByRequestId.get(requestId) ?? '') + deltaText,
     );
 
-    if (streamFlushFrameByRequestId.has(requestId)) {
+    if (streamFlushTimerByRequestId.has(requestId)) {
       return;
     }
 
-    const frame = requestAnimationFrame(() => flushStreamTextDelta(requestId));
-    streamFlushFrameByRequestId.set(requestId, frame);
+    const timer = window.setTimeout(
+      () => flushStreamTextDelta(requestId),
+      STREAM_TEXT_FLUSH_MS,
+    );
+
+    streamFlushTimerByRequestId.set(requestId, timer);
   }
 
   function handleStreamDiff(files: TimelineFileDiff[]): void {
@@ -73,8 +79,12 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       ...prev,
       {
         id: adapters.createId(),
-        type: 'diff',
-        files,
+        type: 'diff_summary',
+        summary: {
+          fileCount: files.length,
+          additions: files.reduce((sum, file) => sum + file.additions, 0),
+          deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+        },
       } satisfies TimelineItem,
     ]);
   }
@@ -111,10 +121,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleChatResult(requestId: string, output: string): void {
-    const frame = streamFlushFrameByRequestId.get(requestId);
+    const timer = streamFlushTimerByRequestId.get(requestId);
 
-    if (frame !== undefined) {
-      cancelAnimationFrame(frame);
+    if (timer !== undefined) {
+      clearTimeout(timer);
       flushStreamTextDelta(requestId);
     }
 
@@ -149,11 +159,11 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function clearRequest(requestId: string): void {
-    const frame = streamFlushFrameByRequestId.get(requestId);
+    const timer = streamFlushTimerByRequestId.get(requestId);
 
-    if (frame !== undefined) {
-      cancelAnimationFrame(frame);
-      streamFlushFrameByRequestId.delete(requestId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      streamFlushTimerByRequestId.delete(requestId);
     }
 
     chatStreamAssistantByRequestId.delete(requestId);

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.2.0] - 2026-05-03
+
+- demo improvements, and other improvements (9462f16)
+
 ## [v9.1.0] - 2026-05-01
 
-- demo system (daa205d)
+- demo system (8bd4b3f)
 
 ## [v9.0.1] - 2026-04-16
 

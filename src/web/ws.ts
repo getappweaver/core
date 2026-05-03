@@ -7,7 +7,10 @@ import {
   listTimelineHistoryLatest,
   upsertTimelineCommandForm,
 } from '@src/timeline/db';
-import type { TimelinePayload } from '@src/timeline/types';
+import {
+  summarizeTimelineDiffFiles,
+  type TimelinePayload,
+} from '@src/timeline/types';
 
 import { runWebChat } from './chat';
 import {
@@ -478,7 +481,7 @@ async function handleChat(params: {
               insertTimelineEvent(ctx.seenDb, {
                 timelineId: message.timelineId,
                 source: 'web',
-                kind: 'diff',
+                kind: 'diff_summary',
                 role: null,
                 command: null,
                 subcommand: null,
@@ -488,7 +491,7 @@ async function handleChat(params: {
                 text: null,
                 web: null,
                 clientView: null,
-                diff: chunk.files,
+                diffSummary: summarizeTimelineDiffFiles(chunk.files),
                 prompt: null,
                 requestId: null,
               });

@@ -36,6 +36,7 @@ import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
+import { disposeOpencodeSdk } from './backends/opencode-sdk';
 import { startLocalCli } from './cli/local-cli';
 import { renderBotStatusText } from './commands/bot/status/renderers/text';
 import { createBotStatusRepresentation } from './commands/bot/status/representation';
@@ -120,6 +121,21 @@ async function main() {
   const seenDb = openCoreDb();
   const providerDb = asProviderDb(seenDb);
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
+
+  let shuttingDown = false;
+
+  function shutdown(exitCode: number): void {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    disposeOpencodeSdk();
+    process.exit(exitCode);
+  }
+
+  process.once('SIGINT', () => shutdown(130));
+  process.once('SIGTERM', () => shutdown(143));
 
   const parentOfBotRoot = join(dmBotRoot, '..');
 
@@ -469,5 +485,6 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
+  disposeOpencodeSdk();
   process.exit(1);
 });

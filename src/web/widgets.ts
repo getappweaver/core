@@ -60,6 +60,10 @@ export function promptAnswerAction(value: string): WebAction {
   };
 }
 
+function promptAnswerStoryTargetId(value: string): string {
+  return `prompt-answer-${value.replace(/[^a-zA-Z0-9_-]+/g, '_')}`;
+}
+
 export function multiChoiceQuestion(params: {
   command: string;
   subcommand: string;
@@ -87,6 +91,7 @@ export function multiChoiceQuestion(params: {
           props: {
             label: option.label,
             ...(option.tone ? { tone: option.tone } : {}),
+            storyTargetId: promptAnswerStoryTargetId(option.value),
             action: promptAnswerAction(option.value),
           },
         })),

@@ -1,3 +1,5 @@
+import type { TimelineFileDiff } from '@src/timeline/types';
+
 import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
@@ -24,6 +26,30 @@ function shouldRefreshComposerAiState(
       'root-model',
     ].includes(subcommand)
   );
+}
+
+function timelineDiffClientViewFiles(
+  payload: unknown,
+): TimelineFileDiff[] | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const files = (payload as { files?: unknown }).files;
+
+  if (!Array.isArray(files)) {
+    return null;
+  }
+
+  return files.filter((file): file is TimelineFileDiff => {
+    if (!file || typeof file !== 'object') {
+      return false;
+    }
+
+    const rec = file as Record<string, unknown>;
+
+    return typeof rec.file === 'string' && typeof rec.patch === 'string';
+  });
 }
 
 export function useCommands(adapters: CommandsAdapters): CommandsHook {
@@ -308,6 +334,26 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
         const output = splitCommandOutput(message.output);
+
+        const timelineDiffFiles =
+          output.clientView?.view === 'timeline-diff'
+            ? timelineDiffClientViewFiles(output.clientView.payload)
+            : null;
+
+        if (timelineDiffFiles !== null) {
+          adapters.setTimeline((prev) => [
+            ...prev,
+            {
+              id: adapters.createId(),
+              type: 'diff',
+              files: timelineDiffFiles,
+            },
+          ]);
+
+          dispatchRefreshOnce();
+
+          return;
+        }
 
         const shouldRenderInTimeline =
           commandAction.surface === 'timeline' &&

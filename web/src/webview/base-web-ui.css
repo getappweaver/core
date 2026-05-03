@@ -149,6 +149,20 @@ select {
   color: #fff;
 }
 
+.web-speech-clickable {
+  cursor: pointer;
+}
+
+::highlight(web-speech-active) {
+  background: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  color: var(--color-text);
+}
+
+::highlight(web-speech-hover) {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-text);
+}
+
 .web-stack {
   display: grid;
   gap: 0.5rem;

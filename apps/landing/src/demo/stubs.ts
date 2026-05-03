@@ -3,6 +3,8 @@ import {
   renderStoryStartWeb,
 } from '@src/commands/story/renderers/web';
 import type { StoryCommandOutput } from '@src/system/story-definition';
+import type { WebNodeRoot } from '@src/web/ui-schema';
+import { row, stack, textBlock } from '@src/web/widgets';
 import { createListRepresentation } from '@plugins/todo/commands/list/representation/builder';
 import { renderListWeb } from '@plugins/todo/commands/list/renderers/web';
 import type { CommandDetail, TimelineItem } from '@web/src/types';
@@ -123,6 +125,7 @@ type DemoStoryEntry = {
   pluginName: string;
   sourceType: 'command' | 'ai';
   sourceName: string;
+  iconUrl?: string;
   story: {
     id: string;
     title: string;
@@ -412,8 +415,53 @@ function buildRegisteredStories(stories: DemoStoryEntry[]) {
     id: entry.story.id,
     pluginAlias: entry.pluginAlias,
     pluginName: entry.pluginName,
+    iconUrl: entry.iconUrl,
     story: entry.story,
   }));
+}
+
+function renderDemoCommandFallbackWeb(params: {
+  command: string | null;
+  subcommand: string | null;
+}): WebNodeRoot {
+  const invocation =
+    params.command && params.subcommand
+      ? `/${params.command} ${params.subcommand}`
+      : 'that command';
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'demo', subcommand: 'fallback' },
+    tree: stack(
+      [
+        textBlock(
+          `Demo mode does not execute ${invocation}. Try a guided story instead.`,
+          'muted',
+        ),
+        row([
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: 'Show demo stories',
+              storyTargetId: 'header-widget:story:list',
+              action: {
+                type: 'command',
+                command: 'story',
+                subcommand: 'list',
+                arguments: {},
+                options: {},
+                recordInTimeline: true,
+                surface: 'timeline',
+              },
+            },
+          },
+        ]),
+      ],
+      'md',
+    ),
+  };
 }
 
 class DemoWebSocket extends EventTarget {
@@ -442,6 +490,11 @@ class DemoWebSocket extends EventTarget {
     const type = message.type;
 
     if (type === 'authenticate') {
+      this.emit({ type: 'done', requestId });
+      return;
+    }
+
+    if (type === 'delete_timeline_event') {
       this.emit({ type: 'done', requestId });
       return;
     }
@@ -584,6 +637,10 @@ class DemoWebSocket extends EventTarget {
               (entry) => entry.id === storyId,
             );
 
+            if (story) {
+              setDemoSelectedStoryId(story.id, 0);
+            }
+
             return story
               ? renderStoryStartWeb(story, {
                   walkthrough: demoStoryPlaybackMode === 'interactive',
@@ -594,7 +651,10 @@ class DemoWebSocket extends EventTarget {
 
           return matchingStory
             ? buildStoryCommandOutput(matchingStory)
-            : 'Demo mode: command execution is not wired yet.';
+            : renderDemoCommandFallbackWeb({
+                command: commandName,
+                subcommand: subcommandName,
+              });
         })();
 
         this.emit({

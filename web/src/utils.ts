@@ -499,6 +499,30 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+export async function postBlob(url: string, body: unknown): Promise<Blob> {
+  const authHeaders = await buildAuthHeaders(url, 'POST');
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const contentType = res.headers.get('Content-Type') ?? '';
+
+    if (contentType.includes('application/json')) {
+      const data = await parseResponseBodyAsJson<{ error?: string }>(res);
+
+      throw new Error(data.error ?? `Request failed: ${res.status}`);
+    }
+
+    throw new Error(`Request failed: ${res.status}`);
+  }
+
+  return res.blob();
+}
+
 export async function deleteJson<T>(url: string, body: unknown): Promise<T> {
   const authHeaders = await buildAuthHeaders(url, 'DELETE');
 

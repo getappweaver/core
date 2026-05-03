@@ -723,12 +723,69 @@ pre {
 }
 
 .chat-card.assistant {
+  background: #1e1e1e;
   justify-self: start;
+  padding: 0.75rem;
+  width: min(48rem, 100%);
+}
+
+.chat-card-head {
+  margin: -0.75rem -0.75rem 0.35rem;
+}
+
+.chat-card-body {
+  padding: 0;
+}
+
+.card-head-speech-btn--manual {
+  background: var(--color-accent);
+  color: #000;
+}
+
+.tag-button.card-head-speech-btn--manual:hover,
+.tag-button.card-head-speech-btn--manual:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 82%, #000);
+  color: #000;
+}
+
+.tag-button.card-head-speech-btn--manual:active {
+  background: color-mix(in srgb, var(--color-accent) 70%, #000);
+  color: #000;
+}
+
+.chat-md__code--speech-clickable {
+  cursor: pointer;
+}
+
+::highlight(chat-speech-active) {
+  background: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  color: var(--color-text);
+}
+
+::highlight(chat-speech-hover) {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-text);
 }
 
 .diff-card {
   background: #141414;
   border-left: 3px solid var(--color-warning);
+}
+
+.timeline-info {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-panel) 82%, #000);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.3rem 0.65rem;
+}
+
+.timeline-info--diff {
+  border-color: color-mix(in srgb, var(--color-warning) 48%, var(--color-border));
 }
 
 .diff-card__head {
@@ -753,20 +810,31 @@ pre {
 
 .diff-file {
   border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, #fff);
-  padding-top: 0.45rem;
-}
-
-.diff-file + .diff-file {
-  margin-top: 0.55rem;
 }
 
 .diff-file__summary {
-  cursor: pointer;
+  position: sticky;
+  /* sits flush under the card-head--timeline-sticky strip */
+  top: 2.55rem;
+  z-index: calc(var(--z-chrome-sticky) - 1);
+  width: 100%;
   display: flex;
   gap: 0.5rem;
   align-items: baseline;
   justify-content: space-between;
   font-family: monospace;
+  font-size: inherit;
+  text-align: left;
+  background: color-mix(in srgb, #141414 95%, #fff);
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, #fff);
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.diff-file__summary:hover {
+  background: color-mix(in srgb, #141414 80%, #fff);
 }
 
 .diff-file__name {
@@ -780,17 +848,41 @@ pre {
 }
 
 .diff-file__patch {
+  display: table;
+  width: 100%;
   margin: 0.5rem 0 0;
-  overflow-x: auto;
-  white-space: pre;
+  overflow-x: hidden;
+  white-space: normal;
   color: var(--color-text);
   background: #0d1117;
-  padding: 0.45rem;
+  padding: 0.45rem 0;
 }
 
 .diff-line {
-  display: block;
-  min-width: max-content;
+  display: table-row;
+}
+
+.diff-line__number {
+  display: table-cell;
+  width: 1%;
+  padding: 0 0.5rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.24);
+  color: #8b949e;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.diff-line__text {
+  display: table-cell;
+  width: auto;
+  min-width: 0;
+  padding: 0 0.55rem;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  white-space: pre-wrap;
 }
 
 .diff-line--add {
