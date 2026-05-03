@@ -36,7 +36,7 @@ import {
   listWebPushSubscriptions,
   upsertWebPushSubscription,
 } from './push-subscriptions';
-import { serveWebDistGet } from './web-dist';
+import { isWebDistUsable, serveWebDistGet } from './web-dist';
 
 export type WebRouteContext = {
   prefix: string;
@@ -424,17 +424,15 @@ export function createWebFetchHandler(
         return fromDist;
       }
 
-      const indexInDist = join(ctx.dmBotRoot, 'web', 'dist', 'index.html');
-
       if (
         !loggedMissingWebDist &&
-        !existsSync(indexInDist) &&
+        !isWebDistUsable(ctx.dmBotRoot) &&
         (path === '/' || path === '/index.html')
       ) {
         loggedMissingWebDist = true;
 
         log.warn(
-          'web/dist is missing; run `bun run web:build` for the Solid PWA. Serving legacy /shell HTML at / until then.',
+          'web/dist is missing or incomplete; run `bun run web:build` for the Solid PWA. Serving legacy /shell HTML at / until then.',
         );
       }
 

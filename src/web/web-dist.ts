@@ -2,7 +2,7 @@
 // web-dist.ts — Serve Vite production build (PWA / SPA) from web/dist
 // ---------------------------------------------------------------------------
 
-import { existsSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { join, resolve, sep } from 'path';
 
 function isPathInside(parent: string, child: string): boolean {
@@ -68,15 +68,32 @@ type ServeWebDistGetProps = {
   pathname: string;
 };
 
+export function isWebDistUsable(dmBotRoot: string): boolean {
+  const webDist = resolve(join(dmBotRoot, 'web', 'dist'));
+  const indexHtml = join(webDist, 'index.html');
+
+  if (!existsSync(indexHtml)) {
+    return false;
+  }
+
+  const html = readFileSync(indexHtml, 'utf-8');
+
+  const assetRefs = Array.from(
+    html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g),
+    (match) => match[1],
+  );
+
+  return assetRefs.every((ref) => existsSync(join(webDist, ref.slice(1))));
+}
+
 /**
  * Serve a GET from `web/dist` or SPA index.html. Returns null if dist is missing
  * or nothing matches (caller should 404).
  */
 export function serveWebDistGet(props: ServeWebDistGetProps): Response | null {
   const webDist = resolve(join(props.dmBotRoot, 'web', 'dist'));
-  const indexHtml = join(webDist, 'index.html');
 
-  if (!existsSync(indexHtml)) {
+  if (!isWebDistUsable(props.dmBotRoot)) {
     return null;
   }
 
