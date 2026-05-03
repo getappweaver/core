@@ -39,6 +39,8 @@ export function openCoreDb(): CoreDb {
     "UPDATE sessions SET backend = 'opencode' WHERE backend = 'opencode-sdk'",
   );
 
+  db.run('CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT)');
+
   db.run(
     "UPDATE state SET value = 'cursor' WHERE key = 'agent_backend' AND value = 'cursor-sdk'",
   );
@@ -57,8 +59,6 @@ export function openCoreDb(): CoreDb {
       FOREIGN KEY (session_id) REFERENCES sessions(id)
     )
   `);
-
-  db.run('CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT)');
 
   db.run(`
     CREATE TABLE IF NOT EXISTS spend_log (

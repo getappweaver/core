@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.2.1] - 2026-05-03
+
+- fix state table not exist error (7b7505c)
+
 ## [v9.2.0] - 2026-05-03
 
-- demo improvements, and other improvements (9462f16)
+- demo improvements, and other improvements (af40292)
 
 ## [v9.1.0] - 2026-05-01
 
