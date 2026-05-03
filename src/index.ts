@@ -30,7 +30,6 @@
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 
-import { spawnSync } from 'bun';
 import { SimplePool } from 'nostr-tools/pool';
 import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
@@ -182,10 +181,7 @@ async function main() {
     config,
   });
 
-  const pwdOutput =
-    spawnSync(['pwd'], { stdout: 'pipe', stderr: 'pipe' })
-      .stdout.toString()
-      .trim() ?? '(failed)';
+  const pwdOutput = process.cwd();
 
   debug('PWD:', pwdOutput);
 
