@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.2.4] - 2026-05-03
+
+- bun run start should start the UI too (251395d)
+
 ## [v9.2.3] - 2026-05-03
 
-- trying bun run start, 5551 asset 404 error fix (8408b51)
+- trying bun run start, 5551 asset 404 error fix (804797d)
 
 ## [v9.2.2] - 2026-05-03
 

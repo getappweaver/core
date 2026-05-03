@@ -1,13 +1,13 @@
 {
   "name": "appweaver",
-  "version": "9.2.3",
+  "version": "9.2.4",
   "description": "Open-source AI-first platform for installable apps, automation, and bot workflows.",
   "type": "module",
   "workspaces": [
     "apps/*"
   ],
   "scripts": {
-    "start": "bun run src/index.ts",
+    "start": "bun run scripts/run-start.ts",
     "watch": "bun run scripts/run-with-restart.ts",
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
