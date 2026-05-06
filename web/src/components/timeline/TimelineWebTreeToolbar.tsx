@@ -1,10 +1,11 @@
 import type { Accessor, JSX } from 'solid-js';
-import { Show, createMemo, createSignal } from 'solid-js';
+import { For, Show, createMemo, createSignal } from 'solid-js';
 
 import { WebButton } from '../WebButton';
 import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
 
 import {
+  cardHeadAddIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
   cardHeadTreeFilterIcon,
@@ -100,32 +101,48 @@ export function TimelineWebTreeToolbar(
               </Show>
             </div>
           </Show>
-          <WebButton
-            type="button"
-            class={btnClass()}
-            data-ui="tree-collapse-all"
-            title="Collapse all"
-            aria-label="Collapse all tree branches"
-            onClick={() => {
-              reg.collapseAll();
-              props.onScrollToTop();
-            }}
-          >
-            {cardHeadTreeCollapseAllIcon()}
-          </WebButton>
-          <WebButton
-            type="button"
-            class={btnClass()}
-            data-ui="tree-expand-all"
-            title="Expand all"
-            aria-label="Expand all tree branches"
-            onClick={() => {
-              reg.expandAll();
-              props.onScrollToTop();
-            }}
-          >
-            {cardHeadTreeExpandAllIcon()}
-          </WebButton>
+          <For each={reg.actions ?? []}>
+            {(item) => (
+              <WebButton
+                type="button"
+                class={btnClass()}
+                data-ui={`toolbar-${item.icon ?? 'action'}`}
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => reg.runAction(item.action)}
+              >
+                {item.icon === 'add' ? cardHeadAddIcon() : item.label}
+              </WebButton>
+            )}
+          </For>
+          <Show when={reg.showTreeControls}>
+            <WebButton
+              type="button"
+              class={btnClass()}
+              data-ui="tree-collapse-all"
+              title="Collapse all"
+              aria-label="Collapse all tree branches"
+              onClick={() => {
+                reg.collapseAll();
+                props.onScrollToTop();
+              }}
+            >
+              {cardHeadTreeCollapseAllIcon()}
+            </WebButton>
+            <WebButton
+              type="button"
+              class={btnClass()}
+              data-ui="tree-expand-all"
+              title="Expand all"
+              aria-label="Expand all tree branches"
+              onClick={() => {
+                reg.expandAll();
+                props.onScrollToTop();
+              }}
+            >
+              {cardHeadTreeExpandAllIcon()}
+            </WebButton>
+          </Show>
           <Show when={reg.showRefresh}>
             <WebButton
               type="button"

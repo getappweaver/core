@@ -545,7 +545,12 @@ export type WebTreeToolbarRegistration = {
   filterValue: Accessor<string>;
   filterPlaceholder: string;
   setFilterValue: (value: string) => void;
+  showTreeControls: boolean;
   showRefresh: boolean;
+  actions: NonNullable<WebElementNode['props']>['toolbarActions'];
+  runAction: (
+    action: NonNullable<NonNullable<WebElementNode['props']>['action']>,
+  ) => void;
   collapseAll: () => void;
   expandAll: () => void;
   refresh: () => void;
@@ -1189,6 +1194,16 @@ function WebTreeItemElement(props: WebTreeItemProps) {
     }
   }
 
+  function handleSummaryClick(event: MouseEvent): void {
+    const selector = props.element.props?.toggleSelector;
+
+    if (selector && !(event.target as Element | null)?.closest(selector)) {
+      return;
+    }
+
+    toggleExpanded();
+  }
+
   createEffect(() => {
     const bulk = bulkExpand?.();
 
@@ -1210,7 +1225,7 @@ function WebTreeItemElement(props: WebTreeItemProps) {
       >
         <div
           class="web-tree-item-summary"
-          onClick={toggleExpanded}
+          onClick={handleSummaryClick}
           style={{
             cursor:
               hasChildren() && activeFilter().length === 0
@@ -1393,6 +1408,7 @@ function WebTreeElement(props: WebTreeElementProps) {
   const renderSurface = useContext(WebRenderSurfaceContext);
   const registerHoistedToolbar = useContext(WebTreeToolbarRegisterContext);
   const reportTreeHeaderEl = useContext(WebTreeHeaderElCallbackContext);
+  const revealContext = useContext(WebRevealContext);
 
   const [bulk, setBulk] = createSignal<TreeBulkExpandState>({
     epoch: 0,
@@ -1506,7 +1522,27 @@ function WebTreeElement(props: WebTreeElementProps) {
       filterValue: filterInput,
       filterPlaceholder: props.element.props?.filterPlaceholder ?? 'Filter',
       setFilterValue: setTreeFilterValue,
+      showTreeControls: childTreeItems(props.element).length > 0,
       showRefresh: meta != null,
+      actions: props.element.props?.toolbarActions,
+      runAction: (action) => {
+        if (action.type === 'reveal') {
+          revealContext?.reveal(action.targetId);
+
+          return;
+        }
+
+        if (action.type === 'hideReveal') {
+          revealContext?.hideReveal(action.targetId);
+
+          return;
+        }
+
+        props.onRunAction?.(action, {
+          onReplaceRoot: props.onReplaceRoot,
+          promptRequestId: props.promptRequestId,
+        });
+      },
       collapseAll: () =>
         setBulk((prev) => ({
           epoch: prev.epoch + 1,
@@ -1749,9 +1785,34 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
       return;
     }
 
+    if (action.type === 'clientAction') {
+      const mergedPayload: Record<string, unknown> = {
+        ...(action.payload ?? {}),
+      };
+
+      for (const [key, value] of fd.entries()) {
+        if (typeof value === 'string') {
+          mergedPayload[key] = value;
+        }
+      }
+
+      props.onRunAction?.(
+        {
+          ...action,
+          payload: mergedPayload,
+        },
+        {
+          onReplaceRoot: props.onReplaceRoot,
+          promptRequestId: props.promptRequestId,
+        },
+      );
+
+      return;
+    }
+
     if (action.type !== 'command') {
       props.onError?.(
-        'Form action must be a command or prompt_answer WebAction.',
+        'Form action must be a command, clientAction, or prompt_answer WebAction.',
       );
 
       return;
@@ -1982,6 +2043,117 @@ function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   );
 }
 
+function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
+  const getBusy = useContext(WebShadowUiBusyContext);
+  const name = props.element.props?.formFieldName;
+  let selectEl: HTMLSelectElement | undefined;
+
+  createEffect(() => {
+    const targetId = props.element.props?.storyTargetId;
+
+    if (!targetId || !selectEl) {
+      return;
+    }
+
+    registerStoryDomTarget(targetId, selectEl);
+    onCleanup(() => registerStoryDomTarget(targetId, null));
+  });
+
+  createEffect(() => {
+    if (props.element.props?.autoFocus !== true || selectEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      selectEl?.focus({ preventScroll: true });
+    });
+  });
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <select
+        ref={(el) => {
+          selectEl = el;
+        }}
+        class="web-select__input"
+        name={name}
+        disabled={props.element.props?.disabled === true || getBusy() === true}
+        value={
+          props.element.props?.value ?? props.element.props?.choices?.[0] ?? ''
+        }
+      >
+        <For each={props.element.props?.choices ?? []}>
+          {(choice) => <option value={choice}>{choice}</option>}
+        </For>
+      </select>
+    </div>
+  );
+}
+
+function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
+  const choices = () => props.element.props?.choices ?? [];
+  const customChoice = () => props.element.props?.customChoice ?? 'custom';
+
+  const [selected, setSelected] = createSignal(
+    props.element.props?.value ?? choices()[0] ?? '',
+  );
+
+  const name = props.element.props?.formFieldName;
+  let customInputEl: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    if (selected() !== customChoice() || customInputEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => customInputEl?.focus({ preventScroll: true }));
+  });
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <Show when={selected() !== customChoice()}>
+        <input type="hidden" name={name} value={selected()} />
+      </Show>
+      <div class="web-choiceField__choices">
+        <For each={choices()}>
+          {(choice) => (
+            <WebButton
+              type="button"
+              class="web-choiceField__choice"
+              classList={{ 'is-selected': selected() === choice }}
+              onClick={() => setSelected(choice)}
+            >
+              {choice}
+            </WebButton>
+          )}
+        </For>
+      </div>
+      <Show when={selected() === customChoice()}>
+        <input
+          ref={(el) => {
+            customInputEl = el;
+          }}
+          class="web-choiceField__custom-input"
+          name={name}
+          type="number"
+          min="1"
+          inputMode="numeric"
+          placeholder={props.element.props?.inputPlaceholder ?? 'Amount'}
+          autocomplete="off"
+        />
+      </Show>
+    </div>
+  );
+}
+
 export function WebNodeRenderer(props: WebNodeRendererProps) {
   const getBusy = useContext(WebShadowUiBusyContext);
   const revealContext = useContext(WebRevealContext);
@@ -2132,17 +2304,35 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
               </Match>
 
               <Match when={element.tag === 'checkbox'}>
-                <WebCheckboxControl
-                  className={elementClass(element)}
-                  style={elementStyle(element)}
-                  checked={Boolean(element.props?.checked)}
-                  indeterminate={element.props?.indeterminate === true}
-                  disabled={
-                    element.props?.disabled ??
-                    (element.props?.action ? false : true)
+                <Show
+                  when={element.props?.formFieldName}
+                  fallback={
+                    <WebCheckboxControl
+                      className={elementClass(element)}
+                      style={elementStyle(element)}
+                      checked={Boolean(element.props?.checked)}
+                      indeterminate={element.props?.indeterminate === true}
+                      disabled={
+                        element.props?.disabled ??
+                        (element.props?.action ? false : true)
+                      }
+                      onChange={() => runAction(element.props?.action)}
+                    />
                   }
-                  onChange={() => runAction(element.props?.action)}
-                />
+                >
+                  {(name) => (
+                    <input
+                      class={elementClass(element)}
+                      data-ui={elementUi(element)}
+                      style={elementStyle(element)}
+                      type="checkbox"
+                      name={name()}
+                      value="true"
+                      checked={element.props?.checked === true}
+                      disabled={element.props?.disabled === true}
+                    />
+                  )}
+                </Show>
               </Match>
 
               <Match when={element.tag === 'overflowMenu'}>
@@ -2216,6 +2406,14 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
 
               <Match when={element.tag === 'textField'}>
                 <WebTextFieldNode element={element} />
+              </Match>
+
+              <Match when={element.tag === 'select'}>
+                <WebSelectNode element={element} />
+              </Match>
+
+              <Match when={element.tag === 'choiceField'}>
+                <WebChoiceFieldNode element={element} />
               </Match>
 
               <Match when={element.tag === 'textArea'}>

@@ -14,5 +14,6 @@ TOOLS.md
 .logs/
 .piper-test/
 apps/landing/dist/
+web/dist/
 web/public/plugin-icons/
 web/public/builtin-icons/

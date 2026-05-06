@@ -702,6 +702,7 @@ function AppInner(): JSX.Element {
     setTimeline,
     setComposerAiState,
     appendSystemMessage,
+    signEvent: auth.signEvent,
     createId,
     requestComposerAiState,
     beginWebUiBusy,

@@ -119,10 +119,10 @@ async function main() {
 
   const relays = await getOrSetEnvVar(ENV_PATH, 'BOT_RELAYS', async () => {
     const raw = await question(
-      'DM/Inbox Relays (comma-separated).\nCheck https://marcodpt.github.io/nostracker/relays/index.html for NIP17 and NIP42 supported relays.\nEnter your relays (leave empty for default wss://auth.nostr1.com,wss://relay.netstr.io): ',
+      'DM/Inbox Relays (comma-separated).\nCheck https://marcodpt.github.io/nostracker/relays/index.html for NIP17 and NIP42 supported relays.\nEnter your relays (leave empty for default wss://relay.primal.net,wss://relay.damus.io): ',
     );
 
-    return raw.trim() || 'wss://auth.nostr1.com,wss://relay.netstr.io';
+    return raw.trim() || 'wss://relay.primal.net,wss://relay.damus.io';
   });
 
   const relayList = relays

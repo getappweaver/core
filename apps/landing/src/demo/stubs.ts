@@ -420,14 +420,59 @@ function buildRegisteredStories(stories: DemoStoryEntry[]) {
   }));
 }
 
-function renderDemoCommandFallbackWeb(params: {
+type FindRelatedDemoStoriesProps = {
+  stories: DemoStoryEntry[];
   command: string | null;
   subcommand: string | null;
-}): WebNodeRoot {
+};
+
+function findRelatedDemoStories({
+  stories,
+  command,
+  subcommand,
+}: FindRelatedDemoStoriesProps): DemoStoryEntry[] {
+  if (!command || !subcommand) {
+    return [];
+  }
+
+  const exactMatches = stories.filter(
+    (entry) =>
+      entry.sourceType === 'command' &&
+      entry.pluginAlias === command &&
+      entry.sourceName === subcommand,
+  );
+
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  return stories.filter((entry) => entry.pluginAlias === command);
+}
+
+type RenderDemoCommandFallbackWebProps = {
+  stories: DemoStoryEntry[];
+  command: string | null;
+  subcommand: string | null;
+};
+
+function renderDemoCommandFallbackWeb({
+  stories,
+  command,
+  subcommand,
+}: RenderDemoCommandFallbackWebProps): WebNodeRoot {
   const invocation =
-    params.command && params.subcommand
-      ? `/${params.command} ${params.subcommand}`
+    command && subcommand
+      ? `/${command} ${subcommand}`
       : 'that command';
+  const relatedStories = findRelatedDemoStories({
+    stories,
+    command,
+    subcommand,
+  });
+
+  if (relatedStories.length > 0) {
+    return renderStoryListWeb(buildRegisteredStories(relatedStories));
+  }
 
   return {
     kind: 'ui',
@@ -652,6 +697,7 @@ class DemoWebSocket extends EventTarget {
           return matchingStory
             ? buildStoryCommandOutput(matchingStory)
             : renderDemoCommandFallbackWeb({
+                stories,
                 command: commandName,
                 subcommand: subcommandName,
               });

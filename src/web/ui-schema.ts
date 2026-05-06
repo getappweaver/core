@@ -90,12 +90,24 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     modalTitle: z.string().min(1).optional(),
   }),
   z.object({
+    /** Browser-side action handled by the web app; payload is client-specific JSON. */
+    type: z.literal('clientAction'),
+    action: z.string().min(1),
+    payload: z.record(z.string(), z.unknown()).optional().default({}),
+  }),
+  z.object({
     type: z.literal('prompt_answer'),
     value: z.string(),
     /** Optional form field whose value is appended to `value` with a space. */
     valueFromField: z.string().min(1).optional(),
   }),
 ]);
+
+export const WebToolbarActionSchema = z.object({
+  label: z.string().min(1),
+  icon: z.enum(['add']).optional(),
+  action: WebActionSchema,
+});
 
 export const WebWhiteSpaceSchema = z.enum(['pre-wrap']);
 
@@ -137,6 +149,8 @@ export const WebPropsSchema = z.object({
   filterName: z.string().optional(),
   /** Stable path/key for structured filtering/glob matching. */
   filterPath: z.string().optional(),
+  /** `treeItem`: when set, only clicks matching this selector toggle the item. */
+  toggleSelector: z.string().min(1).optional(),
   /** Cache key for a client-built filter index. */
   filterIndexKey: z.string().optional(),
   /** Placeholder for built-in filter inputs. */
@@ -155,6 +169,8 @@ export const WebPropsSchema = z.object({
   lazyLoaded: z.boolean().optional(),
   /** `treeItem`: loading label shown while `lazyLoadAction` is running. */
   lazyLoadingLabel: z.string().optional(),
+  /** Extra actions hoisted into timeline card header toolbar for root tree UIs. */
+  toolbarActions: z.array(WebToolbarActionSchema).optional(),
   /** Hide this node until `{ type: "reveal", targetId }`; `{ type: "hideReveal", targetId }` collapses again. */
   revealId: z.string().min(1).optional(),
   hiddenUntilRevealed: z.literal(true).optional(),
@@ -164,6 +180,12 @@ export const WebPropsSchema = z.object({
   formFieldName: z.string().min(1).optional(),
   /** `textField`: placeholder; display-only, not a command option hint. */
   inputPlaceholder: z.string().optional(),
+  /** `select`: allowed option values. */
+  choices: z.array(z.string()).optional(),
+  /** `select`: initially selected option value. */
+  value: z.string().optional(),
+  /** `choiceField`: option value that opens a freeform numeric/text input. */
+  customChoice: z.string().optional(),
   /** `textArea`: maximum auto-grown visible rows before internal scrolling. */
   maxRows: z.number().int().positive().optional(),
   /** `textField`: focus the input when it is mounted. */
@@ -202,6 +224,10 @@ export const WebElementTagSchema = z.enum([
   'treeItem',
   /** One-line text input; use `formFieldName` with parent `form`. */
   'textField',
+  /** Dropdown/select input; use `formFieldName` with parent `form`. */
+  'select',
+  /** Segmented choice input; use `formFieldName` with parent `form`. */
+  'choiceField',
   /** Multi-line text input with auto-growing height; use `formFieldName` with parent `form`. */
   'textArea',
   /**

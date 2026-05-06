@@ -114,6 +114,11 @@ export type NostrAuthContextValue = {
   disconnect: () => void;
   logout: () => void;
   unlockNip49: (password: string) => Promise<void>;
+  signEvent: (
+    event: EventTemplate,
+  ) => Promise<
+    (EventTemplate & { id: string; sig: string; pubkey: string }) | null
+  >;
   getNip98Token: (url: string, method: string) => Promise<string | null>;
 };
 
@@ -326,6 +331,47 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     return btoa(JSON.stringify(signed));
   }
 
+  async function signEvent(
+    event: EventTemplate,
+  ): Promise<
+    (EventTemplate & { id: string; sig: string; pubkey: string }) | null
+  > {
+    const state = authState();
+
+    if (state.status === 'disconnected' || state.status === 'locked') {
+      return null;
+    }
+
+    if (state.method === 'nip07') {
+      if (!window.nostr) {
+        const ready = await waitForNostrExtension({ maxMs: 5000 });
+
+        if (!ready) {
+          return null;
+        }
+      }
+
+      return window.nostr!.signEvent(event);
+    }
+
+    if (state.method === 'nip55') {
+      return signEventWithNip55(event);
+    }
+
+    if (state.method === 'nip49') {
+      lockNip49IfExpired();
+      const after = authState();
+
+      if (after.status !== 'connected' || after.method !== 'nip49') {
+        return null;
+      }
+
+      return finalizeEvent(event, after.secretKey);
+    }
+
+    return bunkerSignEvent(state.bunkerData, event);
+  }
+
   function connect(args: ConnectArgs): void {
     clearNip49ExpiryTimer();
     zeroizeCurrentNip49IfAny();
@@ -423,6 +469,7 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     disconnect,
     logout,
     unlockNip49,
+    signEvent,
     getNip98Token,
   };
 

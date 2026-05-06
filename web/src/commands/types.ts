@@ -1,3 +1,4 @@
+import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import type { Accessor, Setter } from 'solid-js';
 
 import type {
@@ -73,6 +74,7 @@ export type CommandsAdapters = {
   setTimeline: Setter<TimelineItem[]>;
   setComposerAiState: Setter<ComposerAiState | null>;
   appendSystemMessage: (text: string) => void;
+  signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
   createId: () => string;
   requestComposerAiState: () => void;
   beginWebUiBusy: (sourceId: string) => void;

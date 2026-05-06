@@ -517,6 +517,7 @@ select {
 }
 
 .web-textField .web-textField__input,
+.web-select .web-select__input,
 .web-textArea .web-textArea__input {
   width: 100%;
   border: none;
@@ -532,6 +533,10 @@ select {
   line-height: 1.35;
 }
 
+.web-select .web-select__input {
+  appearance: auto;
+}
+
 .web-textField .web-textField__input::placeholder,
 .web-textArea .web-textArea__input::placeholder {
   color: #8f8f00;
@@ -539,6 +544,7 @@ select {
 }
 
 .web-textField .web-textField__input:focus,
+.web-select .web-select__input:focus,
 .web-textArea .web-textArea__input:focus {
   background: var(--color-warning);
   color: #000;
@@ -550,6 +556,42 @@ select {
 }
 
 .web-textField .web-textField__input:disabled,
+.web-select .web-select__input:disabled,
 .web-textArea .web-textArea__input:disabled {
   opacity: 0.55;
+}
+
+.web-choiceField {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.web-choiceField__choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.web-choiceField__choice {
+  padding: 0.3rem 0.55rem;
+  border-radius: 0;
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
+  background: transparent;
+}
+
+.web-choiceField__choice.is-selected {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #000;
+}
+
+.web-choiceField__custom-input {
+  width: 100%;
+  border: none;
+  background: #000;
+  color: var(--color-warning);
+  padding: 0.5rem 0.55rem;
+  outline: 0;
 }

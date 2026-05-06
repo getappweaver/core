@@ -7,6 +7,8 @@ import type { CommandDefinition } from '@src/system/command-definition';
 import { getAiCommandDefinition } from './ai/definition';
 import { getBotCommandDefinition } from './bot/definition';
 import { getBunkerCommandDefinition } from './bunker/definition';
+import { getPluginsCommandDefinition } from './plugin-manager/definition';
+import { getRoadmapCommandDefinition } from './roadmap/definition';
 import { getSessionCommandDefinition } from './session/definition';
 import { getStoryCommandDefinition } from './story/definition';
 import { getWalletCommandDefinition } from './wallet/definition';
@@ -17,6 +19,8 @@ export const BUILTIN_ROOT_NAMES = [
   'session',
   'story',
   'bot',
+  'plugins',
+  'roadmap',
   'ai',
   'wallet',
   'bunker',
@@ -88,6 +92,10 @@ export function getBuiltinCommandDefinition({
       return getStoryCommandDefinition({ prefix });
     case 'bot':
       return getBotCommandDefinition({ prefix });
+    case 'plugins':
+      return getPluginsCommandDefinition({ prefix });
+    case 'roadmap':
+      return getRoadmapCommandDefinition({ prefix });
     case 'ai':
       return getAiCommandDefinition({ prefix });
     case 'wallet':
@@ -114,6 +122,8 @@ export function getBuiltinDefinitionsMap({
     session: getSessionCommandDefinition({ prefix }),
     story: getStoryCommandDefinition({ prefix }),
     bot: getBotCommandDefinition({ prefix }),
+    plugins: getPluginsCommandDefinition({ prefix }),
+    roadmap: getRoadmapCommandDefinition({ prefix }),
     ai: getAiCommandDefinition({ prefix }),
     wallet: getWalletCommandDefinition({ prefix }),
     bunker: getBunkerCommandDefinition({ prefix }),

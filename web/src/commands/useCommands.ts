@@ -1,5 +1,6 @@
 import type { TimelineFileDiff } from '@src/timeline/types';
 
+import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
 import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
@@ -188,6 +189,25 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       return;
     }
 
+    if (action.type === 'clientAction') {
+      void handleRoadmapLightningZap({
+        action,
+        signEvent: adapters.signEvent,
+        setChromeWeb: adapters.setChromeWeb,
+        setChromeText: adapters.setChromeText,
+        setChromeError: adapters.setChromeError,
+        setChromeLoading: adapters.setChromeLoading,
+      }).then((handled) => {
+        if (!handled) {
+          adapters.appendSystemMessage(
+            `Unknown client action: ${action.action}`,
+          );
+        }
+      });
+
+      return;
+    }
+
     if (action.type !== 'command') {
       return;
     }
@@ -209,10 +229,20 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     if (commandAction.surface === 'modal') {
-      openChromeWidget({
+      adapters.setChromeModal({
         command: commandAction.command,
         subcommand: commandAction.subcommand,
         title: commandAction.modalTitle ?? 'Command Output',
+      });
+
+      requestChromeCommand({
+        command: commandAction.command,
+        subcommand: commandAction.subcommand,
+        title: commandAction.modalTitle ?? 'Command Output',
+        payload: {
+          arguments: commandAction.arguments ?? {},
+          options: commandAction.options ?? {},
+        },
       });
 
       return;
