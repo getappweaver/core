@@ -1,4 +1,29 @@
 {
+  "headers": [
+    {
+      "source": "/.well-known/nostr.json",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/.well-known/nostr.json",
+      "destination": "/api/nostr-json"
+    }
+  ],
   "redirects": [
     {
       "source": "/demo",
