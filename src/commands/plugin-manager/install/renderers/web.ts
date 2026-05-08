@@ -1,5 +1,5 @@
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
-import { stack, textBlock, textNode } from '@src/web/widgets';
+import { textBlock, textNode } from '@src/web/widgets';
 
 import type {
   PluginCatalogEntry,
@@ -117,27 +117,26 @@ export function renderPluginsInstallWeb(
     version: 1,
     meta: { command: 'plugins', subcommand: 'install' },
     tree: {
-      ...stack(
-        [
-          {
-            type: 'element',
-            tag: 'text',
-            props: { weight: 'bold' },
-            children: [textNode('Plugin Catalog')],
-          },
-          textBlock(
-            `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreMajor}.`,
-            'muted',
-          ),
-          ...(representation.entries.length === 0
-            ? [textBlock('No plugins found on the queried relays.', 'muted')]
-            : representation.entries.map((entry) =>
-                pluginCard(entry, representation.coreMajor),
-              )),
-        ],
-        'md',
-      ),
+      type: 'element',
+      tag: 'stack',
       props: { gap: 'md', className: 'plugins-install-layout' },
+      children: [
+        {
+          type: 'element',
+          tag: 'text',
+          props: { weight: 'bold' },
+          children: [textNode('Plugin Catalog')],
+        },
+        textBlock(
+          `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreMajor}.`,
+          'muted',
+        ),
+        ...(representation.entries.length === 0
+          ? [textBlock('No plugins found on the queried relays.', 'muted')]
+          : representation.entries.map((entry) =>
+              pluginCard(entry, representation.coreMajor),
+            )),
+      ],
     },
     stylesheets: [pluginsInstallStylesheet],
   };

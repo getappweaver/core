@@ -14,7 +14,7 @@
 //     ["description", "<description>"]
 //     ["version", "<latest-version>"]
 //     ["coreApiVersion", "<latest-core-major>"]
-//     ["t", "dm-bot-plugin"]
+//     ["t", "appweaver-plugin"]
 //     ["ref", "<git-tag>", "<core-major>", "<changelog>"]  (one per release)
 // ---------------------------------------------------------------------------
 
@@ -504,7 +504,7 @@ async function main(): Promise<void> {
       ['repo', repoUrl],
       ['version', gitTag],
       ['coreApiVersion', coreMajor],
-      ['t', 'dm-bot-plugin'],
+      ['t', 'appweaver-plugin'],
       ...updatedRefs.map((r) => ['ref', r.tag, r.coreMajor, r.changelog]),
     ],
     content: eventContent,

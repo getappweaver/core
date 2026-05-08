@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.5.2] - 2026-05-08
+
+- fix: improve plugin catalog publishing and queries (49dc83e)
+
 ## [v9.5.1] - 2026-05-08
 
-- fix: point status agent actions at nested command (98431e3)
+- fix: point status agent actions at nested command (26f7e75)
 
 ## [v9.5.0] - 2026-05-08
 

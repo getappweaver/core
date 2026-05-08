@@ -17,6 +17,8 @@ const PLUGIN_QUERY_RELAYS = [
   'wss://nostr.mom',
 ];
 
+const PLUGIN_QUERY_MAX_WAIT_MS = 10_000;
+
 type RefEntry = {
   tag: string;
   coreMajor: string;
@@ -161,11 +163,44 @@ function attachInstalledState({
 async function queryPluginCatalog(
   ctx: RouteCommandContext,
 ): Promise<PluginCatalogEntry[]> {
-  const events = await ctx.pool.querySync(
-    PLUGIN_QUERY_RELAYS,
-    { kinds: [PLUGIN_KIND], limit: 50 },
-    { maxWait: 10_000 },
-  );
+  const eventRelaysById = new Map<string, Set<string>>();
+  const eventsById = new Map<string, NostrEvent>();
+
+  const events = await new Promise<NostrEvent[]>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => finish('timeout'), PLUGIN_QUERY_MAX_WAIT_MS);
+
+    const sub = ctx.pool.subscribeMany(
+      PLUGIN_QUERY_RELAYS,
+      { kinds: [PLUGIN_KIND], limit: 50 },
+      {
+        maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
+        receivedEvent: (relay, id) => {
+          const relays = eventRelaysById.get(id) ?? new Set<string>();
+          relays.add(relay.url);
+          eventRelaysById.set(id, relays);
+        },
+        onevent: (event) => {
+          eventsById.set(event.id, event as NostrEvent);
+        },
+        oneose: () => finish('eose'),
+        onclose: () => {
+          finish('closed');
+        },
+      },
+    );
+
+    function finish(reason: 'closed' | 'eose' | 'timeout'): void {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      sub.close(`plugins install ${reason}`);
+      resolve([...eventsById.values()]);
+    }
+  });
 
   const latestByPlugin = new Map<string, PluginCatalogEntry>();
 
