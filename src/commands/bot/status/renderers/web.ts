@@ -211,7 +211,7 @@ export function renderBotStatusWeb(
             label: agentName,
             action: commandAction({
               command: 'ai',
-              subcommand: 'agent-set',
+              subcommand: 'agents set',
               arguments: { name: agentName },
             }),
           })),
