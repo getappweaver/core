@@ -1,12 +1,12 @@
 import type { SubcommandDefinition } from '@src/system/command-definition';
 
-export function getAiAgentsSaveSubcommandDefinition(
+export function getAiAgentSaveSubcommandDefinition(
   prefix: string,
 ): SubcommandDefinition {
   const p = prefix;
 
   return {
-    name: 'agents-save',
+    name: 'agents save',
     summary: 'Save the full OpenCode agents draft config.',
     textHidden: true,
     aliases: [],
@@ -20,6 +20,6 @@ export function getAiAgentsSaveSubcommandDefinition(
       },
     ],
     options: [],
-    examples: [`${p}ai agents-save '{"rootModel":null,"agents":[]}'`],
+    examples: [`${p}ai agents save '{"rootModel":null,"agents":[]}'`],
   };
 }

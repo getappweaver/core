@@ -1,14 +1,14 @@
 import type { SubcommandDefinition } from '@src/system/command-definition';
 
-import { getAiAgentPermissionOptionDefinitions } from '../agents-permission-options';
+import { getAiAgentPermissionOptionDefinitions } from '../permission-options';
 
-export function getAiAgentsNewSubcommandDefinition(
+export function getAiAgentNewSubcommandDefinition(
   prefix: string,
 ): SubcommandDefinition {
   const p = prefix;
 
   return {
-    name: 'agents-new',
+    name: 'agents new',
     summary: 'Create a new OpenCode agent.',
     textHidden: true,
     aliases: [],

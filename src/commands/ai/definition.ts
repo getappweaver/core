@@ -5,14 +5,14 @@
 import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
-import { getAiAgentRestoreSubcommandDefinition } from './agent-restore/definition';
-import { getAiAgentSetSubcommandDefinition } from './agent-set/definition';
-import { getAiAgentsSubcommandDefinition } from './agents/definition';
-import { getAiAgentsDeleteSubcommandDefinition } from './agents-delete/definition';
-import { getAiAgentsEditSubcommandDefinition } from './agents-edit/definition';
-import { getAiAgentsNewSubcommandDefinition } from './agents-new/definition';
-import { getAiAgentsSaveSubcommandDefinition } from './agents-save/definition';
-import { getAiAgentsUpsertJsonSubcommandDefinition } from './agents-upsert-json/definition';
+import { getAiAgentDeleteSubcommandDefinition } from './agent/delete/definition';
+import { getAiAgentEditSubcommandDefinition } from './agent/edit/definition';
+import { getAiAgentModalSubcommandDefinition } from './agent/modal/definition';
+import { getAiAgentNewSubcommandDefinition } from './agent/new/definition';
+import { getAiAgentRestoreSubcommandDefinition } from './agent/restore/definition';
+import { getAiAgentSaveSubcommandDefinition } from './agent/save/definition';
+import { getAiAgentSetSubcommandDefinition } from './agent/set/definition';
+import { getAiAgentUpsertJsonSubcommandDefinition } from './agent/upsert-json/definition';
 import { getAiBackendSubcommandDefinition } from './backend/definition';
 import { getAiModeSubcommandDefinition } from './mode/definition';
 import { getAiModelSubcommandDefinition } from './model/definition';
@@ -35,19 +35,20 @@ export function getAiCommandDefinition({
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'ai', {
-        topicArgSummary: 'Optional: mode, backend, model, models, provider.',
-        exampleTopics: ['mode', 'backend', 'model', 'provider'],
+        topicArgSummary:
+          'Optional: mode, backend, model, models, provider, agents.',
+        exampleTopics: ['mode', 'backend', 'model', 'agents', 'provider'],
       }),
       getAiModeSubcommandDefinition(p),
       getAiBackendSubcommandDefinition(p),
       getAiModelSubcommandDefinition(p),
       getAiModelsSubcommandDefinition(p),
-      getAiAgentsSubcommandDefinition(p),
-      getAiAgentsNewSubcommandDefinition(p),
-      getAiAgentsEditSubcommandDefinition(p),
-      getAiAgentsDeleteSubcommandDefinition(p),
-      getAiAgentsUpsertJsonSubcommandDefinition(p),
-      getAiAgentsSaveSubcommandDefinition(p),
+      getAiAgentModalSubcommandDefinition(p),
+      getAiAgentNewSubcommandDefinition(p),
+      getAiAgentEditSubcommandDefinition(p),
+      getAiAgentDeleteSubcommandDefinition(p),
+      getAiAgentUpsertJsonSubcommandDefinition(p),
+      getAiAgentSaveSubcommandDefinition(p),
       getAiAgentSetSubcommandDefinition(p),
       getAiAgentRestoreSubcommandDefinition(p),
       getAiRootModelSubcommandDefinition(p),

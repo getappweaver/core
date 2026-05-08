@@ -9,7 +9,7 @@ export function handleAiAgentSet(props: HandleAiAgentSetProps): string {
   const name = props.name?.trim() ?? '';
 
   if (name.length === 0) {
-    return 'Usage: ai agent-set <name>';
+    return 'Usage: ai agents set <name>';
   }
 
   setSelectedOpencodeAgent(props.seenDb, name);

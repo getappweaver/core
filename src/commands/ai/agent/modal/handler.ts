@@ -11,7 +11,7 @@ import {
 import type { WebAction, WebHandlerResult, WebNode } from '@src/web/ui-schema';
 import { row, stack, textBlock } from '@src/web/widgets';
 
-import { toPermissionFormOptions } from '../agents-permission-options';
+import { toPermissionFormOptions } from '../permission-options';
 
 type HandleAiAgentsProps = {
   seenDb: CoreDb;
@@ -92,7 +92,7 @@ function buildAgentRow(params: {
       padding: 'sm',
       className: `agent-card ${isCurrent ? 'agent-card--current' : ''}`.trim(),
       action: commandAction({
-        subcommand: 'agent-set',
+        subcommand: 'agents set',
         arguments: { name: agent.name },
       }),
     },
@@ -135,7 +135,7 @@ function buildAgentRow(params: {
               button(
                 'Edit',
                 commandAction({
-                  subcommand: 'agents-edit',
+                  subcommand: 'agents edit',
                   arguments: { name: agent.name },
                   options: {
                     description: agent.description ?? '',
@@ -158,7 +158,7 @@ function buildAgentRow(params: {
               button(
                 'Delete',
                 commandAction({
-                  subcommand: 'agents-delete',
+                  subcommand: 'agents delete',
                   arguments: { name: agent.name },
                 }),
                 { tone: 'danger', stopPropagation: true },
@@ -236,7 +236,7 @@ export async function handleAiAgents(
           button(
             'New Agent',
             commandAction({
-              subcommand: 'agents-new',
+              subcommand: 'agents new',
               arguments: { name: '' },
               options: {
                 description: '',
@@ -255,7 +255,7 @@ export async function handleAiAgents(
           ),
           button(
             'Restore Defaults',
-            commandAction({ subcommand: 'agent-restore' }),
+            commandAction({ subcommand: 'agents restore' }),
             { tone: 'danger' },
           ),
         ],

@@ -1,8 +1,77 @@
 import { createMemo, createSignal } from 'solid-js';
 
-import type { CommandSubcommand } from '../types';
+import type { CommandDetail, CommandSubcommand } from '../types';
 
 import type { PaletteAdapters, PaletteHook } from './types';
+
+function helpTopicSubcommand(
+  command: CommandDetail,
+  topic: CommandSubcommand,
+): CommandSubcommand {
+  return {
+    name: topic.name,
+    summary: topic.summary,
+    usage: `help ${topic.name}`,
+    aliases: topic.aliases,
+    arguments:
+      command.subcommands.find((item) => item.name === 'help')?.arguments ?? [],
+    options: [],
+    examples: [`/${command.name} help ${topic.name}`],
+    inferredWeb: { executionMode: 'requires_input' as const },
+  };
+}
+
+type GlobalHelpTopicSubcommandProps = {
+  helpCommand: CommandDetail;
+  command: CommandDetail;
+  topic: CommandSubcommand;
+};
+
+function globalHelpTopicSubcommand({
+  helpCommand,
+  command,
+  topic,
+}: GlobalHelpTopicSubcommandProps): CommandSubcommand {
+  return {
+    name: 'topic',
+    summary: topic.summary,
+    usage: `topic ${command.name} ${topic.name}`,
+    aliases: topic.aliases,
+    arguments: helpCommand.subcommands[0]?.arguments ?? [],
+    options: [],
+    examples: [`/help ${command.name} ${topic.name}`],
+    inferredWeb: { executionMode: 'requires_input' as const },
+  };
+}
+
+function topicPathMatches(
+  topic: CommandSubcommand,
+  queryTokens: string[],
+): boolean {
+  if (queryTokens.length === 0) {
+    return true;
+  }
+
+  const topicTokens = topic.name.toLowerCase().split(/\s+/).filter(Boolean);
+
+  if (queryTokens.length > topicTokens.length) {
+    return false;
+  }
+
+  return queryTokens.every((token, index) => {
+    const topicToken = topicTokens[index];
+
+    if (topicToken === undefined) {
+      return false;
+    }
+
+    if (index === queryTokens.length - 1) {
+      return topicToken.startsWith(token);
+    }
+
+    return topicToken === token;
+  });
+}
 
 export function usePalette(adapters: PaletteAdapters): PaletteHook {
   const [paletteOpen, setPaletteOpen] = createSignal(false);
@@ -14,9 +83,8 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
   const [paletteQuery, setPaletteQuery] = createSignal('');
   const [paletteSelectedIndex, setPaletteSelectedIndex] = createSignal(0);
 
-  const [selectedCommand, setSelectedCommand] = createSignal<
-    import('../types').CommandDetail | null
-  >(null);
+  const [selectedCommand, setSelectedCommand] =
+    createSignal<CommandDetail | null>(null);
 
   const [paletteError, setPaletteError] = createSignal<string | null>(null);
 
@@ -46,21 +114,51 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
     }
 
     if (command.name === 'help') {
-      const query = adapters
+      const queryPath = adapters
         .getSubcommandQueryFromPalette(command, paletteQuery())
         .trim()
         .toLowerCase();
+
+      const pathTokens = queryPath.split(/\s+/).filter(Boolean);
+      const commandQuery = pathTokens[0] ?? '';
+      const topicQueryTokens = pathTokens.slice(1);
+
+      const topicCommand = adapters
+        .commands()
+        .find(
+          (entry) =>
+            entry.name !== 'help' &&
+            [entry.name, ...entry.aliases].some(
+              (value) => value.toLowerCase() === commandQuery,
+            ),
+        );
+
+      if (
+        topicCommand !== undefined &&
+        (paletteQuery().endsWith(' ') || pathTokens.length > 1)
+      ) {
+        return topicCommand.subcommands
+          .filter((entry) => entry.name !== 'help')
+          .filter((entry) => topicPathMatches(entry, topicQueryTokens))
+          .map((entry) =>
+            globalHelpTopicSubcommand({
+              helpCommand: command,
+              command: topicCommand,
+              topic: entry,
+            }),
+          );
+      }
 
       return adapters
         .commands()
         .filter((entry) => entry.name !== 'help')
         .filter((entry) => {
-          if (!query) {
+          if (!commandQuery) {
             return true;
           }
 
           return [entry.name, entry.summary, ...entry.aliases].some((value) =>
-            value.toLowerCase().includes(query),
+            value.toLowerCase().includes(commandQuery),
           );
         })
         .map((entry) => ({
@@ -79,6 +177,20 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
       command,
       paletteQuery(),
     );
+
+    const queryTokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    if (
+      queryTokens[0] === 'help' &&
+      (paletteQuery().endsWith(' ') || queryTokens.length > 1)
+    ) {
+      const topicQueryTokens = queryTokens.slice(1);
+
+      return command.subcommands
+        .filter((entry) => entry.name !== 'help')
+        .filter((entry) => topicPathMatches(entry, topicQueryTokens))
+        .map((entry) => helpTopicSubcommand(command, entry));
+    }
 
     if (!query) {
       return command.subcommands;
@@ -140,14 +252,31 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
     await chooseCommandInternal(name, false);
   }
 
+  async function chooseHighlightedCommandForSubcommands(): Promise<void> {
+    const query = paletteQuery().trim();
+
+    if (!query) {
+      return;
+    }
+
+    const commandsList = filteredCommands();
+    const command = commandsList[paletteSelectedIndex()] ?? commandsList[0];
+
+    if (!command) {
+      return;
+    }
+
+    await chooseCommandInternal(command.name, true);
+    setPaletteQuery(`${command.name} `);
+    setPaletteSelectedIndex(0);
+  }
+
   async function openPaletteForCommand(name: string): Promise<void> {
     openPalette();
     await chooseCommandInternal(name, true);
   }
 
-  function showCommandSubcommands(
-    command: import('../types').CommandDetail,
-  ): void {
+  function showCommandSubcommands(command: CommandDetail): void {
     setSelectedCommand(command);
     setPaletteStep('subcommands');
     setPaletteQuery('');
@@ -223,6 +352,31 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
         tokens.shift();
       }
 
+      if (command.name === 'help') {
+        const topic = first.usage.replace(/^topic\s+/, '');
+        const currentTopic = current.trim();
+
+        if (topic.split(/\s+/).length > currentTopic.split(/\s+/).length) {
+          return;
+        }
+
+        setPaletteQuery(`${command.name} ${topic} `);
+
+        return;
+      }
+
+      if (first.usage.startsWith('help ')) {
+        if (tokens[0] === 'help') {
+          return;
+        }
+
+        const topic = first.usage.replace(/^help\s+/, '');
+
+        setPaletteQuery(`${command.name} help ${topic} `);
+
+        return;
+      }
+
       if (tokens.length <= 1) {
         setPaletteQuery(`${command.name} ${first.name} `);
       }
@@ -258,6 +412,56 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
       tokens.shift();
     }
 
+    if (command.name === 'help') {
+      const subcommand = command.subcommands.find(
+        (item) => item.name === 'topic',
+      );
+
+      if (!subcommand) {
+        return;
+      }
+
+      const selectedTopic = filteredSubcommands()[
+        paletteSelectedIndex()
+      ]?.usage.replace(/^topic\s+/, '');
+
+      const explicitTopic = selectedTopic ?? tokens.join(' ');
+
+      await adapters.openSubcommand(command, subcommand, {
+        arguments: { path: explicitTopic },
+        options: {},
+      });
+
+      return;
+    }
+
+    if (
+      tokens[0] === 'help' &&
+      (tokens.length > 1 || paletteQuery().endsWith(' '))
+    ) {
+      const subcommand = command.subcommands.find(
+        (item) => item.name === 'help',
+      );
+
+      if (!subcommand) {
+        return;
+      }
+
+      const selectedTopic = filteredSubcommands()[
+        paletteSelectedIndex()
+      ]?.usage.replace(/^help\s+/, '');
+
+      const explicitTopic =
+        tokens.length > 1 ? tokens.slice(1).join(' ') : (selectedTopic ?? '');
+
+      await adapters.openSubcommand(command, subcommand, {
+        arguments: { topic: explicitTopic },
+        options: {},
+      });
+
+      return;
+    }
+
     const subcommandToken = tokens[0] ?? '';
     const argTokens = tokens.slice(1);
 
@@ -273,20 +477,6 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
       filteredSubcommands()[0];
 
     if (!subcommand) {
-      return;
-    }
-
-    if (command.name === 'help' && subcommand.name === 'topic') {
-      const explicitTopic =
-        argTokens.length > 0
-          ? argTokens.join(' ')
-          : subcommand.usage.replace(/^topic\s+/, '');
-
-      await adapters.openSubcommand(command, subcommand, {
-        arguments: { path: explicitTopic },
-        options: {},
-      });
-
       return;
     }
 
@@ -341,6 +531,13 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
     if (event.key === 'Enter') {
       event.preventDefault();
       void submitPalette();
+
+      return;
+    }
+
+    if (event.key === ' ' && paletteStep() === 'commands') {
+      event.preventDefault();
+      void chooseHighlightedCommandForSubcommands();
     }
   }
 

@@ -84,10 +84,12 @@ export function formatHelpOptionUsage(
     'flag' | 'shortFlag' | 'name' | 'kind' | 'required'
   >,
 ): string {
-  const labels =
-    option.shortFlag !== null
-      ? `${option.flag}, ${option.shortFlag}`
-      : option.flag;
+  const hasShortFlag =
+    typeof option.shortFlag === 'string' && option.shortFlag.length > 0;
+
+  const labels = hasShortFlag
+    ? `${option.flag}, ${option.shortFlag}`
+    : option.flag;
 
   const value =
     option.kind === 'boolean' ? labels : `${labels} <${option.name}>`;

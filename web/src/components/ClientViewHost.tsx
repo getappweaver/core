@@ -32,7 +32,7 @@ export function ClientViewHost(props: ClientViewHostProps): JSX.Element {
         onSave={(payload) =>
           props.onRunJsonCommand({
             command: 'ai',
-            subcommand: 'agents-upsert-json',
+            subcommand: 'agents upsert-json',
             payload,
           })
         }

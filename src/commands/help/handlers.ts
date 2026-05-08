@@ -103,7 +103,7 @@ export const handleHelpRoot: BuiltinHandler = async (ctx) => {
     const root = first;
 
     const topic =
-      args.length >= 2 ? (args[args.length - 1]?.toLowerCase() ?? null) : null;
+      args.length >= 2 ? args.slice(1).join(' ').toLowerCase() : null;
 
     return renderBuiltinHelpText({
       prefix: p,
@@ -143,7 +143,7 @@ export const handleHelpRoot: BuiltinHandler = async (ctx) => {
     }
 
     const topic =
-      args.length >= 2 ? (args[args.length - 1]?.toLowerCase() ?? null) : null;
+      args.length >= 2 ? args.slice(1).join(' ').toLowerCase() : null;
 
     if (pluginDefinition && topic !== null) {
       const result = buildCommandHelp({

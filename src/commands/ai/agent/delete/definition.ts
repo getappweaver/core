@@ -1,10 +1,10 @@
 import type { SubcommandDefinition } from '@src/system/command-definition';
 
-export function getAiAgentsDeleteSubcommandDefinition(
+export function getAiAgentDeleteSubcommandDefinition(
   prefix: string,
 ): SubcommandDefinition {
   return {
-    name: 'agents-delete',
+    name: 'agents delete',
     summary: 'Delete an OpenCode agent.',
     textHidden: true,
     aliases: [],

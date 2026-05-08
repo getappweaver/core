@@ -6,7 +6,7 @@ export function getAiAgentRestoreSubcommandDefinition(
   const p = prefix;
 
   return {
-    name: 'agent-restore',
+    name: 'agents restore',
     summary:
       'Restore OpenCode agents in opencode.json to the built-in defaults.',
     details: [
@@ -16,6 +16,6 @@ export function getAiAgentRestoreSubcommandDefinition(
     aliases: [],
     arguments: [],
     options: [],
-    examples: [`${p}ai agent-restore`],
+    examples: [`${p}ai agents restore`],
   };
 }

@@ -77,7 +77,7 @@ export async function buildAiAgentEditorClientView(params: {
     view: 'ai-agent-editor',
     meta: {
       command: 'ai',
-      subcommand: params.mode === 'edit' ? 'agents-edit' : 'agents-new',
+      subcommand: params.mode === 'edit' ? 'agents edit' : 'agents new',
     },
     payload: {
       mode: params.mode,

@@ -1,6 +1,6 @@
 import type { ClientViewRoot } from '@src/web/ui-schema';
 
-import { buildAiAgentEditorClientView } from '../agent-editor-view';
+import { buildAiAgentEditorClientView } from '../editor-view';
 
 export async function handleAiAgentsNew(params: {
   dmBotRoot: string;

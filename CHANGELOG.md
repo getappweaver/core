@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.4.0] - 2026-05-08
+
+- feat: nest AI agent management commands (757f6c9)
+
 ## [v9.3.4] - 2026-05-08
 
-- fix: hide piper TTS control when unavailable (645ae9f)
+- fix: hide piper TTS control when unavailable (7e88c72)
 
 ## [v9.3.3] - 2026-05-08
 

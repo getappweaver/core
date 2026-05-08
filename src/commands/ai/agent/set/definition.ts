@@ -6,7 +6,7 @@ export function getAiAgentSetSubcommandDefinition(
   const p = prefix;
 
   return {
-    name: 'agent-set',
+    name: 'agents set',
     summary: 'Select the current OpenCode agent.',
     aliases: [],
     arguments: [
@@ -19,6 +19,6 @@ export function getAiAgentSetSubcommandDefinition(
       },
     ],
     options: [],
-    examples: [`${p}ai agent-set ask`],
+    examples: [`${p}ai agents set ask`],
   };
 }

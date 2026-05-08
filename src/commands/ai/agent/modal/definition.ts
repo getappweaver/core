@@ -1,6 +1,6 @@
 import type { SubcommandDefinition } from '@src/system/command-definition';
 
-export function getAiAgentsSubcommandDefinition(
+export function getAiAgentModalSubcommandDefinition(
   prefix: string,
 ): SubcommandDefinition {
   const p = prefix;
@@ -12,7 +12,7 @@ export function getAiAgentsSubcommandDefinition(
     aliases: [],
     arguments: [],
     options: [],
-    examples: [`${p}ai agents`],
+    examples: [`${p}ai agents`, `${p}ai agents modal`],
     webWidget: {
       placement: 'fixed',
       surface: 'modal',
