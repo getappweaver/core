@@ -92,6 +92,7 @@ export function isWebDistUsable(dmBotRoot: string): boolean {
  */
 export function serveWebDistGet(props: ServeWebDistGetProps): Response | null {
   const webDist = resolve(join(props.dmBotRoot, 'web', 'dist'));
+  const indexHtml = join(webDist, 'index.html');
 
   if (!isWebDistUsable(props.dmBotRoot)) {
     return null;
