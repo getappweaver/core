@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.3.2] - 2026-05-08
+
+- serve nip05 and lud16 for appweaver account (fb810c0)
+
 ## [v9.3.1] - 2026-05-06
 
-- added vercel api function to serve nostr.json in apps/landing (73ac65c)
+- added vercel api function to serve nostr.json in apps/landing (341ef5d)
 
 ## [v9.3.0] - 2026-05-06
 

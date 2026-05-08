@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-05-03T11:41:34.984Z",
+  "generatedAt": "2026-05-07T17:51:02.182Z",
   "prefix": "/",
   "plugins": [
     {
       "alias": "todo",
       "name": "dm-bot-todo-plugin",
-      "repo": "nostr://_@dhalsim.github.io/dm-bot-todo-plugin",
-      "version": "4.0.0",
+      "repo": "nostr://_@getappweaver.com/todo",
+      "version": "4.1.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
     {
       "alias": "job",
       "name": "dm-bot-job-plugin",
-      "repo": "nostr://_@dhalsim.github.io/dm-bot-job-plugin",
+      "repo": "nostr://_@getappweaver.com/job",
       "version": "3.0.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
@@ -21,7 +21,7 @@
     {
       "alias": "bm",
       "name": "dm-bot-bm-plugin",
-      "repo": "nostr://_@dhalsim.github.io/dm-bot-bm-plugin",
+      "repo": "nostr://_@getappweaver.com/bm",
       "version": "3.0.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
@@ -29,7 +29,7 @@
     {
       "alias": "file",
       "name": "dm-bot-file-plugin",
-      "repo": "nostr://_@dhalsim.github.io/dm-bot-file-plugin",
+      "repo": "nostr://_@getappweaver.com/file",
       "version": "2.0.0",
       "commandStoryCount": 2,
       "aiStoryCount": 0
@@ -37,7 +37,7 @@
     {
       "alias": "browser",
       "name": "dm-bot-browser-plugin",
-      "repo": "nostr://_@dhalsim.github.io/dm-bot-browser-plugin",
+      "repo": "nostr://_@getappweaver.com/browser",
       "version": "1.0.3",
       "commandStoryCount": 0,
       "aiStoryCount": 0

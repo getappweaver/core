@@ -488,6 +488,252 @@
     ]
   },
   {
+    "name": "plugins",
+    "summary": "Discover installable bot plugins.",
+    "aliases": [
+      "plugin"
+    ],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for plugins or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: install.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/plugins help",
+          "/plugins help install"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "install",
+        "summary": "Discover installable plugins from the Nostr plugin catalog.",
+        "usage": "install",
+        "aliases": [
+          "list"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/plugins install"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Plugins",
+          "modalTitle": "Plugin installer",
+          "icon": "/src/commands/plugin-manager/install/renderers/plugins.svg",
+          "order": 15
+        }
+      }
+    ]
+  },
+  {
+    "name": "roadmap",
+    "summary": "View AppWeaver roadmap issues, funding, and board assignments.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "list",
+        "summary": "Read roadmap issues from the AppWeaver roadmap relay.",
+        "usage": "list [--relay <relay>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "relay",
+            "summary": "Relay URL to read from.",
+            "flag": "--relay",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "webDefaultValue": "ws://localhost:10547"
+          }
+        ],
+        "examples": [
+          "/roadmap list",
+          "/roadmap list --relay ws://localhost:10547"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Roadmap",
+          "modalTitle": "Roadmap",
+          "icon": "/src/commands/roadmap/renderers/roadmap.svg",
+          "order": 20
+        }
+      },
+      {
+        "name": "new",
+        "summary": "Create a new roadmap issue. Submission is not wired yet.",
+        "usage": "new <repo> <type> <title> <description...> [--relay <relay>]",
+        "aliases": [
+          "add"
+        ],
+        "arguments": [
+          {
+            "name": "repo",
+            "summary": "NIP-34 repository address, e.g. 30617:<owner-pubkey>:<repo-id>.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "type",
+            "summary": "Issue type.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": [
+              "feature",
+              "bug"
+            ],
+            "webDefaultValue": "feature"
+          },
+          {
+            "name": "title",
+            "summary": "Short issue title.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "description",
+            "summary": "Issue description.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [
+          {
+            "name": "relay",
+            "summary": "Relay URL to publish to.",
+            "flag": "--relay",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "webDefaultValue": "ws://localhost:10547"
+          }
+        ],
+        "examples": [
+          "/roadmap new 30617:<owner-pubkey>:appweaver feature \"Export as static site\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "fund",
+        "summary": "Open the funding dialog for a roadmap issue.",
+        "usage": "fund <issueId> [--title <title>] [--sats <sats>] [--relay <relay>]",
+        "aliases": [
+          "zap"
+        ],
+        "arguments": [
+          {
+            "name": "issueId",
+            "summary": "Issue event id.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "title",
+            "summary": "Issue title.",
+            "flag": "--title",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "sats",
+            "summary": "Current verified sats.",
+            "flag": "--sats",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "relay",
+            "summary": "Relay URL to use for verification.",
+            "flag": "--relay",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "webDefaultValue": "ws://localhost:10547"
+          }
+        ],
+        "examples": [
+          "/roadmap fund <issue-id> --title \"Issue title\" --sats 1000"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "board",
+        "summary": "Open one roadmap board by workflow id.",
+        "usage": "board <id> [--relay <relay>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Workflow event id or d tag.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "relay",
+            "summary": "Relay URL to read from.",
+            "flag": "--relay",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "webDefaultValue": "ws://localhost:10547"
+          }
+        ],
+        "examples": [
+          "/roadmap board appweaver-roadmap"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
     "name": "ai",
     "summary": "Agent mode, backend, models, and payment provider (Routstr).",
     "aliases": [],
@@ -501,7 +747,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional: mode, backend, model, models, provider.",
+            "summary": "Optional: mode, backend, model, models, provider, agents.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -513,6 +759,7 @@
           "/ai help mode",
           "/ai help backend",
           "/ai help model",
+          "/ai help agents",
           "/ai help provider"
         ],
         "inferredWeb": {
@@ -615,7 +862,8 @@
         "arguments": [],
         "options": [],
         "examples": [
-          "/ai agents"
+          "/ai agents",
+          "/ai agents modal"
         ],
         "inferredWeb": {
           "generated": true,
@@ -628,9 +876,9 @@
         }
       },
       {
-        "name": "agents-new",
+        "name": "agents new",
         "summary": "Create a new OpenCode agent.",
-        "usage": "agents-new <name> [--description, undefined <description>] [--model, undefined <model>] [--color, undefined <color>] [--steps, undefined <steps>] [--mode, undefined <mode>] [--prompt, undefined <system_prompt>] [--hidden, undefined] [--disabled, undefined] [--perm-read, undefined <perm_read>] [--perm-edit, undefined <perm_edit>] [--perm-glob, undefined <perm_glob>] [--perm-grep, undefined <perm_grep>] [--perm-list, undefined <perm_list>] [--perm-bash, undefined <perm_bash>] [--perm-task, undefined <perm_task>] [--perm-external_directory, undefined <perm_external_directory>] [--perm-todowrite, undefined <perm_todowrite>] [--perm-question, undefined <perm_question>] [--perm-webfetch, undefined <perm_webfetch>] [--perm-websearch, undefined <perm_websearch>] [--perm-codesearch, undefined <perm_codesearch>] [--perm-lsp, undefined <perm_lsp>] [--perm-doom_loop, undefined <perm_doom_loop>] [--perm-skill, undefined <perm_skill>]",
+        "usage": "agents new <name> [--description <description>] [--model <model>] [--color <color>] [--steps <steps>] [--mode <mode>] [--prompt <system_prompt>] [--hidden] [--disabled] [--perm-read <perm_read>] [--perm-edit <perm_edit>] [--perm-glob <perm_glob>] [--perm-grep <perm_grep>] [--perm-list <perm_list>] [--perm-bash <perm_bash>] [--perm-task <perm_task>] [--perm-external_directory <perm_external_directory>] [--perm-todowrite <perm_todowrite>] [--perm-question <perm_question>] [--perm-webfetch <perm_webfetch>] [--perm-websearch <perm_websearch>] [--perm-codesearch <perm_codesearch>] [--perm-lsp <perm_lsp>] [--perm-doom_loop <perm_doom_loop>] [--perm-skill <perm_skill>]",
         "aliases": [],
         "arguments": [
           {
@@ -927,9 +1175,9 @@
         }
       },
       {
-        "name": "agents-edit",
+        "name": "agents edit",
         "summary": "Edit an existing OpenCode agent.",
-        "usage": "agents-edit <name> [--description, undefined <description>] [--model, undefined <model>] [--color, undefined <color>] [--steps, undefined <steps>] [--mode, undefined <mode>] [--prompt, undefined <system_prompt>] [--hidden, undefined] [--disabled, undefined] [--perm-read, undefined <perm_read>] [--perm-edit, undefined <perm_edit>] [--perm-glob, undefined <perm_glob>] [--perm-grep, undefined <perm_grep>] [--perm-list, undefined <perm_list>] [--perm-bash, undefined <perm_bash>] [--perm-task, undefined <perm_task>] [--perm-external_directory, undefined <perm_external_directory>] [--perm-todowrite, undefined <perm_todowrite>] [--perm-question, undefined <perm_question>] [--perm-webfetch, undefined <perm_webfetch>] [--perm-websearch, undefined <perm_websearch>] [--perm-codesearch, undefined <perm_codesearch>] [--perm-lsp, undefined <perm_lsp>] [--perm-doom_loop, undefined <perm_doom_loop>] [--perm-skill, undefined <perm_skill>]",
+        "usage": "agents edit <name> [--description <description>] [--model <model>] [--color <color>] [--steps <steps>] [--mode <mode>] [--prompt <system_prompt>] [--hidden] [--disabled] [--perm-read <perm_read>] [--perm-edit <perm_edit>] [--perm-glob <perm_glob>] [--perm-grep <perm_grep>] [--perm-list <perm_list>] [--perm-bash <perm_bash>] [--perm-task <perm_task>] [--perm-external_directory <perm_external_directory>] [--perm-todowrite <perm_todowrite>] [--perm-question <perm_question>] [--perm-webfetch <perm_webfetch>] [--perm-websearch <perm_websearch>] [--perm-codesearch <perm_codesearch>] [--perm-lsp <perm_lsp>] [--perm-doom_loop <perm_doom_loop>] [--perm-skill <perm_skill>]",
         "aliases": [],
         "arguments": [
           {
@@ -1226,9 +1474,9 @@
         }
       },
       {
-        "name": "agents-delete",
+        "name": "agents delete",
         "summary": "Delete an OpenCode agent.",
-        "usage": "agents-delete <name>",
+        "usage": "agents delete <name>",
         "aliases": [],
         "arguments": [
           {
@@ -1249,14 +1497,14 @@
         }
       },
       {
-        "name": "agents-upsert-json",
+        "name": "agents upsert-json",
         "summary": "Internal structured save for the AI agent editor.",
-        "usage": "agents-upsert-json",
+        "usage": "agents upsert-json",
         "aliases": [],
         "arguments": [],
         "options": [],
         "examples": [
-          "/ai agents-upsert-json"
+          "/ai agents upsert-json"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1264,9 +1512,9 @@
         }
       },
       {
-        "name": "agents-save",
+        "name": "agents save",
         "summary": "Save the full OpenCode agents draft config.",
-        "usage": "agents-save <draft_json...>",
+        "usage": "agents save <draft_json...>",
         "aliases": [],
         "arguments": [
           {
@@ -1279,7 +1527,7 @@
         ],
         "options": [],
         "examples": [
-          "/ai agents-save '{\"rootModel\":null,\"agents\":[]}'"
+          "/ai agents save '{\"rootModel\":null,\"agents\":[]}'"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1287,9 +1535,9 @@
         }
       },
       {
-        "name": "agent-set",
+        "name": "agents set",
         "summary": "Select the current OpenCode agent.",
-        "usage": "agent-set <name>",
+        "usage": "agents set <name>",
         "aliases": [],
         "arguments": [
           {
@@ -1302,7 +1550,7 @@
         ],
         "options": [],
         "examples": [
-          "/ai agent-set ask"
+          "/ai agents set ask"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1310,14 +1558,14 @@
         }
       },
       {
-        "name": "agent-restore",
+        "name": "agents restore",
         "summary": "Restore OpenCode agents in opencode.json to the built-in defaults.",
-        "usage": "agent-restore",
+        "usage": "agents restore",
         "aliases": [],
         "arguments": [],
         "options": [],
         "examples": [
-          "/ai agent-restore"
+          "/ai agents restore"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2508,7 +2756,7 @@
       {
         "name": "tree",
         "summary": "Print a text tree of the workspace (depth, folder, extension filter). Web UI loads folders lazily.",
-        "usage": "tree [<rest...>] [--ext, undefined <ext>] [--expanded, undefined <expanded>]",
+        "usage": "tree [<rest...>] [--ext <ext>] [--expanded <expanded>]",
         "aliases": [],
         "arguments": [
           {
@@ -3394,7 +3642,7 @@
       {
         "name": "add",
         "summary": "Add a todo, optionally under a parent todo.",
-        "usage": "add <text...> [--under, undefined <under>]",
+        "usage": "add <text...> [--under <under>]",
         "aliases": [],
         "arguments": [
           {
@@ -3521,7 +3769,7 @@
       {
         "name": "duel",
         "summary": "Rank sibling todos by pairwise comparison.",
-        "usage": "duel [<parentId>] [--reset, undefined]",
+        "usage": "duel [<parentId>] [--reset]",
         "aliases": [],
         "arguments": [
           {
@@ -3632,7 +3880,7 @@
       {
         "name": "list",
         "summary": "List todos in the current scope or a selected subtree.",
-        "usage": "list [<rootId>] [--status, undefined <status>] [--flat, undefined] [--desc, undefined] [--level, undefined <level>]",
+        "usage": "list [<rootId>] [--status <status>] [--flat] [--desc] [--level <level>]",
         "aliases": [],
         "arguments": [
           {
@@ -3647,6 +3895,7 @@
             "summary": "Filter by status: done|in_progress|pending|all.",
             "flag": "--status",
             "kind": "string",
+            "multiple": true,
             "choices": [
               "done",
               "in_progress",
@@ -3676,6 +3925,7 @@
         "examples": [
           "/todo list",
           "/todo list --status in_progress",
+          "/todo list --status pending --status done",
           "/todo list 12 --status done --flat"
         ],
         "inferredWeb": {
@@ -3694,7 +3944,7 @@
       {
         "name": "move",
         "summary": "Move a todo under a new parent or back to the top level.",
-        "usage": "move <id> [--under, undefined <under>]",
+        "usage": "move <id> [--under <under>]",
         "aliases": [],
         "arguments": [
           {
