@@ -5,6 +5,7 @@ import type { WalletMintsRepresentation } from './representation';
 
 type HandleWalletMintsProps = {
   walletDb: WalletDb | null;
+  defaultMintUrl: string | null;
 };
 
 function toRepresentation(
@@ -26,12 +27,17 @@ export function handleWalletMints(
   }
 
   const result = getCashuMints(props.walletDb);
+  const mints = new Map(result.map((r) => [r.mint, r.total_amount]));
+
+  if (props.defaultMintUrl && !mints.has(props.defaultMintUrl)) {
+    mints.set(props.defaultMintUrl, 0);
+  }
 
   return toRepresentation({
     view: 'list',
-    items: result.map((r) => ({
-      mintUrl: r.mint,
-      totalSats: r.total_amount,
+    items: [...mints.entries()].map(([mintUrl, totalSats]) => ({
+      mintUrl,
+      totalSats,
     })),
   });
 }

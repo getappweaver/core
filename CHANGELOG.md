@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.5.0] - 2026-05-08
+
+- feat: sync wallet state over nostr (63ed23c)
+
 ## [v9.4.0] - 2026-05-08
 
-- feat: nest AI agent management commands (757f6c9)
+- feat: nest AI agent management commands (a554243)
 
 ## [v9.3.4] - 2026-05-08
 

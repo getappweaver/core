@@ -2,6 +2,7 @@
 // src/commands/dispatch.ts — types, constants, error wrapper, route prefixed input
 // ---------------------------------------------------------------------------
 
+import type { VerifiedEvent } from 'nostr-tools';
 import type { SimplePool } from 'nostr-tools/pool';
 
 import type { PromptFn, RunAgentFn, SendReplyFn } from '@src/core/plugin';
@@ -83,6 +84,12 @@ export type RouteCommandProps = {
   sendReply?: SendReplyFn;
   sendDm?: SendReplyFn;
   promptFn?: PromptFn;
+  signEncryptedSelfEvent?: (props: {
+    kind: number;
+    plaintext: string;
+    tags: string[][];
+  }) => Promise<VerifiedEvent>;
+  decryptSelfContent?: (ciphertext: string) => Promise<string>;
   jsonPayload?: unknown;
 };
 

@@ -45,7 +45,7 @@ export class CashuWallet {
   }
 
   async getWallet(): Promise<Wallet> {
-    const counters = loadCounters(this.db);
+    const counters = loadCounters(this.db, this.mintUrl);
 
     const wallet = new Wallet(this.mintUrl, {
       unit: 'sat',
@@ -73,7 +73,7 @@ export class CashuWallet {
     wallet.on.countersReserved((op: OperationCounters) => {
       log.info(`countersReserved event fired:`);
 
-      persistCounter(this.db, op);
+      persistCounter({ db: this.db, mintUrl: this.mintUrl, op });
     });
 
     const { keep, send } = await wallet.ops
@@ -130,7 +130,7 @@ export class CashuWallet {
     wallet.on.countersReserved((op: OperationCounters) => {
       log.info(`countersReserved event fired:`);
 
-      persistCounter(this.db, op);
+      persistCounter({ db: this.db, mintUrl: this.mintUrl, op });
     });
 
     const wouldReceive = totalBalance(decoded.proofs);

@@ -20,5 +20,6 @@ export function getWalletMintSubcommandDefinition(
     ],
     options: [],
     examples: [`${p}wallet mint`, `${p}wallet mint <url>`],
+    webExecutionMode: 'requires_input',
   };
 }

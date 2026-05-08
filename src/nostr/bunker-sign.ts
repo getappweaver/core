@@ -1,4 +1,4 @@
-import type { EventTemplate, NostrEvent } from 'nostr-tools';
+import type { EventTemplate, NostrEvent, VerifiedEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
 import type { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
@@ -9,10 +9,16 @@ import type { RunAgentFn, SendReplyFn } from '@src/core/plugin';
 import type { CoreDb } from '../db';
 import { PROMPT_SESSION_EXIT } from '../prompt-session';
 
-import { bunkerSignEvent } from './bunker';
+import {
+  bunkerNip44Decrypt,
+  bunkerNip44Encrypt,
+  bunkerSignEvent,
+  connectBunker,
+} from './bunker';
 import {
   getConnection,
   listConnections,
+  saveConnection,
   type ConnectionRow,
 } from './connections';
 
@@ -110,16 +116,18 @@ Relays: ${connection.data.relays.join(', ')}`;
 }
 
 async function pickConnection(props: {
+  db: CoreDb;
+  pool: SimplePool;
   connections: ConnectionRow[];
   sendReply: SendReplyFn;
   promptFn: PromptFn;
 }): Promise<ConnectionRow> {
-  const { connections, sendReply, promptFn } = props;
+  const { db, pool, connections, sendReply, promptFn } = props;
 
   await sendReply(
     `Choose bunker signer:\n\n${connections
       .map((connection, index) => formatConnectionChoice(connection, index))
-      .join('\n\n')}`,
+      .join('\n\n')}\n\n${connections.length + 1}. Add new bunker connection`,
   );
 
   while (true) {
@@ -139,8 +147,12 @@ async function pickConnection(props: {
     if (
       Number.isInteger(selected) &&
       selected >= 1 &&
-      selected <= connections.length
+      selected <= connections.length + 1
     ) {
+      if (selected === connections.length + 1) {
+        return connectAndMaybeSaveBunker({ db, pool, sendReply, promptFn });
+      }
+
       return connections[selected - 1];
     }
 
@@ -148,15 +160,53 @@ async function pickConnection(props: {
   }
 }
 
-export async function signWithBunkerInteractive({
-  db,
-  pool,
-  eventTemplate,
-  sendReply,
-  promptFn,
-  runAgent,
-  bunkerName,
-}: SignWithBunkerInteractiveProps): Promise<NostrEvent> {
+async function connectAndMaybeSaveBunker(props: {
+  db: CoreDb;
+  pool: SimplePool;
+  sendReply: SendReplyFn;
+  promptFn: PromptFn;
+}): Promise<ConnectionRow> {
+  const { db, pool, sendReply, promptFn } = props;
+  const bunkerUrl = await askPrompt(promptFn, 'Bunker URL (bunker://...):');
+
+  if (!bunkerUrl) {
+    throw new Error('No bunker URL provided.');
+  }
+
+  await sendReply('Connecting to bunker...');
+
+  const data = await connectBunker(pool, bunkerUrl);
+
+  await sendReply(`Connected bunker signer: ${formatPubkey(data.userPubkey)}`);
+
+  const saveName = await askPrompt(
+    promptFn,
+    'Save this bunker connection? Enter a name, or leave empty to use once.',
+  );
+
+  const name = saveName || `temporary-${Date.now()}`;
+
+  if (saveName) {
+    saveConnection(db, saveName, 'bunker', data);
+    await sendReply(`Saved bunker connection as "${saveName}".`);
+  }
+
+  return {
+    name,
+    method: 'bunker',
+    data,
+    created_at: Date.now(),
+  };
+}
+
+async function resolveBunkerConnection(props: {
+  db: CoreDb;
+  pool: SimplePool;
+  sendReply: SendReplyFn;
+  promptFn: PromptFn;
+  bunkerName?: string;
+}): Promise<ConnectionRow> {
+  const { db, pool, sendReply, promptFn, bunkerName } = props;
   const selectedByName = bunkerName ? getConnection(db, bunkerName) : null;
 
   if (bunkerName && !selectedByName) {
@@ -168,13 +218,37 @@ export async function signWithBunkerInteractive({
     : listConnections(db);
 
   if (availableConnections.length === 0) {
-    await sendReply(
-      'No bunker connections found. Add one first with `!bunker add <name> <address>`.',
-    );
-
-    throw new Error('No bunker connections available.');
+    return connectAndMaybeSaveBunker({ db, pool, sendReply, promptFn });
   }
 
+  const selected = selectedByName
+    ? selectedByName
+    : await pickConnection({
+        db,
+        pool,
+        connections: availableConnections,
+        sendReply,
+        promptFn,
+      });
+
+  if (selectedByName) {
+    await sendReply(
+      `Using bunker signer:\n\n${formatConnectionChoice(selectedByName, 0)}`,
+    );
+  }
+
+  return selected;
+}
+
+export async function signWithBunkerInteractive({
+  db,
+  pool,
+  eventTemplate,
+  sendReply,
+  promptFn,
+  runAgent,
+  bunkerName,
+}: SignWithBunkerInteractiveProps): Promise<NostrEvent> {
   let currentTemplate = eventTemplate;
 
   while (true) {
@@ -226,19 +300,84 @@ export async function signWithBunkerInteractive({
     await sendReply('Invalid choice.');
   }
 
-  const selected = selectedByName
-    ? selectedByName
-    : await pickConnection({
-        connections: availableConnections,
-        sendReply,
-        promptFn,
-      });
+  const selected = await resolveBunkerConnection({
+    db,
+    pool,
+    sendReply,
+    promptFn,
+    bunkerName,
+  });
 
-  if (selectedByName) {
-    await sendReply(
-      `Using bunker signer:\n\n${formatConnectionChoice(selectedByName, 0)}`,
+  return bunkerSignEvent(pool, selected.data, currentTemplate);
+}
+
+export async function signEncryptedSelfEventWithBunkerInteractive(props: {
+  db: CoreDb;
+  pool: SimplePool;
+  ownerPubkey: string;
+  kind: number;
+  plaintext: string;
+  tags: string[][];
+  sendReply: SendReplyFn;
+  promptFn: PromptFn;
+  bunkerName?: string;
+}): Promise<VerifiedEvent> {
+  const selected = await resolveBunkerConnection({
+    db: props.db,
+    pool: props.pool,
+    sendReply: props.sendReply,
+    promptFn: props.promptFn,
+    bunkerName: props.bunkerName,
+  });
+
+  if (selected.data.userPubkey !== props.ownerPubkey) {
+    throw new Error(
+      `Selected bunker signs for ${selected.data.userPubkey}, not wallet owner ${props.ownerPubkey}.`,
     );
   }
 
-  return bunkerSignEvent(pool, selected.data, currentTemplate);
+  const encrypted = await bunkerNip44Encrypt({
+    pool: props.pool,
+    data: selected.data,
+    pubkey: props.ownerPubkey,
+    plaintext: props.plaintext,
+  });
+
+  return bunkerSignEvent(props.pool, selected.data, {
+    kind: props.kind,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: props.tags,
+    content: encrypted,
+  });
+}
+
+export async function decryptSelfContentWithBunkerInteractive(props: {
+  db: CoreDb;
+  pool: SimplePool;
+  ownerPubkey: string;
+  ciphertext: string;
+  sendReply: SendReplyFn;
+  promptFn: PromptFn;
+  bunkerName?: string;
+}): Promise<string> {
+  const selected = await resolveBunkerConnection({
+    db: props.db,
+    pool: props.pool,
+    sendReply: props.sendReply,
+    promptFn: props.promptFn,
+    bunkerName: props.bunkerName,
+  });
+
+  if (selected.data.userPubkey !== props.ownerPubkey) {
+    throw new Error(
+      `Selected bunker signs for ${selected.data.userPubkey}, not wallet owner ${props.ownerPubkey}.`,
+    );
+  }
+
+  return bunkerNip44Decrypt({
+    pool: props.pool,
+    data: selected.data,
+    pubkey: props.ownerPubkey,
+    ciphertext: props.ciphertext,
+  });
 }

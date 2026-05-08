@@ -63,7 +63,11 @@ import { loadBotConfig } from './env';
 import { runAgentConversation } from './flow/agent-conversation';
 import { C, debug, log } from './logger';
 import { createSendReplyForSource, type MessageSource } from './messaging';
-import { signWithBunkerInteractive } from './nostr/bunker-sign';
+import {
+  decryptSelfContentWithBunkerInteractive,
+  signEncryptedSelfEventWithBunkerInteractive,
+  signWithBunkerInteractive,
+} from './nostr/bunker-sign';
 import {
   createDmSubscription,
   createSignAuthEvent,
@@ -75,6 +79,10 @@ import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
 import { openWalletDb } from './wallet/db';
+import {
+  hydrateDeterministicWalletState,
+  resolveDeterministicWalletStateRelays,
+} from './wallet/nostr-state';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
@@ -120,6 +128,24 @@ async function main() {
   const seenDb = openCoreDb();
   const providerDb = asProviderDb(seenDb);
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
+
+  if (walletDb && cashuMnemonic) {
+    const walletStateRelays = await resolveDeterministicWalletStateRelays({
+      pool,
+      ownerPubkey: masterPubkey,
+      fallbackRelays: botRelayUrls,
+    });
+
+    await hydrateDeterministicWalletState({
+      botKeyHex,
+      signerPubkey: botPubkey,
+      ownerPubkey: masterPubkey,
+      pool,
+      readRelays: walletStateRelays.readRelays,
+      walletDb,
+      mnemonic: cashuMnemonic,
+    });
+  }
 
   let shuttingDown = false;
 
@@ -419,6 +445,42 @@ async function main() {
         sendReply: (message: string) => sendReplyForSource(source, message),
         sendDm: pluginContext.sendDm,
         promptFn: pluginContext.promptFn,
+        signEncryptedSelfEvent: ({ kind, plaintext, tags }) =>
+          signEncryptedSelfEventWithBunkerInteractive({
+            db: seenDb,
+            pool,
+            ownerPubkey: masterPubkey,
+            kind,
+            plaintext,
+            tags,
+            sendReply: (message: string) => sendReplyForSource(source, message),
+            promptFn: async (
+              message: string | PromptPayload,
+            ): Promise<string> => {
+              await sendReplyForSource(source, getPromptPayloadValue(message));
+
+              return new Promise((resolve) => {
+                pendingPrompt = resolve;
+              });
+            },
+          }),
+        decryptSelfContent: (ciphertext) =>
+          decryptSelfContentWithBunkerInteractive({
+            db: seenDb,
+            pool,
+            ownerPubkey: masterPubkey,
+            ciphertext,
+            sendReply: (message: string) => sendReplyForSource(source, message),
+            promptFn: async (
+              message: string | PromptPayload,
+            ): Promise<string> => {
+              await sendReplyForSource(source, getPromptPayloadValue(message));
+
+              return new Promise((resolve) => {
+                pendingPrompt = resolve;
+              });
+            },
+          }),
       });
 
       if (reply) {

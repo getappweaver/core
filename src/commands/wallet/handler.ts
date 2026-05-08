@@ -3,6 +3,10 @@
 // ---------------------------------------------------------------------------
 
 import { getWalletDefaultMintUrl } from '@src/db';
+import {
+  hydrateDeterministicWalletStateWithDecrypt,
+  resolveDeterministicWalletStateRelays,
+} from '@src/wallet/nostr-state';
 
 import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
@@ -27,6 +31,41 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
 
   const render = (rep: Parameters<typeof renderWalletCli>[0]) =>
     renderWalletCli(rep, { prefix: p });
+
+  const getWalletStateWriteRelays = async () => {
+    const relays = await resolveDeterministicWalletStateRelays({
+      pool: input.pool,
+      ownerPubkey: input.config.masterPubkey,
+      fallbackRelays: input.botRelayUrls,
+    });
+
+    return relays.writeRelays;
+  };
+
+  const hydrateWalletStateIfAvailable = async () => {
+    if (input.source === 'web' || !input.walletDb || !mnemonic) {
+      return;
+    }
+
+    if (!input.decryptSelfContent) {
+      return;
+    }
+
+    const relays = await resolveDeterministicWalletStateRelays({
+      pool: input.pool,
+      ownerPubkey: input.config.masterPubkey,
+      fallbackRelays: input.botRelayUrls,
+    });
+
+    await hydrateDeterministicWalletStateWithDecrypt({
+      pool: input.pool,
+      readRelays: relays.readRelays,
+      ownerPubkey: input.config.masterPubkey,
+      walletDb: input.walletDb,
+      mnemonic,
+      decryptSelfContent: input.decryptSelfContent,
+    });
+  };
 
   if (subcmd === 'help') {
     const topic = args[1]?.toLowerCase() ?? null;
@@ -57,14 +96,20 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
     );
   }
 
+  const mint = getWalletDefaultMintUrl(input.seenDb, defaultMintUrl);
+
   if (subcmd === 'mints') {
     return handleError(
-      async () => render(handleWalletMints({ walletDb: input.walletDb })),
+      async () =>
+        render(
+          handleWalletMints({
+            walletDb: input.walletDb,
+            defaultMintUrl: mint,
+          }),
+        ),
       'Failed to list mints',
     );
   }
-
-  const mint = getWalletDefaultMintUrl(input.seenDb, defaultMintUrl);
 
   switch (subcmd) {
     case 'balance':
@@ -93,34 +138,50 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
       );
 
     case 'receive':
-      return handleError(
-        async () =>
-          render(
-            await handleWalletReceive({
-              mnemonic,
-              walletDb: input.walletDb,
-              mintUrl: mint,
-              token: args[1],
-              prefix: p,
-            }),
-          ),
-        'Failed to receive token',
-      );
+      return handleError(async () => {
+        await hydrateWalletStateIfAvailable();
+
+        return render(
+          await handleWalletReceive({
+            mnemonic,
+            walletDb: input.walletDb,
+            mintUrl: mint,
+            token: args[1],
+            prefix: p,
+            botKeyHex: input.config.botKeyHex,
+            signerPubkey: input.botPubkey,
+            ownerPubkey: input.config.masterPubkey,
+            walletStateWriteRelays: await getWalletStateWriteRelays(),
+            signEncryptedSelfEvent:
+              input.source === 'web'
+                ? null
+                : (input.signEncryptedSelfEvent ?? null),
+          }),
+        );
+      }, 'Failed to receive token');
 
     case 'send':
-      return handleError(
-        async () =>
-          render(
-            await handleWalletSend({
-              mnemonic,
-              walletDb: input.walletDb,
-              mintUrl: mint,
-              amountArg: args[1],
-              prefix: p,
-            }),
-          ),
-        'Failed to send token',
-      );
+      return handleError(async () => {
+        await hydrateWalletStateIfAvailable();
+
+        return render(
+          await handleWalletSend({
+            mnemonic,
+            walletDb: input.walletDb,
+            mintUrl: mint,
+            amountArg: args[1],
+            prefix: p,
+            botKeyHex: input.config.botKeyHex,
+            signerPubkey: input.botPubkey,
+            ownerPubkey: input.config.masterPubkey,
+            walletStateWriteRelays: await getWalletStateWriteRelays(),
+            signEncryptedSelfEvent:
+              input.source === 'web'
+                ? null
+                : (input.signEncryptedSelfEvent ?? null),
+          }),
+        );
+      }, 'Failed to send token');
 
     case 'history':
       return handleError(

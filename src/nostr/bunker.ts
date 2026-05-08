@@ -30,7 +30,7 @@ import { isRelaySuccess, publishSignedEventToRelays } from './relay-publish';
 // ---------------------------------------------------------------------------
 
 const NIP46_KIND = 24133;
-const DEFAULT_PERMS = 'sign_event,get_public_key';
+const DEFAULT_PERMS = 'sign_event,get_public_key,nip44_encrypt,nip44_decrypt';
 const REQUEST_TIMEOUT_MS = 60_000;
 
 // ---------------------------------------------------------------------------
@@ -431,4 +431,58 @@ export async function bunkerSignEvent(
   }
 
   return signed;
+}
+
+export async function bunkerNip44Encrypt(props: {
+  pool: SimplePool;
+  data: BunkerSignerData;
+  pubkey: string;
+  plaintext: string;
+}): Promise<string> {
+  const ephemeralSecret = hexToBytes(props.data.ephemeralSecret);
+
+  const response = await sendNip46Request({
+    pool: props.pool,
+    relays: props.data.relays,
+    ephemeralSecret,
+    ephemeralPubkey: props.data.ephemeralPubkey,
+    remoteSignerPubkey: props.data.remoteSignerPubkey,
+    method: 'nip44_encrypt',
+    params: [props.pubkey, props.plaintext],
+  });
+
+  const encrypted = response.result?.trim() ?? '';
+
+  if (!encrypted) {
+    throw new Error('Invalid nip44_encrypt response from bunker');
+  }
+
+  return encrypted;
+}
+
+export async function bunkerNip44Decrypt(props: {
+  pool: SimplePool;
+  data: BunkerSignerData;
+  pubkey: string;
+  ciphertext: string;
+}): Promise<string> {
+  const ephemeralSecret = hexToBytes(props.data.ephemeralSecret);
+
+  const response = await sendNip46Request({
+    pool: props.pool,
+    relays: props.data.relays,
+    ephemeralSecret,
+    ephemeralPubkey: props.data.ephemeralPubkey,
+    remoteSignerPubkey: props.data.remoteSignerPubkey,
+    method: 'nip44_decrypt',
+    params: [props.pubkey, props.ciphertext],
+  });
+
+  const plaintext = response.result ?? '';
+
+  if (!plaintext) {
+    throw new Error('Invalid nip44_decrypt response from bunker');
+  }
+
+  return plaintext;
 }

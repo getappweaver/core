@@ -4,6 +4,7 @@
 
 import type { SimplePool } from 'nostr-tools/pool';
 
+import { APPWEAVER_RELAY } from '../appweaver-relay';
 import { ensureWss } from '../env';
 
 /** Kind 10050 — relay list metadata (NIP-65). */
@@ -16,6 +17,7 @@ export const PROFILE_RELAYS_FOR_QUERY: readonly string[] = [
   'wss://user.kindpag.es',
   'wss://relay.damus.io',
   'wss://relay.primal.net',
+  ensureWss(APPWEAVER_RELAY),
 ];
 
 export function parseNip65RelayTags(tags: string[][]): {
@@ -66,4 +68,50 @@ export async function fetchNip65WriteRelays({
   }
 
   return [...new Set(writeRelays)];
+}
+
+type FetchNip65RelaySetProps = {
+  pool: SimplePool;
+  authorPubkey: string;
+  fallbackRelays: string[];
+};
+
+export async function fetchNip65RelaySet({
+  pool,
+  authorPubkey,
+  fallbackRelays,
+}: FetchNip65RelaySetProps): Promise<{
+  readRelays: string[];
+  writeRelays: string[];
+}> {
+  const fallback = [
+    ...new Set([
+      ...PROFILE_RELAYS_FOR_QUERY.map(ensureWss),
+      ...fallbackRelays.map(ensureWss),
+      ensureWss(APPWEAVER_RELAY),
+    ]),
+  ];
+
+  const nip65Event = await pool.get(fallback, {
+    kinds: [NIP65_RELAY_LIST_KIND],
+    authors: [authorPubkey],
+    limit: 1,
+  });
+
+  if (!nip65Event) {
+    return { readRelays: fallback, writeRelays: fallback };
+  }
+
+  const parsed = parseNip65RelayTags(nip65Event.tags);
+
+  return {
+    readRelays:
+      parsed.readRelays.length > 0
+        ? [...new Set([...parsed.readRelays, ensureWss(APPWEAVER_RELAY)])]
+        : fallback,
+    writeRelays:
+      parsed.writeRelays.length > 0
+        ? [...new Set([...parsed.writeRelays, ensureWss(APPWEAVER_RELAY)])]
+        : fallback,
+  };
 }

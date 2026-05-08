@@ -11,6 +11,7 @@ import { Database } from 'bun:sqlite';
 import { log } from '../logger';
 import type { Brand } from '../types';
 
+import { normalizeMintUrl } from './mint-url';
 import type { WalletInfo } from './types';
 
 export type WalletDb = Brand<Database, 'WalletDb'>;
@@ -54,12 +55,36 @@ export function openWalletDb(mnemonic: string): WalletDb {
     CREATE INDEX IF NOT EXISTS idx_proofs_keyset_id ON proofs (keyset_id)
   `);
 
+  const counterColumns = db.prepare('PRAGMA table_info(counters)').all() as {
+    name: string;
+  }[];
+
+  if (
+    counterColumns.length > 0 &&
+    !counterColumns.some((column) => column.name === 'mint')
+  ) {
+    db.run('ALTER TABLE counters RENAME TO counters_legacy_keyset_only');
+  }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS counters (
-      keyset_id TEXT PRIMARY KEY,
-      next INTEGER NOT NULL DEFAULT 0
+      mint TEXT NOT NULL,
+      keyset_id TEXT NOT NULL,
+      next INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (mint, keyset_id)
     )
   `);
+
+  const legacyColumns = db
+    .prepare('PRAGMA table_info(counters_legacy_keyset_only)')
+    .all() as { name: string }[];
+
+  if (legacyColumns.some((column) => column.name === 'keyset_id')) {
+    db.run(`
+      INSERT OR IGNORE INTO counters (mint, keyset_id, next)
+      SELECT '', keyset_id, next FROM counters_legacy_keyset_only
+    `);
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS wallet_log (
@@ -84,7 +109,16 @@ export type CashuMintResult = {
 export function getCashuMints(db: WalletDb): CashuMintResult[] {
   return db
     .prepare(
-      'SELECT SUM(amount) as total_amount, mint FROM proofs GROUP BY mint',
+      `
+        SELECT mint, SUM(total_amount) as total_amount
+        FROM (
+          SELECT mint, SUM(amount) as total_amount FROM proofs GROUP BY mint
+          UNION ALL
+          SELECT mint_url as mint, 0 as total_amount FROM wallet_log GROUP BY mint_url
+        )
+        GROUP BY mint
+        ORDER BY mint
+      `,
     )
     .all() as CashuMintResult[];
 }
@@ -183,14 +217,29 @@ export function totalBalance(proofs: Proof[]): number {
   return proofs.reduce((sum, p) => sum + p.amount, 0);
 }
 
-export function loadCounters(db: WalletDb): Record<string, number> {
-  const rows = db.query('SELECT keyset_id, next FROM counters').all() as {
+export function loadCounters(
+  db: WalletDb,
+  mintUrl: string,
+): Record<string, number> {
+  const normalizedMintUrl = normalizeMintUrl(mintUrl);
+
+  const filteredRows = db
+    .query(
+      `
+        SELECT keyset_id, MAX(next) as next
+        FROM counters
+        WHERE mint IN (?, '')
+        GROUP BY keyset_id
+      `,
+    )
+    .all(normalizedMintUrl) as {
     keyset_id: string;
     next: number;
   }[];
 
   const counters: Record<string, number> = {};
-  for (const row of rows) {
+
+  for (const row of filteredRows) {
     counters[row.keyset_id] = row.next;
   }
 
@@ -199,31 +248,80 @@ export function loadCounters(db: WalletDb): Record<string, number> {
   return counters;
 }
 
-export function persistCounter(db: WalletDb, op: OperationCounters): void {
+export type WalletCounterRow = {
+  mint: string;
+  keyset_id: string;
+  next: number;
+};
+
+export function getWalletCounterRows(db: WalletDb): WalletCounterRow[] {
+  return db
+    .prepare(
+      `
+        SELECT mint, keyset_id, next
+        FROM counters
+        WHERE mint != ''
+        ORDER BY mint, keyset_id
+      `,
+    )
+    .all() as WalletCounterRow[];
+}
+
+type UpsertWalletCounterRowsProps = {
+  db: WalletDb;
+  rows: WalletCounterRow[];
+};
+
+export function upsertWalletCounterRows({
+  db,
+  rows,
+}: UpsertWalletCounterRowsProps): void {
+  const stmt = db.prepare(`
+    INSERT INTO counters (mint, keyset_id, next)
+    VALUES ($mint, $keyset_id, $next)
+    ON CONFLICT(mint, keyset_id) DO UPDATE SET next = MAX(next, excluded.next)
+  `);
+
+  const insertMany = db.transaction((counterRows: WalletCounterRow[]) => {
+    for (const row of counterRows) {
+      stmt.run({
+        $mint: normalizeMintUrl(row.mint),
+        $keyset_id: row.keyset_id,
+        $next: row.next,
+      });
+    }
+  });
+
+  insertMany(rows);
+}
+
+type PersistCounterProps = {
+  db: WalletDb;
+  mintUrl: string;
+  op: OperationCounters;
+};
+
+export function persistCounter({ db, mintUrl, op }: PersistCounterProps): void {
+  const normalizedMintUrl = normalizeMintUrl(mintUrl);
+
   // OperationCounters = { keysetId: string, start: number, count: number, next: number }
   // `next` is the value to use for the NEXT operation — always persist this.
   log.info(
-    `  countersReserved: keyset=${op.keysetId} start=${op.start} count=${op.count} next=${op.next}`,
+    `  countersReserved: mint=${normalizedMintUrl} keyset=${op.keysetId} start=${op.start} count=${op.count} next=${op.next}`,
   );
 
-  db.run('INSERT OR REPLACE INTO counters (keyset_id, next) VALUES (?, ?)', [
-    op.keysetId,
-    op.next,
-  ]);
+  db.run(
+    'INSERT OR REPLACE INTO counters (mint, keyset_id, next) VALUES (?, ?, ?)',
+    [normalizedMintUrl, op.keysetId, op.next],
+  );
 
   log.ok(`  Counter for ${op.keysetId} persisted → next=${op.next}`);
 }
 
-export function bumpCounters(db: WalletDb): void {
-  const counters = loadCounters(db);
-  for (const keysetId of Object.keys(counters)) {
-    const next = counters[keysetId] + 1;
-
-    db.run('INSERT OR REPLACE INTO counters (keyset_id, next) VALUES (?, ?)', [
-      keysetId,
-      next,
-    ]);
-  }
+export function bumpCounters(db: WalletDb, mintUrl: string): void {
+  db.run("UPDATE counters SET next = next + 1 WHERE mint IN (?, '')", [
+    normalizeMintUrl(mintUrl),
+  ]);
 }
 
 export type WalletHistoryRow = {

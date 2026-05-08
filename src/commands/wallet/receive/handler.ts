@@ -1,3 +1,5 @@
+import type { VerifiedEvent } from 'nostr-tools';
+
 import { log } from '@src/logger';
 import { CashuWallet } from '@src/wallet/cashu';
 import type { WalletDb } from '@src/wallet/db';
@@ -6,6 +8,8 @@ import {
   getBalanceByMint,
   logWalletOperation,
 } from '@src/wallet/db';
+import { publishCurrentDeterministicWalletState } from '@src/wallet/nostr-state';
+import { publishCurrentDeterministicWalletStateWithSigner } from '@src/wallet/nostr-state';
 
 import type { WalletReceiveRepresentation } from './representation';
 
@@ -15,6 +19,17 @@ type HandleWalletReceiveProps = {
   mintUrl: string | null;
   token: string | undefined;
   prefix: string;
+  botKeyHex: string;
+  signerPubkey: string | null;
+  ownerPubkey: string;
+  walletStateWriteRelays: string[];
+  signEncryptedSelfEvent:
+    | ((props: {
+        kind: number;
+        plaintext: string;
+        tags: string[][];
+      }) => Promise<VerifiedEvent>)
+    | null;
 };
 
 function toRepresentation(
@@ -31,7 +46,18 @@ function toRepresentation(
 export async function handleWalletReceive(
   props: HandleWalletReceiveProps,
 ): Promise<WalletReceiveRepresentation> {
-  const { mnemonic, walletDb, mintUrl, token, prefix } = props;
+  const {
+    mnemonic,
+    walletDb,
+    mintUrl,
+    token,
+    prefix,
+    botKeyHex,
+    signerPubkey,
+    ownerPubkey,
+    walletStateWriteRelays,
+    signEncryptedSelfEvent,
+  } = props;
 
   if (!walletDb) {
     return toRepresentation({ view: 'no-wallet-db' });
@@ -69,6 +95,24 @@ export async function handleWalletReceive(
         token,
       });
 
+      if (signEncryptedSelfEvent) {
+        await publishCurrentDeterministicWalletStateWithSigner({
+          writeRelays: walletStateWriteRelays,
+          walletDb,
+          mnemonic,
+          signEncryptedSelfEvent,
+        });
+      } else if (signerPubkey) {
+        await publishCurrentDeterministicWalletState({
+          botKeyHex,
+          signerPubkey,
+          ownerPubkey,
+          writeRelays: walletStateWriteRelays,
+          walletDb,
+          mnemonic,
+        });
+      }
+
       return toRepresentation({ view: 'success' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -78,7 +122,7 @@ export async function handleWalletReceive(
         msg.includes('already signed');
 
       if (isSignedError && attempt < maxRetries - 1) {
-        bumpCounters(walletDb);
+        bumpCounters(walletDb, mintUrl);
         continue;
       }
 
