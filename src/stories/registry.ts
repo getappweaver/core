@@ -79,10 +79,11 @@ function storyWidgetIconUrl(params: {
     return undefined;
   }
 
+  const storyTarget = target.target;
   const definition = resolvePluginDefinition(params.plugin);
 
   const subcommand = definition?.subcommands.find(
-    (item) => item.name === target.target.subcommand,
+    (item) => item.name === storyTarget.subcommand,
   );
 
   return publishedIconUrl({

@@ -267,8 +267,10 @@ function storyWidgetIconUrl(params: {
     return undefined;
   }
 
+  const storyTarget = target.target;
+
   const subcommand = params.definition.subcommands.find(
-    (item) => item.name === target.target.subcommand,
+    (item) => item.name === storyTarget.subcommand,
   );
 
   return publishedWidgetIconUrl({
