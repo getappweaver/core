@@ -52,6 +52,7 @@ import {
   appendSystemMessageToTimeline,
   useTimeline,
 } from '@web/src/timeline/useTimeline';
+import { disablePiperTts } from '@web/src/tts/piper';
 import type {
   CommandPayload,
   CommandDetail,
@@ -1123,6 +1124,8 @@ function AppInner(): JSX.Element {
   );
 
   onMount(() => {
+    disablePiperTts();
+
     function handleLandingChromeWideMessage(ev: MessageEvent): void {
       if (ev.origin !== window.location.origin) {
         return;
