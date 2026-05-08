@@ -25,6 +25,11 @@ export function isPiperTtsEnabled(): boolean {
   return window.localStorage.getItem(PIPER_TTS_ENABLED_KEY) === '1';
 }
 
+export function disablePiperTts(): void {
+  setPiperTtsEnabled(false);
+  stopPiperTts();
+}
+
 function clearCurrentAudio(): void {
   if (currentAudio != null) {
     currentAudio.pause();
