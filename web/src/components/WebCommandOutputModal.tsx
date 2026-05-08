@@ -18,6 +18,7 @@ type WebCommandOutputModalProps = {
   error: string | null;
   text: string | null;
   web: WebNodeRoot | null;
+  currentUserPubkey: string | null;
   onReplaceWeb: (root: WebNodeRoot) => void;
   isWebUiBusy: (sourceId: string) => boolean;
   chromeWebCommandSourceId: string;
@@ -93,6 +94,7 @@ export function WebCommandOutputModal(
                 <WebNodeShadowRoot
                   root={getWeb()}
                   renderSurface="modal"
+                  currentUserPubkey={props.currentUserPubkey}
                   busy={props.isWebUiBusy(props.chromeWebCommandSourceId)}
                   onRunAction={(action, params) =>
                     props.onRunWebAction(action, {

@@ -6,6 +6,7 @@ import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
 
 import {
   cardHeadAddIcon,
+  cardHeadChecklistIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
   cardHeadTreeFilterIcon,
@@ -111,7 +112,11 @@ export function TimelineWebTreeToolbar(
                 aria-label={item.label}
                 onClick={() => reg.runAction(item.action)}
               >
-                {item.icon === 'add' ? cardHeadAddIcon() : item.label}
+                {item.icon === 'add'
+                  ? cardHeadAddIcon()
+                  : item.icon === 'checklist'
+                    ? cardHeadChecklistIcon()
+                    : item.label}
               </WebButton>
             )}
           </For>

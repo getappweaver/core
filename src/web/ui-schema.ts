@@ -24,6 +24,20 @@ export const WebRefreshSchema = z.object({
   subcommand: z.string().min(1),
   arguments: z.record(z.string(), z.unknown()).optional().default({}),
   options: z.record(z.string(), z.unknown()).optional().default({}),
+  highlightTargetIds: z.array(z.string().min(1)).optional(),
+  highlightTargetIdFromOutput: z
+    .object({
+      pattern: z.string().min(1),
+      template: z.string().min(1),
+    })
+    .optional(),
+  expandTreeItemIds: z.array(z.string().min(1)).optional(),
+  expandTreeItemIdFromOption: z
+    .object({
+      option: z.string().min(1),
+      template: z.string().min(1),
+    })
+    .optional(),
 });
 
 /** Optional line under a command option in the web form; not sent to the bot. */
@@ -62,6 +76,11 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     targetId: z.string().min(1),
   }),
   z.object({
+    /** Toggle a reveal target open/closed. */
+    type: z.literal('toggleReveal'),
+    targetId: z.string().min(1),
+  }),
+  z.object({
     type: z.literal('command'),
     command: z.string().min(1),
     subcommand: z.string().min(1),
@@ -94,6 +113,7 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     type: z.literal('clientAction'),
     action: z.string().min(1),
     payload: z.record(z.string(), z.unknown()).optional().default({}),
+    refresh: WebRefreshSchema.optional(),
   }),
   z.object({
     type: z.literal('prompt_answer'),
@@ -105,7 +125,7 @@ export const WebActionSchema = z.discriminatedUnion('type', [
 
 export const WebToolbarActionSchema = z.object({
   label: z.string().min(1),
-  icon: z.enum(['add']).optional(),
+  icon: z.enum(['add', 'checklist']).optional(),
   action: WebActionSchema,
 });
 
@@ -174,6 +194,8 @@ export const WebPropsSchema = z.object({
   /** Hide this node until `{ type: "reveal", targetId }`; `{ type: "hideReveal", targetId }` collapses again. */
   revealId: z.string().min(1).optional(),
   hiddenUntilRevealed: z.literal(true).optional(),
+  /** Hide this node unless the connected browser signer pubkey is in this allow-list. */
+  visibleForPubkeys: z.array(z.string().min(1)).optional(),
   action: WebActionSchema.optional(),
   stopPropagation: z.boolean().optional(),
   /** `textField`: name submitted with parent `form` (FormData / merge into command `arguments`). */
@@ -182,7 +204,9 @@ export const WebPropsSchema = z.object({
   inputPlaceholder: z.string().optional(),
   /** `select`: allowed option values. */
   choices: z.array(z.string()).optional(),
-  /** `select`: initially selected option value. */
+  /** `select`: display labels keyed by submitted option value. */
+  choiceLabels: z.record(z.string(), z.string()).optional(),
+  /** `select`/`textField`: initially selected or prefilled value. */
   value: z.string().optional(),
   /** `choiceField`: option value that opens a freeform numeric/text input. */
   customChoice: z.string().optional(),
@@ -194,6 +218,8 @@ export const WebPropsSchema = z.object({
   storyTargetId: z.string().min(1).optional(),
   /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
   htmlType: z.enum(['button', 'submit']).optional(),
+  /** `form`: fields with these names merge into command `options` instead of positional `arguments`. */
+  formOptionFieldNames: z.array(z.string().min(1)).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */
   ttsText: z.string().optional(),
 });
@@ -268,6 +294,8 @@ export const WebNodeSchema: z.ZodType<WebNode> = z.lazy(() =>
 export const WebRenderMetaSchema = z.object({
   command: z.string().min(1),
   subcommand: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Scoped CSS for one WebNodeRoot render; applied inside Shadow DOM only (client). */

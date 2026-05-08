@@ -153,8 +153,20 @@ export function payloadFromPathTokens(
       throw new Error(`Missing value for ${token}`);
     }
 
-    payload.options[option.name] =
+    const parsedValue =
       option.kind === 'integer' ? Number.parseInt(next, 10) : next;
+
+    if (option.multiple === true) {
+      const existing = payload.options[option.name];
+
+      payload.options[option.name] = Array.isArray(existing)
+        ? [...existing, parsedValue]
+        : existing == null || existing === ''
+          ? [parsedValue]
+          : [existing, parsedValue];
+    } else {
+      payload.options[option.name] = parsedValue;
+    }
 
     i += 1;
   }

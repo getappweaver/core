@@ -97,6 +97,16 @@ function pushOptionTokens(
     return;
   }
 
+  if (option.multiple === true && Array.isArray(value)) {
+    for (const item of value) {
+      if (item != null && item !== '') {
+        tokens.push(option.flag, stringifyScalar(item));
+      }
+    }
+
+    return;
+  }
+
   tokens.push(option.flag, stringifyScalar(value));
 }
 

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.6.0] - 2026-05-08
+
+- feat: add interactive roadmap issue actions (9f001d0)
+
 ## [v9.5.2] - 2026-05-08
 
-- fix: improve plugin catalog publishing and queries (49dc83e)
+- fix: improve plugin catalog publishing and queries (9dc1a9d)
 
 ## [v9.5.1] - 2026-05-08
 

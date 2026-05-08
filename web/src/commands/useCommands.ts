@@ -1,6 +1,13 @@
 import type { TimelineFileDiff } from '@src/timeline/types';
+import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
+import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
+import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
 import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
+import {
+  handleRoadmapDeleteIssue,
+  handleRoadmapMarkIssue,
+} from '../roadmap/markIssue';
 import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
@@ -19,7 +26,7 @@ function shouldRefreshComposerAiState(
   return (
     command === 'ai' &&
     [
-      'agent-set',
+      'agents set',
       'backend',
       'mode',
       'model',
@@ -27,6 +34,40 @@ function shouldRefreshComposerAiState(
       'root-model',
     ].includes(subcommand)
   );
+}
+
+function taskbarLoadingWeb(command: string, subcommand: string): WebNodeRoot {
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command, subcommand },
+    tree: {
+      type: 'element',
+      tag: 'box',
+      props: { padding: 'md' },
+      children: [
+        {
+          type: 'element',
+          tag: 'stack',
+          props: { gap: 'sm' },
+          children: [
+            {
+              type: 'element',
+              tag: 'text',
+              props: { weight: 'bold' },
+              children: [{ type: 'text', value: `/${command} ${subcommand}` }],
+            },
+            {
+              type: 'element',
+              tag: 'text',
+              props: { tone: 'muted' },
+              children: [{ type: 'text', value: 'Loading...' }],
+            },
+          ],
+        },
+      ],
+    },
+  };
 }
 
 function timelineDiffClientViewFiles(
@@ -50,6 +91,71 @@ function timelineDiffClientViewFiles(
     const rec = file as Record<string, unknown>;
 
     return typeof rec.file === 'string' && typeof rec.patch === 'string';
+  });
+}
+
+function appendClassName(
+  existing: string | undefined,
+  className: string,
+): string {
+  return existing ? `${existing} ${className}` : className;
+}
+
+function highlightWebNodeTargets(
+  node: WebNode,
+  targetIds: Set<string>,
+): WebNode {
+  if (node.type !== 'element') {
+    return node;
+  }
+
+  const shouldHighlight =
+    (node.props?.id !== undefined && targetIds.has(node.props.id)) ||
+    (node.props?.storyTargetId !== undefined &&
+      targetIds.has(node.props.storyTargetId));
+
+  return {
+    ...node,
+    props: shouldHighlight
+      ? {
+          ...node.props,
+          className: appendClassName(
+            node.props?.className,
+            'web-highlight-flash',
+          ),
+        }
+      : node.props,
+    summary: node.summary
+      ? highlightWebNodeTargets(node.summary, targetIds)
+      : undefined,
+    children: node.children?.map((child) =>
+      highlightWebNodeTargets(child, targetIds),
+    ),
+  };
+}
+
+function highlightWebRootTargets(
+  root: WebNodeRoot,
+  targetIds: string[],
+): WebNodeRoot {
+  if (targetIds.length === 0) {
+    return root;
+  }
+
+  return {
+    ...root,
+    tree: highlightWebNodeTargets(root.tree, new Set(targetIds)),
+  };
+}
+
+function expandHighlightTargetTemplate(
+  template: string,
+  match: RegExpMatchArray,
+): string {
+  return template.replace(/\$(\d+)/g, (_placeholder, indexRaw: string) => {
+    const index = Number.parseInt(indexRaw, 10);
+
+    return match[index] ?? '';
   });
 }
 
@@ -190,20 +296,96 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     if (action.type === 'clientAction') {
-      void handleRoadmapLightningZap({
-        action,
-        signEvent: adapters.signEvent,
-        setChromeWeb: adapters.setChromeWeb,
-        setChromeText: adapters.setChromeText,
-        setChromeError: adapters.setChromeError,
-        setChromeLoading: adapters.setChromeLoading,
-      }).then((handled) => {
-        if (!handled) {
-          adapters.appendSystemMessage(
-            `Unknown client action: ${action.action}`,
+      const runClientAction = (actionPromise: Promise<void>): void => {
+        void actionPromise.then(() => {
+          const refresh = action.refresh;
+
+          if (!refresh || !params?.onReplaceRoot) {
+            return;
+          }
+
+          runWebAction(
+            {
+              type: 'command',
+              command: refresh.command,
+              subcommand: refresh.subcommand,
+              arguments: refresh.arguments ?? {},
+              options: refresh.options ?? {},
+              recordInTimeline: false,
+            },
+            {
+              onReplaceRoot: params.onReplaceRoot,
+              promptRequestId: params.promptRequestId,
+              uiExecutionPolicy: { recordInTimeline: false },
+            },
           );
-        }
-      });
+        });
+      };
+
+      if (action.action === 'roadmap.lightningZap') {
+        runClientAction(
+          handleRoadmapLightningZap({
+            action,
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+          }),
+        );
+      } else if (action.action === 'roadmap.createIssue') {
+        runClientAction(
+          handleRoadmapCreateIssue({
+            action,
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (action.action === 'roadmap.commentIssue') {
+        runClientAction(
+          handleRoadmapCommentIssue({
+            action,
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (action.action === 'roadmap.markIssue') {
+        runClientAction(
+          handleRoadmapMarkIssue({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (action.action === 'roadmap.deleteIssue') {
+        runClientAction(
+          handleRoadmapDeleteIssue({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else {
+        adapters.appendSystemMessage(`Unknown client action: ${action.action}`);
+      }
 
       return;
     }
@@ -271,8 +453,31 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const sourceId = params?.webCommandSourceId;
 
     let refreshChildInFlight = false;
-    let refreshDispatchAttempted = false;
+    let promptRefreshDispatchAttempted = false;
+    let finalRefreshDispatchAttempted = false;
     let userBusyEnded = false;
+
+    const refreshHighlightTargetIds = [
+      ...(commandAction.refresh?.highlightTargetIds ?? []),
+    ];
+
+    function collectRefreshHighlightTargets(outputText: string | null): void {
+      const fromOutput = commandAction.refresh?.highlightTargetIdFromOutput;
+
+      if (!fromOutput || !outputText) {
+        return;
+      }
+
+      const match = outputText.match(new RegExp(fromOutput.pattern));
+
+      if (!match) {
+        return;
+      }
+
+      refreshHighlightTargetIds.push(
+        expandHighlightTargetTemplate(fromOutput.template, match),
+      );
+    }
 
     function endUserWebUiBusyOnce(): void {
       if (!sourceId || userBusyEnded) {
@@ -283,11 +488,25 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       adapters.endWebUiBusy(sourceId);
     }
 
-    function dispatchRefreshOnce(): void {
+    function dispatchRefreshOnce(refreshStage: 'prompt' | 'final'): void {
       const refresh = commandAction.refresh;
 
-      if (!refresh || refreshDispatchAttempted) {
+      if (!refresh) {
         return;
+      }
+
+      if (refreshStage === 'prompt') {
+        if (promptRefreshDispatchAttempted) {
+          return;
+        }
+
+        promptRefreshDispatchAttempted = true;
+      } else {
+        if (finalRefreshDispatchAttempted) {
+          return;
+        }
+
+        finalRefreshDispatchAttempted = true;
       }
 
       const refreshesTaskbar = adapters.isTaskbarSubcommand(
@@ -299,14 +518,23 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         return;
       }
 
-      refreshDispatchAttempted = true;
-
       const refreshRequestId = adapters.createId();
 
       adapters.pendingRequests.set(refreshRequestId, {
         recordInTimeline: recordTl,
         onCommandResult: (refreshMessage) => {
+          if (refreshStage === 'prompt' && finalRefreshDispatchAttempted) {
+            return;
+          }
+
           const refreshOutput = splitCommandOutput(refreshMessage.output);
+
+          const highlightedWeb = refreshOutput.web
+            ? highlightWebRootTargets(
+                refreshOutput.web,
+                refreshHighlightTargetIds,
+              )
+            : null;
 
           if (refreshesTaskbar) {
             adapters.setTaskbarDockResult({
@@ -316,11 +544,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 arguments: refresh.arguments ?? {},
                 options: refresh.options ?? {},
               },
-              output: refreshOutput,
+              output: { ...refreshOutput, web: highlightedWeb },
               visible: true,
             });
-          } else if (refreshOutput.web) {
-            params?.onReplaceRoot?.(refreshOutput.web);
+          } else if (highlightedWeb) {
+            params?.onReplaceRoot?.(highlightedWeb);
           }
         },
         onDone: () => {
@@ -364,6 +592,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
         const output = splitCommandOutput(message.output);
+        collectRefreshHighlightTargets(output.text);
 
         const timelineDiffFiles =
           output.clientView?.view === 'timeline-diff'
@@ -380,7 +609,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             },
           ]);
 
-          dispatchRefreshOnce();
+          dispatchRefreshOnce('final');
 
           return;
         }
@@ -432,10 +661,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           params.onReplaceRoot(output.web);
         }
 
-        dispatchRefreshOnce();
+        dispatchRefreshOnce('final');
       },
       onPrompt: (message) => {
         const prompt = splitPromptPayload(message.prompt);
+
+        dispatchRefreshOnce('prompt');
 
         adapters.setPendingPromptRequestId(message.requestId);
 
@@ -473,7 +704,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           void refreshComposerAiState();
         }
 
-        dispatchRefreshOnce();
+        dispatchRefreshOnce('final');
 
         if (!refreshChildInFlight) {
           endUserWebUiBusyOnce();
@@ -537,7 +768,19 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const requestId = adapters.createId();
     const isTaskbar = adapters.isTaskbarSubcommand(command, subcommand.name);
 
-    if (!isTaskbar) {
+    if (isTaskbar) {
+      adapters.setTaskbarDockResult({
+        command,
+        subcommand: subcommand.name,
+        values,
+        output: {
+          text: null,
+          web: taskbarLoadingWeb(command, subcommand.name),
+          clientView: null,
+        },
+        visible: true,
+      });
+    } else {
       adapters.setTimeline((prev) => [
         ...prev,
         {

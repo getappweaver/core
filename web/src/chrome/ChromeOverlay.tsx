@@ -13,6 +13,7 @@ import {
 
 type ChromeOverlayProps = {
   chrome: ChromeHook;
+  currentUserPubkey: string | null;
   isWebUiBusy: (sourceId: string) => boolean;
   onClose: () => void;
   onRunWebAction: (
@@ -40,6 +41,7 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
         error={props.chrome.chromeError()}
         text={props.chrome.chromeText()}
         web={props.chrome.chromeWeb()}
+        currentUserPubkey={props.currentUserPubkey}
         onReplaceWeb={(root) => props.chrome.setChromeWeb(root)}
         isWebUiBusy={props.isWebUiBusy}
         chromeWebCommandSourceId={CHROME_WEB_COMMAND_SOURCE_ID}
@@ -76,6 +78,7 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
                   <WebNodeShadowRoot
                     root={payload.web!}
                     promptRequestId={session.requestId}
+                    currentUserPubkey={props.currentUserPubkey}
                     busy={props.isWebUiBusy(promptSourceId)}
                     onRunAction={(action, params) =>
                       props.onRunWebAction(action, {

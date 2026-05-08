@@ -533,6 +533,7 @@ export type WebRevealContextValue = {
   isRevealed: (id: string) => boolean;
   reveal: (id: string) => void;
   hideReveal: (id: string) => void;
+  toggleReveal: (id: string) => void;
 };
 
 export const WebRevealContext = createContext<
@@ -569,6 +570,31 @@ export const WebTreeHeaderElCallbackContext = createContext<
 export const TreeItemExpandedStateContext = createContext<
   Map<string, boolean> | undefined
 >(undefined);
+
+function expandTreeItemsForAction(
+  action: WebAction,
+  expandedById: Map<string, boolean> | undefined,
+): void {
+  if (action.type !== 'command' || expandedById === undefined) {
+    return;
+  }
+
+  for (const id of action.refresh?.expandTreeItemIds ?? []) {
+    expandedById.set(id, true);
+  }
+
+  const fromOption = action.refresh?.expandTreeItemIdFromOption;
+
+  if (fromOption === undefined) {
+    return;
+  }
+
+  const value = action.options?.[fromOption.option];
+
+  if (typeof value === 'string' && value.length > 0) {
+    expandedById.set(fromOption.template.replace('$1', value), true);
+  }
+}
 
 type TreeFilterState = {
   query: Accessor<string>;
@@ -613,8 +639,18 @@ export const WebRenderSurfaceContext = createContext<
   Accessor<'modal' | 'timeline' | null> | undefined
 >(undefined);
 
+export const WebCurrentUserPubkeyContext = createContext<
+  Accessor<string | null> | undefined
+>(undefined);
+
 function useWebRenderMeta(): Accessor<WebRenderMeta | null> {
   const ctx = useContext(WebRenderMetaContext);
+
+  return () => (ctx !== undefined ? ctx() : null);
+}
+
+function useWebCurrentUserPubkey(): Accessor<string | null> {
+  const ctx = useContext(WebCurrentUserPubkeyContext);
 
   return () => (ctx !== undefined ? ctx() : null);
 }
@@ -1134,7 +1170,7 @@ function WebTreeItemElement(props: WebTreeItemProps) {
   const initialExpanded = () => {
     const id = treeItemId();
 
-    if (!id || !expandedById) {
+    if (!(id && expandedById)) {
       return props.element.props?.defaultExpanded ?? true;
     }
 
@@ -1494,8 +1530,9 @@ function WebTreeElement(props: WebTreeElementProps) {
         type: 'command',
         command: meta.command,
         subcommand: meta.subcommand,
-        arguments: {},
-        options: {},
+        arguments: meta.arguments ?? {},
+        options: meta.options ?? {},
+        recordInTimeline: false,
       },
       {
         onReplaceRoot: props.onReplaceRoot,
@@ -1534,6 +1571,12 @@ function WebTreeElement(props: WebTreeElementProps) {
 
         if (action.type === 'hideReveal') {
           revealContext?.hideReveal(action.targetId);
+
+          return;
+        }
+
+        if (action.type === 'toggleReveal') {
+          revealContext?.toggleReveal(action.targetId);
 
           return;
         }
@@ -1730,6 +1773,7 @@ type WebFormElementProps = {
 };
 
 function WebFormElement(props: WebFormElementProps): JSX.Element {
+  const expandedById = useContext(TreeItemExpandedStateContext);
   let formEl: HTMLFormElement | undefined;
 
   createEffect(() => {
@@ -1822,9 +1866,21 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
       ...(action.arguments ?? {}),
     };
 
+    const mergedOptions: Record<string, unknown> = {
+      ...(action.options ?? {}),
+    };
+
+    const optionFieldNames = new Set(
+      props.element.props?.formOptionFieldNames ?? [],
+    );
+
     for (const [key, value] of fd.entries()) {
       if (typeof value === 'string') {
-        mergedArgs[key] = value;
+        if (optionFieldNames.has(key)) {
+          mergedOptions[key] = value;
+        } else {
+          mergedArgs[key] = value;
+        }
       }
     }
 
@@ -1832,7 +1888,10 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
       ...action,
       type: 'command',
       arguments: mergedArgs,
+      options: mergedOptions,
     };
+
+    expandTreeItemsForAction(merged, expandedById);
 
     props.onRunAction?.(merged, {
       onReplaceRoot: props.onReplaceRoot,
@@ -1930,6 +1989,7 @@ function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
         class="web-textField__input"
         type="text"
         name={name}
+        value={props.element.props?.value ?? ''}
         placeholder={props.element.props?.inputPlaceholder}
         disabled={props.element.props?.disabled === true || getBusy() === true}
         autocomplete="off"
@@ -2087,7 +2147,11 @@ function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
         }
       >
         <For each={props.element.props?.choices ?? []}>
-          {(choice) => <option value={choice}>{choice}</option>}
+          {(choice) => (
+            <option value={choice}>
+              {props.element.props?.choiceLabels?.[choice] ?? choice}
+            </option>
+          )}
         </For>
       </select>
     </div>
@@ -2157,12 +2221,16 @@ function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
 export function WebNodeRenderer(props: WebNodeRendererProps) {
   const getBusy = useContext(WebShadowUiBusyContext);
   const revealContext = useContext(WebRevealContext);
+  const currentUserPubkey = useWebCurrentUserPubkey();
+  const expandedById = useContext(TreeItemExpandedStateContext);
   const node = () => props.node ?? props.root?.tree;
 
   const runAction = (action: WebAction | undefined) => {
     if (!action) {
       return;
     }
+
+    expandTreeItemsForAction(action, expandedById);
 
     if (action.type === 'reveal') {
       revealContext?.reveal(action.targetId);
@@ -2172,6 +2240,12 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
 
     if (action.type === 'hideReveal') {
       revealContext?.hideReveal(action.targetId);
+
+      return;
+    }
+
+    if (action.type === 'toggleReveal') {
+      revealContext?.toggleReveal(action.targetId);
 
       return;
     }
@@ -2192,6 +2266,14 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
         {(() => {
           const element = node() as WebElementNode;
           const revealId = element.props?.revealId;
+          const visibleForPubkeys = element.props?.visibleForPubkeys;
+
+          if (
+            visibleForPubkeys !== undefined &&
+            !visibleForPubkeys.includes(currentUserPubkey() ?? '')
+          ) {
+            return null;
+          }
 
           if (
             element.props?.hiddenUntilRevealed === true &&

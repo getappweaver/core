@@ -42,7 +42,7 @@ export function getRoadmapCommandDefinition({
       },
       {
         name: 'new',
-        summary: 'Create a new roadmap issue. Submission is not wired yet.',
+        summary: 'Create a new roadmap issue from the web client.',
         aliases: ['add'],
         arguments: [
           {

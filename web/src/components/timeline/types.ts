@@ -17,6 +17,7 @@ export type TimelineViewProps = {
   onDeleteTimelineItem: (itemId: string) => void;
   onReplaceCommandWeb: (itemId: string, web: WebNodeRoot) => void;
   onAppendSystem: (text: string) => void;
+  currentUserPubkey: string | null;
   isWebUiBusy: (sourceId: string) => boolean;
   onRunWebAction: (
     action: WebAction,

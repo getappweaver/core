@@ -59,6 +59,7 @@ export type SplitCommandOutput = {
 
 export type CommandsAdapters = {
   authStatus: Accessor<string>;
+  currentUserPubkey: Accessor<string | null>;
   wsConnected: Accessor<boolean>;
   timelineId: Accessor<string>;
   pendingPromptRequestId: Accessor<string | null>;

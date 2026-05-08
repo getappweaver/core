@@ -6,7 +6,7 @@ import { join } from 'path';
 
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
-import type { WebNodeRoot } from '@src/web/ui-schema';
+import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
 
 import type {
   BotPlugin,
@@ -62,7 +62,7 @@ export async function dispatchPluginCommand(
   cmd: string,
   args: string[],
   context: PluginInvocationContext,
-): Promise<string | WebNodeRoot | null> {
+): Promise<string | WebNodeRoot | ClientViewRoot | null> {
   const plugin = byAlias.get(cmd);
 
   if (!plugin) {

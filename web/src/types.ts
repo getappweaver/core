@@ -19,6 +19,7 @@ export type CommandField = {
   webDefaultValue?: string | number | boolean;
   required?: boolean;
   variadic?: boolean;
+  multiple?: boolean;
   flag?: string;
   shortFlag?: string | null;
   /** When present on a string option, prefer a dropdown in the web form. */

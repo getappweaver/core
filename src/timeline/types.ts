@@ -41,6 +41,7 @@ export type TimelineCommandField = {
   kind: 'string' | 'integer' | 'boolean';
   required?: boolean;
   variadic?: boolean;
+  multiple?: boolean;
   flag?: string;
   shortFlag?: string | null;
   choices?: string[];

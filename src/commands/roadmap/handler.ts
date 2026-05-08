@@ -9,9 +9,12 @@ import { renderRoadmapFundWeb, renderRoadmapWeb } from './renderers/web';
 
 const PROJECT_KIND = 30617;
 const ISSUE_KIND = 1621;
+const STATUS_OPEN_KIND = 1630;
 const STATUS_RESOLVED_KIND = 1631;
 const STATUS_CLOSED_KIND = 1632;
+const STATUS_DRAFT_KIND = 1633;
 const COMMENT_KIND = 1111;
+const DELETE_KIND = 5;
 const WORKFLOW_KIND = 39010;
 const TRACKER_KIND = 39011;
 const ZAP_KIND = 9735;
@@ -20,6 +23,9 @@ const MSATS_PER_SAT = 1000;
 export type IssueView = {
   id: string;
   project: string;
+  projectAddress: string;
+  authorPubkey: string;
+  repoMaintainers: string[];
   subject: string;
   content: string;
   labels: string[];
@@ -27,6 +33,12 @@ export type IssueView = {
   fundingSats: number;
   zapCount: number;
   commentCount: number;
+  comments: {
+    id: string;
+    authorPubkey: string;
+    content: string;
+    createdAt: number;
+  }[];
   status: string | null;
 };
 
@@ -57,6 +69,43 @@ function tags(event: NostrEvent, name: string): string[][] {
 
 function eventReference(event: NostrEvent, name: string): string {
   return tags(event, name).find((tag) => tag[1])?.[1] ?? '';
+}
+
+function projectAddress(event: NostrEvent): string {
+  const identifier = tagValue(event, 'd');
+
+  return identifier ? `${event.kind}:${event.pubkey}:${identifier}` : '';
+}
+
+function projectMaintainers(event: NostrEvent): Set<string> {
+  return new Set([
+    event.pubkey,
+    ...tags(event, 'maintainers')
+      .map((tag) => tag[1])
+      .filter(Boolean),
+  ]);
+}
+
+type IsMaintainerProps = {
+  pubkey: string;
+  projectAddressValue: string;
+  maintainersByProject: Map<string, Set<string>>;
+};
+
+function isMaintainer({
+  pubkey,
+  projectAddressValue,
+  maintainersByProject,
+}: IsMaintainerProps): boolean {
+  return maintainersByProject.get(projectAddressValue)?.has(pubkey) ?? false;
+}
+
+function workflowProjectAddress(event: NostrEvent): string {
+  return tags(event, 'a').find((tag) => tag[3] === 'project')?.[1] ?? '';
+}
+
+function workflowReference(event: NostrEvent): string {
+  return tags(event, 'a').find((tag) => tag[3] === 'workflow')?.[1] ?? '';
 }
 
 function relayArg(args: string[]): string {
@@ -167,18 +216,27 @@ function issueView({
   fundingByIssue,
   zapCountByIssue,
   commentCountByIssue,
+  commentsByIssue,
   statusByIssue,
+  maintainersByProject,
 }: {
   issue: NostrEvent;
   projectName: string;
   fundingByIssue: Map<string, number>;
   zapCountByIssue: Map<string, number>;
   commentCountByIssue: Map<string, number>;
+  commentsByIssue: Map<string, NostrEvent[]>;
   statusByIssue: Map<string, string>;
+  maintainersByProject: Map<string, Set<string>>;
 }): IssueView {
   return {
     id: issue.id,
     project: projectName,
+    projectAddress: tagValue(issue, 'a'),
+    authorPubkey: issue.pubkey,
+    repoMaintainers: [
+      ...(maintainersByProject.get(tagValue(issue, 'a')) ?? []),
+    ],
     subject: tagValue(issue, 'subject') || '(untitled issue)',
     content: issue.content,
     labels: tags(issue, 't')
@@ -188,6 +246,12 @@ function issueView({
     fundingSats: fundingByIssue.get(issue.id) ?? 0,
     zapCount: zapCountByIssue.get(issue.id) ?? 0,
     commentCount: commentCountByIssue.get(issue.id) ?? 0,
+    comments: (commentsByIssue.get(issue.id) ?? []).map((comment) => ({
+      id: comment.id,
+      authorPubkey: comment.pubkey,
+      content: comment.content,
+      createdAt: comment.created_at,
+    })),
     status: statusByIssue.get(issue.id) ?? null,
   };
 }
@@ -196,7 +260,7 @@ function renderIssue(issue: IssueView): string {
   const status = issue.status ? ` · ${issue.status}` : '';
   const labels = issue.labels.length > 0 ? ` · ${issue.labels.join(', ')}` : '';
 
-  return `- ${issue.subject} (${formatSats(issue.fundingSats)}, ${issue.zapCount} zap${issue.zapCount === 1 ? '' : 's'}, ${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}${status}${labels}) #${shortId(issue.id)}`;
+  return `- ${issue.subject} (${formatSats(issue.fundingSats)}, ${issue.zapCount} zap${issue.zapCount === 1 ? '' : 's'}, ${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}${status}${labels})`;
 }
 
 function renderRoadmap(view: RoadmapView): string {
@@ -229,21 +293,70 @@ function materializeRoadmap({
   relay: string;
   events: NostrEvent[];
 }): RoadmapView {
-  const projects = events.filter((event) => event.kind === PROJECT_KIND);
-  const issues = events.filter((event) => event.kind === ISSUE_KIND);
-  const workflows = events.filter((event) => event.kind === WORKFLOW_KIND);
-  const trackers = events.filter((event) => event.kind === TRACKER_KIND);
+  const projects = [
+    ...latestByKey(
+      events.filter((event) => event.kind === PROJECT_KIND),
+      projectAddress,
+    ).values(),
+  ];
+
   const zaps = events.filter((event) => event.kind === ZAP_KIND);
   const comments = events.filter((event) => event.kind === COMMENT_KIND);
+  const deletions = events.filter((event) => event.kind === DELETE_KIND);
 
   const statuses = events.filter(
     (event) =>
-      event.kind === STATUS_RESOLVED_KIND || event.kind === STATUS_CLOSED_KIND,
+      event.kind === STATUS_OPEN_KIND ||
+      event.kind === STATUS_RESOLVED_KIND ||
+      event.kind === STATUS_CLOSED_KIND ||
+      event.kind === STATUS_DRAFT_KIND,
   );
 
+  const projectEventsByAddress = new Map(
+    projects
+      .map((event) => [projectAddress(event), event] as const)
+      .filter(([address]) => address),
+  );
+
+  const maintainersByProject = new Map(
+    [...projectEventsByAddress].map(([address, event]) => [
+      address,
+      projectMaintainers(event),
+    ]),
+  );
+
+  const rawIssues = events
+    .filter((event) => event.kind === ISSUE_KIND)
+    .filter((event) => projectEventsByAddress.has(tagValue(event, 'a')));
+
+  const rawIssuesById = new Map(rawIssues.map((event) => [event.id, event]));
+  const deletedIssueIds = new Set<string>();
+
+  for (const deletion of deletions) {
+    for (const tag of tags(deletion, 'e')) {
+      const issue = rawIssuesById.get(tag[1] ?? '');
+
+      if (issue && issue.pubkey === deletion.pubkey) {
+        deletedIssueIds.add(issue.id);
+      }
+    }
+  }
+
+  const issues = rawIssues.filter((event) => !deletedIssueIds.has(event.id));
+
+  const workflows = events
+    .filter((event) => event.kind === WORKFLOW_KIND)
+    .filter((event) =>
+      isMaintainer({
+        pubkey: event.pubkey,
+        projectAddressValue: workflowProjectAddress(event),
+        maintainersByProject,
+      }),
+    );
+
   const projectNameByAddress = new Map(
-    projects.map((event) => [
-      `${event.kind}:${event.pubkey}:${tagValue(event, 'd')}`,
+    [...projectEventsByAddress].map(([address, event]) => [
+      address,
       tagValue(event, 'name') || tagValue(event, 'd') || shortId(event.id),
     ]),
   );
@@ -268,6 +381,7 @@ function materializeRoadmap({
   }
 
   const commentCountByIssue = new Map<string, number>();
+  const commentsByIssue = new Map<string, NostrEvent[]>();
 
   for (const comment of comments) {
     const issueId =
@@ -278,20 +392,53 @@ function materializeRoadmap({
         issueId,
         (commentCountByIssue.get(issueId) ?? 0) + 1,
       );
+
+      commentsByIssue.set(issueId, [
+        ...(commentsByIssue.get(issueId) ?? []),
+        comment,
+      ]);
     }
+  }
+
+  for (const [issueId, issueComments] of commentsByIssue) {
+    commentsByIssue.set(
+      issueId,
+      issueComments.sort(
+        (a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id),
+      ),
+    );
   }
 
   const statusByIssue = new Map<string, string>();
 
-  const latestStatuses = latestByKey(statuses, (event) =>
-    eventReference(event, 'e'),
+  const latestStatuses = latestByKey(
+    statuses.filter((event) => {
+      const issue = issuesById.get(eventReference(event, 'e'));
+
+      if (!issue) {
+        return false;
+      }
+
+      return (
+        event.pubkey === issue.pubkey ||
+        isMaintainer({
+          pubkey: event.pubkey,
+          projectAddressValue: tagValue(issue, 'a'),
+          maintainersByProject,
+        })
+      );
+    }),
+    (event) => eventReference(event, 'e'),
   );
 
   for (const [issueId, status] of latestStatuses) {
-    statusByIssue.set(
-      issueId,
-      status.kind === STATUS_RESOLVED_KIND ? 'resolved' : 'closed',
-    );
+    if (status.kind === STATUS_RESOLVED_KIND) {
+      statusByIssue.set(issueId, 'resolved');
+    } else if (status.kind === STATUS_CLOSED_KIND) {
+      statusByIssue.set(issueId, 'closed');
+    } else if (status.kind === STATUS_DRAFT_KIND) {
+      statusByIssue.set(issueId, 'draft');
+    }
   }
 
   const workflowAddressById = new Map(
@@ -301,11 +448,35 @@ function materializeRoadmap({
     ]),
   );
 
+  const workflowProjectByAddress = new Map(
+    workflows.map((event) => [
+      workflowAddressById.get(event.id) ?? '',
+      workflowProjectAddress(event),
+    ]),
+  );
+
+  const trackers = events
+    .filter((event) => event.kind === TRACKER_KIND)
+    .filter((event) => {
+      const issue = issuesById.get(eventReference(event, 'e'));
+      const workflow = workflowReference(event);
+      const project = workflowProjectByAddress.get(workflow) ?? '';
+
+      return (
+        issue !== undefined &&
+        project !== '' &&
+        tagValue(issue, 'a') === project &&
+        isMaintainer({
+          pubkey: event.pubkey,
+          projectAddressValue: project,
+          maintainersByProject,
+        })
+      );
+    });
+
   const latestTrackers = latestByKey(trackers, (event) => {
     const issueId = eventReference(event, 'e');
-
-    const workflow =
-      tags(event, 'a').find((tag) => tag[3] === 'workflow')?.[1] ?? '';
+    const workflow = workflowReference(event);
 
     return issueId && workflow ? `${workflow}:${issueId}` : '';
   });
@@ -316,8 +487,7 @@ function materializeRoadmap({
   for (const tracker of latestTrackers.values()) {
     const issueId = eventReference(tracker, 'e');
 
-    const workflow =
-      tags(tracker, 'a').find((tag) => tag[3] === 'workflow')?.[1] ?? '';
+    const workflow = workflowReference(tracker);
 
     if (!issueId || !workflow || !issuesById.has(issueId)) {
       continue;
@@ -343,7 +513,9 @@ function materializeRoadmap({
       fundingByIssue,
       zapCountByIssue,
       commentCountByIssue,
+      commentsByIssue,
       statusByIssue,
+      maintainersByProject,
     });
   };
 
@@ -351,8 +523,7 @@ function materializeRoadmap({
     const workflowAddress = workflowAddressById.get(workflow.id) ?? '';
     const workflowTrackers = trackerByWorkflow.get(workflowAddress) ?? [];
 
-    const projectAddress =
-      tags(workflow, 'a').find((tag) => tag[3] === 'project')?.[1] ?? '';
+    const projectAddress = workflowProjectAddress(workflow);
 
     const assignedForWorkflow =
       assignedIssueIdsByWorkflow.get(workflowAddress) ?? new Set<string>();
@@ -420,9 +591,12 @@ async function loadRoadmap(ctx: Parameters<BuiltinHandler>[0]) {
     {
       kinds: [
         PROJECT_KIND,
+        DELETE_KIND,
         ISSUE_KIND,
+        STATUS_OPEN_KIND,
         STATUS_RESOLVED_KIND,
         STATUS_CLOSED_KIND,
+        STATUS_DRAFT_KIND,
         COMMENT_KIND,
         WORKFLOW_KIND,
         TRACKER_KIND,
@@ -523,7 +697,7 @@ export const handleRoadmapRoot: BuiltinHandler = (ctx) => {
     const repo = positionalArg(ctx.args.slice(1), 0);
 
     return Promise.resolve(
-      `Roadmap issue creation is not wired yet. The issue will publish as NIP-34 kind 1621 with repo tag ${repo || '(missing repo)'} once submission is enabled.`,
+      `Roadmap issue creation publishes from the web client with your Nostr signer. Open /roadmap board for repo ${repo || '(missing repo)'}.`,
     );
   }
 

@@ -83,6 +83,7 @@ type TimelineCommandResultCardProps = {
   onRunWebAction: TimelineViewProps['onRunWebAction'];
   onRunJsonCommand: TimelineViewProps['onRunJsonCommand'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
+  currentUserPubkey: TimelineViewProps['currentUserPubkey'];
 };
 
 type SpeechSentenceState = {
@@ -400,6 +401,7 @@ export function TimelineCommandResultCard(
               renderSurface="timeline"
               stateScopeId={props.item.id}
               busy={props.isWebUiBusy(props.item.id)}
+              currentUserPubkey={props.currentUserPubkey}
               speechSentences={
                 speechHighlightActive() ? speechState().sentences : undefined
               }

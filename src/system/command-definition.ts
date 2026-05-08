@@ -11,6 +11,11 @@ export type CommandArgumentDefinition = {
   kind: CommandValueKind;
   /** Optional default used only by the web form layer. */
   webDefaultValue?: string | number | boolean;
+  /**
+   * Omit or `null` when there is no fixed choice list.
+   * Prefer writing `null` explicitly for new definitions.
+   */
+  choices?: string[] | null;
   /** When omitted, treated as false at parse time; prefer writing `false` explicitly. */
   required?: boolean;
   /** When omitted, treated as false at parse time; prefer writing `false` explicitly. */
@@ -31,6 +36,8 @@ export type CommandOptionDefinition = {
   kind: CommandValueKind;
   /** When omitted, treated as false at parse time; prefer writing `false` explicitly. */
   required?: boolean;
+  /** When true, repeated flags are preserved as an array instead of last-write-wins. */
+  multiple?: boolean;
   /**
    * Omit or `null` when there is no fixed choice list.
    * Prefer writing `null` explicitly for new definitions.

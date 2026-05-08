@@ -18,6 +18,7 @@ import {
   TreeItemExpandedStateContext,
   WebNodeRenderer,
   WebRevealContext,
+  WebCurrentUserPubkeyContext,
   type WebRevealContextValue,
   WebRenderMetaContext,
   WebRenderSurfaceContext,
@@ -41,6 +42,7 @@ type WebNodeShadowRootProps = {
   activeSpeechSentenceIndex?: number | null;
   onSpeechSentenceClick?: ((index: number) => void) | null;
   onReplaceRoot?: (root: WebNodeRoot) => void;
+  currentUserPubkey?: string | null;
   onError?: (message: string) => void;
   promptRequestId?: string;
   onRunAction?: (
@@ -141,6 +143,19 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
         return next;
       });
     },
+    toggleReveal: (id) => {
+      setRevealedIds((prev) => {
+        const next = new Set(prev);
+
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+
+        return next;
+      });
+    },
   };
 
   onMount(() => {
@@ -216,20 +231,24 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                   <WebTreeHeaderElCallbackContext.Provider
                     value={props.onWebTreeHeaderEl ?? null}
                   >
-                    <WebRevealContext.Provider value={revealContext}>
-                      <WebNodeRenderer
-                        root={currentRoot()}
-                        onReplaceRoot={props.onReplaceRoot}
-                        onError={props.onError}
-                        promptRequestId={props.promptRequestId}
-                        speechSentences={props.speechSentences}
-                        activeSpeechSentenceIndex={
-                          props.activeSpeechSentenceIndex
-                        }
-                        onSpeechSentenceClick={props.onSpeechSentenceClick}
-                        onRunAction={props.onRunAction}
-                      />
-                    </WebRevealContext.Provider>
+                    <WebCurrentUserPubkeyContext.Provider
+                      value={() => props.currentUserPubkey ?? null}
+                    >
+                      <WebRevealContext.Provider value={revealContext}>
+                        <WebNodeRenderer
+                          root={currentRoot()}
+                          onReplaceRoot={props.onReplaceRoot}
+                          onError={props.onError}
+                          promptRequestId={props.promptRequestId}
+                          speechSentences={props.speechSentences}
+                          activeSpeechSentenceIndex={
+                            props.activeSpeechSentenceIndex
+                          }
+                          onSpeechSentenceClick={props.onSpeechSentenceClick}
+                          onRunAction={props.onRunAction}
+                        />
+                      </WebRevealContext.Provider>
+                    </WebCurrentUserPubkeyContext.Provider>
                   </WebTreeHeaderElCallbackContext.Provider>
                 </WebTreeToolbarRegisterContext.Provider>
               </WebRenderSurfaceContext.Provider>

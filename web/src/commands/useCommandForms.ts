@@ -98,34 +98,27 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
       return;
     }
 
-    adapters.closePalette();
-    adapters.setComposerText('');
-
     if (subcommand.name === 'help') {
-      adapters.setTimeline((prev) => [
-        ...prev,
-        {
-          id: adapters.createId(),
-          type: 'command_result',
-          command: command.name,
-          subcommand: subcommand.name,
-          subcommandTag: 'help',
-          values: null,
-          text: command.subcommands
-            .map((item) => `/${command.name} ${item.usage} - ${item.summary}`)
-            .join('\n'),
-          web: null,
-          clientView: null,
-        },
-      ]);
+      adapters.closePalette();
+      adapters.setComposerText('');
+
+      await adapters.runCommand(
+        command.name,
+        subcommand,
+        initialValues ?? adapters.defaultPayload(subcommand),
+      );
 
       return;
     }
+
+    adapters.closePalette();
+    adapters.setComposerText('');
 
     const mode = subcommand.inferredWeb?.executionMode ?? 'requires_input';
 
     if (
       preferRun &&
+      mode !== 'requires_input' &&
       !adapters.hasMissingRequiredInputs(
         subcommand,
         initialValues ?? adapters.defaultPayload(subcommand),

@@ -45,6 +45,22 @@ select {
   word-break: break-word;
 }
 
+@keyframes web-highlight-flash {
+  0%, 100% {
+    background: transparent;
+  }
+  10%, 45%, 80% {
+    background: color-mix(in srgb, var(--color-warning) 38%, transparent);
+  }
+  25%, 65% {
+    background: transparent;
+  }
+}
+
+.web-highlight-flash {
+  animation: web-highlight-flash 3s ease-in-out;
+}
+
 .web-button {
   display: inline-block;
   border: none;

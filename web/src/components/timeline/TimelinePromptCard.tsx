@@ -58,6 +58,7 @@ type TimelinePromptCardProps = {
   onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
   onRunWebAction: TimelineViewProps['onRunWebAction'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
+  currentUserPubkey: TimelineViewProps['currentUserPubkey'];
 };
 
 export function TimelinePromptCard(props: TimelinePromptCardProps) {
@@ -113,6 +114,7 @@ export function TimelinePromptCard(props: TimelinePromptCardProps) {
             root={props.item.web!}
             promptRequestId={props.item.requestId}
             busy={props.isWebUiBusy(props.item.id)}
+            currentUserPubkey={props.currentUserPubkey}
             onRunAction={(action, params) =>
               props.onRunWebAction(action, {
                 ...params,

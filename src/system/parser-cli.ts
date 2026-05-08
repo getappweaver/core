@@ -117,6 +117,30 @@ function matchesOptionToken(
   );
 }
 
+function assignOptionValue(
+  parsedOptions: Record<string, ParsedCliValue>,
+  option: CommandOptionDefinition,
+  value: string | number | boolean,
+): void {
+  if (option.multiple !== true) {
+    parsedOptions[option.name] = value;
+
+    return;
+  }
+
+  const existing = parsedOptions[option.name];
+
+  if (existing === undefined) {
+    parsedOptions[option.name] = [value];
+
+    return;
+  }
+
+  parsedOptions[option.name] = Array.isArray(existing)
+    ? [...existing, value]
+    : [existing, value];
+}
+
 export function parseCliInput({
   command,
   tokens: inputTokens,
@@ -160,7 +184,7 @@ export function parseCliInput({
         index,
       );
 
-      parsedOptions[option.name] = value;
+      assignOptionValue(parsedOptions, option, value);
       index = nextIndex;
       continue;
     }

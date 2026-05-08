@@ -687,6 +687,11 @@ function AppInner(): JSX.Element {
     runWebAction,
   } = useCommands({
     authStatus: () => auth.authState().status,
+    currentUserPubkey: () => {
+      const state = auth.authState();
+
+      return state.status === 'connected' ? state.pubkey : null;
+    },
     wsConnected,
     timelineId,
     pendingPromptRequestId,
@@ -1063,6 +1068,11 @@ function AppInner(): JSX.Element {
           onDeleteTimelineItem={deleteTimelineItem}
           onReplaceCommandWeb={replaceCommandResultWeb}
           onAppendSystem={appendSystemMessage}
+          currentUserPubkey={(() => {
+            const state = auth.authState();
+
+            return state.status === 'connected' ? state.pubkey : null;
+          })()}
           isWebUiBusy={isWebUiBusyFor}
           onRunWebAction={runWebAction}
           onRunJsonCommand={runJsonCommand}
@@ -1169,6 +1179,11 @@ function AppInner(): JSX.Element {
       <ConnectOverlays auth={auth} connect={connect} />
       <ChromeOverlay
         chrome={chrome}
+        currentUserPubkey={(() => {
+          const state = auth.authState();
+
+          return state.status === 'connected' ? state.pubkey : null;
+        })()}
         isWebUiBusy={isWebUiBusyFor}
         onClose={closeChromeModal}
         onRunWebAction={runWebAction}

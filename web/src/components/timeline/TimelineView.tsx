@@ -75,6 +75,7 @@ export function TimelineView(props: TimelineViewProps) {
                 onDeleteTimelineItem={props.onDeleteTimelineItem}
                 onRunWebAction={props.onRunWebAction}
                 onAppendSystem={props.onAppendSystem}
+                currentUserPubkey={props.currentUserPubkey}
               />
             </Match>
 
@@ -99,6 +100,7 @@ export function TimelineView(props: TimelineViewProps) {
                   onRunWebAction={props.onRunWebAction}
                   onRunJsonCommand={props.onRunJsonCommand}
                   onAppendSystem={props.onAppendSystem}
+                  currentUserPubkey={props.currentUserPubkey}
                 />
               </div>
             </Match>

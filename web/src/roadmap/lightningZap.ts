@@ -220,11 +220,7 @@ export async function handleRoadmapLightningZap({
   setChromeText,
   setChromeError,
   setChromeLoading,
-}: LightningZapDeps): Promise<boolean> {
-  if (action.action !== 'roadmap.lightningZap') {
-    return false;
-  }
-
+}: LightningZapDeps): Promise<void> {
   setChromeLoading(true);
   setChromeError(null);
   setChromeText(null);
@@ -390,12 +386,8 @@ export async function handleRoadmapLightningZap({
     } catch {
       setChromeWeb(await invoiceRoot(invoice));
     }
-
-    return true;
   } catch (error) {
     setChromeError(error instanceof Error ? error.message : String(error));
-
-    return true;
   } finally {
     setChromeLoading(false);
   }
