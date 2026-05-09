@@ -79,10 +79,6 @@ import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
 import { openWalletDb } from './wallet/db';
-import {
-  hydrateDeterministicWalletState,
-  resolveDeterministicWalletStateRelays,
-} from './wallet/nostr-state';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
@@ -128,24 +124,6 @@ async function main() {
   const seenDb = openCoreDb();
   const providerDb = asProviderDb(seenDb);
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
-
-  if (walletDb && cashuMnemonic) {
-    const walletStateRelays = await resolveDeterministicWalletStateRelays({
-      pool,
-      ownerPubkey: masterPubkey,
-      fallbackRelays: botRelayUrls,
-    });
-
-    await hydrateDeterministicWalletState({
-      botKeyHex,
-      signerPubkey: botPubkey,
-      ownerPubkey: masterPubkey,
-      pool,
-      readRelays: walletStateRelays.readRelays,
-      walletDb,
-      mnemonic: cashuMnemonic,
-    });
-  }
 
   let shuttingDown = false;
 
