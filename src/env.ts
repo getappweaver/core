@@ -28,6 +28,14 @@ export type BotConfig = {
   };
 };
 
+const REQUIRED_BOT_ENV = [
+  'BOT_KEY',
+  'BOT_MASTER_PUBKEY',
+  'BOT_RELAYS',
+] as const;
+
+export type RequiredBotEnvName = (typeof REQUIRED_BOT_ENV)[number];
+
 /** BOT_KEY + BOT_RELAYS only — for Nostr file share without loading full bot config. */
 export type FileShareNostrConfig = {
   botKeyHex: string;
@@ -43,6 +51,12 @@ export function requireEnv(name: string): string {
   }
 
   return val;
+}
+
+export function getMissingRequiredBotEnv(): RequiredBotEnvName[] {
+  return REQUIRED_BOT_ENV.filter(
+    (name) => (process.env[name]?.trim() ?? '').length === 0,
+  );
 }
 
 export function ensureWss(url: string): string {

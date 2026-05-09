@@ -97,6 +97,239 @@ pre {
   overflow: hidden;
 }
 
+.setup-shell {
+  min-height: var(--app-viewport-height, 100vh);
+  display: grid;
+  align-content: start;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.setup-app-shell .setup-shell {
+  min-height: 0;
+}
+
+.setup-card {
+  width: min(46rem, calc(100vw - 2rem));
+  background: #1e1e1e;
+  box-shadow: 10px 10px 0 var(--color-panel-shadow);
+}
+
+.setup-card--error {
+  border-left: 4px solid var(--color-danger);
+}
+
+.setup-card--timeline {
+  width: min(58rem, calc(100vw - 2rem));
+}
+
+.setup-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setup-kicker {
+  margin: 0 0 0.25rem;
+  color: var(--color-warning);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.setup-card h1 {
+  margin: 0;
+  font-size: clamp(1.35rem, 5vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.setup-copy,
+.setup-footnote {
+  margin: 0.9rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.setup-footnote {
+  width: min(46rem, calc(100vw - 2rem));
+  font-size: 0.78rem;
+}
+
+.setup-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.45rem;
+  background: var(--color-warning);
+  color: #000;
+  box-shadow: 4px 4px 0 var(--color-panel-shadow);
+}
+
+.setup-badge.is-ok {
+  background: var(--color-success);
+}
+
+.setup-runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 1rem 0 0;
+}
+
+.setup-runtime-grid div {
+  min-width: 0;
+  padding: 0.55rem;
+  background: #242424;
+}
+
+.setup-runtime-grid dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.setup-runtime-grid dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.setup-status-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-status-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  background: #242424;
+}
+
+.setup-status-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--color-warning);
+}
+
+.setup-status-dot.is-ok {
+  background: var(--color-success);
+}
+
+.setup-status-dot.is-missing {
+  background: var(--color-danger);
+}
+
+.setup-status-detail {
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.setup-error-detail {
+  margin: 0.8rem 0 0;
+  color: var(--color-danger);
+  white-space: pre-wrap;
+}
+
+.setup-timeline {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.7rem;
+  background: #242424;
+  border-left: 4px solid var(--color-danger);
+}
+
+.setup-step.is-ok {
+  border-left-color: var(--color-success);
+}
+
+.setup-step-marker {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: var(--color-warning);
+  color: #000;
+  box-shadow: 4px 4px 0 var(--color-panel-shadow);
+}
+
+.setup-step.is-ok .setup-step-marker {
+  background: var(--color-success);
+}
+
+.setup-step-body h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.setup-step-body p {
+  margin: 0.45rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.setup-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.setup-relay-field {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+}
+
+.setup-inline-code {
+  color: var(--color-warning);
+  overflow-wrap: anywhere;
+}
+
+.setup-error-line {
+  color: var(--color-danger) !important;
+}
+
+.setup-warning-line {
+  color: var(--color-warning) !important;
+}
+
+@media (max-width: 640px) {
+  .setup-card-head,
+  .setup-status-row {
+    align-items: flex-start;
+  }
+
+  .setup-card-head {
+    flex-direction: column;
+  }
+
+  .setup-runtime-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-status-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .setup-status-detail {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
 .topbar.compact {
   position: sticky;
   top: 0;

@@ -30,6 +30,7 @@ import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
 import { PaletteView } from './palette/PaletteView';
 import { usePalette } from './palette/usePalette';
 import { registerWebPushNotifications } from './register-web-push';
+import { SetupView } from './setup/SetupView';
 import { useSocket } from './socket/useSocket';
 import { getStoryDomTarget } from './story/dom-targets';
 import {
@@ -62,6 +63,14 @@ import {
 } from './utils';
 
 export function App(): JSX.Element {
+  if (window.location.pathname === '/setup') {
+    return (
+      <NostrAuthProvider>
+        <SetupView />
+      </NostrAuthProvider>
+    );
+  }
+
   return (
     <NostrAuthProvider>
       <AppInner />

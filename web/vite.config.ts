@@ -3,6 +3,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import solid from 'vite-plugin-solid';
 
 const devHost = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+const devPort = Number.parseInt(process.env.BOT_WEB_UI_PORT ?? '5552', 10);
+const setupOnlyMode = ['BOT_KEY', 'BOT_MASTER_PUBKEY', 'BOT_RELAYS'].some(
+  (name) => (process.env[name]?.trim() ?? '').length === 0,
+);
 
 export default defineConfig({
   plugins: [
@@ -52,18 +56,22 @@ export default defineConfig({
   root: import.meta.dirname,
   server: {
     host: devHost,
-    port: 5552,
+    port: Number.isNaN(devPort) ? 5552 : devPort,
     allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:5551',
         changeOrigin: true,
       },
-      '/ws': {
-        target: 'ws://127.0.0.1:5551',
-        ws: true,
-        changeOrigin: true,
-      },
+      ...(setupOnlyMode
+        ? {}
+        : {
+            '/ws': {
+              target: 'ws://127.0.0.1:5551',
+              ws: true,
+              changeOrigin: true,
+            },
+          }),
     },
   },
   build: {

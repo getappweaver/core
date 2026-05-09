@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.7.0] - 2026-05-09
+
+- feat: add docker setup flow (3c57949)
+
 ## [v9.6.4] - 2026-05-09
 
-- fix: skip startup wallet state hydration (10e48fd)
+- fix: skip startup wallet state hydration (6906d97)
 
 ## [v9.6.3] - 2026-05-09
 

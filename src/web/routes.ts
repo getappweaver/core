@@ -15,6 +15,7 @@ import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
+import { isSetupSecretValid } from '@src/setup-secret';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -36,6 +37,12 @@ import {
   listWebPushSubscriptions,
   upsertWebPushSubscription,
 } from './push-subscriptions';
+import {
+  generateSetupBotKey,
+  setSetupMasterPubkey,
+  setSetupRelays,
+} from './setup-actions';
+import { createSetupStatus } from './setup-status';
 import { isWebDistUsable, serveWebDistGet } from './web-dist';
 
 export type WebRouteContext = {
@@ -51,12 +58,15 @@ export type WebRouteContext = {
   walletDb: WalletDb | null;
   providerDb: ProviderDb | null;
   config: BotConfig;
+  setupSecret: string;
 };
 
 function jsonResponse(data: unknown, init?: ResponseInit): Response {
   const headers = new Headers(init?.headers);
 
   headers.set('Content-Type', 'application/json; charset=utf-8');
+  headers.set('Referrer-Policy', 'no-referrer');
+  headers.set('Cache-Control', 'no-store');
 
   return new Response(JSON.stringify(data), {
     ...init,
@@ -101,7 +111,38 @@ function verifyNip98Auth(params: VerifyNip98AuthParams): Response | null {
   );
 }
 
+function verifySetupSecret(ctx: WebRouteContext, url: URL): Response | null {
+  if (isSetupSecretValid(url.searchParams.get('secret'), ctx.setupSecret)) {
+    return null;
+  }
+
+  return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+}
+
 let loggedMissingWebDist = false;
+
+function activeSetupUiOrigin(): string | null {
+  const origin = process.env.BOT_SETUP_UI_ORIGIN?.trim();
+
+  return origin && origin.length > 0 ? origin : null;
+}
+
+function shouldServeWebDist(): boolean {
+  return process.env.BOT_WEB_STATIC === '1';
+}
+
+function redirectToSetupUi(url: URL): Response | null {
+  const origin = activeSetupUiOrigin();
+
+  if (!origin || url.pathname !== '/setup') {
+    return null;
+  }
+
+  const target = new URL('/setup', origin);
+  target.search = url.search;
+
+  return Response.redirect(target.toString(), 302);
+}
 
 export function createWebFetchHandler(
   ctx: WebRouteContext,
@@ -112,8 +153,113 @@ export function createWebFetchHandler(
     const url = new URL(req.url);
     const path = url.pathname;
 
+    if (req.method === 'GET') {
+      const setupUiRedirect = redirectToSetupUi(url);
+
+      if (setupUiRedirect) {
+        return setupUiRedirect;
+      }
+    }
+
     if (req.method === 'GET' && path === '/api/health') {
       return jsonResponse({ ok: true, version: ctx.version });
+    }
+
+    if (path.startsWith('/api/setup/')) {
+      const authFail = verifySetupSecret(ctx, url);
+
+      if (authFail) {
+        return authFail;
+      }
+
+      if (req.method === 'GET' && path === '/api/setup/status') {
+        return jsonResponse(createSetupStatus(ctx));
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/master-pubkey') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const pubkey =
+              payload && typeof payload === 'object' && 'pubkey' in payload
+                ? (payload as { pubkey?: unknown }).pubkey
+                : null;
+
+            if (typeof pubkey !== 'string' || pubkey.trim().length === 0) {
+              throw new Error('invalid_master_pubkey');
+            }
+
+            const result = setSetupMasterPubkey({
+              dmBotRoot: ctx.dmBotRoot,
+              rawPubkey: pubkey,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' || message === 'invalid_master_pubkey'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/bot-key') {
+        const result = generateSetupBotKey({ dmBotRoot: ctx.dmBotRoot });
+
+        return jsonResponse({
+          ok: true,
+          ...result,
+          status: createSetupStatus(ctx),
+        });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/relays') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const relays =
+              payload && typeof payload === 'object' && 'relays' in payload
+                ? (payload as { relays?: unknown }).relays
+                : null;
+
+            if (
+              !Array.isArray(relays) ||
+              relays.some((relay) => typeof relay !== 'string')
+            ) {
+              throw new Error('invalid_relays');
+            }
+
+            const result = setSetupRelays({
+              dmBotRoot: ctx.dmBotRoot,
+              rawRelays: relays,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' || message === 'invalid_relays'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      return jsonResponse({ error: 'not_found' }, { status: 404 });
     }
 
     if (path.startsWith('/api/') && path !== '/api/push/vapid-key') {
@@ -414,7 +560,7 @@ export function createWebFetchHandler(
       }
     }
 
-    if (req.method === 'GET') {
+    if (req.method === 'GET' && shouldServeWebDist()) {
       const fromDist = serveWebDistGet({
         dmBotRoot: ctx.dmBotRoot,
         pathname: path,

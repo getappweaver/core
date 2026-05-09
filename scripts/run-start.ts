@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
  * Production-ish start runner:
- * - starts bot API server (`src/index.ts`) on 5551
  * - ensures `web/dist` exists (builds if needed)
- * - serves web UI on 5552 via Vite preview
+ * - starts bot API server (`src/index.ts`) on 5551
+ * - serves built web UI from the bot API server when START_WEB_UI is enabled
  */
 
 import { join } from 'path';
@@ -16,19 +16,17 @@ const DM_BOT_DIR = join(import.meta.dir, '..');
 const INDEX_TS = join(DM_BOT_DIR, 'src', 'index.ts');
 
 let botChild: ReturnType<typeof spawn> | null = null;
-let webChild: ReturnType<typeof spawn> | null = null;
 let shuttingDown = false;
 
 function isWebUiEnabled(): boolean {
   return (process.env.START_WEB_UI ?? '1') !== '0';
 }
 
-function resolveWebPreviewHost(): string {
-  return process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
-}
-
-function resolveWebPreviewPort(): string {
-  return process.env.BOT_WEB_UI_PORT?.trim() || '5552';
+function botEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BOT_WEB_STATIC: isWebUiEnabled() ? '1' : '0',
+  };
 }
 
 function runBot(): ReturnType<typeof spawn> {
@@ -38,68 +36,8 @@ function runBot(): ReturnType<typeof spawn> {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    env: process.env,
+    env: botEnv(),
   });
-}
-
-function runWebPreview(): ReturnType<typeof spawn> {
-  return spawn({
-    cmd: [
-      'bunx',
-      'vite',
-      'preview',
-      '--config',
-      'web/vite.config.ts',
-      '--host',
-      resolveWebPreviewHost(),
-      '--port',
-      resolveWebPreviewPort(),
-      '--strictPort',
-    ],
-    cwd: DM_BOT_DIR,
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-    env: process.env,
-  });
-}
-
-async function forwardStreamWithPrefix(props: {
-  stream: ReadableStream<Uint8Array> | number | null | undefined;
-  prefix: string;
-  target: NodeJS.WriteStream;
-}): Promise<void> {
-  const { stream, prefix, target } = props;
-
-  if (!stream || typeof stream === 'number') {
-    return;
-  }
-
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffered = '';
-
-  while (true) {
-    const { value, done } = await reader.read();
-
-    if (done) {
-      break;
-    }
-
-    buffered += decoder.decode(value, { stream: true });
-    const lines = buffered.split('\n');
-    buffered = lines.pop() ?? '';
-
-    for (const line of lines) {
-      target.write(line.length === 0 ? '\n' : `${prefix} ${line}\n`);
-    }
-  }
-
-  buffered += decoder.decode();
-
-  if (buffered.length > 0) {
-    target.write(`${prefix} ${buffered}\n`);
-  }
 }
 
 function ensureWebDistBuilt(): void {
@@ -136,15 +74,9 @@ function shutdownAll(): void {
   } catch {
     // Ignore if already exited.
   }
-
-  try {
-    webChild?.kill();
-  } catch {
-    // Ignore if already exited.
-  }
 }
 
-function exitOnChildFailure(code: number | null, which: 'bot' | 'web'): void {
+function exitOnChildFailure(code: number | null): void {
   if (shuttingDown) {
     return;
   }
@@ -160,42 +92,20 @@ function exitOnChildFailure(code: number | null, which: 'bot' | 'web'): void {
     process.exit(normalizedCode);
   }
 
-  console.error(`[run-start] ${which} exited with code ${normalizedCode}.`);
+  console.error(`[run-start] bot exited with code ${normalizedCode}.`);
   shutdownAll();
   process.exit(normalizedCode);
 }
 
 function main(): void {
-  botChild = runBot();
-  botChild.exited.then((code) => exitOnChildFailure(code, 'bot'));
-
   if (!isWebUiEnabled()) {
-    console.log('[run-start] START_WEB_UI=0, skipping UI preview.');
-
-    return;
+    console.log('[run-start] START_WEB_UI=0, backend static UI disabled.');
+  } else {
+    ensureWebDistBuilt();
   }
 
-  ensureWebDistBuilt();
-
-  console.log(
-    `[run-start] Starting web preview at http://${resolveWebPreviewHost()}:${resolveWebPreviewPort()}/`,
-  );
-
-  webChild = runWebPreview();
-
-  void forwardStreamWithPrefix({
-    stream: webChild.stdout,
-    prefix: '[web]',
-    target: process.stdout,
-  });
-
-  void forwardStreamWithPrefix({
-    stream: webChild.stderr,
-    prefix: '[web]',
-    target: process.stderr,
-  });
-
-  webChild.exited.then((code) => exitOnChildFailure(code, 'web'));
+  botChild = runBot();
+  botChild.exited.then((code) => exitOnChildFailure(code));
 }
 
 process.on('SIGINT', () => {

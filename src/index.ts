@@ -59,7 +59,7 @@ import {
   getWotScore,
   getRoutstrSkKey,
 } from './db';
-import { loadBotConfig } from './env';
+import { getMissingRequiredBotEnv, loadBotConfig } from './env';
 import { runAgentConversation } from './flow/agent-conversation';
 import { C, debug, log } from './logger';
 import { createSendReplyForSource, type MessageSource } from './messaging';
@@ -78,10 +78,73 @@ import { dmBotRoot, RESTART_REQUESTED_PATH } from './paths';
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
+import { createSetupSecret } from './setup-secret';
 import { openWalletDb } from './wallet/db';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
+
+async function waitForever(): Promise<never> {
+  return new Promise(() => {});
+}
+
+function readPackageVersion(): string {
+  const packageJson = readFileSync(join(dmBotRoot, 'package.json'), 'utf-8');
+  const packageJsonData = JSON.parse(packageJson) as { version: string };
+
+  return packageJsonData.version;
+}
+
+async function startSetupOnlyMode(props: {
+  setupSecret: string;
+  version: string;
+  missingEnv: string[];
+}): Promise<never> {
+  const seenDb = openCoreDb();
+  const parentOfBotRoot = join(dmBotRoot, '..');
+  const prefix = getDmCommandPrefix(seenDb);
+  const pool = new SimplePool({ enablePing: false, enableReconnect: false });
+  const providerDb = asProviderDb(seenDb);
+
+  log.warn(
+    `Setup mode: missing required env ${props.missingEnv.join(', ')}. Starting setup web server only.`,
+  );
+
+  startLocalWebServer({
+    prefix,
+    version: props.version,
+    botRelayUrls: [],
+    parentOfBotRoot,
+    dmBotRoot,
+    attachUrl: null,
+    botPubkey: null,
+    seenDb,
+    pool,
+    walletDb: null,
+    providerDb,
+    config: {
+      botKeyHex: '',
+      botPubkey: null,
+      masterPubkey: '',
+      botRelayUrls: [],
+      opencodeServeUrl: null,
+      cashuMnemonic: null,
+      cashuDefaultMintUrl: null,
+      routstrBaseUrl:
+        process.env.ROUTSTR_BASE_URL ?? 'https://api.routstr.com/v1',
+      webPush: null,
+      browser: {
+        profileDir:
+          process.env.BOT_BROWSER_PROFILE_DIR?.trim() ||
+          join(dmBotRoot, '.data', 'browser-profile'),
+        headless: process.env.BOT_BROWSER_HEADLESS === '1',
+      },
+    },
+    setupSecret: props.setupSecret,
+  });
+
+  return waitForever();
+}
 
 async function main() {
   // --- Restart & config ---
@@ -91,6 +154,14 @@ async function main() {
     } catch {
       // Ignore if file was already removed.
     }
+  }
+
+  const setupSecret = createSetupSecret();
+  const VERSION = readPackageVersion();
+  const missingEnv = getMissingRequiredBotEnv();
+
+  if (missingEnv.length > 0) {
+    return startSetupOnlyMode({ setupSecret, version: VERSION, missingEnv });
   }
 
   const config = loadBotConfig();
@@ -142,10 +213,6 @@ async function main() {
 
   const parentOfBotRoot = join(dmBotRoot, '..');
 
-  const packageJson = readFileSync(join(dmBotRoot, 'package.json'), 'utf-8');
-  const packageJsonData = JSON.parse(packageJson) as { version: string };
-  const VERSION = packageJsonData.version;
-
   const signAuthEvent = createSignAuthEvent({ botSecretKey });
 
   // --- Startup logging & ready DM ---
@@ -183,6 +250,7 @@ async function main() {
     walletDb,
     providerDb,
     config,
+    setupSecret,
   });
 
   const pwdOutput = process.cwd();

@@ -197,6 +197,106 @@ BOT_RELAYS=wss://auth.nostr1.com/,wss://relay.netstr.io
 bun run start
 ```
 
+## Docker
+
+Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Cursor Agent, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support. Your AppWeaver checkout is mounted into the container at `/app`, so core and plugin updates can still use git.
+
+Clone AppWeaver on the host if you have not already:
+
+```bash
+git clone https://github.com/getappweaver/core.git appweaver
+cd appweaver
+```
+
+Build the runtime image:
+
+```bash
+docker build -t appweaver-runtime .
+```
+
+Run AppWeaver from the mounted checkout, with the web server exposed only on your machine:
+
+```bash
+docker run --rm -it \
+  --name appweaver \
+  -p 127.0.0.1:5551:5551 \
+  -v "$PWD:/app" \
+  appweaver-runtime
+```
+
+On startup the container runs `bun install --frozen-lockfile` inside `/app`, then `bun run start`. `bun run start` builds `web/dist` if needed and serves the UI/API on port `5551`.
+
+Open the setup URL printed in the logs. It will look like:
+
+```text
+http://127.0.0.1:5551/setup?secret=...
+```
+
+For a long-running container, use Docker's restart policy:
+
+```bash
+docker run -d \
+  --name appweaver \
+  --restart unless-stopped \
+  -p 127.0.0.1:5551:5551 \
+  -v "$PWD:/app" \
+  appweaver-runtime
+```
+
+Core and plugin state stays in the mounted checkout. That includes `.env`, `dm-bot.sqlite*`, `plugins/`, `plugins.json`, browser profiles, generated web assets, and plugin-managed data. Do not mount only selected state files unless you know every path your installed plugins use.
+
+To update AppWeaver core:
+
+```bash
+git pull
+docker restart appweaver
+```
+
+To update the runtime tools, rebuild or pull the runtime image, then recreate the container with the same `/app` mount:
+
+```bash
+docker build -t appweaver-runtime .
+docker stop appweaver
+docker rm appweaver
+docker run -d \
+  --name appweaver \
+  --restart unless-stopped \
+  -p 127.0.0.1:5551:5551 \
+  -v "$PWD:/app" \
+  appweaver-runtime
+```
+
+Plugin updates should use AppWeaver's plugin update/install flow. Those changes happen in the mounted checkout and persist across container restarts.
+
+### Secure setup access
+
+The setup URL can configure secrets such as bot keys, relay settings, and provider credentials. Treat it as a local-only admin interface.
+
+- Do not expose setup over public plain HTTP.
+- Bind Docker ports on the host to `127.0.0.1`, not all interfaces. Use `-p 127.0.0.1:5551:5551`, not `-p 5551:5551`. The app still listens on `0.0.0.0` inside the container so Docker can forward the localhost-only host port.
+- If AppWeaver is running on a VPS, keep port `5551` closed to the internet and use SSH port forwarding.
+- If you intentionally expose setup remotely, put HTTPS in front of it with a trusted tunnel or reverse proxy such as Caddy, Traefik, Tailscale HTTPS, or Cloudflare Tunnel.
+
+For VPS setup, start the container on the VPS with localhost-only port publishing, then from your laptop run:
+
+```bash
+ssh -L 5551:127.0.0.1:5551 user@VPS_PUBLIC_IP
+```
+
+Then open this on your laptop:
+
+```text
+http://127.0.0.1:5551/setup?secret=...
+```
+
+Although the browser URL uses `http://`, the traffic between your laptop and the VPS is encrypted inside SSH. The plain HTTP connection exists only on loopback interfaces (`127.0.0.1`) at each end of the tunnel.
+
+Optional browser/VNC ports should also be localhost-only if enabled:
+
+```bash
+-p 127.0.0.1:5900:5900 -p 127.0.0.1:6080:6080 -e ENABLE_VNC=1
+```
+
 ### Watch mode (development)
 
 - **`bun run watch`** – Runs AppWeaver under a small watcher that restarts **only** when the file **`restart.requested`** is created or touched. Use this when the agent may edit the core code: the agent (with your approval) runs `touch restart.requested` when it’s done changing code; the watcher restarts the app. AppWeaver deletes `restart.requested` on startup. No restart on every save.

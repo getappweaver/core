@@ -31,6 +31,7 @@ export type StartLocalWebServerOptions = {
   walletDb: WalletDb | null;
   providerDb: ProviderDb | null;
   config: BotConfig;
+  setupSecret: string;
   host?: string;
   port?: number;
 };
@@ -59,6 +60,18 @@ function resolveHost(explicit?: string): string {
   return explicit ?? DEFAULT_HOST;
 }
 
+function displayHost(host: string): string {
+  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+}
+
+function setupUrl(origin: string, setupSecret: string): string {
+  return `${origin}/setup?secret=${setupSecret}`;
+}
+
+function setupStatusApiUrl(origin: string, setupSecret: string): string {
+  return `${origin}/api/setup/status?secret=${setupSecret}`;
+}
+
 export function startLocalWebServer(options: StartLocalWebServerOptions): void {
   if ((process.env.BOT_WEB_ENABLED ?? '1') === '0') {
     return;
@@ -80,6 +93,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     walletDb: options.walletDb,
     providerDb: options.providerDb,
     config: options.config,
+    setupSecret: options.setupSecret,
   };
 
   const fetch = createWebFetchHandler(ctx);
@@ -121,8 +135,20 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     });
 
     log.info(
-      `Local web: http://${host}:${port}/ — health /api/health, commands /api/commands`,
+      `Local API: http://${host}:${port}/ — health /api/health, commands /api/commands`,
     );
+
+    const backendOrigin = `http://${displayHost(host)}:${port}`;
+    const frontendOrigin = process.env.BOT_SETUP_UI_ORIGIN?.trim();
+    const preferredOrigin = frontendOrigin || backendOrigin;
+
+    log.info(`Setup web: ${setupUrl(preferredOrigin, options.setupSecret)}`);
+
+    if (preferredOrigin !== backendOrigin) {
+      log.info(
+        `Setup status API: ${setupStatusApiUrl(backendOrigin, options.setupSecret)}`,
+      );
+    }
   } catch (err) {
     const code =
       err && typeof err === 'object' && 'code' in err

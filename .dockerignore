@@ -1,0 +1,16 @@
+.git
+.cursor
+.logs
+.env
+.env.*
+!.env.example
+.data
+.piper-test
+dm-bot.sqlite
+dm-bot.sqlite-*
+node_modules
+**/node_modules
+web/dist
+apps/landing/dist
+restart.requested
+*.log

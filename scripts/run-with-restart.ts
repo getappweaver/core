@@ -28,6 +28,31 @@ function isWebUiEnabled(): boolean {
   return (process.env.WATCH_WEB_UI ?? '1') !== '0';
 }
 
+function resolveWebUiHost(): string {
+  const host = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+
+  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+}
+
+function resolveWebUiPort(): string {
+  return process.env.BOT_WEB_UI_PORT?.trim() || '5552';
+}
+
+function botEnv(): NodeJS.ProcessEnv {
+  if (!isWebUiEnabled()) {
+    return {
+      ...process.env,
+      BOT_WEB_STATIC: '0',
+    };
+  }
+
+  return {
+    ...process.env,
+    BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
+    BOT_WEB_STATIC: '0',
+  };
+}
+
 function runBot(): ReturnType<typeof spawn> {
   return spawn({
     cmd: ['bun', 'run', INDEX_TS],
@@ -35,7 +60,7 @@ function runBot(): ReturnType<typeof spawn> {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    env: process.env,
+    env: botEnv(),
   });
 }
 
