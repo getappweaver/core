@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.6.3] - 2026-05-09
+
+- fix: render modal timeline UI outputs (5a59e1b)
+
 ## [v9.6.2] - 2026-05-08
 
-- fix: preserve narrowed story widget targets (825e3a9)
+- fix: preserve narrowed story widget targets (0f0acef)
 
 ## [v9.6.1] - 2026-05-08
 

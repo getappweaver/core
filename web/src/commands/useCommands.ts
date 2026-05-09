@@ -616,8 +616,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         const shouldRenderInTimeline =
           commandAction.surface === 'timeline' &&
-          output.clientView !== null &&
-          recordTl === false;
+          recordTl === false &&
+          (output.clientView !== null || output.web !== null);
 
         if (recordTl || shouldRenderInTimeline) {
           adapters.setTimeline((prev) => [
