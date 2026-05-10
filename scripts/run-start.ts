@@ -6,6 +6,7 @@
  * - serves built web UI from the bot API server when START_WEB_UI is enabled
  */
 
+import { existsSync, unlinkSync, watch } from 'fs';
 import { join } from 'path';
 
 import { spawn, spawnSync } from 'bun';
@@ -14,9 +15,11 @@ import { isWebDistUsable } from '../src/web/web-dist';
 
 const DM_BOT_DIR = join(import.meta.dir, '..');
 const INDEX_TS = join(DM_BOT_DIR, 'src', 'index.ts');
+const RESTART_FILE = join(DM_BOT_DIR, 'restart.requested');
 
 let botChild: ReturnType<typeof spawn> | null = null;
 let shuttingDown = false;
+let restartRequested = false;
 
 function isWebUiEnabled(): boolean {
   return (process.env.START_WEB_UI ?? '1') !== '0';
@@ -76,8 +79,20 @@ function shutdownAll(): void {
   }
 }
 
-function exitOnChildFailure(code: number | null): void {
+function startBot(): void {
+  botChild = runBot();
+  botChild.exited.then((code) => exitOnChild(code));
+}
+
+function exitOnChild(code: number | null): void {
   if (shuttingDown) {
+    return;
+  }
+
+  if (restartRequested) {
+    restartRequested = false;
+    startBot();
+
     return;
   }
 
@@ -104,8 +119,7 @@ function main(): void {
     ensureWebDistBuilt();
   }
 
-  botChild = runBot();
-  botChild.exited.then((code) => exitOnChildFailure(code));
+  startBot();
 }
 
 process.on('SIGINT', () => {
@@ -118,6 +132,20 @@ process.on('SIGTERM', () => {
   shutdownAll();
 
   process.exit(143);
+});
+
+watch(DM_BOT_DIR, (_, filename) => {
+  if (filename === 'restart.requested' && existsSync(RESTART_FILE)) {
+    restartRequested = true;
+
+    try {
+      unlinkSync(RESTART_FILE);
+    } catch {
+      // Ignore if file was already removed.
+    }
+
+    botChild?.kill();
+  }
 });
 
 main();

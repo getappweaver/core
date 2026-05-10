@@ -2370,6 +2370,17 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                   rel={
                     element.props?.external ? 'noopener noreferrer' : undefined
                   }
+                  onClick={(e) => {
+                    if (element.props?.action) {
+                      e.preventDefault();
+                    }
+
+                    if (element.props?.stopPropagation) {
+                      e.stopPropagation();
+                    }
+
+                    runAction(element.props?.action);
+                  }}
                 >
                   <For each={element.children ?? []}>
                     {(child) => (

@@ -9,7 +9,6 @@ import type { CoreDb } from '../db';
 import {
   getCurrentOrDefaultMode,
   getProviderName,
-  getReplyTransport,
   getRoutstrBudget,
   getWalletDefaultMintUrl,
   getWorkspaceTarget,
@@ -58,10 +57,10 @@ export async function runAgentConversation({
   providerDb,
   routstrBaseUrl,
 }: RunAgentConversationProps): Promise<void> {
-  const isLocal = source === 'local' || getReplyTransport(seenDb) === 'local';
+  const isLocal = source === 'local';
   const mode = getCurrentOrDefaultMode(seenDb);
   const currentWorkspace = getWorkspaceTarget(seenDb);
-  const cwd = currentWorkspace === 'bot' ? dmBotRoot : parentOfBotRoot;
+  const cwd = currentWorkspace === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
   const sessionId = await getOrCreateCurrentSession({
     db: seenDb,

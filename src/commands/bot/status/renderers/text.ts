@@ -3,7 +3,6 @@ import type {
   AgentMode,
   Linting,
   ProviderName,
-  ReplyTransport,
   WorkspaceTarget,
 } from '@src/db';
 import { C } from '@src/logger';
@@ -19,8 +18,7 @@ const STATUS_EMOJI = {
   mode: (v: AgentMode) =>
     ({ free: '🆓', ask: '💬', plan: '📋', agent: '🤖' })[v],
   linting: (v: Linting) => (v === 'on' ? '✅' : '❌'),
-  workspace: (v: WorkspaceTarget) => (v === 'bot' ? '🤖' : '📁'),
-  transport: (v: ReplyTransport) => (v === 'remote' ? '📡' : '💻'),
+  workspace: (v: WorkspaceTarget) => (v === 'appweaver' ? '🤖' : '📁'),
 } as const;
 
 export function renderBotStatusText(
@@ -50,7 +48,6 @@ export function renderBotStatusText(
     `${lbl('Linting')} ${STATUS_EMOJI.linting(d.linting)} ${d.linting}`,
     `${lbl('Model')} ${modelDisplay}`,
     `${lbl('Workspace')} ${STATUS_EMOJI.workspace(d.workspace)} ${d.workspace}`,
-    `${lbl('Transport')} ${STATUS_EMOJI.transport(d.transport)} ${d.transport}`,
     `${lbl('Relays')} ${d.botRelayUrls.join(', ')}`,
     `${lbl('Session')} ${d.sessionId ?? `${C.gray}(none)${C.reset}`}`,
   ];

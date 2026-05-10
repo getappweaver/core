@@ -56,6 +56,35 @@ export type OpencodeSdkContextStats = {
   contextPercent: number | null;
 };
 
+export type OpencodeSetupAuthMethod = {
+  type: string;
+  label: string;
+  prompts: unknown[];
+};
+
+export type OpencodeSetupProvider = {
+  id: string;
+  name: string;
+  source: string;
+  env: string[];
+  configured: boolean;
+  authMethods: OpencodeSetupAuthMethod[];
+};
+
+export type OpencodeSetupAuthStatus = {
+  ok: true;
+  providers: OpencodeSetupProvider[];
+};
+
+export type OpencodeSetupAuthorizeResult = {
+  ok: true;
+  providerID: string;
+  methodIndex: number;
+  url: string | null;
+  method: string | null;
+  instructions: string | null;
+};
+
 function getPortsToTry(): number[] {
   const envPort = process.env.OPENCODE_SDK_PORT;
 
@@ -133,6 +162,158 @@ async function getOrInitSdk(): Promise<SdkInstance> {
   } finally {
     sdkInitPromise = null;
   }
+}
+
+function coerceAuthMethods(value: unknown): OpencodeSetupAuthMethod[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+
+      const raw = entry as {
+        type?: unknown;
+        label?: unknown;
+        prompts?: unknown;
+      };
+
+      if (typeof raw.type !== 'string' || typeof raw.label !== 'string') {
+        return null;
+      }
+
+      return {
+        type: raw.type,
+        label: raw.label,
+        prompts: Array.isArray(raw.prompts) ? raw.prompts : [],
+      };
+    })
+    .filter((entry): entry is OpencodeSetupAuthMethod => entry !== null);
+}
+
+function configuredFromProviderOptions(options: unknown): boolean {
+  if (!options || typeof options !== 'object') {
+    return false;
+  }
+
+  return Object.keys(options).some((key) => key.toLowerCase().includes('key'));
+}
+
+export async function getOpencodeSetupAuthStatus(
+  directory: string,
+): Promise<OpencodeSetupAuthStatus> {
+  const { client } = await getOrInitSdk();
+
+  const [authResult, providersResult] = await Promise.all([
+    client.provider.auth({ directory }),
+    client.provider.list({ directory }),
+  ]);
+
+  const authData = (authResult.data ?? {}) as Record<string, unknown>;
+
+  const providerData = providersResult.data as
+    | {
+        all?: Array<{
+          id?: unknown;
+          name?: unknown;
+          source?: unknown;
+          env?: unknown;
+          options?: unknown;
+        }>;
+      }
+    | undefined;
+
+  const providers = (providerData?.all ?? [])
+    .map((provider) => {
+      if (typeof provider.id !== 'string') {
+        return null;
+      }
+
+      const env = Array.isArray(provider.env)
+        ? provider.env.filter(
+            (name): name is string => typeof name === 'string',
+          )
+        : [];
+
+      return {
+        id: provider.id,
+        name: typeof provider.name === 'string' ? provider.name : provider.id,
+        source:
+          typeof provider.source === 'string' ? provider.source : 'unknown',
+        env,
+        configured: configuredFromProviderOptions(provider.options),
+        authMethods: coerceAuthMethods(authData[provider.id]),
+      };
+    })
+    .filter((provider): provider is OpencodeSetupProvider => provider !== null)
+    .filter(
+      (provider) =>
+        provider.authMethods.length > 0 ||
+        provider.configured ||
+        provider.env.length > 0,
+    )
+    .sort((a, b) => {
+      if (a.id === 'opencode') {
+        return -1;
+      }
+
+      if (b.id === 'opencode') {
+        return 1;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+  return { ok: true, providers };
+}
+
+export async function authorizeOpencodeSetupProvider(props: {
+  directory: string;
+  providerID: string;
+  methodIndex: number;
+}): Promise<OpencodeSetupAuthorizeResult> {
+  const { client } = await getOrInitSdk();
+
+  const result = await client.provider.oauth.authorize({
+    directory: props.directory,
+    providerID: props.providerID,
+    method: props.methodIndex,
+  });
+
+  if (result.error) {
+    const message =
+      typeof result.error === 'object' &&
+      result.error !== null &&
+      'data' in result.error
+        ? JSON.stringify((result.error as { data?: unknown }).data)
+        : String(result.error);
+
+    throw new Error(`opencode_authorize_failed:${message}`);
+  }
+
+  const data = (result.data ?? {}) as {
+    url?: unknown;
+    method?: unknown;
+    instructions?: unknown;
+  };
+
+  return {
+    ok: true,
+    providerID: props.providerID,
+    methodIndex: props.methodIndex,
+    url: typeof data.url === 'string' && data.url.length > 0 ? data.url : null,
+    method:
+      typeof data.method === 'string' && data.method.length > 0
+        ? data.method
+        : null,
+    instructions:
+      typeof data.instructions === 'string' && data.instructions.length > 0
+        ? data.instructions
+        : null,
+  };
 }
 
 export function disposeOpencodeSdk(): void {

@@ -70,28 +70,47 @@ function taskbarLoadingWeb(command: string, subcommand: string): WebNodeRoot {
   };
 }
 
-function timelineDiffClientViewFiles(
-  payload: unknown,
-): TimelineFileDiff[] | null {
+function timelineDiffClientViewData(payload: unknown): {
+  files: TimelineFileDiff[];
+  commit: { subject: string; relativeTime: string } | null;
+} | null {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
 
-  const files = (payload as { files?: unknown }).files;
+  const payloadRecord = payload as { files?: unknown; commit?: unknown };
+  const files = payloadRecord.files;
 
   if (!Array.isArray(files)) {
     return null;
   }
 
-  return files.filter((file): file is TimelineFileDiff => {
-    if (!file || typeof file !== 'object') {
-      return false;
-    }
+  const commit =
+    payloadRecord.commit &&
+    typeof payloadRecord.commit === 'object' &&
+    typeof (payloadRecord.commit as { subject?: unknown }).subject ===
+      'string' &&
+    typeof (payloadRecord.commit as { relativeTime?: unknown }).relativeTime ===
+      'string'
+      ? {
+          subject: (payloadRecord.commit as { subject: string }).subject,
+          relativeTime: (payloadRecord.commit as { relativeTime: string })
+            .relativeTime,
+        }
+      : null;
 
-    const rec = file as Record<string, unknown>;
+  return {
+    files: files.filter((file): file is TimelineFileDiff => {
+      if (!file || typeof file !== 'object') {
+        return false;
+      }
 
-    return typeof rec.file === 'string' && typeof rec.patch === 'string';
-  });
+      const rec = file as Record<string, unknown>;
+
+      return typeof rec.file === 'string' && typeof rec.patch === 'string';
+    }),
+    commit,
+  };
 }
 
 function appendClassName(
@@ -594,18 +613,19 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         const output = splitCommandOutput(message.output);
         collectRefreshHighlightTargets(output.text);
 
-        const timelineDiffFiles =
+        const timelineDiffData =
           output.clientView?.view === 'timeline-diff'
-            ? timelineDiffClientViewFiles(output.clientView.payload)
+            ? timelineDiffClientViewData(output.clientView.payload)
             : null;
 
-        if (timelineDiffFiles !== null) {
+        if (timelineDiffData !== null) {
           adapters.setTimeline((prev) => [
             ...prev,
             {
               id: adapters.createId(),
               type: 'diff',
-              files: timelineDiffFiles,
+              files: timelineDiffData.files,
+              commit: timelineDiffData.commit,
             },
           ]);
 

@@ -7,6 +7,7 @@ import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
 import {
   cardHeadAddIcon,
   cardHeadChecklistIcon,
+  cardHeadLogIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
   cardHeadTreeFilterIcon,
@@ -116,7 +117,9 @@ export function TimelineWebTreeToolbar(
                   ? cardHeadAddIcon()
                   : item.icon === 'checklist'
                     ? cardHeadChecklistIcon()
-                    : item.label}
+                    : item.icon === 'log'
+                      ? cardHeadLogIcon()
+                      : item.label}
               </WebButton>
             )}
           </For>

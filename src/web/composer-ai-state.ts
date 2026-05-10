@@ -83,7 +83,7 @@ export async function getComposerAiState(
   ];
 
   const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'bot'
+    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
       ? ctx.dmBotRoot
       : ctx.parentOfBotRoot;
 

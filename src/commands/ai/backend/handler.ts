@@ -12,6 +12,7 @@ import {
   type CoreDb,
 } from '@src/db';
 import { createNewSession } from '@src/session';
+import { ensureOpencodeParentWorkspaceAssets } from '@src/workspace-assets';
 
 import type { AiBackendRepresentation } from './representation';
 
@@ -76,7 +77,15 @@ export async function handleAiBackend(
   }
 
   const workspace = getWorkspaceTarget(db);
-  const cwd = workspace === 'bot' ? dmBotRoot : parentOfBotRoot;
+
+  ensureOpencodeParentWorkspaceAssets({
+    backend: nextBackendName,
+    workspace,
+    dmBotRoot,
+    parentOfBotRoot,
+  });
+
+  const cwd = workspace === 'appweaver' ? dmBotRoot : parentOfBotRoot;
   const executionProfile = getBackendExecutionProfile(db, nextBackendName);
   const modelOverride = getModelOverride(db, nextBackendName);
   const providerName = getProviderName(db);

@@ -4,11 +4,13 @@ import {
   type CoreDb,
   type WorkspaceTarget,
   WorkspaceTargetSchema,
+  getAgentBackend,
   getWorkspaceTarget,
   setWorkspaceTarget,
 } from '@src/db';
 import { createNewSession } from '@src/session';
 import type { WebHandlerResult } from '@src/web/ui-schema';
+import { ensureOpencodeParentWorkspaceAssets } from '@src/workspace-assets';
 
 import { appendStatusBlock } from '../../shared/with-status';
 
@@ -29,7 +31,9 @@ function pwdForWorkspace(params: {
   dmBotRoot: string;
   parentOfBotRoot: string;
 }): string {
-  return params.target === 'bot' ? params.dmBotRoot : params.parentOfBotRoot;
+  return params.target === 'appweaver'
+    ? params.dmBotRoot
+    : params.parentOfBotRoot;
 }
 
 function toRepresentation(
@@ -95,6 +99,13 @@ export async function handleBotWorkspace(
   }
 
   setWorkspaceTarget(db, nextTarget);
+
+  ensureOpencodeParentWorkspaceAssets({
+    backend: getAgentBackend(db),
+    workspace: nextTarget,
+    dmBotRoot,
+    parentOfBotRoot,
+  });
 
   const cwd = pwdForWorkspace({
     target: nextTarget,

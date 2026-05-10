@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// scripts/bot-setup.ts — Interactive bot configuration setup
+// src/web/setup/bot-setup.ts — Interactive bot configuration setup
 //
 // Usage: bun run bot:setup
 //
@@ -26,8 +26,8 @@ import * as readline from 'readline';
 
 import { generateVAPIDKeys } from 'web-push';
 
-import type { Linting } from '../src/db';
-import { openCoreDb } from '../src/db';
+import type { Linting } from '@src/db';
+import { openCoreDb } from '@src/db';
 import {
   getDmCommandPrefix,
   getWorkspaceTarget,
@@ -41,10 +41,10 @@ import {
   getProviderName,
   setProviderName,
   setDmCommandPrefix,
-} from '../src/db';
-import { normalizeVapidSubject } from '../src/env';
-import { getEnvFromFile, setEnvInFile } from '../src/env-file';
-import { dmBotRoot } from '../src/paths';
+} from '@src/db';
+import { normalizeVapidSubject } from '@src/env';
+import { getEnvFromFile, setEnvInFile } from '@src/env-file';
+import { dmBotRoot } from '@src/paths';
 
 const PARENT_ROOT = resolve(join(dmBotRoot, '..'));
 const BOT_DIR_NAME = basename(dmBotRoot);
@@ -377,12 +377,15 @@ async function main(): Promise<void> {
 
   console.log('── Workspace ──');
   console.log('  parent — agent works on your project (bot is a subfolder)');
-  console.log('  bot    — agent works only on the bot itself (standalone)\n');
+
+  console.log(
+    '  appweaver — agent works only on AppWeaver itself (standalone)\n',
+  );
 
   const workspace = await askWithDefault(
     'Workspace',
-    currentWorkspace as 'parent' | 'bot',
-    ['parent', 'bot'],
+    currentWorkspace as 'parent' | 'appweaver',
+    ['parent', 'appweaver'],
   );
 
   setWorkspaceTarget(db, workspace);
@@ -396,7 +399,7 @@ async function main(): Promise<void> {
     ensureAgentTemplatesInstalled(PARENT_ROOT);
   } else if (wasParent && !isParent) {
     const remove = await ask(
-      '\nWorkspace changed from parent to bot. Remove symlinks from parent project? (y/N): ',
+      '\nWorkspace changed from parent to appweaver. Remove symlinks from parent project? (y/N): ',
     );
 
     if (remove.toLowerCase() === 'y') {
@@ -465,7 +468,7 @@ async function main(): Promise<void> {
     const currentCursorKey = getEnvFromFile(envPath, 'CURSOR_API_KEY');
 
     const cursorKeyUrl =
-      'https://cursor.com/dashboard/cloud-agents#my-user-api-keys';
+      'https://cursor.com/dashboard/integrations#user-api-keys';
 
     console.log('\n  Cursor backend requires CURSOR_API_KEY in .env.');
     console.log('  Open this URL to create or copy your API key:\n');

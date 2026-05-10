@@ -15,11 +15,9 @@ import {
   DEFAULT_MODE,
   DmCommandPrefixSchema,
   DEFAULT_PROVIDER,
-  DEFAULT_REPLY_TRANSPORT,
   DEFAULT_WORKSPACE_TARGET,
   LintingSchema,
   ProviderNameSchema,
-  ReplyTransportSchema,
   STATE_AGENT_BACKEND,
   STATE_CASHU_DEFAULT_MINT_URL,
   STATE_DEFAULT_MODE,
@@ -28,7 +26,6 @@ import {
   STATE_MODEL_OVERRIDE,
   STATE_OPENCODE_AGENT,
   STATE_PROVIDER_NAME,
-  STATE_REPLY_TRANSPORT,
   STATE_ROUTSTR_BUDGET_MSATS,
   STATE_ROUTSTR_MODEL,
   STATE_ROUTSTR_MODELS_CACHE,
@@ -42,7 +39,6 @@ import {
   type Linting,
   type Msats,
   type ProviderName,
-  type ReplyTransport,
   type RoutstrModelCache,
   type WorkspaceTarget,
   WorkspaceTargetSchema,
@@ -168,18 +164,14 @@ export function setAgentBackend(db: CoreDb, backend: AgentBackendName): void {
   setState(db, STATE_AGENT_BACKEND, backend);
 }
 
-export function getReplyTransport(db: CoreDb): ReplyTransport {
-  const v = getState(db, STATE_REPLY_TRANSPORT);
-
-  return ReplyTransportSchema.safeParse(v).data ?? DEFAULT_REPLY_TRANSPORT;
-}
-
-export function setReplyTransport(db: CoreDb, transport: ReplyTransport): void {
-  setState(db, STATE_REPLY_TRANSPORT, transport);
-}
-
 export function getWorkspaceTarget(db: CoreDb): WorkspaceTarget {
   const v = getState(db, STATE_WORKSPACE_TARGET);
+
+  if (v === 'bot') {
+    setState(db, STATE_WORKSPACE_TARGET, 'appweaver');
+
+    return 'appweaver';
+  }
 
   return WorkspaceTargetSchema.safeParse(v).data ?? DEFAULT_WORKSPACE_TARGET;
 }

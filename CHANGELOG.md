@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.8.0] - 2026-05-11
+
+- feat: add setup web configuration flow (442bf5f)
+
 ## [v9.7.0] - 2026-05-09
 
-- feat: add docker setup flow (3c57949)
+- feat: add docker setup flow (aab6b20)
 
 ## [v9.6.4] - 2026-05-09
 

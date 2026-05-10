@@ -149,7 +149,7 @@ function parseModel({ dmBotRoot, mode, modelOverride, providerName }: ParseModel
 
 When the bot runs in `agent` mode:
 
-- After each agent response, the bot runs `bun run lint` for the active workspace target (`parent` or `bot`).
+- After each agent response, the bot runs `bun run lint` for the active workspace target (`parent` or `appweaver`).
 - The lint result is appended to the response sent to the user.
 - If lint fails, the bot performs one additional agent round and sends lint output as feedback.
 - The user receives the combined output after this lint step (and optional fix round).
@@ -187,7 +187,7 @@ When editing or extending the dm-bot (NIP-17 DM bot), use this as the map. The b
     - `default_mode` – `ask` | `plan` | `agent`
     - `agent_backend` – `cursor` | `opencode`
     - `reply_transport` – `remote` | `local`
-    - `workspace_target` – `parent` | `bot`
+    - `workspace_target` – `parent` | `appweaver`
 - **Restart signal**: file `restart.requested` in the project root. Create/touch it to restart the bot when using `watch`; the watcher removes it and restarts the process. There is **no** auto-restart on file edits — that is intentional.
 
 ## Agent backends
@@ -232,7 +232,7 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 - **New `!` commands**: In `index.ts`, function `handleBangCommand`. Add a new `if (cmd === "my-cmd") { ... return "reply"; }`. The function now receives `workspaceRoot`, `dmBotRoot`, and `agentEnv` for commands that need to create sessions.
 - **Agent backends**: `CursorBackend` and `OpenCodeBackend` classes implement `AgentBackend`. Add new backends by implementing the interface and registering in `createBackend()`.
 - **JSONL parsing**: `parseOpenCodeJsonl()` handles OpenCode `--format json` output. Accumulates tokens across multiple steps.
-- **Workspace targeting + auto session reset**: `!workspace [parent|bot]` sets the active workspace target and auto-creates a new session on change.
+- **Workspace targeting + auto session reset**: `!workspace [parent|appweaver]` sets the active workspace target and auto-creates a new session on change.
 - **Backend switching + auto session reset**: `!backend [cursor|opencode]` sets the active backend and auto-creates a new session on change.
 - **Post-agent lint flow (agent mode)**: After an `agent`-mode run, bot runs `bun run lint` for the active workspace; on lint errors, performs one additional agent round with lint feedback.
 - **Reply formatting / chunking**: `chunkMessage` (max length), `modePrefix()` (colored prefix), `tokenFooter()` (token/cost line).

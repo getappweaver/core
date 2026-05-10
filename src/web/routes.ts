@@ -11,11 +11,15 @@ import { join } from 'path';
 import type { SimplePool } from 'nostr-tools/pool';
 import { ZodError } from 'zod';
 
+import {
+  authorizeOpencodeSetupProvider,
+  getOpencodeSetupAuthStatus,
+} from '@src/backends/opencode-sdk';
+import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
-import { isSetupSecretValid } from '@src/setup-secret';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -39,10 +43,15 @@ import {
 } from './push-subscriptions';
 import {
   generateSetupBotKey,
+  setSetupCursorApiKey,
+  setSetupDefaults,
   setSetupMasterPubkey,
+  setSetupProviderApiKey,
   setSetupRelays,
-} from './setup-actions';
-import { createSetupStatus } from './setup-status';
+  setupWebPush,
+} from './setup/actions';
+import { createSetupSessionToken, isSetupSecretValid } from './setup/secret';
+import { createSetupStatus } from './setup/status';
 import { isWebDistUsable, serveWebDistGet } from './web-dist';
 
 export type WebRouteContext = {
@@ -59,6 +68,7 @@ export type WebRouteContext = {
   providerDb: ProviderDb | null;
   config: BotConfig;
   setupSecret: string;
+  setupMode: boolean;
 };
 
 function jsonResponse(data: unknown, init?: ResponseInit): Response {
@@ -111,12 +121,39 @@ function verifyNip98Auth(params: VerifyNip98AuthParams): Response | null {
   );
 }
 
-function verifySetupSecret(ctx: WebRouteContext, url: URL): Response | null {
-  if (isSetupSecretValid(url.searchParams.get('secret'), ctx.setupSecret)) {
+const setupSessionTokens = new Set<string>();
+
+function bearerToken(req: Request): string | null {
+  const header = req.headers.get('Authorization');
+
+  if (!header?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = header.slice('Bearer '.length).trim();
+
+  return token.length > 0 ? token : null;
+}
+
+function verifySetupSession(req: Request): Response | null {
+  const token = bearerToken(req);
+
+  if (token && setupSessionTokens.has(token)) {
     return null;
   }
 
   return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+}
+
+function createSetupSession(ctx: WebRouteContext, url: URL): Response {
+  if (!isSetupSecretValid(url.searchParams.get('secret'), ctx.setupSecret)) {
+    return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const token = createSetupSessionToken();
+  setupSessionTokens.add(token);
+
+  return jsonResponse({ ok: true, token });
 }
 
 let loggedMissingWebDist = false;
@@ -166,7 +203,11 @@ export function createWebFetchHandler(
     }
 
     if (path.startsWith('/api/setup/')) {
-      const authFail = verifySetupSecret(ctx, url);
+      if (req.method === 'POST' && path === '/api/setup/session') {
+        return createSetupSession(ctx, url);
+      }
+
+      const authFail = verifySetupSession(req);
 
       if (authFail) {
         return authFail;
@@ -174,6 +215,60 @@ export function createWebFetchHandler(
 
       if (req.method === 'GET' && path === '/api/setup/status') {
         return jsonResponse(createSetupStatus(ctx));
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/restart') {
+        writeRestartRequestedFile();
+
+        return jsonResponse({ ok: true, status: createSetupStatus(ctx) });
+      }
+
+      if (req.method === 'GET' && path === '/api/setup/opencode/auth') {
+        return getOpencodeSetupAuthStatus(ctx.dmBotRoot)
+          .then((result) => jsonResponse(result))
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            return jsonResponse({ error: message }, { status: 500 });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/opencode/authorize') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const input = payload as {
+              providerID?: unknown;
+              methodIndex?: unknown;
+            } | null;
+
+            if (
+              !input ||
+              typeof input.providerID !== 'string' ||
+              typeof input.methodIndex !== 'number' ||
+              !Number.isInteger(input.methodIndex) ||
+              input.methodIndex < 0
+            ) {
+              throw new Error('invalid_opencode_authorize');
+            }
+
+            return authorizeOpencodeSetupProvider({
+              directory: ctx.dmBotRoot,
+              providerID: input.providerID,
+              methodIndex: input.methodIndex,
+            });
+          })
+          .then((result) => jsonResponse(result))
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' ||
+              message === 'invalid_opencode_authorize'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
       }
 
       if (req.method === 'POST' && path === '/api/setup/master-pubkey') {
@@ -252,6 +347,188 @@ export function createWebFetchHandler(
 
             const status =
               message === 'invalid_json' || message === 'invalid_relays'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/cursor-api-key') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const apiKey =
+              payload && typeof payload === 'object' && 'apiKey' in payload
+                ? (payload as { apiKey?: unknown }).apiKey
+                : null;
+
+            if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+              throw new Error('invalid_cursor_api_key');
+            }
+
+            const result = setSetupCursorApiKey({
+              dmBotRoot: ctx.dmBotRoot,
+              apiKey,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' || message === 'invalid_cursor_api_key'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/provider-api-key') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const input = payload as {
+              values?: unknown;
+            } | null;
+
+            if (
+              !input ||
+              !input.values ||
+              typeof input.values !== 'object' ||
+              Array.isArray(input.values) ||
+              Object.entries(input.values).some(
+                ([key, value]) =>
+                  typeof key !== 'string' || typeof value !== 'string',
+              )
+            ) {
+              throw new Error('invalid_provider_api_key');
+            }
+
+            const result = setSetupProviderApiKey({
+              dmBotRoot: ctx.dmBotRoot,
+              values: input.values as Record<string, string>,
+            });
+
+            return jsonResponse({ ok: true, ...result });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' ||
+              message === 'invalid_provider_api_key'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/web-push') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const input = payload as {
+              subject?: unknown;
+              generateNewKeys?: unknown;
+            } | null;
+
+            if (
+              !input ||
+              typeof input.subject !== 'string' ||
+              typeof input.generateNewKeys !== 'boolean'
+            ) {
+              throw new Error('invalid_web_push');
+            }
+
+            const result = setupWebPush({
+              dmBotRoot: ctx.dmBotRoot,
+              subjectRaw: input.subject,
+              generateNewKeys: input.generateNewKeys,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' ||
+              message === 'invalid_web_push' ||
+              message === 'invalid_web_push_subject' ||
+              message === 'missing_web_push_keys'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/defaults') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            if (!payload || typeof payload !== 'object') {
+              throw new Error('invalid_defaults');
+            }
+
+            const input = payload as {
+              prefix?: unknown;
+              backend?: unknown;
+              provider?: unknown;
+              mode?: unknown;
+              workspace?: unknown;
+              linting?: unknown;
+              readyNotification?: unknown;
+            };
+
+            if (
+              typeof input.prefix !== 'string' ||
+              typeof input.backend !== 'string' ||
+              typeof input.provider !== 'string' ||
+              typeof input.mode !== 'string' ||
+              typeof input.workspace !== 'string' ||
+              typeof input.linting !== 'string' ||
+              typeof input.readyNotification !== 'boolean'
+            ) {
+              throw new Error('invalid_defaults');
+            }
+
+            const result = setSetupDefaults({
+              db: ctx.seenDb,
+              dmBotRoot: ctx.dmBotRoot,
+              parentOfBotRoot: ctx.parentOfBotRoot,
+              input: {
+                prefix: input.prefix,
+                backend: input.backend,
+                provider: input.provider,
+                mode: input.mode,
+                workspace: input.workspace,
+                linting: input.linting,
+                readyNotification: input.readyNotification,
+              },
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' ||
+              message === 'invalid_defaults' ||
+              err instanceof ZodError
                 ? 400
                 : 500;
 

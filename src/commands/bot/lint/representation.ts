@@ -79,7 +79,7 @@ export function buildBotLintRepresentationFromArgs(
 
   if (args.length === 0) {
     const workspace = getWorkspaceTarget(db);
-    const label = workspace === 'bot' ? 'AppWeaver core' : 'workspace';
+    const label = workspace === 'appweaver' ? 'AppWeaver core' : 'workspace';
     const result = runPostAgentLint({ cwd, label });
 
     return toRepresentation({

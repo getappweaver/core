@@ -345,7 +345,17 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
   const head = () => (
     <>
-      <span class="tag mode-tag">diff</span>
+      <span class="tag mode-tag">
+        {props.item.commit ? 'commit diff' : 'diff'}
+      </span>
+      <Show when={props.item.commit}>
+        {(commit) => (
+          <>
+            <span class="diff-card__summary">{commit().subject}</span>
+            <span class="diff-card__summary">{commit().relativeTime}</span>
+          </>
+        )}
+      </Show>
       <span class="diff-card__summary">
         {props.item.files.length}{' '}
         {props.item.files.length === 1 ? 'file' : 'files'}

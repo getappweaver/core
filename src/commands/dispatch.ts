@@ -144,7 +144,7 @@ export async function routeCommand(
   const { cmd, args } = parsed;
 
   const cwd =
-    getWorkspaceTarget(seenDb) === 'bot' ? dmBotRoot : parentOfBotRoot;
+    getWorkspaceTarget(seenDb) === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
   const ctx = {
     ...props,

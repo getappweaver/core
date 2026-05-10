@@ -12,7 +12,6 @@ import {
   AgentModeSchema,
   LintingSchema,
   ProviderNameSchema,
-  ReplyTransportSchema,
   WorkspaceTargetSchema,
   getAgentBackend,
   getBackendExecutionProfile,
@@ -20,7 +19,6 @@ import {
   getLinting,
   getModelOverride,
   getProviderName,
-  getReplyTransport,
   getRoutstrBudget,
   getState,
   getWorkspaceTarget,
@@ -53,7 +51,6 @@ export const BotStatusDataSchema = z.object({
   resolvedModelName: z.string().min(1),
   effectiveModelSource: z.enum(['override', 'agent', 'root', 'default']),
   workspace: WorkspaceTargetSchema,
-  transport: ReplyTransportSchema,
   botRelayUrls: z.array(z.string()),
   sessionId: z.string().nullable(),
   opencodeServeUrl: z.string().nullable(),
@@ -84,7 +81,6 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
   const mode = getCurrentOrDefaultMode(seenDb);
   const linting = getLinting(seenDb);
   const backendName = getAgentBackend(seenDb);
-  const replyTransport = getReplyTransport(seenDb);
   const workspace = getWorkspaceTarget(seenDb);
   const serveUrl = process.env.BOT_OPENCODE_SERVE_URL;
   const modelOverride = getModelOverride(seenDb, backendName);
@@ -151,7 +147,6 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
       ? 'override'
       : (opencodeConfigured?.source ?? 'default'),
     workspace,
-    transport: replyTransport,
     botRelayUrls,
     sessionId: cur,
     opencodeServeUrl: opencodeServeUrlAttached,

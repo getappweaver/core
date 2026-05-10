@@ -41,7 +41,7 @@ export async function runWebChat(
   });
 
   const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'bot'
+    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
       ? ctx.dmBotRoot
       : ctx.parentOfBotRoot;
 

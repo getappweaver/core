@@ -14,13 +14,13 @@ export function getBotWorkspaceSubcommandDefinition(
     arguments: [
       {
         name: 'target',
-        summary: 'parent or bot',
+        summary: 'parent or appweaver',
         kind: 'string',
         required: false,
         variadic: false,
       },
     ],
     options: [],
-    examples: [`${p}bot workspace`, `${p}bot workspace bot`],
+    examples: [`${p}bot workspace`, `${p}bot workspace appweaver`],
   };
 }

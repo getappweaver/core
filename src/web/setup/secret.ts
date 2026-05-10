@@ -10,6 +10,10 @@ export function createSetupSecret(): string {
   return randomBytes(32).toString('base64url');
 }
 
+export function createSetupSessionToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
 export function isSetupSecretValid(
   provided: string | null,
   expected: string,

@@ -13,7 +13,7 @@ import { finalizeEvent } from 'nostr-tools/pure';
 
 import { redrawPrompt } from '../cli/local-cli';
 import type { CoreDb } from '../db';
-import { alreadyHaveEvent, getReplyTransport, markSeen } from '../db';
+import { alreadyHaveEvent, markSeen } from '../db';
 import { ensureWss } from '../env';
 import { C, debug, log, stripAnsi } from '../logger';
 
@@ -222,15 +222,6 @@ export function createDmSubscription({
 
           if (kind !== 14 && kind !== 15) {
             debug('Ignoring non–kind-14 or kind-15 rumor:', kind);
-
-            return;
-          }
-
-          if (getReplyTransport(seenDb) === 'local') {
-            markSeen(seenDb, wrap.id);
-            debug('Reply transport is local; ignoring incoming Nostr message.');
-
-            redrawPrompt?.();
 
             return;
           }

@@ -143,6 +143,7 @@ export type TimelineItem =
       source?: MessageSource;
       type: 'diff';
       files: TimelineFileDiff[];
+      commit?: { subject: string; relativeTime: string } | null;
     }
   | {
       id: string;

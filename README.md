@@ -232,6 +232,8 @@ Open the setup URL printed in the logs. It will look like:
 http://127.0.0.1:5551/setup?secret=...
 ```
 
+The setup page exchanges that boot secret for a temporary browser session and removes the secret from the address bar.
+
 For a long-running container, use Docker's restart policy:
 
 ```bash
@@ -288,6 +290,8 @@ Then open this on your laptop:
 ```text
 http://127.0.0.1:5551/setup?secret=...
 ```
+
+After the page loads, the secret is removed from the browser URL and setup API calls use the temporary local session.
 
 Although the browser URL uses `http://`, the traffic between your laptop and the VPS is encrypted inside SSH. The plain HTTP connection exists only on loopback interfaces (`127.0.0.1`) at each end of the tunnel.
 

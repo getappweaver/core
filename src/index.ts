@@ -78,11 +78,12 @@ import { dmBotRoot, RESTART_REQUESTED_PATH } from './paths';
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
-import { createSetupSecret } from './setup-secret';
 import { openWalletDb } from './wallet/db';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
+import { createSetupSecret } from './web/setup/secret';
+import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
 
 async function waitForever(): Promise<never> {
   return new Promise(() => {});
@@ -141,6 +142,7 @@ async function startSetupOnlyMode(props: {
       },
     },
     setupSecret: props.setupSecret,
+    setupMode: true,
   });
 
   return waitForever();
@@ -213,6 +215,13 @@ async function main() {
 
   const parentOfBotRoot = join(dmBotRoot, '..');
 
+  ensureOpencodeParentWorkspaceAssets({
+    backend: getAgentBackend(seenDb),
+    workspace: getWorkspaceTarget(seenDb),
+    dmBotRoot,
+    parentOfBotRoot,
+  });
+
   const signAuthEvent = createSignAuthEvent({ botSecretKey });
 
   // --- Startup logging & ready DM ---
@@ -251,6 +260,7 @@ async function main() {
     providerDb,
     config,
     setupSecret,
+    setupMode: false,
   });
 
   const pwdOutput = process.cwd();
@@ -278,7 +288,7 @@ async function main() {
 
   debug('Subscription filter:', JSON.stringify(dmFilter));
 
-  // --- Reply transport & job engine ---
+  // --- Reply handling & job engine ---
   const sendReplyForSource = createSendReplyForSource({
     pool,
     botRelayUrls,
@@ -301,7 +311,7 @@ async function main() {
 
   let pendingPrompt: ((answer: string) => void) | null = null;
 
-  /** Reply transport for plugin `sendReply` / `promptFn` — mirrors the current inbound message source. */
+  /** Plugin `sendReply` / `promptFn` mirrors the current inbound message source. */
   let replySource: MessageSource = 'nostr';
 
   async function resolvePendingPromptIfAny(
@@ -450,7 +460,7 @@ async function main() {
     const dmPrefix = getDmCommandPrefix(seenDb);
 
     const cwd =
-      getWorkspaceTarget(seenDb) === 'bot' ? dmBotRoot : parentOfBotRoot;
+      getWorkspaceTarget(seenDb) === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
     pluginContext.runAgent = async (prompt: string) =>
       backend.runMessage({

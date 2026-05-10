@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "9.7.0",
+  "version": "9.8.0",
   "description": "Open-source AI-first platform for installable apps, automation, and bot workflows.",
   "type": "module",
   "workspaces": [
@@ -20,7 +20,7 @@
     "lint": "eslint . --fix",
     "wallet:setup": "bun run scripts/setup-wallet.ts",
     "nostr:setup": "bun run scripts/nostr-setup.ts",
-    "bot:setup": "bun run scripts/bot-setup.ts",
+    "bot:setup": "bun run src/web/setup/bot-setup.ts",
     "contrib:setup": "chmod +x scripts/commit-msg scripts/post-commit scripts/ngit-helper.sh && git config include.path ../.gitconfig",
     "plugin:publish": "bun run scripts/publish-plugin.ts",
     "plugin:install": "bun run scripts/install-plugin.ts",
