@@ -19,7 +19,7 @@ import type { MessageSource } from '@src/messaging';
 import type { AiDefinition } from '@src/system/ai-definition';
 import type { CommandDefinition } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
-import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
+import type { WebHandlerResult, WebNodeRoot } from '@src/web/ui-schema';
 
 // ---------------------------------------------------------------------------
 export type SendReplyFn = (message: string) => Promise<void>;
@@ -191,7 +191,7 @@ export type BotPlugin = {
   handler: (
     args: string[],
     context: PluginInvocationContext,
-  ) => Promise<string | WebNodeRoot | ClientViewRoot>;
+  ) => Promise<WebHandlerResult>;
   helpText: (alias: string, prefix: string) => string[];
   /** When set, global `help <alias>` can render structured CLI help via core. */
   commandDefinition:

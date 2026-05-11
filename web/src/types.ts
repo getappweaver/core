@@ -7,6 +7,7 @@ import type {
 } from '@src/timeline/types';
 import type {
   ClientViewRoot,
+  TimelineEventOutput,
   WebArgumentFieldChoice,
   WebNodeRoot,
   WebOptionFieldHintValue,
@@ -119,7 +120,11 @@ export type CommandDetail = {
 
 export type CommandPayload = TimelinePayload;
 
-export type CommandOutput = string | WebNodeRoot | ClientViewRoot;
+export type CommandOutput =
+  | string
+  | WebNodeRoot
+  | ClientViewRoot
+  | TimelineEventOutput;
 
 export type TimelineItem =
   | {
@@ -143,7 +148,11 @@ export type TimelineItem =
       source?: MessageSource;
       type: 'diff';
       files: TimelineFileDiff[];
-      commit?: { subject: string; relativeTime: string } | null;
+      meta?: {
+        title: string | null;
+        subtitle: string | null;
+        origin: 'workspace_diff' | 'git_commit' | null;
+      } | null;
     }
   | {
       id: string;

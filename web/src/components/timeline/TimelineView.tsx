@@ -346,13 +346,19 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
   const head = () => (
     <>
       <span class="tag mode-tag">
-        {props.item.commit ? 'commit diff' : 'diff'}
+        {props.item.meta?.origin === 'git_commit' ? 'commit diff' : 'diff'}
       </span>
-      <Show when={props.item.commit}>
-        {(commit) => (
+      <Show when={props.item.meta}>
+        {(meta) => (
           <>
-            <span class="diff-card__summary">{commit().subject}</span>
-            <span class="diff-card__summary">{commit().relativeTime}</span>
+            <Show when={meta().title}>
+              {(title) => <span class="diff-card__summary">{title()}</span>}
+            </Show>
+            <Show when={meta().subtitle}>
+              {(subtitle) => (
+                <span class="diff-card__summary">{subtitle()}</span>
+              )}
+            </Show>
           </>
         )}
       </Show>

@@ -328,13 +328,40 @@ export const ClientViewResultSchema = z.object({
   payload: z.unknown(),
 });
 
+export const TimelineFileDiffSchema = z.object({
+  file: z.string(),
+  patch: z.string(),
+  additions: z.number().int().nonnegative(),
+  deletions: z.number().int().nonnegative(),
+  status: z.enum(['added', 'deleted', 'modified']).nullable(),
+});
+
+export const TimelineDiffEventSchema = z.object({
+  type: z.literal('diff'),
+  files: z.array(TimelineFileDiffSchema),
+  title: z.string().nullable(),
+  subtitle: z.string().nullable(),
+  origin: z.enum(['workspace_diff', 'git_commit']).nullable(),
+});
+
+export const TimelineEventOutputSchema = z.object({
+  kind: z.literal('timeline_event'),
+  version: z.literal(1),
+  event: TimelineDiffEventSchema,
+});
+
 export type WebAction = z.infer<typeof WebActionSchema>;
 export type WebProps = z.infer<typeof WebPropsSchema>;
 export type WebRenderMeta = z.infer<typeof WebRenderMetaSchema>;
 export type WebNodeRoot = z.infer<typeof WebRenderResultSchema>;
 export type ClientViewRoot = z.infer<typeof ClientViewResultSchema>;
+export type TimelineEventOutput = z.infer<typeof TimelineEventOutputSchema>;
 /** Union of all possible return types from command handlers. */
-export type WebHandlerResult = string | WebNodeRoot | ClientViewRoot;
+export type WebHandlerResult =
+  | string
+  | WebNodeRoot
+  | ClientViewRoot
+  | TimelineEventOutput;
 export type WebShadowMountOverflow = z.infer<
   typeof WebShadowMountOverflowSchema
 >;

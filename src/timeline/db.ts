@@ -6,6 +6,7 @@ import type {
   TimelineCommandFormState,
   TimelineDiffSummary,
   TimelineEventKind,
+  TimelineEventMeta,
   TimelineEventRecord,
   TimelineFileDiff,
   TimelineHistoryItem,
@@ -28,6 +29,7 @@ type TimelineEventRow = {
   web_json: string | null;
   client_view_json: string | null;
   diff_json: string | null;
+  meta_json: string | null;
   diff_summary_json: string | null;
   tool_json: string | null;
   prompt_json: string | null;
@@ -52,6 +54,7 @@ export function createTimelineTables(db: CoreDb): void {
       web_json TEXT,
       client_view_json TEXT,
       diff_json TEXT,
+      meta_json TEXT,
       diff_summary_json TEXT,
       tool_json TEXT,
       prompt_json TEXT,
@@ -85,6 +88,12 @@ export function createTimelineTables(db: CoreDb): void {
   }
 
   try {
+    db.run('ALTER TABLE timeline_events ADD COLUMN meta_json TEXT');
+  } catch {
+    /* Column already exists */
+  }
+
+  try {
     db.run('ALTER TABLE timeline_events ADD COLUMN tool_json TEXT');
   } catch {
     /* Column already exists */
@@ -107,11 +116,12 @@ export function insertTimelineEvent(
   db: CoreDb,
   event: Omit<
     TimelineEventRecord,
-    'id' | 'createdAt' | 'diff' | 'diffSummary' | 'tool'
+    'id' | 'createdAt' | 'diff' | 'meta' | 'diffSummary' | 'tool'
   > & {
     id?: string;
     createdAt?: number;
     diff?: TimelineFileDiff[] | null;
+    meta?: TimelineEventMeta | null;
     diffSummary?: TimelineDiffSummary | null;
     tool?: TimelineToolCall | null;
   },
@@ -119,6 +129,7 @@ export function insertTimelineEvent(
   const record: TimelineEventRecord = {
     ...event,
     diff: event.diff ?? null,
+    meta: event.meta ?? null,
     diffSummary: event.diffSummary ?? null,
     tool: event.tool ?? null,
     id: event.id ?? createTimelineEventId(),
@@ -141,12 +152,13 @@ export function insertTimelineEvent(
       web_json,
       client_view_json,
       diff_json,
+      meta_json,
       diff_summary_json,
       tool_json,
       prompt_json,
       request_id,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       record.id,
       record.timelineId,
@@ -162,6 +174,7 @@ export function insertTimelineEvent(
       record.web ? JSON.stringify(record.web) : null,
       record.clientView ? JSON.stringify(record.clientView) : null,
       record.diff ? JSON.stringify(record.diff) : null,
+      record.meta ? JSON.stringify(record.meta) : null,
       record.diffSummary ? JSON.stringify(record.diffSummary) : null,
       record.tool ? JSON.stringify(record.tool) : null,
       record.prompt ? JSON.stringify(record.prompt) : null,
@@ -194,6 +207,9 @@ function rowToTimelineEventRecord(row: TimelineEventRow): TimelineEventRecord {
     clientView: row.client_view_json ? JSON.parse(row.client_view_json) : null,
     diff: row.diff_json
       ? (JSON.parse(row.diff_json) as TimelineFileDiff[])
+      : null,
+    meta: row.meta_json
+      ? (JSON.parse(row.meta_json) as TimelineEventMeta)
       : null,
     diffSummary: row.diff_summary_json
       ? (JSON.parse(row.diff_summary_json) as TimelineDiffSummary)
@@ -240,6 +256,7 @@ export function timelineEventToHistoryItem(
             id: event.id,
             type: 'diff',
             files: event.diff,
+            meta: event.meta,
             createdAt: event.createdAt,
             source: event.source,
           }

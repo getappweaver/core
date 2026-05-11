@@ -1,5 +1,8 @@
-import type { TimelineFileDiff } from '@src/timeline/types';
-import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
+import type {
+  TimelineEventOutput,
+  WebNode,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
 
 import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
 import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
@@ -10,6 +13,7 @@ import {
 } from '../roadmap/markIssue';
 import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
+import type { TimelineItem } from '../types';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
 
 import type {
@@ -70,47 +74,29 @@ function taskbarLoadingWeb(command: string, subcommand: string): WebNodeRoot {
   };
 }
 
-function timelineDiffClientViewData(payload: unknown): {
-  files: TimelineFileDiff[];
-  commit: { subject: string; relativeTime: string } | null;
-} | null {
-  if (!payload || typeof payload !== 'object') {
-    return null;
+function timelineEventOutputToItem(
+  output: TimelineEventOutput,
+  id: string,
+): TimelineItem | null {
+  switch (output.event.type) {
+    case 'diff':
+      return {
+        id,
+        type: 'diff',
+        files: output.event.files,
+        meta: {
+          title: output.event.title,
+          subtitle: output.event.subtitle,
+          origin: output.event.origin,
+        },
+      };
+    default:
+      return assertUnreachable(output.event.type);
   }
+}
 
-  const payloadRecord = payload as { files?: unknown; commit?: unknown };
-  const files = payloadRecord.files;
-
-  if (!Array.isArray(files)) {
-    return null;
-  }
-
-  const commit =
-    payloadRecord.commit &&
-    typeof payloadRecord.commit === 'object' &&
-    typeof (payloadRecord.commit as { subject?: unknown }).subject ===
-      'string' &&
-    typeof (payloadRecord.commit as { relativeTime?: unknown }).relativeTime ===
-      'string'
-      ? {
-          subject: (payloadRecord.commit as { subject: string }).subject,
-          relativeTime: (payloadRecord.commit as { relativeTime: string })
-            .relativeTime,
-        }
-      : null;
-
-  return {
-    files: files.filter((file): file is TimelineFileDiff => {
-      if (!file || typeof file !== 'object') {
-        return false;
-      }
-
-      const rec = file as Record<string, unknown>;
-
-      return typeof rec.file === 'string' && typeof rec.patch === 'string';
-    }),
-    commit,
-  };
+function assertUnreachable(value: never): never {
+  throw new Error(`Unreachable: ${String(value)}`);
 }
 
 function appendClassName(
@@ -613,21 +599,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         const output = splitCommandOutput(message.output);
         collectRefreshHighlightTargets(output.text);
 
-        const timelineDiffData =
-          output.clientView?.view === 'timeline-diff'
-            ? timelineDiffClientViewData(output.clientView.payload)
-            : null;
+        const timelineEventItem = output.timelineEvent
+          ? timelineEventOutputToItem(output.timelineEvent, adapters.createId())
+          : null;
 
-        if (timelineDiffData !== null) {
-          adapters.setTimeline((prev) => [
-            ...prev,
-            {
-              id: adapters.createId(),
-              type: 'diff',
-              files: timelineDiffData.files,
-              commit: timelineDiffData.commit,
-            },
-          ]);
+        if (timelineEventItem !== null) {
+          adapters.setTimeline((prev) => [...prev, timelineEventItem]);
 
           dispatchRefreshOnce('final');
 
@@ -797,6 +774,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           text: null,
           web: taskbarLoadingWeb(command, subcommand.name),
           clientView: null,
+          timelineEvent: null,
         },
         visible: true,
       });

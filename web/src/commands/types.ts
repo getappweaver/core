@@ -55,6 +55,7 @@ export type SplitCommandOutput = {
   text: string | null;
   web: Extract<CommandOutput, { kind: 'ui' }> | null;
   clientView: Extract<CommandOutput, { kind: 'client_view' }> | null;
+  timelineEvent: Extract<CommandOutput, { kind: 'timeline_event' }> | null;
 };
 
 export type CommandsAdapters = {

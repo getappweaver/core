@@ -30,12 +30,14 @@ export function splitCommandOutput(output: CommandOutput | undefined): {
   text: string | null;
   web: Extract<CommandOutput, { kind: 'ui' }> | null;
   clientView: Extract<CommandOutput, { kind: 'client_view' }> | null;
+  timelineEvent: Extract<CommandOutput, { kind: 'timeline_event' }> | null;
 } {
   if (typeof output === 'string') {
     return {
       text: output,
       web: null,
       clientView: null,
+      timelineEvent: null,
     };
   }
 
@@ -44,6 +46,7 @@ export function splitCommandOutput(output: CommandOutput | undefined): {
       text: null,
       web: output,
       clientView: null,
+      timelineEvent: null,
     };
   }
 
@@ -52,6 +55,16 @@ export function splitCommandOutput(output: CommandOutput | undefined): {
       text: null,
       web: null,
       clientView: output,
+      timelineEvent: null,
+    };
+  }
+
+  if (output?.kind === 'timeline_event') {
+    return {
+      text: null,
+      web: null,
+      clientView: null,
+      timelineEvent: output,
     };
   }
 
@@ -59,6 +72,7 @@ export function splitCommandOutput(output: CommandOutput | undefined): {
     text: '(no output)',
     web: null,
     clientView: null,
+    timelineEvent: null,
   };
 }
 

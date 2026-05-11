@@ -400,12 +400,6 @@ export function renderBotStatusWeb(
       nowrapValue: true,
     }),
     kvRow({
-      label: 'Transport',
-      value: d.transport,
-      valueTone: null,
-      nowrapValue: true,
-    }),
-    kvRow({
       label: 'Relays',
       value: d.botRelayUrls.length > 0 ? d.botRelayUrls.join(', ') : '(none)',
       valueTone: 'muted',

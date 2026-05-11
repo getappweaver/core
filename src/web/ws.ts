@@ -11,6 +11,8 @@ import {
   summarizeTimelineDiffFiles,
   type TimelinePayload,
 } from '@src/timeline/types';
+import { assertUnreachable } from '@src/utils';
+import type { TimelineEventOutput, WebHandlerResult } from '@src/web/ui-schema';
 
 import { runWebChat } from './chat';
 import {
@@ -50,6 +52,50 @@ export type WebSocketData = {
   /** Set from NIP-98 on HTTP upgrade and/or first `authenticate` message. */
   nip98Authenticated: boolean;
 };
+
+function isTimelineEventOutput(
+  output: WebHandlerResult,
+): output is TimelineEventOutput {
+  return typeof output !== 'string' && output.kind === 'timeline_event';
+}
+
+function insertCommandOutputTimelineEvent(props: {
+  ctx: WebRouteContext;
+  timelineId: string;
+  output: TimelineEventOutput;
+}): void {
+  const { ctx, timelineId, output } = props;
+
+  switch (output.event.type) {
+    case 'diff':
+      insertTimelineEvent(ctx.seenDb, {
+        timelineId,
+        source: 'web',
+        kind: 'diff',
+        role: null,
+        command: null,
+        subcommand: null,
+        subcommandTag: null,
+        values: null,
+        form: null,
+        text: null,
+        web: null,
+        clientView: null,
+        diff: output.event.files,
+        meta: {
+          title: output.event.title,
+          subtitle: output.event.subtitle,
+          origin: output.event.origin,
+        },
+        prompt: null,
+        requestId: null,
+      });
+
+      return;
+    default:
+      return assertUnreachable(output.event.type);
+  }
+}
 
 function sendMessage(
   ws: Bun.ServerWebSocket<WebSocketData>,
@@ -344,7 +390,13 @@ async function handleRunCommand(params: {
     promptFn,
   });
 
-  if (recordTl) {
+  if (recordTl && isTimelineEventOutput(result.output)) {
+    insertCommandOutputTimelineEvent({
+      ctx,
+      timelineId: message.timelineId,
+      output: result.output,
+    });
+  } else if (recordTl) {
     insertTimelineEvent(ctx.seenDb, {
       timelineId: message.timelineId,
       source: 'web',
@@ -362,11 +414,14 @@ async function handleRunCommand(params: {
       text: typeof result.output === 'string' ? result.output : null,
       web:
         typeof result.output === 'string' ||
-        result.output.kind === 'client_view'
+        result.output.kind === 'client_view' ||
+        result.output.kind === 'timeline_event'
           ? null
           : result.output,
       clientView:
-        typeof result.output === 'string' || result.output.kind === 'ui'
+        typeof result.output === 'string' ||
+        result.output.kind === 'ui' ||
+        result.output.kind === 'timeline_event'
           ? null
           : result.output,
       prompt: null,

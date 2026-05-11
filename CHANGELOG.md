@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.0] - 2026-05-11
+
+- feat: add timeline event command outputs (31725de)
+
 ## [v9.8.0] - 2026-05-11
 
-- feat: add setup web configuration flow (442bf5f)
+- feat: add setup web configuration flow (248d0a3)
 
 ## [v9.7.0] - 2026-05-09
 

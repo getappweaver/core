@@ -25,6 +25,14 @@ export type TimelineDiffSummary = {
   deletions: number;
 };
 
+export type TimelineDiffOrigin = 'workspace_diff' | 'git_commit';
+
+export type TimelineEventMeta = {
+  title: string | null;
+  subtitle: string | null;
+  origin: TimelineDiffOrigin | null;
+};
+
 export function summarizeTimelineDiffFiles(
   files: TimelineFileDiff[],
 ): TimelineDiffSummary {
@@ -103,6 +111,7 @@ export type TimelineHistoryItem =
       id: string;
       type: 'diff';
       files: TimelineFileDiff[];
+      meta: TimelineEventMeta | null;
       createdAt: number;
       source: MessageSource;
     }
@@ -170,6 +179,7 @@ export type TimelineEventRecord = {
   web: WebNodeRoot | null;
   clientView: ClientViewRoot | null;
   diff: TimelineFileDiff[] | null;
+  meta: TimelineEventMeta | null;
   diffSummary: TimelineDiffSummary | null;
   tool: TimelineToolCall | null;
   prompt: PromptPayload | null;

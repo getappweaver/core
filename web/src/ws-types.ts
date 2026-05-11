@@ -1,6 +1,10 @@
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { TimelineHistoryItem } from '@src/timeline/types';
-import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
+import type {
+  ClientViewRoot,
+  TimelineEventOutput,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
 
 import type { ComposerAiState } from './commands/types';
 import type { CommandDetail } from './types';
@@ -30,7 +34,7 @@ export type ComposerAiStateResultServerMessage = {
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
-  output: string | WebNodeRoot | ClientViewRoot;
+  output: string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
 };
 
 export type TimelineEventsResultServerMessage = {

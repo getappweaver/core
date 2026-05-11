@@ -4,7 +4,11 @@ import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { PromptPayload } from '@src/core/plugin';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type { WebCommandListItem } from '@src/web/command-catalog';
-import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
+import type {
+  ClientViewRoot,
+  TimelineEventOutput,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
 import {
   WebArgumentFieldChoiceSchema,
   WebOptionFieldHintValueSchema,
@@ -318,7 +322,7 @@ export type TimelineEventsResultServerMessage = {
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
-  output: string | WebNodeRoot | ClientViewRoot;
+  output: string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
 };
 
 export type PromptServerMessage = {
@@ -385,7 +389,7 @@ export function createComposerAiStateResultMessage(params: {
 
 export function createCommandResultMessage(params: {
   requestId: string;
-  output: string | WebNodeRoot | ClientViewRoot;
+  output: string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
 }): CommandResultServerMessage {
   return {
     type: 'command_result',

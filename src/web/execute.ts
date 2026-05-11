@@ -18,7 +18,7 @@ import type {
 } from '@src/system/command-definition';
 
 import type { WebRouteContext } from './routes';
-import type { ClientViewRoot, WebNodeRoot } from './ui-schema';
+import type { WebHandlerResult } from './ui-schema';
 
 const ExecuteCommandRequestSchema = z.object({
   arguments: z.record(z.string(), z.unknown()).optional().default({}),
@@ -144,7 +144,7 @@ export async function executeBuiltinCommand({
 }: ExecuteBuiltinCommandProps): Promise<{
   invocation: ExecuteCommandRequest;
   input: string;
-  output: string | WebNodeRoot | ClientViewRoot;
+  output: WebHandlerResult;
 }> {
   const request = ExecuteCommandRequestSchema.parse(payload);
 
@@ -201,7 +201,7 @@ export async function executeBuiltinJsonCommand(params: {
   command: CommandDefinition;
   subcommand: SubcommandDefinition;
   payload: unknown;
-}): Promise<string | WebNodeRoot | ClientViewRoot> {
+}): Promise<WebHandlerResult> {
   const { ctx, command, subcommand, payload } = params;
   const backendName = getAgentBackend(ctx.seenDb);
   const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
