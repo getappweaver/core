@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Production-ish start runner:
- * - ensures `web/dist` exists (builds if needed)
+ * - builds `web/dist`
  * - starts bot API server (`src/index.ts`) on 5551
  * - serves built web UI from the bot API server when START_WEB_UI is enabled
  */
@@ -44,11 +44,7 @@ function runBot(): ReturnType<typeof spawn> {
 }
 
 function ensureWebDistBuilt(): void {
-  if (isWebDistUsable(DM_BOT_DIR)) {
-    return;
-  }
-
-  console.log('[run-start] web/dist missing or stale. Running web build...');
+  console.log('[run-start] Running web build...');
 
   const result = spawnSync({
     cmd: ['bun', 'run', 'web:build'],
