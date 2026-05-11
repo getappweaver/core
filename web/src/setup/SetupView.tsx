@@ -824,9 +824,20 @@ function CursorSetupCard(props: CursorSetupCardProps): JSX.Element {
         >
           {saving() ? 'Saving...' : 'Save Cursor key'}
         </button>
-        <Show when={props.status.env.cursorApiKey}>
-          <span class="setup-inline-code">CURSOR_API_KEY saved</span>
-        </Show>
+      </div>
+      <div
+        class="setup-step setup-auth-step"
+        classList={{ 'is-ok': props.status.env.cursorApiKey }}
+      >
+        <span class="setup-step-marker">✓</span>
+        <div class="setup-step-body">
+          <h2>Cursor API key</h2>
+          <p>
+            {props.status.env.cursorApiKey
+              ? 'CURSOR_API_KEY is saved in .env.'
+              : 'Optional. Save a Cursor API key here only if you plan to use the Cursor backend.'}
+          </p>
+        </div>
       </div>
       <Show when={error()}>
         {(message) => <p class="setup-error-line">{message()}</p>}
@@ -1446,10 +1457,22 @@ function SetupChrome(props: { children: JSX.Element }): JSX.Element {
 export function SetupView(): JSX.Element {
   const [setupToken] = createResource(initializeSetupSession);
 
+  const [latestStatus, setLatestStatus] = createSignal<SetupStatus | null>(
+    null,
+  );
+
   const [status, { refetch }] = createResource(
     () => setupToken() ?? null,
     async (token) => fetchSetupStatus(token),
   );
+
+  createEffect(() => {
+    const next = status();
+
+    if (next) {
+      setLatestStatus(next);
+    }
+  });
 
   return (
     <SetupChrome>
@@ -1478,7 +1501,9 @@ export function SetupView(): JSX.Element {
             </section>
           </Match>
 
-          <Match when={setupToken.loading || status.loading}>
+          <Match
+            when={(setupToken.loading || status.loading) && !latestStatus()}
+          >
             <section class="card setup-card">
               <h1>Checking configuration...</h1>
               <p class="setup-copy">
@@ -1487,7 +1512,7 @@ export function SetupView(): JSX.Element {
             </section>
           </Match>
 
-          <Match when={status()}>
+          <Match when={latestStatus()}>
             {(loaded) => (
               <>
                 <SetupTimeline

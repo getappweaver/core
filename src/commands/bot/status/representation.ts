@@ -125,6 +125,11 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
     providerName,
   });
 
+  const resolvedModelName =
+    backendName === 'opencode' && opencodeConfigured && !modelOverride
+      ? opencodeConfigured.modelName
+      : backend.modelName;
+
   const cur = getState(seenDb, STATE_CURRENT_SESSION);
 
   const opencodeServeUrlAttached =
@@ -151,7 +156,7 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
     opencodeRootModel: opencodeConfigured?.rootModel ?? null,
     opencodeAgentModel: opencodeConfigured?.agentModel ?? null,
     opencodeAgentNames: opencodeConfig?.agents.map((agent) => agent.name) ?? [],
-    resolvedModelName: backend.modelName,
+    resolvedModelName,
     effectiveModelSource: modelOverride
       ? 'override'
       : (opencodeConfigured?.source ?? 'default'),

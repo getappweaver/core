@@ -1,4 +1,5 @@
 import { createBackend } from '@src/backends/factory';
+import { resolveConfiguredModelFromOpencodeConfig } from '@src/backends/opencode-common';
 import {
   getOpencodeAgent,
   listOpencodeModelCatalog,
@@ -58,6 +59,11 @@ export async function getComposerAiState(
       ? getOpencodeAgent(opencodeConfig!, executionProfile.agent)
       : null;
 
+  const opencodeConfigured =
+    executionProfile.kind === 'opencode'
+      ? resolveConfiguredModelFromOpencodeConfig(cwd, executionProfile.agent)
+      : null;
+
   const modelOverride = getModelOverride(ctx.seenDb, backendName);
 
   const backend = createBackend({
@@ -70,6 +76,11 @@ export async function getComposerAiState(
     modelOverride,
     providerName,
   });
+
+  const effectiveModel =
+    backendName === 'opencode' && opencodeConfigured && !modelOverride
+      ? opencodeConfigured.modelName
+      : backend.modelName;
 
   const isOpencodeBackend = backendName === 'opencode';
 
@@ -92,7 +103,7 @@ export async function getComposerAiState(
       ? await getOpencodeSdkContextStats({
           sessionId: currentSessionId,
           cwd,
-          effectiveModel: backend.modelName,
+          effectiveModel,
         }).catch(() => null)
       : null;
 
@@ -108,7 +119,7 @@ export async function getComposerAiState(
           ? executionProfile.mode
           : executionProfile.agent,
     executionProfileColor: opencodeAgent?.color ?? null,
-    effectiveModel: backend.modelName,
+    effectiveModel,
     provider: providerName,
     modelOverride,
     opencodeModelFormChoices,

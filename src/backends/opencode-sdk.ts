@@ -883,12 +883,13 @@ export function createOpencodeSDKBackend({
 
       const { client } = await getOrInitSdk();
 
-      const normalizedOverride = normalizeModelForProvider(
+      const effectiveModel = parseModel({
+        dmBotRoot: cwd,
+        agentName: selectedAgentName,
         modelOverride,
         providerName,
-      );
+      });
 
-      const effectiveModel = normalizedOverride ?? modelName;
       const model = modelToProviderAndId(effectiveModel);
 
       if (modelOverride) {
