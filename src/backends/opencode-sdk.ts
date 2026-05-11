@@ -1,3 +1,8 @@
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 // ---------------------------------------------------------------------------
 // backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (in-process server)
 // ---------------------------------------------------------------------------
@@ -83,6 +88,14 @@ export type OpencodeSetupAuthorizeResult = {
   url: string | null;
   method: string | null;
   instructions: string | null;
+};
+
+type StoredAuthJson = Record<string, unknown>;
+
+type StartNativeOpenCodeAuthProps = {
+  directory: string;
+  providerID: string;
+  methodLabel: string;
 };
 
 function getPortsToTry(): number[] {
@@ -194,12 +207,128 @@ function coerceAuthMethods(value: unknown): OpencodeSetupAuthMethod[] {
     .filter((entry): entry is OpencodeSetupAuthMethod => entry !== null);
 }
 
-function configuredFromProviderOptions(options: unknown): boolean {
-  if (!options || typeof options !== 'object') {
+function getOpenCodeAuthJsonPath(): string {
+  const dataHome = process.env.XDG_DATA_HOME?.trim();
+
+  return join(
+    dataHome && dataHome.length > 0
+      ? dataHome
+      : join(homedir(), '.local', 'share'),
+    'opencode',
+    'auth.json',
+  );
+}
+
+function readOpenCodeAuthJson(): StoredAuthJson {
+  const path = getOpenCodeAuthJsonPath();
+
+  if (!existsSync(path)) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as StoredAuthJson)
+      : {};
+  } catch (err) {
+    debug(
+      `opencode-sdk: failed to read auth.json: ${err instanceof Error ? err.message : String(err)}`,
+    );
+
+    return {};
+  }
+}
+
+function hasStoredOpenCodeCredential(providerID: string): boolean {
+  const authEntry = readOpenCodeAuthJson()[providerID];
+
+  if (authEntry === undefined || authEntry === null) {
     return false;
   }
 
-  return Object.keys(options).some((key) => key.toLowerCase().includes('key'));
+  if (typeof authEntry === 'string') {
+    return authEntry.trim().length > 0;
+  }
+
+  if (typeof authEntry !== 'object' || Array.isArray(authEntry)) {
+    return false;
+  }
+
+  return Object.keys(authEntry).length > 0;
+}
+
+function hasProviderEnvCredential(env: string[]): boolean {
+  return env.some((name) => (process.env[name]?.trim() ?? '').length > 0);
+}
+
+async function startNativeOpenCodeAuth({
+  directory,
+  providerID,
+  methodLabel,
+}: StartNativeOpenCodeAuthProps): Promise<{
+  url: string | null;
+  instructions: string | null;
+}> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      'opencode',
+      ['auth', 'login', '--provider', providerID, '--method', methodLabel],
+      { cwd: directory, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    let output = '';
+    let settled = false;
+
+    function settle(value: {
+      url: string | null;
+      instructions: string | null;
+    }): void {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      child.unref();
+      resolve(value);
+    }
+
+    function scan(chunk: Buffer): void {
+      output += chunk.toString('utf8');
+      const match = output.match(/https?:\/\/\S+/);
+
+      if (match) {
+        settle({ url: match[0].replace(/[),.]+$/, ''), instructions: null });
+      }
+    }
+
+    const timer = setTimeout(() => {
+      settle({
+        url: null,
+        instructions:
+          'OpenCode native auth login was started. Complete the provider flow in the browser or terminal, then refresh this status.',
+      });
+    }, 8000);
+
+    child.stdout?.on('data', scan);
+    child.stderr?.on('data', scan);
+
+    child.on('error', (err) => {
+      if (!settled) {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+
+    child.on('exit', (code) => {
+      if (!settled) {
+        clearTimeout(timer);
+        reject(new Error(`opencode_auth_login_failed:${code ?? 'unknown'}`));
+      }
+    });
+  });
 }
 
 export async function getOpencodeSetupAuthStatus(
@@ -221,19 +350,9 @@ export async function getOpencodeSetupAuthStatus(
           name?: unknown;
           source?: unknown;
           env?: unknown;
-          options?: unknown;
         }>;
-        connected?: unknown;
       }
     | undefined;
-
-  const connectedProviders = new Set(
-    Array.isArray(providerData?.connected)
-      ? providerData.connected.filter(
-          (providerID): providerID is string => typeof providerID === 'string',
-        )
-      : [],
-  );
 
   const providers = (providerData?.all ?? [])
     .map((provider) => {
@@ -254,8 +373,8 @@ export async function getOpencodeSetupAuthStatus(
           typeof provider.source === 'string' ? provider.source : 'unknown',
         env,
         configured:
-          connectedProviders.has(provider.id) ||
-          configuredFromProviderOptions(provider.options),
+          hasStoredOpenCodeCredential(provider.id) ||
+          hasProviderEnvCredential(env),
         authMethods: coerceAuthMethods(authData[provider.id]),
       };
     })
@@ -288,42 +407,32 @@ export async function authorizeOpencodeSetupProvider(props: {
 }): Promise<OpencodeSetupAuthorizeResult> {
   const { client } = await getOrInitSdk();
 
-  const result = await client.provider.oauth.authorize({
-    directory: props.directory,
-    providerID: props.providerID,
-    method: props.methodIndex,
-  });
+  const authResult = await client.provider.auth({ directory: props.directory });
+  const authData = (authResult.data ?? {}) as Record<string, unknown>;
 
-  if (result.error) {
-    const message =
-      typeof result.error === 'object' &&
-      result.error !== null &&
-      'data' in result.error
-        ? JSON.stringify((result.error as { data?: unknown }).data)
-        : String(result.error);
+  const method = coerceAuthMethods(authData[props.providerID])[
+    props.methodIndex
+  ];
 
-    throw new Error(`opencode_authorize_failed:${message}`);
+  if (!method || method.type === 'api') {
+    throw new Error('opencode_authorize_failed:invalid_auth_method');
   }
 
-  const data = (result.data ?? {}) as {
-    url?: unknown;
-    method?: unknown;
-    instructions?: unknown;
-  };
+  disposeOpencodeSdk();
+
+  const nativeResult = await startNativeOpenCodeAuth({
+    directory: props.directory,
+    providerID: props.providerID,
+    methodLabel: method.label,
+  });
 
   return {
     ok: true,
     providerID: props.providerID,
     methodIndex: props.methodIndex,
-    url: typeof data.url === 'string' && data.url.length > 0 ? data.url : null,
-    method:
-      typeof data.method === 'string' && data.method.length > 0
-        ? data.method
-        : null,
-    instructions:
-      typeof data.instructions === 'string' && data.instructions.length > 0
-        ? data.instructions
-        : null,
+    url: nativeResult.url,
+    method: method.type,
+    instructions: nativeResult.instructions,
   };
 }
 

@@ -245,10 +245,26 @@ type OpenCodeAuthCardProps = {
   status: SetupStatus;
 };
 
+const SETUP_OPENCODE_PROVIDER_STORAGE_KEY = 'appweaver.setup.opencode.provider';
+
+function getStoredProviderID(): string {
+  return window.localStorage.getItem(SETUP_OPENCODE_PROVIDER_STORAGE_KEY) ?? '';
+}
+
 function preferredProvider(providers: OpenCodeAuthProvider[]): string {
   return providers.find((provider) => provider.id === 'opencode')
     ? 'opencode'
     : (providers[0]?.id ?? '');
+}
+
+function storedPreferredProvider(providers: OpenCodeAuthProvider[]): string {
+  const stored = getStoredProviderID();
+
+  if (stored && providers.some((provider) => provider.id === stored)) {
+    return stored;
+  }
+
+  return preferredProvider(providers);
 }
 
 function providerIsConfigured(
@@ -268,16 +284,15 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     fetchOpenCodeAuthStatus,
   );
 
-  const [selectedProviderID, setSelectedProviderID] = createSignal('');
+  const [selectedProviderID, setSelectedProviderID] = createSignal(
+    getStoredProviderID(),
+  );
+
   const [selectedMethodIndex, setSelectedMethodIndex] = createSignal(0);
   const [authorizing, setAuthorizing] = createSignal(false);
   const [envValues, setEnvValues] = createSignal<Record<string, string>>({});
   const [savingApiKey, setSavingApiKey] = createSignal(false);
   const [pollingAuth, setPollingAuth] = createSignal(false);
-
-  const [authSuccessProvider, setAuthSuccessProvider] = createSignal<
-    string | null
-  >(null);
 
   const [authorizeResult, setAuthorizeResult] =
     createSignal<OpenCodeAuthorizeResponse | null>(null);
@@ -285,18 +300,40 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [authorizeError, setAuthorizeError] = createSignal<string | null>(null);
   const [apiKeyError, setApiKeyError] = createSignal<string | null>(null);
   const [apiKeySaved, setApiKeySaved] = createSignal<string[] | null>(null);
+  let providerSelect: HTMLSelectElement | undefined;
   let stopAuthPolling: (() => void) | null = null;
 
   onCleanup(() => stopAuthPolling?.());
 
   createEffect(() => {
     const providers = authStatus()?.providers ?? [];
+    const selected = selectedProviderID();
 
-    if (providers.length === 0 || selectedProviderID()) {
+    if (providers.length === 0) {
       return;
     }
 
-    setSelectedProviderID(preferredProvider(providers));
+    if (selected && providers.some((provider) => provider.id === selected)) {
+      return;
+    }
+
+    setSelectedProviderID(storedPreferredProvider(providers));
+    setSelectedMethodIndex(0);
+  });
+
+  createEffect(() => {
+    const selected = selectedProviderID();
+
+    if (selected) {
+      window.localStorage.setItem(
+        SETUP_OPENCODE_PROVIDER_STORAGE_KEY,
+        selected,
+      );
+
+      if (providerSelect && providerSelect.value !== selected) {
+        providerSelect.value = selected;
+      }
+    }
   });
 
   const selectedProvider = () =>
@@ -305,8 +342,7 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     ) ?? null;
 
   const selectedProviderConfigured = () =>
-    Boolean(selectedProvider()?.configured) ||
-    authSuccessProvider() === selectedProviderID();
+    Boolean(selectedProvider()?.configured);
 
   const selectedAuthMethod = () => {
     const provider = selectedProvider();
@@ -346,8 +382,12 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   createEffect(() => {
     const provider = selectedProvider();
 
-    if (provider?.configured) {
-      setAuthSuccessProvider(provider.id);
+    if (!provider) {
+      return;
+    }
+
+    if (selectedMethodIndex() >= provider.authMethods.length) {
+      setSelectedMethodIndex(0);
     }
   });
 
@@ -378,7 +418,6 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
         const nextStatus = await refetch();
 
         if (providerIsConfigured(nextStatus, providerID)) {
-          setAuthSuccessProvider(providerID);
           stopAuthPolling?.();
           stopAuthPolling = null;
 
@@ -514,9 +553,16 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                 <label class="field-block">
                   <span class="field-label">Provider</span>
                   <select
+                    ref={providerSelect}
                     value={selectedProviderID()}
                     onChange={(event) => {
                       setSelectedProviderID(event.currentTarget.value);
+
+                      window.localStorage.setItem(
+                        SETUP_OPENCODE_PROVIDER_STORAGE_KEY,
+                        event.currentTarget.value,
+                      );
+
                       setSelectedMethodIndex(0);
                       setAuthorizeResult(null);
                     }}
@@ -628,13 +674,6 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                     {savingApiKey() ? 'Saving key...' : 'Save API key'}
                   </button>
                 </Show>
-                <button
-                  type="button"
-                  class="web-button"
-                  onClick={() => void refetch()}
-                >
-                  Refresh
-                </button>
                 <span class="setup-inline-code">
                   {loaded().providers.length} provider(s)
                 </span>
@@ -651,10 +690,10 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                       <h2>{provider().name} auth</h2>
                       <p>
                         {selectedProviderConfigured()
-                          ? 'OpenCode reports this provider is connected.'
+                          ? 'OpenCode reports stored credentials for this provider.'
                           : pollingAuth()
                             ? 'Waiting for the provider callback to complete...'
-                            : 'Start auth, complete the provider login, then this will turn green when OpenCode detects the callback.'}
+                            : 'Start auth, complete the provider login, then this will turn green when OpenCode reports stored credentials.'}
                       </p>
                     </div>
                   </div>

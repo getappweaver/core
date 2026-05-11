@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "9.9.4",
+  "version": "9.9.5",
   "description": "Open-source AI-first platform for installable apps, automation, and bot workflows.",
   "type": "module",
   "workspaces": [
