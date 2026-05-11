@@ -207,7 +207,7 @@ function coerceAuthMethods(value: unknown): OpencodeSetupAuthMethod[] {
     .filter((entry): entry is OpencodeSetupAuthMethod => entry !== null);
 }
 
-function getOpenCodeAuthJsonPath(): string {
+export function getOpenCodeAuthJsonPath(): string {
   const dataHome = process.env.XDG_DATA_HOME?.trim();
 
   return join(

@@ -5,6 +5,10 @@ ARG PIPER_VERSION=2023.11.14-2
 ARG PIPER_VOICE=en_US-libritts_r-medium
 
 ENV BUN_INSTALL=/home/pwuser/.bun \
+    HOME=/home/pwuser \
+    XDG_CONFIG_HOME=/workspace/.data/xdg/config \
+    XDG_DATA_HOME=/workspace/.data/xdg/share \
+    XDG_CACHE_HOME=/workspace/.data/xdg/cache \
     PATH=/home/pwuser/.bun/bin:/home/pwuser/.local/bin:/usr/local/bin:$PATH \
     APPWEAVER_REPO_URL=https://github.com/getappweaver/core.git \
     APPWEAVER_GIT_REF=main \
@@ -49,7 +53,7 @@ RUN mkdir -p /opt/piper/voices \
       "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/${PIPER_VOICE}.onnx.json" \
       -o "/opt/piper/voices/${PIPER_VOICE}.onnx.json" \
     && /opt/piper/piper --help >/dev/null \
-    && mkdir -p /workspace/appweaver \
+    && mkdir -p /workspace/appweaver /workspace/.data/xdg/config /workspace/.data/xdg/share /workspace/.data/xdg/cache \
     && chown -R pwuser:pwuser /workspace /home/pwuser
 
 COPY scripts/docker-entrypoint.sh /usr/local/bin/appweaver-entrypoint

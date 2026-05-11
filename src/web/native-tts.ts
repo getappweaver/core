@@ -12,6 +12,11 @@ type NativePiperPaths = {
   libraryPath: string;
 };
 
+export type NativePiperStatus = NativePiperPaths & {
+  binaryExists: boolean;
+  modelExists: boolean;
+};
+
 type SynthesizeNativePiperProps = {
   dmBotRoot: string;
   text: string;
@@ -35,6 +40,16 @@ function resolveNativePiperPaths(dmBotRoot: string): NativePiperPaths {
     libraryPath:
       process.env.BOT_PIPER_LIBRARY_PATH ??
       [phonemizeLib, piperRoot, '/usr/local/opt/espeak-ng/lib'].join(':'),
+  };
+}
+
+export function getNativePiperStatus(dmBotRoot: string): NativePiperStatus {
+  const paths = resolveNativePiperPaths(dmBotRoot);
+
+  return {
+    ...paths,
+    binaryExists: existsSync(paths.binaryPath),
+    modelExists: existsSync(paths.modelPath),
   };
 }
 
@@ -67,6 +82,7 @@ async function spawnNativePiper(props: SpawnNativePiperProps): Promise<Blob> {
       env: {
         ...process.env,
         DYLD_LIBRARY_PATH: props.libraryPath,
+        LD_LIBRARY_PATH: props.libraryPath,
       },
     },
   );

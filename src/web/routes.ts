@@ -122,6 +122,7 @@ function verifyNip98Auth(params: VerifyNip98AuthParams): Response | null {
 }
 
 const setupSessionTokens = new Set<string>();
+const SETUP_RESTART_DELAY_MS = 500;
 
 function bearerToken(req: Request): string | null {
   const header = req.headers.get('Authorization');
@@ -218,7 +219,15 @@ export function createWebFetchHandler(
       }
 
       if (req.method === 'POST' && path === '/api/setup/restart') {
-        writeRestartRequestedFile();
+        setTimeout(() => {
+          try {
+            writeRestartRequestedFile();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+
+            log.error(`Failed to request setup restart: ${message}`);
+          }
+        }, SETUP_RESTART_DELAY_MS);
 
         return jsonResponse({ ok: true, status: createSetupStatus(ctx) });
       }
@@ -622,6 +631,8 @@ export function createWebFetchHandler(
         )
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
+
+          log.warn(`Piper TTS request failed: ${message}`);
 
           const status =
             message === 'invalid_json' ||

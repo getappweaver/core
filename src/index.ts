@@ -35,7 +35,10 @@ import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
-import { disposeOpencodeSdk } from './backends/opencode-sdk';
+import {
+  disposeOpencodeSdk,
+  getOpenCodeAuthJsonPath,
+} from './backends/opencode-sdk';
 import { startLocalCli } from './cli/local-cli';
 import { renderBotStatusText } from './commands/bot/status/renderers/text';
 import { createBotStatusRepresentation } from './commands/bot/status/representation';
@@ -83,6 +86,7 @@ import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
 import { openWalletDb } from './wallet/db';
+import { getNativePiperStatus } from './web/native-tts';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { startLocalWebServer } from './web/server';
@@ -114,6 +118,15 @@ async function startSetupOnlyMode(props: {
   log.warn(
     `Setup mode: missing required env ${props.missingEnv.join(', ')}. Starting setup web server only.`,
   );
+
+  const piperStatus = getNativePiperStatus(dmBotRoot);
+
+  log.info(
+    `${C.bold}Piper TTS:${C.reset} binary=${piperStatus.binaryPath} (${piperStatus.binaryExists ? 'found' : 'missing'}), model=${piperStatus.modelPath} (${piperStatus.modelExists ? 'found' : 'missing'})`,
+  );
+
+  log.info(`${C.bold}Piper libs:${C.reset} ${piperStatus.libraryPath}`);
+  log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
 
   startLocalWebServer({
     prefix,
@@ -231,6 +244,15 @@ async function main() {
   // --- Startup logging & ready DM ---
   log.info(`${C.bold}Bot pubkey:${C.reset} ${botPubkey}`);
   log.info(`${C.bold}Master:${C.reset} ${masterPubkey}`);
+
+  const piperStatus = getNativePiperStatus(dmBotRoot);
+
+  log.info(
+    `${C.bold}Piper TTS:${C.reset} binary=${piperStatus.binaryPath} (${piperStatus.binaryExists ? 'found' : 'missing'}), model=${piperStatus.modelPath} (${piperStatus.modelExists ? 'found' : 'missing'})`,
+  );
+
+  log.info(`${C.bold}Piper libs:${C.reset} ${piperStatus.libraryPath}`);
+  log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
 
   const statusRep = createBotStatusRepresentation({
     botRelayUrls,

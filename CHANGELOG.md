@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.8] - 2026-05-11
+
+- fix: improve docker setup runtime (7dfac9b)
+
 ## [v9.9.7] - 2026-05-11
 
-- fix: use workspace root for opencode agents (8e4fba3)
+- fix: use workspace root for opencode agents (da3fec4)
 
 ## [v9.9.6] - 2026-05-11
 

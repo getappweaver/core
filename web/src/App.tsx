@@ -112,6 +112,7 @@ function formatComposerContextStats(
 
 function AppInner(): JSX.Element {
   const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
+  const PIPER_TTS_AUTO_ATTEMPTED_KEY = 'appweaver.tts.piper-auto-attempted';
 
   const initialTimelineId = (() => {
     const existing = window.localStorage.getItem(TIMELINE_STORAGE_KEY);
@@ -989,7 +990,7 @@ function AppInner(): JSX.Element {
     }
   }
 
-  async function onEnablePiperTts(): Promise<void> {
+  async function onEnablePiperTts(auto: boolean = false): Promise<void> {
     if (piperTtsBusy()) {
       return;
     }
@@ -997,6 +998,12 @@ function AppInner(): JSX.Element {
     setPiperTtsBusy(true);
 
     try {
+      if (auto) {
+        appendSystemMessage(
+          'Piper TTS is booting. Speech buttons will switch to Piper when ready.',
+        );
+      }
+
       await preparePiperTts();
       setPiperTtsEnabled(true);
       appendSystemMessage('Piper TTS is ready. Speech buttons will use Piper.');
@@ -1008,6 +1015,21 @@ function AppInner(): JSX.Element {
       setPiperTtsBusy(false);
     }
   }
+
+  onMount(() => {
+    if (isPiperTtsEnabled()) {
+      setPiperTtsEnabled(true);
+
+      return;
+    }
+
+    if (window.sessionStorage.getItem(PIPER_TTS_AUTO_ATTEMPTED_KEY) === '1') {
+      return;
+    }
+
+    window.sessionStorage.setItem(PIPER_TTS_AUTO_ATTEMPTED_KEY, '1');
+    void onEnablePiperTts(true);
+  });
 
   return (
     <div class="app-shell" data-web-ui-busy-digest={webUiBusyDigest()}>
