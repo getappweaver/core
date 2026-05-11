@@ -199,7 +199,7 @@ bun run start
 
 ## Docker
 
-Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Cursor Agent, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support. Your AppWeaver checkout is mounted into the container at `/app`, so core and plugin updates can still use git.
+Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Cursor Agent, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support. Your AppWeaver checkout is mounted into the container at `/workspace/appweaver`, so core and plugin updates can still use git. The container runs as the non-root Playwright user `pwuser`.
 
 Clone AppWeaver on the host if you have not already:
 
@@ -221,11 +221,11 @@ docker run --rm -it \
   --name appweaver \
   -p 127.0.0.1:5551:5551 \
   -p 127.0.0.1:1455:1455 \
-  -v "$PWD:/app" \
+  -v "$PWD:/workspace/appweaver" \
   appweaver-runtime
 ```
 
-On startup the container runs `bun install --frozen-lockfile` inside `/app`, then `bun run start`. `bun run start` builds `web/dist` and serves the UI/API on port `5551`. Port `1455` is used by OpenCode provider OAuth callbacks during setup.
+On startup the container runs `bun install --frozen-lockfile` inside `/workspace/appweaver`, then `bun run start`. `bun run start` builds `web/dist` and serves the UI/API on port `5551`. Port `1455` is used by OpenCode provider OAuth callbacks during setup. The bot's `parent` workspace is `/workspace`, which lets parent-scoped assets such as `opencode.json`, `AGENTS.md`, and `.opencode/agents` live outside the mounted checkout while still being available to OpenCode.
 
 Open the setup URL printed in the logs. It will look like:
 
@@ -243,7 +243,7 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:5551:5551 \
   -p 127.0.0.1:1455:1455 \
-  -v "$PWD:/app" \
+  -v "$PWD:/workspace/appweaver" \
   appweaver-runtime
 ```
 
@@ -256,7 +256,7 @@ git pull
 docker restart appweaver
 ```
 
-To update the runtime tools, rebuild or pull the runtime image, then recreate the container with the same `/app` mount:
+To update the runtime tools, rebuild or pull the runtime image, then recreate the container with the same `/workspace/appweaver` mount:
 
 ```bash
 docker build -t appweaver-runtime .
@@ -267,7 +267,7 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:5551:5551 \
   -p 127.0.0.1:1455:1455 \
-  -v "$PWD:/app" \
+  -v "$PWD:/workspace/appweaver" \
   appweaver-runtime
 ```
 

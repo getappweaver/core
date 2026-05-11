@@ -74,7 +74,11 @@ import {
   sendDm,
 } from './nostr/nip17';
 import { normalizePubkeyInput } from './nostr/wot';
-import { dmBotRoot, RESTART_REQUESTED_PATH } from './paths';
+import {
+  dmBotRoot,
+  getParentWorkspaceRoot,
+  RESTART_REQUESTED_PATH,
+} from './paths';
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
@@ -102,7 +106,7 @@ async function startSetupOnlyMode(props: {
   missingEnv: string[];
 }): Promise<never> {
   const seenDb = openCoreDb();
-  const parentOfBotRoot = join(dmBotRoot, '..');
+  const parentOfBotRoot = getParentWorkspaceRoot();
   const prefix = getDmCommandPrefix(seenDb);
   const pool = new SimplePool({ enablePing: false, enableReconnect: false });
   const providerDb = asProviderDb(seenDb);
@@ -213,7 +217,7 @@ async function main() {
   process.once('SIGINT', () => shutdown(130));
   process.once('SIGTERM', () => shutdown(143));
 
-  const parentOfBotRoot = join(dmBotRoot, '..');
+  const parentOfBotRoot = getParentWorkspaceRoot();
 
   ensureOpencodeParentWorkspaceAssets({
     backend: getAgentBackend(seenDb),

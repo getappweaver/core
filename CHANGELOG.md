@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.6] - 2026-05-11
+
+- fix: run docker workspace as non-root (d827881)
+
 ## [v9.9.5] - 2026-05-11
 
-- fix: persist opencode setup auth state (1b6fbf6)
+- fix: persist opencode setup auth state (56c871d)
 
 ## [v9.9.4] - 2026-05-11
 

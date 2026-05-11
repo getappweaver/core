@@ -4,8 +4,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG PIPER_VERSION=2023.11.14-2
 ARG PIPER_VOICE=en_US-libritts_r-medium
 
-ENV BUN_INSTALL=/root/.bun \
-    PATH=/root/.bun/bin:/root/.local/bin:/usr/local/bin:$PATH \
+ENV BUN_INSTALL=/home/pwuser/.bun \
+    PATH=/home/pwuser/.bun/bin:/home/pwuser/.local/bin:/usr/local/bin:$PATH \
     DISPLAY=:99 \
     BOT_WEB_HOST=0.0.0.0 \
     BOT_WEB_UI_PORT=5552 \
@@ -13,8 +13,6 @@ ENV BUN_INSTALL=/root/.bun \
     BOT_PIPER_MODEL_PATH=/opt/piper/voices/${PIPER_VOICE}.onnx \
     BOT_PIPER_LIBRARY_PATH=/opt/piper:/opt/piper/piper-phonemize/lib:/usr/lib/x86_64-linux-gnu \
     LD_LIBRARY_PATH=/opt/piper:/opt/piper/piper-phonemize/lib:/usr/lib/x86_64-linux-gnu
-
-WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -39,6 +37,22 @@ RUN apt-get update \
       xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /opt/piper/voices \
+    && curl -fsSL "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz" \
+      | tar -xz -C /opt \
+    && curl -fsSL \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/${PIPER_VOICE}.onnx" \
+      -o "/opt/piper/voices/${PIPER_VOICE}.onnx" \
+    && curl -fsSL \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/${PIPER_VOICE}.onnx.json" \
+      -o "/opt/piper/voices/${PIPER_VOICE}.onnx.json" \
+    && /opt/piper/piper --help >/dev/null \
+    && mkdir -p /workspace/appweaver \
+    && chown -R pwuser:pwuser /workspace /home/pwuser
+
+USER pwuser
+WORKDIR /workspace/appweaver
+
 RUN curl -fsSL https://bun.sh/install | bash \
     && bun --version \
     && node --version
@@ -49,17 +63,6 @@ RUN bun install -g opencode-ai \
     && opencode --version \
     && agent --version \
     && ngit --version
-
-RUN mkdir -p /opt/piper/voices \
-    && curl -fsSL "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz" \
-      | tar -xz -C /opt \
-    && curl -fsSL \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/${PIPER_VOICE}.onnx" \
-      -o "/opt/piper/voices/${PIPER_VOICE}.onnx" \
-    && curl -fsSL \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/${PIPER_VOICE}.onnx.json" \
-      -o "/opt/piper/voices/${PIPER_VOICE}.onnx.json" \
-    && /opt/piper/piper --help >/dev/null
 
 EXPOSE 1455 5551 5552 5900 6080
 

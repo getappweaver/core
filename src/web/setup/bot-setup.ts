@@ -21,7 +21,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'fs';
-import { basename, dirname, join, resolve } from 'path';
+import { basename, dirname, join } from 'path';
 import * as readline from 'readline';
 
 import { generateVAPIDKeys } from 'web-push';
@@ -44,9 +44,9 @@ import {
 } from '@src/db';
 import { normalizeVapidSubject } from '@src/env';
 import { getEnvFromFile, setEnvInFile } from '@src/env-file';
-import { dmBotRoot } from '@src/paths';
+import { dmBotRoot, getParentWorkspaceRoot } from '@src/paths';
 
-const PARENT_ROOT = resolve(join(dmBotRoot, '..'));
+const PARENT_ROOT = getParentWorkspaceRoot();
 const BOT_DIR_NAME = basename(dmBotRoot);
 const DM_BOT_SKILLS_DIR = join(dmBotRoot, '.claude', 'skills');
 const AGENT_TEMPLATES_DIR = join(dmBotRoot, 'templates', 'opencode-agents');
