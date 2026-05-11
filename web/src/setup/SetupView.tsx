@@ -507,12 +507,6 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
       </p>
 
       <Switch>
-        <Match when={authStatus.loading}>
-          <p class="setup-copy">Starting local OpenCode server...</p>
-        </Match>
-        <Match when={authStatus.error}>
-          <p class="setup-error-line">{String(authStatus.error)}</p>
-        </Match>
         <Match when={authStatus()}>
           {(loaded) => (
             <>
@@ -705,6 +699,12 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
               </Show>
             </>
           )}
+        </Match>
+        <Match when={authStatus.loading}>
+          <p class="setup-copy">Starting local OpenCode server...</p>
+        </Match>
+        <Match when={authStatus.error}>
+          <p class="setup-error-line">{String(authStatus.error)}</p>
         </Match>
       </Switch>
     </section>

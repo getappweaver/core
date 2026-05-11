@@ -223,8 +223,17 @@ export async function getOpencodeSetupAuthStatus(
           env?: unknown;
           options?: unknown;
         }>;
+        connected?: unknown;
       }
     | undefined;
+
+  const connectedProviders = new Set(
+    Array.isArray(providerData?.connected)
+      ? providerData.connected.filter(
+          (providerID): providerID is string => typeof providerID === 'string',
+        )
+      : [],
+  );
 
   const providers = (providerData?.all ?? [])
     .map((provider) => {
@@ -244,7 +253,9 @@ export async function getOpencodeSetupAuthStatus(
         source:
           typeof provider.source === 'string' ? provider.source : 'unknown',
         env,
-        configured: configuredFromProviderOptions(provider.options),
+        configured:
+          connectedProviders.has(provider.id) ||
+          configuredFromProviderOptions(provider.options),
         authMethods: coerceAuthMethods(authData[provider.id]),
       };
     })
