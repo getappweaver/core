@@ -936,9 +936,15 @@ function WebPushSetupCard(props: WebPushSetupCardProps): JSX.Element {
       </div>
       <Show when={result()}>
         {(saved) => (
-          <p class="setup-inline-code">
-            Saved {saved().subject} / {saved().publicKey.slice(0, 14)}...
-          </p>
+          <div class="setup-step setup-auth-step is-ok">
+            <span class="setup-step-marker">✓</span>
+            <div class="setup-step-body">
+              <h2>Web Push config</h2>
+              <p>
+                Saved {saved().subject} / {saved().publicKey.slice(0, 14)}...
+              </p>
+            </div>
+          </div>
         )}
       </Show>
       <Show when={error()}>

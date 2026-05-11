@@ -1019,6 +1019,18 @@ pre {
   padding: 0;
 }
 
+.chat-copy-btn {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.chat-copy-btn__icon {
+  display: block;
+  height: 0.78rem;
+  width: 0.78rem;
+}
+
 .card-head-speech-btn--manual {
   background: var(--color-accent);
   color: #000;

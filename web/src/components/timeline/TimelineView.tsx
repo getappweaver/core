@@ -172,6 +172,8 @@ function splitThinkingBlock(text: string): {
 export function TimelineChatCard(props: TimelineChatCardProps) {
   let cardEl: HTMLDivElement | undefined;
 
+  const [copied, setCopied] = createSignal(false);
+
   const [speechState, setSpeechState] = createSignal<SpeechSentenceState>({
     active: false,
     sentenceIndex: null,
@@ -187,11 +189,28 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
   const speechText = () =>
     props.role === 'assistant' ? parts().output.trim() : '';
 
+  const copyText = () =>
+    props.role === 'assistant' && parts().thinking !== null
+      ? parts().output.trim()
+      : props.text.trim();
+
   const speechHighlightActive = () =>
     props.role === 'assistant' && speechState().active;
 
   const scrollCardToTop = () => {
     cardEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  const copyReply = async () => {
+    const text = copyText();
+
+    if (!text) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
   };
 
   const body = () => (
@@ -269,6 +288,27 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
       }
       expandedHeadToolbar={
         <div class="card-head-tree-toolbar" role="toolbar" aria-label="Reply">
+          <button
+            type="button"
+            class="tag tag-button card-head__control card-head-tree-toolbar-btn chat-copy-btn"
+            title={copied() ? 'Copied reply' : 'Copy reply'}
+            aria-label={copied() ? 'Copied reply' : 'Copy reply'}
+            onClick={copyReply}
+          >
+            <svg
+              class="chat-copy-btn__icon"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 12V2H4V0h12v12h-2zM0 4h12v12H0V4zm2 2v8h8V6H2z"
+                fill-rule="evenodd"
+              />
+            </svg>
+            <span>{copied() ? 'copied' : 'copy'}</span>
+          </button>
           <TimelineSpeechButton
             text={speechText()}
             class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
