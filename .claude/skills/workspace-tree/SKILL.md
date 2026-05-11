@@ -33,4 +33,4 @@ bun src/cli.ts file tree '{"max_depth":2,"target_dir":"plugins","extensions":["t
 !file tree 2 . --ext ts,tsx
 ```
 
-See also: skill **dm-bot-file** (from `bun run plugin:generate`) for full tool schema.
+See also: skill **appweaver-file** (from `bun run plugin:generate`) for full tool schema.

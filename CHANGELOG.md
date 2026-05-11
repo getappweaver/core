@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.11] - 2026-05-12
+
+- fix: complete AppWeaver rebrand cleanup (ed14c48)
+
 ## [v9.9.10] - 2026-05-11
 
-- fix: improve web chat controls (0aff605)
+- fix: improve web chat controls (47bc4e5)
 
 ## [v9.9.9] - 2026-05-11
 

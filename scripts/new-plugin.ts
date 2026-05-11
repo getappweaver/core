@@ -162,7 +162,7 @@ async function main(): Promise<void> {
   }
 
   const pascalAlias = aliasToPascal(alias);
-  const defaultDescription = `${pascalAlias} plugin for dm-bot`;
+  const defaultDescription = `${pascalAlias} plugin for AppWeaver`;
 
   const descriptionAnswer = await ask(
     `Short description [${defaultDescription}]: `,

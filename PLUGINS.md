@@ -59,7 +59,7 @@ Run:
 
 to see available commands for that plugin. All plugin commands follow the same `<prefix><alias> <subcommand>` pattern (e.g. `/todo list`).
 
-Plugin AI features work through your configured agent backend and the generated **skills** / **`bun src/cli.ts`** tool flow: each plugin exposes a `ToolCallSchema` in `ai.ts`, and `bun run plugin:generate` writes `.claude/skills/dm-bot-<alias>/SKILL.md` when the plugin exports `ToolCallSchema` and `skillDescription`.
+Plugin AI features work through your configured agent backend and the generated **skills** / **`bun src/cli.ts`** tool flow: each plugin exposes a `ToolCallSchema` in `ai.ts`, and `bun run plugin:generate` writes `.claude/skills/appweaver-<alias>/SKILL.md` when the plugin exports `ToolCallSchema` and `skillDescription`.
 
 ### Version compatibility
 
@@ -143,10 +143,10 @@ Older in-tree plugins may add `output/`, web renderers, or extra `db/` modules; 
 {
   "name": "dm-bot-todo-plugin",
   "version": "1.0.1",
-  "description": "Todo management plugin for dm-bot",
+  "description": "Todo management plugin for AppWeaver",
   "dmBot": {
     "coreApiVersion": "5",
-    "description": "Todo management plugin for dm-bot"
+    "description": "Todo management plugin for AppWeaver"
   }
 }
 ```
@@ -209,7 +209,7 @@ Plugins expose AI/CLI tool calls via:
 - **`ToolCallSchema`** (named export from `ai.ts`) — a Zod discriminated union keyed by `type`
 - **`skillDescription`** (export from `ai.ts`) — short string for the generated skill frontmatter (required for skill generation)
 - **`executeTool({ alias, call, db })`** (export from `ai.ts`) — executes one validated tool call
-- **`agentInstructions(alias)`** (optional export from `ai.ts`) — extra prose prepended to generated `.claude/skills/dm-bot-<alias>/SKILL.md` (omit it when the JSON schema + shared skill rules are enough)
+- **`agentInstructions(alias)`** (optional export from `ai.ts`) — extra prose prepended to generated `.claude/skills/appweaver-<alias>/SKILL.md` (omit it when the JSON schema + shared skill rules are enough)
 
 `src/cli.ts` validates incoming JSON with `ToolCallSchema`, injects `type` from `<toolName>`, then calls `executeTool`.
 
@@ -257,7 +257,7 @@ The published event looks like:
   "kind": 32107,
   "tags": [
     ["d", "dm-bot-todo-plugin"],
-    ["description", "Todo management plugin for dm-bot"],
+    ["description", "Todo management plugin for AppWeaver"],
     ["version", "v1.0.1"],
     ["coreApiVersion", "5"],
     ["t", "dm-bot-plugin"],
@@ -299,9 +299,9 @@ export function registerPlugins(ctx: PluginContext): void {
 
 **`generated/cli-registry.ts`** — AUTO-GENERATED; imports each plugin’s `ToolCallSchema` from `plugins/<alias>/ai.ts` and exposes alias/schema metadata for `src/cli.ts`.
 
-**`.claude/skills/dm-bot-<alias>/SKILL.md`** — AUTO-GENERATED skill docs for CLI-based tool usage (generated when the plugin exports `ToolCallSchema`, `skillDescription`, and passes the generator’s schema checks).
+**`.claude/skills/appweaver-<alias>/SKILL.md`** — AUTO-GENERATED skill docs for CLI-based tool usage (generated when the plugin exports `ToolCallSchema`, `skillDescription`, and passes the generator’s schema checks).
 
-Paths such as `.claude/skills/dm-bot*/` and `generated/` may be gitignored locally; run `bun run plugin:generate` after clone or template changes. Keep `plugins.json` private as today.
+Paths such as `.claude/skills/appweaver*/` and `generated/` may be gitignored locally; run `bun run plugin:generate` after clone or template changes. Keep `plugins.json` private as today.
 
 #### SQLite WAL
 

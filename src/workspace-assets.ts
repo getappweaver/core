@@ -88,7 +88,9 @@ function getParentSymlinkTargets({
   }
 
   const skillTargets = readdirSync(skillsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith('dm-bot'))
+    .filter(
+      (entry) => entry.isDirectory() && entry.name.startsWith('appweaver'),
+    )
     .map((entry) => {
       const rel = join('.claude', 'skills', entry.name);
 
@@ -150,7 +152,7 @@ function updateParentGitignore({
     `${botDirName}/`,
     'opencode.json',
     'AGENTS.md',
-    '.claude/skills/dm-bot-*/',
+    '.claude/skills/appweaver-*/',
   ];
 
   const gitignorePath = join(parentOfBotRoot, '.gitignore');

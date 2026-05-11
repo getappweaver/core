@@ -58,7 +58,7 @@ From the plugin directory (repository root of that plugin), run once to point Gi
 bun run contrib:setup
 ```
 
-Use the same commit messages as above (`--patch` / `--minor` / `--major`). The hooks bump **`package.json` in that plugin’s work tree**, not the dm-bot root.
+Use the same commit messages as above (`--patch` / `--minor` / `--major`). The hooks bump **`package.json` in that plugin’s work tree**, not the AppWeaver root.
 
 If the plugin is cloned **standalone** (not inside a dm-bot checkout), copy the `scripts/` hook files from this repo or set `core.hooksPath` to an absolute path to your dm-bot `scripts` directory on that machine.
 

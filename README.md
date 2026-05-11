@@ -571,4 +571,4 @@ Before running a package script, the agent should:
 
 With this setup, commands such as `bun run build` and `bun run lint` are available to the agent without extra per-command approvals, while still keeping execution bounded to your script definitions.
 
-Full codebase context and extension points are in **AGENTS.md** (section **dm-bot codebase context**).
+Full codebase context and extension points are in **AGENTS.md** (section **AppWeaver Codebase Context**).

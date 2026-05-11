@@ -10,7 +10,7 @@ function workspaceTargetLabel(props: {
   cwd: string;
   dmBotRoot: string;
 }): string {
-  return props.cwd === props.dmBotRoot ? 'bot' : 'parent';
+  return props.cwd === props.dmBotRoot ? 'appweaver' : 'parent';
 }
 
 export function buildOpenCodeRuntimeContent({
@@ -29,7 +29,7 @@ OpenCode agent profile: ${agentName}
 OpenCode agent profile source of truth: .opencode/agents
 Workspace target: ${workspaceTarget}
 Workspace root: ${cwd}
-dm-bot root: ${dmBotRoot}
+AppWeaver root: ${dmBotRoot}
 Tool permissions: enforced by the active OpenCode agent profile; do not add an extra shell approval layer from AGENTS.md.
 Ready-to-test reload rule: after changes under src/ or plugins/ pass lint/verification, create or touch restart.requested in the project root.
 

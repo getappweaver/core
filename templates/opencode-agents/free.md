@@ -1,7 +1,7 @@
 ---
 description: Quick read-only analysis with a fast, cheap model. No file edits or shell commands.
 mode: primary
-model: opencode/gpt-5-nano
+model: opencode/big-pickle
 color: info
 steps: 5
 permission:

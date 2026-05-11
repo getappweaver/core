@@ -77,7 +77,7 @@ export function startLocalCli({
 
   localCli.on('close', () => {
     redrawPrompt = null;
-    log.ok('Local terminal chat closed. Nostr DM listener continues running.');
+    log.ok('Local terminal chat closed. AppWeaver listener continues running.');
   });
 
   localCli.prompt();

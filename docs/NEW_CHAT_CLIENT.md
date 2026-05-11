@@ -2,7 +2,7 @@
 
 ## Overview
 
-A mobile-first chat client for interacting with the nostr-dm-bot. Text-based by default with optional rich UI components that enhance without bloating the screen.
+A mobile-first chat client for interacting with AppWeaver. Text-based by default with optional rich UI components that enhance without bloating the screen.
 
 ## Design Principles
 

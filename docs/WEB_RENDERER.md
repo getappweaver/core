@@ -1,4 +1,4 @@
-We are building a web UI and web-renderer system for this dm-bot codebase.
+We are building a web UI and web-renderer system for AppWeaver.
 Current goal
 - Support rich web renderers for commands/subcommands, starting with a custom web renderer for `todo list`.
 - Keep the existing text command flow working.

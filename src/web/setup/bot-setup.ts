@@ -6,7 +6,7 @@
 // Reads current state from DB, shows current values as defaults,
 // lets user reconfigure workspace, backend, provider, mode, lint, ready.
 // If workspace is "parent", symlinks AGENTS.md, opencode.json, and
-// `.claude/skills/dm-bot*/` skill folders into the parent project.
+// `.claude/skills/appweaver*/` skill folders into the parent project.
 // Optionally configures Web Push VAPID keys (BOT_WEB_PUSH_*) in .env via web-push.
 // ---------------------------------------------------------------------------
 
@@ -82,7 +82,7 @@ function getSymlinkTargets(): SymlinkTarget[] {
 
   if (existsSync(DM_BOT_SKILLS_DIR)) {
     const names = readdirSync(DM_BOT_SKILLS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name.startsWith('dm-bot'))
+      .filter((d) => d.isDirectory() && d.name.startsWith('appweaver'))
       .map((d) => d.name)
       .sort();
 
@@ -104,7 +104,7 @@ const PARENT_GITIGNORE_ENTRIES = [
   `${BOT_DIR_NAME}/`,
   'opencode.json',
   'AGENTS.md',
-  '.claude/skills/dm-bot-*/',
+  '.claude/skills/appweaver-*/',
 ];
 
 // ---------------------------------------------------------------------------
@@ -667,7 +667,7 @@ async function main(): Promise<void> {
     console.log(`\n  Parent root:       ${PARENT_ROOT}`);
 
     console.log(
-      '  Symlinks: opencode.json, AGENTS.md, .claude/skills/dm-bot-*/',
+      '  Symlinks: opencode.json, AGENTS.md, .claude/skills/appweaver-*/',
     );
   }
 

@@ -1,4 +1,4 @@
-# dm-bot plugin tools
+# AppWeaver Plugin Tools
 
 This repo uses a CLI-based tool system for AI agents.
 
@@ -84,7 +84,7 @@ Before running a package script, the agent should:
 
 ### Agent workspace boundary
 
-- You may only create, edit, or delete files under the **workspace** (project root). The workspace is set when the agent is invoked (e.g. one level up from the dm-bot directory). NEVER modify files outside that tree.
+- You may only create, edit, or delete files under the **workspace** (project root). The workspace is set when the agent is invoked (e.g. the parent project or the AppWeaver directory). NEVER modify files outside that tree.
 
 ---
 
@@ -162,9 +162,9 @@ When the bot runs in `agent` mode:
 
 ---
 
-# dm-bot codebase context
+# AppWeaver Codebase Context
 
-When editing or extending the dm-bot (NIP-17 DM bot), use this as the map. The bot forwards Nostr DMs to an agent CLI (Cursor or OpenCode) and sends replies back.
+When editing or extending AppWeaver, use this as the map. AppWeaver is an AI-first platform for installable apps, automation, web workflows, and Nostr-based bot interactions. It can forward Nostr DMs to an agent CLI (Cursor or OpenCode) and send replies back.
 
 ## File map
 
@@ -178,7 +178,7 @@ When editing or extending the dm-bot (NIP-17 DM bot), use this as the map. The b
 
 ## State and persistence
 
-- **SQLite** at `dm-bot.sqlite` (same dir as `index.ts`):
+- **SQLite** at `dm-bot.sqlite` (same dir as `index.ts`; filename kept for compatibility):
   - `seen_events(id)` – event ids already processed (avoids duplicate on restart).
   - `sessions(id, created_at, backend)` – agent session IDs with backend tag (`cursor` or `opencode`).
   - `session_messages(session_id, role, content, created_at)` – conversation history per session.
@@ -207,7 +207,7 @@ Two backends are supported, switchable at runtime via `!backend cursor|opencode`
 - Output is JSONL; parser collects `type:text` events and accumulates tokens/cost from `type:step_finish`
 
 ### Mode → agent mapping (OpenCode)
-| dm-bot mode | OpenCode `--agent` | Model (in opencode.json) |
+| AppWeaver mode | OpenCode `--agent` | Model (in opencode.json) |
 |---|---|---|
 | `!ask` | `ask` | `ppq/google/gemini-2.5-flash-lite` |
 | `!plan` | `plan` | `ppq/claude-opus-4.5` |
@@ -238,14 +238,14 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 - **Reply formatting / chunking**: `chunkMessage` (max length), `modePrefix()` (colored prefix), `tokenFooter()` (token/cost line).
 - **DM relay discovery**: `getMasterDmRelays` (kind 10050) and `PROFILE_RELAYS`. `sendDm` uses these to decide where to publish.
 
-## After editing dm-bot code
+## After editing AppWeaver code
 
 - Use judgment when deciding whether to run verification. Run `bun run lint` after substantive code changes, TypeScript changes, broad refactors, or changes likely to affect formatting/types. For small, simple edits such as docs text, comments, or a narrow CSS variable/value change, lint is optional and can be skipped.
 - If the implementation changed any file under `src/` or `plugins/`, create/touch **`restart.requested`** in the project root after lint/verification passes and the change is ready for the user to test. This is the deliberate bot reload signal for `bun run watch`; do not expect restarts on every save.
 
 ## Codebase vs agent workspace
 
-- Agent backends are invoked with `cwd` set to the **project root** (parent of dm-bot) or `dm-bot/` depending on `!workspace` setting. You may create, edit, or delete files under that root. Do not modify files outside the project root.
+- Agent backends are invoked with `cwd` set to the **project root** or the AppWeaver directory depending on `!workspace` setting. You may create, edit, or delete files under that root. Do not modify files outside the project root.
 
 ## Environment (runtime)
 

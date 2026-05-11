@@ -10,7 +10,7 @@ plugins.json
 plugins/
 generated/
 TOOLS.md
-.claude/skills/dm-bot*/
+.claude/skills/appweaver*/
 .logs/
 .piper-test/
 apps/landing/dist/

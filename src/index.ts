@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 /**
- * NIP-17 DM Bot - Listens for private messages from master and replies.
+ * AppWeaver - Listens for private messages from master and replies.
  *
  * Environment variables:
  *   BOT_KEY                 - Bot's private key (hex)

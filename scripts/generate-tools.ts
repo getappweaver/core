@@ -1,12 +1,12 @@
 // ---------------------------------------------------------------------------
-// scripts/generate-tools.ts — Generate .claude/skills/dm-bot-*/SKILL.md,
+// scripts/generate-tools.ts — Generate .claude/skills/appweaver-*/SKILL.md,
 //                             generated/cli-registry.ts,
 //                             generated/plugins.ts
 //
 // Usage: bun run plugin:generate  (see package.json)
 // Idempotent: all outputs are recreated each run.
 //
-// SKILL.md files under .claude/skills/dm-bot-*/ are auto-generated; edit each
+// SKILL.md files under .claude/skills/appweaver-*/ are auto-generated; edit each
 // plugin’s plugins/<alias>/ai.ts (via aiDefinition: toolCallSchema,
 // skillDescription, optional agentInstructions/skillNotes/skillRules)
 // and re-run plugin:generate — do not edit SKILL.md by hand.
@@ -209,7 +209,7 @@ function generateSkillMarkdown(params: {
 
   return `\
 ---
-name: dm-bot-${alias}
+name: appweaver-${alias}
 description: ${skillDescription}
 allowed-tools: Bash
 ---
@@ -308,7 +308,7 @@ for (const entry of pluginsJson.plugins) {
   const bashExamples = buildBashExamples(alias, toolCallSchema);
   const jsonSchema = JSON.stringify(z.toJSONSchema(toolCallSchema), null, 2);
 
-  const skillDir = join(CLAUDE_SKILLS_DIR, `dm-bot-${alias}`);
+  const skillDir = join(CLAUDE_SKILLS_DIR, `appweaver-${alias}`);
   mkdirSync(skillDir, { recursive: true });
 
   const skillMd = generateSkillMarkdown({
@@ -325,7 +325,7 @@ for (const entry of pluginsJson.plugins) {
   writeFileSync(join(skillDir, 'SKILL.md'), skillMd, 'utf8');
 
   console.log(
-    `[generate-tools] Generated .claude/skills/dm-bot-${alias}/SKILL.md`,
+    `[generate-tools] Generated .claude/skills/appweaver-${alias}/SKILL.md`,
   );
 
   pluginGenData.push({

@@ -78,11 +78,38 @@ function parseBunkerSignerData(parsed: unknown): BunkerSignerData | null {
 // Storage keys
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = 'dm-bot:bunker-connection';
-const NIP07_KEY = 'dm-bot:nip07-pubkey';
-const NIP55_KEY = 'dm-bot:nip55-pubkey';
-const NIP49_NCRYPTSEC_KEY = 'dm-bot:nip49-ncryptsec';
-const NIP49_PUBKEY_KEY = 'dm-bot:nip49-pubkey';
+const STORAGE_KEY = 'appweaver:bunker-connection';
+const NIP07_KEY = 'appweaver:nip07-pubkey';
+const NIP55_KEY = 'appweaver:nip55-pubkey';
+const NIP49_NCRYPTSEC_KEY = 'appweaver:nip49-ncryptsec';
+const NIP49_PUBKEY_KEY = 'appweaver:nip49-pubkey';
+
+const LEGACY_STORAGE_KEY = 'dm-bot:bunker-connection';
+const LEGACY_NIP07_KEY = 'dm-bot:nip07-pubkey';
+const LEGACY_NIP55_KEY = 'dm-bot:nip55-pubkey';
+const LEGACY_NIP49_NCRYPTSEC_KEY = 'dm-bot:nip49-ncryptsec';
+const LEGACY_NIP49_PUBKEY_KEY = 'dm-bot:nip49-pubkey';
+
+function loadStorageValue(key: string, legacyKey: string): string | null {
+  const raw = localStorage.getItem(key);
+
+  if (raw !== null) {
+    return raw;
+  }
+
+  const legacyRaw = localStorage.getItem(legacyKey);
+
+  if (legacyRaw !== null) {
+    localStorage.setItem(key, legacyRaw);
+  }
+
+  return legacyRaw;
+}
+
+function clearStorageValue(key: string, legacyKey: string): void {
+  localStorage.removeItem(key);
+  localStorage.removeItem(legacyKey);
+}
 
 // ---------------------------------------------------------------------------
 // NIP-07 / NIP-55 pubkey persistence
@@ -93,7 +120,7 @@ export function saveNip07Pubkey(pubkey: string): void {
 }
 
 export function loadNip07Pubkey(): string | null {
-  const raw = localStorage.getItem(NIP07_KEY);
+  const raw = loadStorageValue(NIP07_KEY, LEGACY_NIP07_KEY);
 
   if (!raw) {
     return null;
@@ -103,7 +130,7 @@ export function loadNip07Pubkey(): string | null {
 }
 
 export function clearNip07Pubkey(): void {
-  localStorage.removeItem(NIP07_KEY);
+  clearStorageValue(NIP07_KEY, LEGACY_NIP07_KEY);
 }
 
 export function saveNip55Pubkey(pubkey: string): void {
@@ -111,7 +138,7 @@ export function saveNip55Pubkey(pubkey: string): void {
 }
 
 export function loadNip55Pubkey(): string | null {
-  const raw = localStorage.getItem(NIP55_KEY);
+  const raw = loadStorageValue(NIP55_KEY, LEGACY_NIP55_KEY);
 
   if (!raw) {
     return null;
@@ -121,7 +148,7 @@ export function loadNip55Pubkey(): string | null {
 }
 
 export function clearNip55Pubkey(): void {
-  localStorage.removeItem(NIP55_KEY);
+  clearStorageValue(NIP55_KEY, LEGACY_NIP55_KEY);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +160,7 @@ export function saveBunkerData(data: BunkerSignerData): void {
 }
 
 export function loadBunkerData(): BunkerSignerData | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = loadStorageValue(STORAGE_KEY, LEGACY_STORAGE_KEY);
 
   if (!raw) {
     return null;
@@ -158,7 +185,7 @@ export function loadBunkerData(): BunkerSignerData | null {
 }
 
 export function clearBunkerData(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  clearStorageValue(STORAGE_KEY, LEGACY_STORAGE_KEY);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +204,7 @@ export function saveNip49Bundle(ncryptsec: string, pubkeyHex: string): void {
 }
 
 export function loadNip49Ncryptsec(): string | null {
-  const raw = localStorage.getItem(NIP49_NCRYPTSEC_KEY);
+  const raw = loadStorageValue(NIP49_NCRYPTSEC_KEY, LEGACY_NIP49_NCRYPTSEC_KEY);
 
   if (!raw) {
     return null;
@@ -187,7 +214,7 @@ export function loadNip49Ncryptsec(): string | null {
 }
 
 export function loadNip49Pubkey(): string | null {
-  const raw = localStorage.getItem(NIP49_PUBKEY_KEY);
+  const raw = loadStorageValue(NIP49_PUBKEY_KEY, LEGACY_NIP49_PUBKEY_KEY);
 
   if (!raw) {
     return null;
@@ -217,8 +244,8 @@ export function loadNip49Bundle(): {
 }
 
 export function clearNip49Bundle(): void {
-  localStorage.removeItem(NIP49_NCRYPTSEC_KEY);
-  localStorage.removeItem(NIP49_PUBKEY_KEY);
+  clearStorageValue(NIP49_NCRYPTSEC_KEY, LEGACY_NIP49_NCRYPTSEC_KEY);
+  clearStorageValue(NIP49_PUBKEY_KEY, LEGACY_NIP49_PUBKEY_KEY);
 }
 
 /** Clears bunker, NIP-07, NIP-55, and NIP-49 signer data from localStorage. */

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Extensible plugin architecture for the nostr-dm-bot. Core features (todos, jobs, tasks) are first-class plugins. Third-party plugins can be installed separately.
+Extensible plugin architecture for AppWeaver. Core features (todos, jobs, tasks) are first-class plugins. Third-party plugins can be installed separately.
 
 ## Core Concepts
 
