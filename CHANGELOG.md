@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.2] - 2026-05-11
+
+- fix: show opencode auth completion (2c57094)
+
 ## [v9.9.1] - 2026-05-11
 
-- fix: rebuild web UI on startup (468c5f3)
+- fix: rebuild web UI on startup (fd83f0c)
 
 ## [v9.9.0] - 2026-05-11
 

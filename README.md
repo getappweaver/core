@@ -220,11 +220,12 @@ Run AppWeaver from the mounted checkout, with the web server exposed only on you
 docker run --rm -it \
   --name appweaver \
   -p 127.0.0.1:5551:5551 \
+  -p 127.0.0.1:1455:1455 \
   -v "$PWD:/app" \
   appweaver-runtime
 ```
 
-On startup the container runs `bun install --frozen-lockfile` inside `/app`, then `bun run start`. `bun run start` builds `web/dist` if needed and serves the UI/API on port `5551`.
+On startup the container runs `bun install --frozen-lockfile` inside `/app`, then `bun run start`. `bun run start` builds `web/dist` and serves the UI/API on port `5551`. Port `1455` is used by OpenCode provider OAuth callbacks during setup.
 
 Open the setup URL printed in the logs. It will look like:
 
@@ -241,6 +242,7 @@ docker run -d \
   --name appweaver \
   --restart unless-stopped \
   -p 127.0.0.1:5551:5551 \
+  -p 127.0.0.1:1455:1455 \
   -v "$PWD:/app" \
   appweaver-runtime
 ```
@@ -264,6 +266,7 @@ docker run -d \
   --name appweaver \
   --restart unless-stopped \
   -p 127.0.0.1:5551:5551 \
+  -p 127.0.0.1:1455:1455 \
   -v "$PWD:/app" \
   appweaver-runtime
 ```
@@ -275,14 +278,14 @@ Plugin updates should use AppWeaver's plugin update/install flow. Those changes 
 The setup URL can configure secrets such as bot keys, relay settings, and provider credentials. Treat it as a local-only admin interface.
 
 - Do not expose setup over public plain HTTP.
-- Bind Docker ports on the host to `127.0.0.1`, not all interfaces. Use `-p 127.0.0.1:5551:5551`, not `-p 5551:5551`. The app still listens on `0.0.0.0` inside the container so Docker can forward the localhost-only host port.
+- Bind Docker ports on the host to `127.0.0.1`, not all interfaces. Use `-p 127.0.0.1:5551:5551` and `-p 127.0.0.1:1455:1455`, not `-p 5551:5551` or `-p 1455:1455`. The app still listens on `0.0.0.0` inside the container so Docker can forward the localhost-only host port.
 - If AppWeaver is running on a VPS, keep port `5551` closed to the internet and use SSH port forwarding.
 - If you intentionally expose setup remotely, put HTTPS in front of it with a trusted tunnel or reverse proxy such as Caddy, Traefik, Tailscale HTTPS, or Cloudflare Tunnel.
 
 For VPS setup, start the container on the VPS with localhost-only port publishing, then from your laptop run:
 
 ```bash
-ssh -L 5551:127.0.0.1:5551 user@VPS_PUBLIC_IP
+ssh -L 5551:127.0.0.1:5551 -L 1455:127.0.0.1:1455 user@VPS_PUBLIC_IP
 ```
 
 Then open this on your laptop:

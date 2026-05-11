@@ -5,6 +5,7 @@ import {
   createSignal,
   For,
   Match,
+  onCleanup,
   Show,
   Switch,
 } from 'solid-js';
@@ -250,6 +251,17 @@ function preferredProvider(providers: OpenCodeAuthProvider[]): string {
     : (providers[0]?.id ?? '');
 }
 
+function providerIsConfigured(
+  status: { providers: OpenCodeAuthProvider[] } | undefined,
+  providerID: string,
+): boolean {
+  return Boolean(
+    providerID &&
+    status?.providers.find((provider) => provider.id === providerID)
+      ?.configured,
+  );
+}
+
 function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [authStatus, { refetch }] = createResource(
     () => props.token,
@@ -261,6 +273,11 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [authorizing, setAuthorizing] = createSignal(false);
   const [envValues, setEnvValues] = createSignal<Record<string, string>>({});
   const [savingApiKey, setSavingApiKey] = createSignal(false);
+  const [pollingAuth, setPollingAuth] = createSignal(false);
+
+  const [authSuccessProvider, setAuthSuccessProvider] = createSignal<
+    string | null
+  >(null);
 
   const [authorizeResult, setAuthorizeResult] =
     createSignal<OpenCodeAuthorizeResponse | null>(null);
@@ -268,6 +285,9 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [authorizeError, setAuthorizeError] = createSignal<string | null>(null);
   const [apiKeyError, setApiKeyError] = createSignal<string | null>(null);
   const [apiKeySaved, setApiKeySaved] = createSignal<string[] | null>(null);
+  let stopAuthPolling: (() => void) | null = null;
+
+  onCleanup(() => stopAuthPolling?.());
 
   createEffect(() => {
     const providers = authStatus()?.providers ?? [];
@@ -283,6 +303,10 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     authStatus()?.providers.find(
       (provider) => provider.id === selectedProviderID(),
     ) ?? null;
+
+  const selectedProviderConfigured = () =>
+    Boolean(selectedProvider()?.configured) ||
+    authSuccessProvider() === selectedProviderID();
 
   const selectedAuthMethod = () => {
     const provider = selectedProvider();
@@ -319,8 +343,79 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
       (envName) => (envValues()[envName]?.trim() ?? '').length > 0,
     );
 
+  createEffect(() => {
+    const provider = selectedProvider();
+
+    if (provider?.configured) {
+      setAuthSuccessProvider(provider.id);
+    }
+  });
+
   function setEnvValue(envName: string, value: string): void {
     setEnvValues((current) => ({ ...current, [envName]: value }));
+  }
+
+  async function waitForProviderAuth(providerID: string): Promise<void> {
+    stopAuthPolling?.();
+
+    let stopped = false;
+    let checking = false;
+
+    stopAuthPolling = () => {
+      stopped = true;
+      window.removeEventListener('focus', checkSoon);
+      document.removeEventListener('visibilitychange', checkSoon);
+    };
+
+    async function checkNow(): Promise<boolean> {
+      if (stopped || checking) {
+        return false;
+      }
+
+      checking = true;
+
+      try {
+        const nextStatus = await refetch();
+
+        if (providerIsConfigured(nextStatus, providerID)) {
+          setAuthSuccessProvider(providerID);
+          stopAuthPolling?.();
+          stopAuthPolling = null;
+
+          return true;
+        }
+      } finally {
+        checking = false;
+      }
+
+      return false;
+    }
+
+    function checkSoon(): void {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      void checkNow();
+    }
+
+    setPollingAuth(true);
+    window.addEventListener('focus', checkSoon);
+    document.addEventListener('visibilitychange', checkSoon);
+
+    try {
+      for (let attempt = 0; attempt < 90 && !stopped; attempt += 1) {
+        if (await checkNow()) {
+          break;
+        }
+
+        await sleep(2000);
+      }
+    } finally {
+      stopAuthPolling?.();
+      stopAuthPolling = null;
+      setPollingAuth(false);
+    }
   }
 
   async function startAuth(): Promise<void> {
@@ -345,6 +440,7 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
 
       if (result.url) {
         window.open(result.url, '_blank', 'noopener,noreferrer');
+        void waitForProviderAuth(provider.id);
       }
     } catch (err) {
       setAuthorizeError(err instanceof Error ? err.message : String(err));
@@ -549,6 +645,27 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                   {loaded().providers.length} provider(s)
                 </span>
               </div>
+
+              <Show when={selectedProvider()}>
+                {(provider) => (
+                  <div
+                    class="setup-step setup-auth-step"
+                    classList={{ 'is-ok': selectedProviderConfigured() }}
+                  >
+                    <span class="setup-step-marker">✓</span>
+                    <div class="setup-step-body">
+                      <h2>{provider().name} auth</h2>
+                      <p>
+                        {selectedProviderConfigured()
+                          ? 'OpenCode reports this provider is connected.'
+                          : pollingAuth()
+                            ? 'Waiting for the provider callback to complete...'
+                            : 'Start auth, complete the provider login, then this will turn green when OpenCode detects the callback.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </Show>
 
               <Show when={authorizeResult()}>
                 {(result) => (
