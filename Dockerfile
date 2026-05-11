@@ -21,6 +21,7 @@ RUN apt-get update \
       bash \
       ca-certificates \
       curl \
+      dbus-x11 \
       espeak-ng \
       git \
       openssh-client \

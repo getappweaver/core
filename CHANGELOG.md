@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.4] - 2026-05-11
+
+- fix: add dbus for docker vnc session (a61bf22)
+
 ## [v9.9.3] - 2026-05-11
 
-- fix: detect opencode oauth setup status (b49c4e3)
+- fix: detect opencode oauth setup status (b930aa7)
 
 ## [v9.9.2] - 2026-05-11
 
