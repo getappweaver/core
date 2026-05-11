@@ -237,6 +237,7 @@ async function main() {
     seenDb,
     version: VERSION,
     dmBotRoot,
+    parentOfBotRoot,
     attachUrl: opencodeServeUrl,
   });
 

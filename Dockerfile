@@ -6,6 +6,8 @@ ARG PIPER_VOICE=en_US-libritts_r-medium
 
 ENV BUN_INSTALL=/home/pwuser/.bun \
     PATH=/home/pwuser/.bun/bin:/home/pwuser/.local/bin:/usr/local/bin:$PATH \
+    APPWEAVER_REPO_URL=https://github.com/getappweaver/core.git \
+    APPWEAVER_GIT_REF=main \
     DISPLAY=:99 \
     BOT_WEB_HOST=0.0.0.0 \
     BOT_WEB_UI_PORT=5552 \
@@ -50,6 +52,9 @@ RUN mkdir -p /opt/piper/voices \
     && mkdir -p /workspace/appweaver \
     && chown -R pwuser:pwuser /workspace /home/pwuser
 
+COPY scripts/docker-entrypoint.sh /usr/local/bin/appweaver-entrypoint
+RUN chmod +x /usr/local/bin/appweaver-entrypoint
+
 USER pwuser
 WORKDIR /workspace/appweaver
 
@@ -66,4 +71,4 @@ RUN bun install -g opencode-ai \
 
 EXPOSE 1455 5551 5552 5900 6080
 
-CMD ["bash", "-lc", "if [ \"${ENABLE_VNC:-0}\" = \"1\" ]; then Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & xfce4-session >/tmp/xfce.log 2>&1 & x11vnc -display :99 -forever -shared -nopw -rfbport 5900 >/tmp/x11vnc.log 2>&1 & websockify --web=/usr/share/novnc/ 6080 localhost:5900 >/tmp/novnc.log 2>&1 & fi; bun install --frozen-lockfile && exec bun run start"]
+CMD ["appweaver-entrypoint"]

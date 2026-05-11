@@ -89,7 +89,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
         async () =>
           handleAiAgents({
             seenDb: ctx.seenDb,
-            dmBotRoot: ctx.dmBotRoot,
+            dmBotRoot: ctx.cwd,
           }),
         'Failed to open agent manager',
       );
@@ -109,7 +109,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     if (nested === 'restore') {
       return handleError(async () => {
         const out = await handleAiAgentRestore({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           seenDb: ctx.seenDb,
         });
 
@@ -120,7 +120,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     if (nested === 'delete') {
       return handleError(async () => {
         const out = await handleAiAgentsDelete({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           seenDb: ctx.seenDb,
           name: args[2],
         });
@@ -132,7 +132,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     if (nested === 'new') {
       return handleError(async () => {
         return handleAiAgentsNew({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           args: args.slice(2),
         });
       }, 'Failed to save agent');
@@ -141,7 +141,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     if (nested === 'edit') {
       return handleError(async () => {
         return handleAiAgentsEdit({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           args: args.slice(2),
         });
       }, 'Failed to save agent');
@@ -150,7 +150,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     if (nested === 'save') {
       return handleError(async () => {
         const out = await handleAiAgentsSave({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           seenDb: ctx.seenDb,
           draft: ctx.jsonPayload,
         });
@@ -164,7 +164,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
 
       return handleError(async () => {
         const out = await handleAiAgentsUpsertJson({
-          dmBotRoot: ctx.dmBotRoot,
+          dmBotRoot: ctx.cwd,
           payload: ctx.jsonPayload,
         });
 
@@ -178,7 +178,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
   if (sub === 'root-model') {
     return handleError(async () => {
       const out = await handleAiRootModel({
-        dmBotRoot: ctx.dmBotRoot,
+        dmBotRoot: ctx.cwd,
         selected: args[1],
       });
 

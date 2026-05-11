@@ -45,10 +45,13 @@ export async function getComposerAiState(
   const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
   const providerName = getProviderName(ctx.seenDb);
 
+  const cwd =
+    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
+      ? ctx.dmBotRoot
+      : ctx.parentOfBotRoot;
+
   const opencodeConfig =
-    executionProfile.kind === 'opencode'
-      ? readOpencodeConfig(ctx.dmBotRoot)
-      : null;
+    executionProfile.kind === 'opencode' ? readOpencodeConfig(cwd) : null;
 
   const opencodeAgent =
     executionProfile.kind === 'opencode'
@@ -73,7 +76,7 @@ export async function getComposerAiState(
   const opencodeModelFormChoices: WebArgumentFieldChoice[] = [
     { value: 'reset', label: 'Clear / reset' },
     ...(isOpencodeBackend
-      ? listOpencodeModelCatalog(ctx.dmBotRoot)
+      ? listOpencodeModelCatalog(cwd)
       : backendName === 'cursor'
         ? (await backend.availableModels()).map((model) => ({
             value: model,
@@ -81,11 +84,6 @@ export async function getComposerAiState(
           }))
         : []),
   ];
-
-  const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-      ? ctx.dmBotRoot
-      : ctx.parentOfBotRoot;
 
   const currentSessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
 

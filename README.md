@@ -214,7 +214,32 @@ Build the runtime image:
 docker build -t appweaver-runtime .
 ```
 
-Run AppWeaver from the mounted checkout, with the web server exposed only on your machine:
+Run AppWeaver from an isolated checkout inside the container, with the web server exposed only on your machine:
+
+```bash
+docker run --rm -it \
+  --name appweaver \
+  -p 127.0.0.1:5551:5551 \
+  -p 127.0.0.1:1455:1455 \
+  appweaver-runtime
+```
+
+If `/workspace/appweaver` is empty, the container clones `${APPWEAVER_REPO_URL}` at `${APPWEAVER_GIT_REF}` before starting. The defaults are `https://github.com/getappweaver/core.git` and `main`. With `--rm`, this checkout and bot state are discarded when the container exits.
+
+For a persistent container-managed checkout without exposing your host files, use a named Docker volume:
+
+```bash
+docker volume create appweaver-workspace
+docker run -d \
+  --name appweaver \
+  --restart unless-stopped \
+  -p 127.0.0.1:5551:5551 \
+  -p 127.0.0.1:1455:1455 \
+  -v appweaver-workspace:/workspace \
+  appweaver-runtime
+```
+
+To run AppWeaver from a host checkout instead, bind mount it:
 
 ```bash
 docker run --rm -it \
@@ -225,7 +250,7 @@ docker run --rm -it \
   appweaver-runtime
 ```
 
-On startup the container runs `bun install --frozen-lockfile` inside `/workspace/appweaver`, then `bun run start`. `bun run start` builds `web/dist` and serves the UI/API on port `5551`. Port `1455` is used by OpenCode provider OAuth callbacks during setup. The bot's `parent` workspace is `/workspace`, which lets parent-scoped assets such as `opencode.json`, `AGENTS.md`, and `.opencode/agents` live outside the mounted checkout while still being available to OpenCode.
+On startup the container runs `bun install --frozen-lockfile` inside `/workspace/appweaver`, then `bun run start`. `bun run start` builds `web/dist` and serves the UI/API on port `5551`. Port `1455` is used by OpenCode provider OAuth callbacks during setup. The bot's `parent` workspace is `/workspace`, which lets parent-scoped assets such as `opencode.json`, `AGENTS.md`, and `.opencode/agents` live outside the checkout while still being available to OpenCode. Use `ls -la /workspace` to see hidden directories such as `.opencode`.
 
 Open the setup URL printed in the logs. It will look like:
 

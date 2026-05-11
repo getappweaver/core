@@ -15,6 +15,7 @@ export function statusPropsFromContext(ctx: RouteCommandContext) {
     seenDb: ctx.seenDb,
     version: ctx.version,
     dmBotRoot: ctx.dmBotRoot,
+    parentOfBotRoot: ctx.parentOfBotRoot,
     attachUrl: ctx.attachUrl,
   };
 }

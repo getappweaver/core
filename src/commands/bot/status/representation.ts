@@ -33,6 +33,7 @@ export type StatusProps = {
   seenDb: CoreDb;
   version: string;
   dmBotRoot: string;
+  parentOfBotRoot: string;
   attachUrl: string | null;
 };
 
@@ -76,12 +77,20 @@ export type BotStatusRepresentation = z.infer<
 export type BotStatusData = z.infer<typeof BotStatusDataSchema>;
 
 export function buildBotStatusData(props: StatusProps): BotStatusData {
-  const { botRelayUrls, seenDb, version, dmBotRoot, attachUrl } = props;
+  const {
+    botRelayUrls,
+    seenDb,
+    version,
+    dmBotRoot,
+    parentOfBotRoot,
+    attachUrl,
+  } = props;
 
   const mode = getCurrentOrDefaultMode(seenDb);
   const linting = getLinting(seenDb);
   const backendName = getAgentBackend(seenDb);
   const workspace = getWorkspaceTarget(seenDb);
+  const opencodeRoot = workspace === 'appweaver' ? dmBotRoot : parentOfBotRoot;
   const serveUrl = process.env.BOT_OPENCODE_SERVE_URL;
   const modelOverride = getModelOverride(seenDb, backendName);
   const providerName = getProviderName(seenDb);
@@ -90,17 +99,17 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
   const opencodeConfigured =
     backendName === 'opencode'
       ? resolveConfiguredModelFromOpencodeConfig(
-          dmBotRoot,
+          opencodeRoot,
           executionProfile.kind === 'opencode' ? executionProfile.agent : mode,
         )
       : null;
 
   const opencodeConfig =
-    backendName === 'opencode' ? readOpencodeConfig(dmBotRoot) : null;
+    backendName === 'opencode' ? readOpencodeConfig(opencodeRoot) : null;
 
   const opencodeModelCatalog =
     backendName === 'opencode'
-      ? listOpencodeModelCatalog(dmBotRoot)
+      ? listOpencodeModelCatalog(opencodeRoot)
       : backendName === 'cursor'
         ? listCachedCursorSdkModelCatalog()
         : [];
