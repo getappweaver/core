@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.16] - 2026-05-12
+
+- docs: clarify plugin git status (417e0e6)
+
 ## [v9.9.15] - 2026-05-12
 
-- refactor opencode parts parser (c8fe5c8)
+- refactor opencode parts parser (bfb90f6)
 
 ## [v9.9.14] - 2026-05-12
 
