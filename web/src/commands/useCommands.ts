@@ -388,6 +388,14 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
+      } else if (action.action === 'clipboard.writeText') {
+        const text = action.payload?.text;
+
+        if (typeof text !== 'string') {
+          return;
+        }
+
+        runClientAction(navigator.clipboard.writeText(text).catch(() => {}));
       } else {
         adapters.appendSystemMessage(`Unknown client action: ${action.action}`);
       }

@@ -1194,6 +1194,19 @@ pre {
   padding: 0.1rem 0.75rem;
 }
 
+.agent-muted-card {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.75rem;
+  white-space: pre-wrap;
+}
+
+.reasoning-card {
+  font-family: inherit;
+}
+
 .tool-card--pending {
   color: color-mix(in srgb, var(--color-warning) 74%, var(--color-text-muted));
 }

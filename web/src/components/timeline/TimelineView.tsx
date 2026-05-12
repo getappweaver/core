@@ -8,7 +8,9 @@ import {
   isCommandResultItem,
   isDiffItem,
   isDiffSummaryItem,
+  isAgentSummaryItem,
   isPromptItem,
+  isReasoningItem,
   isSystemItem,
   isToolItem,
 } from '../../types';
@@ -43,6 +45,23 @@ export function TimelineView(props: TimelineViewProps) {
                 role={(item as Extract<TimelineItem, { type: 'chat' }>).role}
                 text={(item as Extract<TimelineItem, { type: 'chat' }>).text}
                 onDeleteTimelineItem={props.onDeleteTimelineItem}
+              />
+            </Match>
+
+            <Match when={isReasoningItem(item)}>
+              <TimelineReasoningCard
+                text={
+                  (item as Extract<TimelineItem, { type: 'reasoning' }>).text
+                }
+              />
+            </Match>
+
+            <Match when={isAgentSummaryItem(item)}>
+              <TimelineAgentSummaryCard
+                text={
+                  (item as Extract<TimelineItem, { type: 'agent_summary' }>)
+                    .text
+                }
               />
             </Match>
 
@@ -131,6 +150,26 @@ type TimelineSystemCardProps = {
 
 export function TimelineSystemCard(props: TimelineSystemCardProps) {
   return <div class="card system-card">{props.text}</div>;
+}
+
+type TimelineReasoningCardProps = {
+  text: string;
+};
+
+function TimelineReasoningCard(props: TimelineReasoningCardProps) {
+  return (
+    <div class="card agent-muted-card reasoning-card">
+      <i>Thinking:</i> {props.text}
+    </div>
+  );
+}
+
+type TimelineAgentSummaryCardProps = {
+  text: string;
+};
+
+function TimelineAgentSummaryCard(props: TimelineAgentSummaryCardProps) {
+  return <div class="card agent-muted-card">{props.text}</div>;
 }
 
 type TimelineChatCardProps = {

@@ -4,6 +4,15 @@
 
 import { debug, log } from '../logger';
 
+import type { parseOpenCodePart } from './opencode-parts';
+import {
+  createOpenCodeParseState,
+  parseOpenCodeUpdatedPart,
+  rememberOpenCodeAssistantMessage,
+  segmentSummary,
+  type OpenCodeParseState,
+} from './opencode-parts';
+
 export type AgentFileDiff = {
   file: string;
   patch: string;
@@ -26,6 +35,8 @@ export type AgentToolCall = {
 
 export type AgentStreamChunk =
   | { kind: 'text_delta'; text: string }
+  | { kind: 'reasoning_delta'; text: string }
+  | { kind: 'summary'; id: string; text: string }
   | { kind: 'diff'; files: AgentFileDiff[] }
   | { kind: 'tool'; tool: AgentToolCall }
   | { kind: 'status'; phase: 'started' | 'completed'; message: string | null }
@@ -34,9 +45,7 @@ export type AgentStreamChunk =
 export type OpencodeStreamLogState = {
   sessionId: string;
   warnOnceTypes: Set<string>;
-  assistantMessageIds: Set<string>;
-  partTextLengths: Map<string, number>;
-  emittedTextDeltas: Set<string>;
+  parseState: OpenCodeParseState;
 };
 
 const DIFF_CONTEXT_LINES = 3;
@@ -48,9 +57,7 @@ export function createOpencodeStreamLogState(
   return {
     sessionId,
     warnOnceTypes: new Set(),
-    assistantMessageIds: new Set(),
-    partTextLengths: new Map(),
-    emittedTextDeltas: new Set(),
+    parseState: createOpenCodeParseState(),
   };
 }
 
@@ -291,53 +298,6 @@ export function coerceFileDiff(value: unknown): AgentFileDiff | null {
   };
 }
 
-function coerceRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object'
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function coerceToolCall(value: unknown): AgentToolCall | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  const part = value as Record<string, unknown>;
-
-  if (
-    part.type !== 'tool' ||
-    typeof part.id !== 'string' ||
-    typeof part.callID !== 'string' ||
-    typeof part.tool !== 'string'
-  ) {
-    return null;
-  }
-
-  const state = coerceRecord(part.state);
-  const status = state.status;
-
-  if (
-    status !== 'pending' &&
-    status !== 'running' &&
-    status !== 'completed' &&
-    status !== 'error'
-  ) {
-    return null;
-  }
-
-  return {
-    id: part.id,
-    callId: part.callID,
-    tool: part.tool,
-    status,
-    input: coerceRecord(state.input),
-    title: typeof state.title === 'string' ? state.title : null,
-    raw: typeof state.raw === 'string' ? state.raw : null,
-    output: typeof state.output === 'string' ? state.output : null,
-    error: typeof state.error === 'string' ? state.error : null,
-  };
-}
-
 function isMatchingSession(
   properties: Record<string, unknown>,
   sessionId: string,
@@ -361,80 +321,42 @@ function isMatchingSession(
   return true;
 }
 
-function getPartType(properties: Record<string, unknown>): string {
-  const directType = properties.type;
-
-  if (typeof directType === 'string') {
-    return directType;
+function segmentToChunk(
+  segment: ReturnType<typeof parseOpenCodePart>,
+): AgentStreamChunk | null {
+  if (!segment) {
+    return null;
   }
 
-  const part = properties.part;
+  switch (segment.kind) {
+    case 'text':
+      return { kind: 'text_delta', text: segment.text };
+    case 'reasoning':
+      return { kind: 'reasoning_delta', text: segment.text };
+    case 'tool':
+      debug('opencode-sdk stream: tool update', {
+        tool: segment.tool.tool,
+        status: segment.tool.status,
+        callId: segment.tool.callId,
+      });
 
-  if (part && typeof part === 'object') {
-    const partType = (part as { type?: unknown }).type;
+      return { kind: 'tool', tool: segment.tool };
+    case 'step_start':
+      return { kind: 'status', phase: 'started', message: null };
+    case 'step_finish':
+      return { kind: 'status', phase: 'completed', message: null };
+    case 'patch':
+      return null;
+    case 'file':
+    case 'subtask':
+    case 'agent':
+    case 'retry':
+    case 'compaction': {
+      const text = segmentSummary(segment);
 
-    if (typeof partType === 'string') {
-      return partType;
+      return text ? { kind: 'summary', id: segment.partId, text } : null;
     }
   }
-
-  return '';
-}
-
-function rememberAssistantMessage(
-  properties: Record<string, unknown>,
-  logState: OpencodeStreamLogState,
-): void {
-  const info = properties.info;
-
-  if (!info || typeof info !== 'object') {
-    return;
-  }
-
-  const message = info as Record<string, unknown>;
-
-  if (message.role !== 'assistant' || typeof message.id !== 'string') {
-    return;
-  }
-
-  logState.assistantMessageIds.add(message.id);
-}
-
-function textDeltaFromUpdatedPart(
-  part: Record<string, unknown>,
-  logState: OpencodeStreamLogState,
-): string | null {
-  const partId = typeof part.id === 'string' ? part.id : null;
-  const messageId = typeof part.messageID === 'string' ? part.messageID : null;
-  const text = typeof part.text === 'string' ? part.text : null;
-
-  if (!partId || !messageId || text === null) {
-    return null;
-  }
-
-  if (!logState.assistantMessageIds.has(messageId)) {
-    return null;
-  }
-
-  const previousLength = logState.partTextLengths.get(partId) ?? 0;
-
-  if (text.length <= previousLength) {
-    return null;
-  }
-
-  logState.partTextLengths.set(partId, text.length);
-
-  const delta = text.slice(previousLength);
-  const partType = typeof part.type === 'string' ? part.type : 'text';
-  const emittedKey = `${messageId}:${partType}:${delta}`;
-
-  if (logState.emittedTextDeltas.has(emittedKey)) {
-    return null;
-  }
-
-  logState.emittedTextDeltas.add(emittedKey);
-
-  return delta;
 }
 
 /**
@@ -445,11 +367,11 @@ export function mapOpencodeSsePayloadToChunk(
   raw: unknown,
   sessionId: string,
   logState: OpencodeStreamLogState,
-): AgentStreamChunk | null {
+): AgentStreamChunk[] {
   if (!raw || typeof raw !== 'object') {
     logUnknownOnce(logState, '(non-object)', raw);
 
-    return null;
+    return [];
   }
 
   const root = raw as Record<string, unknown>;
@@ -465,20 +387,20 @@ export function mapOpencodeSsePayloadToChunk(
   if (!eventType) {
     logUnknownOnce(logState, '(missing-type)', raw);
 
-    return null;
+    return [];
   }
 
   if (SILENT_STREAM_EVENT_TYPES.has(eventType)) {
     logIgnoredOnce(logState, eventType, 'silent transport event', raw);
 
-    return null;
+    return [];
   }
 
   if (eventType === 'message.part.delta') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -486,21 +408,21 @@ export function mapOpencodeSsePayloadToChunk(
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
     if (typeof p.delta !== 'string' || p.delta.length === 0) {
-      return null;
+      return [];
     }
 
     const field = typeof p.field === 'string' ? p.field : '';
 
     if (field === 'text') {
-      return { kind: 'text_delta', text: p.delta };
+      return [{ kind: 'text_delta', text: p.delta }];
     }
 
-    if (field === 'reasoning' || field === 'thinking') {
-      return { kind: 'text_delta', text: p.delta };
+    if (field === 'reasoning') {
+      return [{ kind: 'reasoning_delta', text: p.delta }];
     }
 
     logIgnoredOnce(
@@ -510,14 +432,14 @@ export function mapOpencodeSsePayloadToChunk(
       raw,
     );
 
-    return null;
+    return [];
   }
 
   if (eventType === 'session.status') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -525,7 +447,7 @@ export function mapOpencodeSsePayloadToChunk(
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
     const status = p.status;
@@ -535,23 +457,25 @@ export function mapOpencodeSsePayloadToChunk(
       typeof status === 'object' &&
       (status as { type?: string }).type === 'busy'
     ) {
-      return {
-        kind: 'status',
-        phase: 'started',
-        message: null,
-      };
+      return [
+        {
+          kind: 'status',
+          phase: 'started',
+          message: null,
+        },
+      ];
     }
 
     logIgnoredOnce(logState, eventType, 'non-busy session status', raw);
 
-    return null;
+    return [];
   }
 
   if (eventType === 'session.idle') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -559,17 +483,17 @@ export function mapOpencodeSsePayloadToChunk(
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
-    return { kind: 'status', phase: 'completed', message: null };
+    return [{ kind: 'status', phase: 'completed', message: null }];
   }
 
   if (eventType === 'message.part.updated') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -577,64 +501,36 @@ export function mapOpencodeSsePayloadToChunk(
     if (!isMatchingSession(p, sessionId)) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
-    const partType = getPartType(p);
+    const segment = parseOpenCodeUpdatedPart(p.part, logState.parseState);
+    const chunk = segmentToChunk(segment);
+
+    if (chunk) {
+      return [chunk];
+    }
 
     const part =
       p.part && typeof p.part === 'object'
-        ? (p.part as Record<string, unknown>)
+        ? (p.part as { type?: unknown })
         : null;
-
-    if (part && (partType === 'text' || partType === 'reasoning')) {
-      const delta = textDeltaFromUpdatedPart(part, logState);
-
-      return delta ? { kind: 'text_delta', text: delta } : null;
-    }
-
-    if (partType === 'tool') {
-      const tool = coerceToolCall(p.part);
-
-      if (!tool) {
-        logUnknownOnce(logState, eventType, raw);
-
-        return null;
-      }
-
-      debug('opencode-sdk stream: tool update', {
-        sessionId,
-        tool: tool.tool,
-        status: tool.status,
-        callId: tool.callId,
-      });
-
-      return { kind: 'tool', tool };
-    }
-
-    if (
-      partType === 'step-finish' ||
-      partType === 'step_finish' ||
-      partType === 'step.finish'
-    ) {
-      return { kind: 'status', phase: 'completed', message: null };
-    }
 
     logIgnoredOnce(
       logState,
       eventType,
-      `unsupported part type ${partType}`,
+      `unsupported part type ${typeof part?.type === 'string' ? part.type : ''}`,
       raw,
     );
 
-    return null;
+    return [];
   }
 
   if (eventType === 'session.error') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -642,19 +538,19 @@ export function mapOpencodeSsePayloadToChunk(
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
     const message = extractSessionErrorMessage(p.error);
 
-    return { kind: 'error', message };
+    return [{ kind: 'error', message }];
   }
 
   if (eventType === 'session.diff') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -662,13 +558,13 @@ export function mapOpencodeSsePayloadToChunk(
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
     if (!Array.isArray(p.diff)) {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const files = p.diff
@@ -681,14 +577,14 @@ export function mapOpencodeSsePayloadToChunk(
       files: files.length,
     });
 
-    return files.length > 0 ? { kind: 'diff', files } : null;
+    return files.length > 0 ? [{ kind: 'diff', files }] : [];
   }
 
   if (eventType === 'message.updated') {
     if (!properties || typeof properties !== 'object') {
       logUnknownOnce(logState, eventType, raw);
 
-      return null;
+      return [];
     }
 
     const p = properties as Record<string, unknown>;
@@ -696,13 +592,13 @@ export function mapOpencodeSsePayloadToChunk(
     if (!isMatchingSession(p, sessionId)) {
       logIgnoredOnce(logState, eventType, 'different session', raw);
 
-      return null;
+      return [];
     }
 
-    rememberAssistantMessage(p, logState);
+    rememberOpenCodeAssistantMessage(p, logState.parseState);
     logIgnoredOnce(logState, eventType, 'message metadata update', raw);
 
-    return null;
+    return [];
   }
 
   const ignoredPrefixes = [
@@ -729,7 +625,7 @@ export function mapOpencodeSsePayloadToChunk(
     if (eventType.startsWith(prefix)) {
       logIgnoredOnce(logState, eventType, `ignored prefix ${prefix}`, raw);
 
-      return null;
+      return [];
     }
   }
 
@@ -750,7 +646,7 @@ export function mapOpencodeSsePayloadToChunk(
       typeof (properties as { sessionID?: string }).sessionID === 'string' &&
       (properties as { sessionID: string }).sessionID !== sessionId
     ) {
-      return null;
+      return [];
     }
 
     logIgnoredOnce(
@@ -760,10 +656,10 @@ export function mapOpencodeSsePayloadToChunk(
       raw,
     );
 
-    return null;
+    return [];
   }
 
   logUnknownOnce(logState, eventType, raw);
 
-  return null;
+  return [];
 }

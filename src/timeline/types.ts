@@ -87,6 +87,8 @@ export type TimelineCommandFormState = {
 export type TimelineEventKind =
   | 'system'
   | 'chat'
+  | 'reasoning'
+  | 'agent_summary'
   | 'diff'
   | 'diff_summary'
   | 'tool'
@@ -106,6 +108,20 @@ export type TimelineHistoryItem =
       id: string;
       type: 'chat';
       role: 'user' | 'assistant';
+      text: string;
+      createdAt: number;
+      source: MessageSource;
+    }
+  | {
+      id: string;
+      type: 'reasoning';
+      text: string;
+      createdAt: number;
+      source: MessageSource;
+    }
+  | {
+      id: string;
+      type: 'agent_summary';
       text: string;
       createdAt: number;
       source: MessageSource;

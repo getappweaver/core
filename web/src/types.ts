@@ -146,6 +146,20 @@ export type TimelineItem =
       id: string;
       createdAt?: number;
       source?: MessageSource;
+      type: 'reasoning';
+      text: string;
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
+      type: 'agent_summary';
+      text: string;
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
       type: 'diff';
       files: TimelineFileDiff[];
       meta?: {
@@ -215,6 +229,18 @@ export function isChatItem(
   item: TimelineItem,
 ): item is Extract<TimelineItem, { type: 'chat' }> {
   return item.type === 'chat';
+}
+
+export function isReasoningItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'reasoning' }> {
+  return item.type === 'reasoning';
+}
+
+export function isAgentSummaryItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'agent_summary' }> {
+  return item.type === 'agent_summary';
 }
 
 export function isDiffItem(

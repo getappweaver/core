@@ -223,6 +223,10 @@ function AppInner(): JSX.Element {
         chat.handleStreamDiff(requestId, files),
       handleStreamTool: (requestId, tool) =>
         chat.handleStreamTool(requestId, tool),
+      handleStreamReasoningDelta: (requestId, deltaText) =>
+        chat.handleStreamReasoningDelta(requestId, deltaText),
+      handleStreamSummary: (requestId, id, text) =>
+        chat.handleStreamSummary(requestId, id, text),
       handleStreamTextDelta: (requestId, deltaText) =>
         chat.handleStreamTextDelta(requestId, deltaText),
     },

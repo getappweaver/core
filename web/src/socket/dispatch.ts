@@ -157,6 +157,22 @@ export function handleServerMessage(params: {
         return;
       }
 
+      if (chunk.kind === 'reasoning_delta') {
+        adapters.chat.handleStreamReasoningDelta(message.requestId, chunk.text);
+
+        return;
+      }
+
+      if (chunk.kind === 'summary') {
+        adapters.chat.handleStreamSummary(
+          message.requestId,
+          chunk.id,
+          chunk.text,
+        );
+
+        return;
+      }
+
       if (chunk.kind !== 'text_delta') {
         return;
       }

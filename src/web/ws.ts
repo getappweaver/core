@@ -115,24 +115,6 @@ function normalizeIncomingMessage(
   return message.toString('utf8');
 }
 
-function combineStreamedThinkingWithOutput(
-  streamedText: string,
-  output: string,
-): string {
-  const thinking = streamedText.trim();
-  const finalOutput = output.trim();
-
-  if (!thinking || !finalOutput || thinking === finalOutput) {
-    return output;
-  }
-
-  if (thinking.includes(finalOutput) || finalOutput.includes(thinking)) {
-    return output;
-  }
-
-  return `**Thinking:**\n${thinking}\n\n${output}`;
-}
-
 function summarizeInvocation(
   command: string,
   subcommand: string,
@@ -521,7 +503,7 @@ async function handleChat(params: {
   });
 
   let result: { output: string; sessionId: string };
-  let streamedText = '';
+  let streamedReasoning = '';
 
   try {
     result = await runWebChat({
@@ -583,8 +565,46 @@ async function handleChat(params: {
               });
             }
 
-            if (chunk.kind === 'text_delta') {
-              streamedText += chunk.text;
+            if (chunk.kind === 'reasoning_delta') {
+              streamedReasoning += chunk.text;
+
+              insertTimelineEvent(ctx.seenDb, {
+                id: `${message.requestId}-reasoning`,
+                timelineId: message.timelineId,
+                source: 'web',
+                kind: 'reasoning',
+                role: null,
+                command: null,
+                subcommand: null,
+                subcommandTag: null,
+                values: null,
+                form: null,
+                text: streamedReasoning,
+                web: null,
+                clientView: null,
+                prompt: null,
+                requestId: null,
+              });
+            }
+
+            if (chunk.kind === 'summary') {
+              insertTimelineEvent(ctx.seenDb, {
+                id: `${message.requestId}-summary-${chunk.id}`,
+                timelineId: message.timelineId,
+                source: 'web',
+                kind: 'agent_summary',
+                role: null,
+                command: null,
+                subcommand: null,
+                subcommandTag: null,
+                values: null,
+                form: null,
+                text: chunk.text,
+                web: null,
+                clientView: null,
+                prompt: null,
+                requestId: null,
+              });
             }
           }
         : null,
@@ -599,7 +619,7 @@ async function handleChat(params: {
     }
   }
 
-  const output = combineStreamedThinkingWithOutput(streamedText, result.output);
+  const output = result.output;
 
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,

@@ -62,6 +62,8 @@ export type SocketAppAdapters = {
     ChatHook,
     | 'clearRequest'
     | 'handleStreamDiff'
+    | 'handleStreamReasoningDelta'
+    | 'handleStreamSummary'
     | 'handleStreamTextDelta'
     | 'handleStreamTool'
   >;

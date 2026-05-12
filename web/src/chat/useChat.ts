@@ -8,6 +8,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   const STREAM_TEXT_FLUSH_MS = 80;
 
   const chatStreamAssistantByRequestId = new Map<string, string>();
+  const reasoningStreamByRequestId = new Map<string, string>();
   const pendingStreamTextByRequestId = new Map<string, string>();
   const streamFlushTimerByRequestId = new Map<string, number>();
 
@@ -74,16 +75,86 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     streamFlushTimerByRequestId.set(requestId, timer);
   }
 
-  function handleStreamDiff(
-    requestId: string,
-    files: TimelineFileDiff[],
-  ): void {
+  function flushBeforeStructuralChunk(requestId: string): void {
     const timer = streamFlushTimerByRequestId.get(requestId);
 
     if (timer !== undefined) {
       clearTimeout(timer);
       flushStreamTextDelta(requestId);
     }
+  }
+
+  function handleStreamReasoningDelta(
+    requestId: string,
+    deltaText: string,
+  ): void {
+    flushBeforeStructuralChunk(requestId);
+
+    const itemId = `${requestId}-reasoning`;
+
+    reasoningStreamByRequestId.set(
+      requestId,
+      (reasoningStreamByRequestId.get(requestId) ?? '') + deltaText,
+    );
+
+    adapters.setTimeline((prev) => {
+      let found = false;
+
+      const next = prev.map((item) => {
+        if (item.id !== itemId || item.type !== 'reasoning') {
+          return item;
+        }
+
+        found = true;
+
+        return { ...item, text: item.text + deltaText } satisfies TimelineItem;
+      });
+
+      if (found) {
+        return next;
+      }
+
+      return [
+        ...prev,
+        {
+          id: itemId,
+          type: 'reasoning',
+          text: deltaText,
+        } satisfies TimelineItem,
+      ];
+    });
+  }
+
+  function handleStreamSummary(
+    requestId: string,
+    id: string,
+    text: string,
+  ): void {
+    flushBeforeStructuralChunk(requestId);
+
+    adapters.setTimeline((prev) => {
+      const itemId = `${requestId}-summary-${id}`;
+
+      if (prev.some((item) => item.id === itemId)) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: itemId,
+          type: 'agent_summary',
+          text,
+        } satisfies TimelineItem,
+      ];
+    });
+  }
+
+  function handleStreamDiff(
+    requestId: string,
+    files: TimelineFileDiff[],
+  ): void {
+    flushBeforeStructuralChunk(requestId);
 
     adapters.setTimeline((prev) => [
       ...prev,
@@ -141,6 +212,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
     const assistantId = chatStreamAssistantByRequestId.get(requestId);
     chatStreamAssistantByRequestId.delete(requestId);
+    reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
 
     adapters.setTimeline((prev) => {
@@ -178,6 +250,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     }
 
     chatStreamAssistantByRequestId.delete(requestId);
+    reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
   }
 
@@ -251,6 +324,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     clearRequest,
     handleChatResult,
     handleStreamDiff,
+    handleStreamReasoningDelta,
+    handleStreamSummary,
     handleStreamTool,
     handleStreamTextDelta,
     sendChat,

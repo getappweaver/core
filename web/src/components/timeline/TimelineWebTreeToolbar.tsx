@@ -1,5 +1,5 @@
 import type { Accessor, JSX } from 'solid-js';
-import { For, Show, createMemo, createSignal } from 'solid-js';
+import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
 
 import { WebButton } from '../WebButton';
 import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
@@ -7,6 +7,7 @@ import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
 import {
   cardHeadAddIcon,
   cardHeadChecklistIcon,
+  cardHeadCopyIcon,
   cardHeadLogIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
@@ -30,7 +31,13 @@ export function TimelineWebTreeToolbar(
   props: TimelineWebTreeToolbarProps,
 ): JSX.Element {
   const [filterOpen, setFilterOpen] = createSignal(false);
+
+  const [copiedActionLabel, setCopiedActionLabel] = createSignal<string | null>(
+    null,
+  );
+
   let filterInputEl: HTMLInputElement | undefined;
+  let copiedTimer: ReturnType<typeof window.setTimeout> | undefined;
 
   const btnClass = () =>
     [
@@ -51,6 +58,12 @@ export function TimelineWebTreeToolbar(
     }
 
     return reg;
+  });
+
+  onCleanup(() => {
+    if (copiedTimer !== undefined) {
+      window.clearTimeout(copiedTimer);
+    }
   });
 
   /*
@@ -107,19 +120,41 @@ export function TimelineWebTreeToolbar(
             {(item) => (
               <WebButton
                 type="button"
-                class={btnClass()}
+                class={`${btnClass()}${item.icon === 'copy' ? ' chat-copy-btn' : ''}${copiedActionLabel() === item.label ? ' chat-copy-btn--show-text' : ''}`}
                 data-ui={`toolbar-${item.icon ?? 'action'}`}
-                title={item.label}
-                aria-label={item.label}
-                onClick={() => reg.runAction(item.action)}
+                title={
+                  copiedActionLabel() === item.label ? 'Copied' : item.label
+                }
+                aria-label={
+                  copiedActionLabel() === item.label ? 'Copied' : item.label
+                }
+                onClick={() => {
+                  reg.runAction(item.action);
+
+                  if (item.icon === 'copy') {
+                    setCopiedActionLabel(item.label);
+
+                    if (copiedTimer !== undefined) {
+                      window.clearTimeout(copiedTimer);
+                    }
+
+                    copiedTimer = window.setTimeout(() => {
+                      setCopiedActionLabel(null);
+                      copiedTimer = undefined;
+                    }, 1200);
+                  }
+                }}
               >
                 {item.icon === 'add'
                   ? cardHeadAddIcon()
                   : item.icon === 'checklist'
                     ? cardHeadChecklistIcon()
-                    : item.icon === 'log'
-                      ? cardHeadLogIcon()
-                      : item.label}
+                    : item.icon === 'copy'
+                      ? cardHeadCopyIcon()
+                      : item.icon === 'log'
+                        ? cardHeadLogIcon()
+                        : item.label}
+                {copiedActionLabel() === item.label && <span>copied</span>}
               </WebButton>
             )}
           </For>

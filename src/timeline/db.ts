@@ -250,6 +250,26 @@ export function timelineEventToHistoryItem(
             source: event.source,
           }
         : null;
+    case 'reasoning':
+      return event.text
+        ? {
+            id: event.id,
+            type: 'reasoning',
+            text: event.text,
+            createdAt: event.createdAt,
+            source: event.source,
+          }
+        : null;
+    case 'agent_summary':
+      return event.text
+        ? {
+            id: event.id,
+            type: 'agent_summary',
+            text: event.text,
+            createdAt: event.createdAt,
+            source: event.source,
+          }
+        : null;
     case 'diff':
       return event.diff
         ? {

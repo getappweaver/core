@@ -125,7 +125,7 @@ export const WebActionSchema = z.discriminatedUnion('type', [
 
 export const WebToolbarActionSchema = z.object({
   label: z.string().min(1),
-  icon: z.enum(['add', 'checklist', 'log']).optional(),
+  icon: z.enum(['add', 'checklist', 'copy', 'log']).optional(),
   action: WebActionSchema,
 });
 

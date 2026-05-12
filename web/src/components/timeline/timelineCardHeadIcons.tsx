@@ -264,6 +264,27 @@ export function cardHeadChecklistIcon(
   );
 }
 
+export function cardHeadCopyIcon(dims?: CardHeadChromeIconDims): JSX.Element {
+  const { width, height } = resolveDims(dims);
+
+  return (
+    <svg
+      class="chat-copy-btn__icon"
+      fill="currentColor"
+      width={width}
+      height={height}
+      viewBox="0 0 16 16"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M14 12V2H4V0h12v12h-2zM0 4h12v12H0V4zm2 2v8h8V6H2z"
+        fill-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
 export function cardHeadLogIcon(dims?: CardHeadChromeIconDims): JSX.Element {
   const { width, height } = resolveDims(dims);
 

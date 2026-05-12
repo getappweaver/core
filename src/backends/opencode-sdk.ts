@@ -16,12 +16,19 @@ import {
   createOpencodeStreamLogState,
   mapOpencodeSsePayloadToChunk,
   type AgentFileDiff,
+  type AgentStreamChunk,
 } from './agent-stream-chunk';
 import type { ParseModelProps } from './opencode-common';
 import {
   normalizeModelForProvider,
   resolveConfiguredModelFromOpencodeConfig,
 } from './opencode-common';
+import {
+  isOpenCodeSessionCompletionEvent,
+  parseOpenCodeMessage,
+  segmentsToOutputs,
+  unwrapOpenCodeEventRecord,
+} from './opencode-parts';
 import { buildOpenCodeRuntimeContent } from './opencode-runtime-context';
 import {
   createStreamDebugMetrics,
@@ -658,18 +665,9 @@ function coerceDiffFiles(value: unknown): AgentFileDiff[] {
 }
 
 function getPatchPartMessageId(raw: unknown, sessionId: string): string | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
+  const rec = unwrapOpenCodeEventRecord(raw);
 
-  const root = raw as Record<string, unknown>;
-
-  const rec =
-    root.payload && typeof root.payload === 'object'
-      ? (root.payload as Record<string, unknown>)
-      : root;
-
-  if (rec.type !== 'message.part.updated') {
+  if (!rec || rec.type !== 'message.part.updated') {
     return null;
   }
 
@@ -702,36 +700,6 @@ function getPatchPartMessageId(raw: unknown, sessionId: string): string | null {
   return typeof messageId === 'string' && messageId.length > 0
     ? messageId
     : null;
-}
-
-function getEventRecord(raw: unknown): Record<string, unknown> | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-
-  const root = raw as Record<string, unknown>;
-
-  return root.payload && typeof root.payload === 'object'
-    ? (root.payload as Record<string, unknown>)
-    : root;
-}
-
-function isSessionCompletionEvent(raw: unknown, sessionId: string): boolean {
-  const rec = getEventRecord(raw);
-
-  if (!rec) {
-    return false;
-  }
-
-  const properties = rec.properties;
-
-  if (!properties || typeof properties !== 'object') {
-    return false;
-  }
-
-  const p = properties as Record<string, unknown>;
-
-  return rec.type === 'session.idle' && p.sessionID === sessionId;
 }
 
 function latestAssistantMessage(
@@ -781,7 +749,7 @@ function latestAssistantMessage(
 }
 
 function partsFromV2PromptData(data: {
-  parts?: Array<{ type?: string; text?: string; content?: string } | string>;
+  parts?: unknown[];
   output?: string;
   content?: string;
   text?: string;
@@ -791,44 +759,9 @@ function partsFromV2PromptData(data: {
     structured_output?: unknown;
   };
 }): OutputSegment[] {
-  const parts = data.parts ?? [];
-  const outputs: OutputSegment[] = [];
+  const outputs = segmentsToOutputs(parseOpenCodeMessage(data));
 
-  if (parts.length > 0) {
-    for (const p of parts) {
-      const partType =
-        p &&
-        typeof p === 'object' &&
-        typeof (p as { type?: string }).type === 'string'
-          ? (p as { type: string }).type
-          : '';
-
-      const text =
-        p &&
-        typeof p === 'object' &&
-        typeof (p as { text?: string }).text === 'string'
-          ? (p as { text: string }).text
-          : p &&
-              typeof p === 'object' &&
-              typeof (p as { content?: string }).content === 'string'
-            ? (p as { content: string }).content
-            : typeof p === 'string'
-              ? p
-              : '';
-
-      if (text.length === 0) {
-        continue;
-      }
-
-      if (partType === 'reasoning' || partType === 'thinking') {
-        outputs.push({ type: 'reasoning', value: text });
-      } else {
-        outputs.push({ type: 'text', value: text });
-      }
-    }
-  }
-
-  if (outputs.length === 0) {
+  if (outputs.length === 1 && outputs[0].value === '(no output)') {
     const fallback =
       (typeof data.output === 'string' &&
         data.output.length > 0 &&
@@ -843,11 +776,9 @@ function partsFromV2PromptData(data: {
           : JSON.stringify(data.info.structured_output)
         : null);
 
-    if (fallback) {
-      outputs.push({ type: 'text', value: fallback });
-    } else {
-      outputs.push({ type: 'text', value: '(no output)' });
-    }
+    return fallback
+      ? [{ type: 'text', value: fallback }]
+      : [{ type: 'text', value: '(no output)' }];
   }
 
   return outputs;
@@ -898,9 +829,7 @@ function parsePromptSdkResult({
           tokens?: { input: number; output: number };
           structured_output?: unknown;
         };
-        parts?: Array<
-          { type?: string; text?: string; content?: string } | string
-        >;
+        parts?: unknown[];
         output?: string;
         content?: string;
         text?: string;
@@ -1104,6 +1033,24 @@ export function createOpencodeSDKBackend({
         resolveStreamComplete = resolve;
       });
 
+      const emitStreamChunk = (chunk: AgentStreamChunk): void => {
+        if (chunk.kind === 'diff') {
+          diffEmitted = true;
+        }
+
+        if (chunk.kind === 'error') {
+          streamErrorMessage = chunk.message;
+          resolveStreamComplete();
+        }
+
+        recordStreamDebugChunk(
+          streamMetrics,
+          chunk.kind === 'text_delta' ? chunk.text : null,
+        );
+
+        onAgentStreamChunk(chunk);
+      };
+
       const fetchAndEmitDiff = (messageID: string | null, reason: string) => {
         void (async () => {
           debug('opencode-sdk stream: fetching diff', {
@@ -1123,9 +1070,7 @@ export function createOpencodeSDKBackend({
             : coerceDiffFiles(diffResult.data);
 
           if (files.length > 0) {
-            diffEmitted = true;
-            recordStreamDebugChunk(streamMetrics, null);
-            onAgentStreamChunk({ kind: 'diff', files });
+            emitStreamChunk({ kind: 'diff', files });
 
             return;
           }
@@ -1208,30 +1153,18 @@ export function createOpencodeSDKBackend({
               break;
             }
 
-            const chunk = mapOpencodeSsePayloadToChunk(
+            const chunks = mapOpencodeSsePayloadToChunk(
               evt,
               sessionId,
               logState,
             );
 
-            if (chunk) {
-              if (chunk.kind === 'diff') {
-                diffEmitted = true;
+            if (chunks.length > 0) {
+              for (const chunk of chunks) {
+                emitStreamChunk(chunk);
               }
 
-              if (chunk.kind === 'error') {
-                streamErrorMessage = chunk.message;
-                resolveStreamComplete();
-              }
-
-              recordStreamDebugChunk(
-                streamMetrics,
-                chunk.kind === 'text_delta' ? chunk.text : null,
-              );
-
-              onAgentStreamChunk(chunk);
-
-              if (isSessionCompletionEvent(evt, sessionId)) {
+              if (isOpenCodeSessionCompletionEvent(evt, sessionId)) {
                 resolveStreamComplete();
               }
 
@@ -1248,7 +1181,7 @@ export function createOpencodeSDKBackend({
                 patchMessageId,
               });
 
-              fetchAndEmitDiff(null, 'patch-part');
+              fetchAndEmitDiff(patchMessageId, 'patch-part');
             }
           }
         } catch (err) {

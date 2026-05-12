@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.15] - 2026-05-12
+
+- refactor opencode parts parser (c8fe5c8)
+
 ## [v9.9.14] - 2026-05-12
 
-- eslint advice (48419ce)
+- eslint advice (6be541e)
 
 ## [v9.9.13] - 2026-05-12
 
