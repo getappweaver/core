@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.10.1] - 2026-05-13
+
+- fix: improve landing demo playback controls (7061db4)
+
 ## [v9.10.0] - 2026-05-12
 
-- feat: add WebNode scroll on mount support (bb61613)
+- feat: add WebNode scroll on mount support (051a54a)
 
 ## [v9.9.16] - 2026-05-12
 

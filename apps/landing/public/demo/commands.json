@@ -353,13 +353,13 @@
       },
       {
         "name": "workspace",
-        "summary": "Show or set workspace target [parent|bot].",
+        "summary": "Show or set workspace target [parent|appweaver].",
         "usage": "workspace [<target>]",
         "aliases": [],
         "arguments": [
           {
             "name": "target",
-            "summary": "parent or bot",
+            "summary": "parent or appweaver",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -368,7 +368,7 @@
         "options": [],
         "examples": [
           "/bot workspace",
-          "/bot workspace bot"
+          "/bot workspace appweaver"
         ],
         "inferredWeb": {
           "generated": true,
@@ -588,7 +588,7 @@
       },
       {
         "name": "new",
-        "summary": "Create a new roadmap issue. Submission is not wired yet.",
+        "summary": "Create a new roadmap issue from the web client.",
         "usage": "new <repo> <type> <title> <description...> [--relay <relay>]",
         "aliases": [
           "add"
@@ -1676,7 +1676,7 @@
         ],
         "inferredWeb": {
           "generated": true,
-          "executionMode": "runnable_customizable"
+          "executionMode": "requires_input"
         }
       },
       {
@@ -2663,7 +2663,7 @@
   },
   {
     "name": "file",
-    "summary": "Browse the workspace tree, diff and preview files, upload files encrypted for another bot (NIP-17), and download by naddr.",
+    "summary": "Browse the workspace tree, inspect git history, diff and preview files, upload files encrypted for another AppWeaver bot (NIP-17), and download by naddr.",
     "aliases": [],
     "source": "plugin",
     "pluginAlias": "file",
@@ -2676,7 +2676,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name: upload, download, tree, search, view, diff, bottomup, bottomup_context, summarize, or topdown.",
+            "summary": "Optional subcommand name: upload, download, tree, search, view, diff, history, bottomup, bottomup_context, summarize, or topdown.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2691,6 +2691,7 @@
           "/file help search",
           "/file help view",
           "/file help diff",
+          "/file help history",
           "/file help bottomup",
           "/file help bottomup_context",
           "/file help summarize",
@@ -2805,15 +2806,15 @@
       {
         "name": "search",
         "summary": "Search file contents under the workspace with optional extension and folder filters.",
-        "usage": "search <keyword> [--ext <ext>] [--path <path>]",
+        "usage": "search <keyword...> [--ext <ext>] [--path <path>] [--regex]",
         "aliases": [],
         "arguments": [
           {
             "name": "keyword",
-            "summary": "Text or regex pattern to search for.",
+            "summary": "Literal text to search for. Use --regex to treat it as a regex pattern.",
             "kind": "string",
             "required": true,
-            "variadic": false
+            "variadic": true
           }
         ],
         "options": [
@@ -2832,12 +2833,22 @@
             "kind": "string",
             "required": false,
             "shortFlag": null
+          },
+          {
+            "name": "regex",
+            "summary": "Treat keyword as a regular expression instead of literal text.",
+            "flag": "--regex",
+            "kind": "boolean",
+            "required": false,
+            "shortFlag": null
           }
         ],
         "examples": [
           "/file search TODO",
+          "/file search project notes",
           "/file search nostr --ext md,txt",
-          "/file search WebNode --path src --ext ts,tsx"
+          "/file search meeting agenda --path docs",
+          "/file search invoice|receipt --regex"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2888,7 +2899,7 @@
       {
         "name": "diff",
         "summary": "Show a simple git diff preview for one workspace path.",
-        "usage": "diff <path> [--previous-dir <previousDir>] [--timeline]",
+        "usage": "diff <path> [--previous-dir <previousDir>] [--timeline] [--commit <commit>]",
         "aliases": [],
         "arguments": [
           {
@@ -2917,6 +2928,15 @@
             "required": false,
             "shortFlag": null,
             "choices": null
+          },
+          {
+            "name": "commit",
+            "summary": "Commit hash to show as a timeline diff card.",
+            "flag": "--commit",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null,
+            "choices": null
           }
         ],
         "examples": [
@@ -2926,6 +2946,31 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "history",
+        "summary": "Show recent git commits for one workspace path.",
+        "usage": "history [<path>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "File or folder path relative to workspace root. Defaults to workspace root.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file history",
+          "/file history README.md",
+          "/file history src"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
         }
       },
       {
@@ -3769,13 +3814,19 @@
       {
         "name": "duel",
         "summary": "Rank sibling todos by pairwise comparison.",
-        "usage": "duel [<parentId>] [--reset]",
+        "usage": "duel [<parentId>] [<duelArgs...>] [--reset]",
         "aliases": [],
         "arguments": [
           {
             "name": "parentId",
             "summary": "Optional scope root todo ID.",
             "kind": "integer"
+          },
+          {
+            "name": "duelArgs",
+            "summary": "Internal web duel action tokens.",
+            "kind": "string",
+            "variadic": true
           }
         ],
         "options": [

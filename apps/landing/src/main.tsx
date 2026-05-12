@@ -78,6 +78,15 @@ type ShowcaseRailItem =
 
 type ActiveSection = 'hero' | 'demo' | 'rest';
 
+type ShowcasePlayRequest = {
+  storyIndex: number;
+  stepIndex: number;
+};
+
+type RequestShowcaseStoryProps = ShowcasePlayRequest & {
+  deferWhileInspecting: boolean;
+};
+
 const sectionOrder: ActiveSection[] = ['hero', 'demo', 'rest'];
 
 const sectionLabels: Record<ActiveSection, string> = {
@@ -103,6 +112,7 @@ const STAGE_NAV_SLOT_WIDTH_PX = 120;
 
 const DEFAULT_STEP_DELAY_MS = 1800;
 const MIN_SHOWCASE_STEP_DELAY_MS = 2800;
+const RAIL_CLICK_DELAY_MS = 180;
 
 async function loadShowcaseStories(): Promise<ShowcaseStoryEntry[]> {
   const response = await fetch('/demo/stories.json');
@@ -175,6 +185,19 @@ function storyProgressDurationMs(entry: ShowcaseStoryEntry): number {
   return Math.max(stepDurationMs, MIN_SHOWCASE_STEP_DELAY_MS);
 }
 
+function storyProgressElapsedMs(
+  entry: ShowcaseStoryEntry,
+  stepIndex: number,
+): number {
+  return entry.story.steps
+    .slice(0, Math.max(stepIndex, 0))
+    .reduce(
+      (total, step) =>
+        step.type === 'complete' ? total : total + stepDisplayDelayMs(entry, step),
+      0,
+    );
+}
+
 function railKey(item: ShowcaseRailItem): string {
   return item.type === 'story'
     ? `story:${item.storyId}`
@@ -185,6 +208,7 @@ function App() {
   let demoFrameEl: HTMLIFrameElement | undefined;
   let railViewportEl: HTMLDivElement | undefined;
   let storySelectorEl: HTMLDivElement | undefined;
+  let railClickTimer: ReturnType<typeof setTimeout> | undefined;
 
   const [showcaseStories, setShowcaseStories] = createSignal<
     ShowcaseStoryEntry[]
@@ -194,6 +218,8 @@ function App() {
   const [isFrameReady, setIsFrameReady] = createSignal(false);
   const [isAutoplayPaused, setIsAutoplayPaused] = createSignal(false);
   const [isRailInspecting, setIsRailInspecting] = createSignal(false);
+  const [pendingPlayRequest, setPendingPlayRequest] =
+    createSignal<ShowcasePlayRequest | null>(null);
   const [playRequest, setPlayRequest] = createSignal({
     storyIndex: 0,
     stepIndex: 0,
@@ -340,6 +366,19 @@ function App() {
     return story ? storyProgressDurationMs(story) : MIN_SHOWCASE_STEP_DELAY_MS;
   });
 
+  const activeStoryProgressElapsedMs = createMemo(() => {
+    const story = activeShowcaseStory();
+    const step = activeShowcaseStep();
+
+    if (!story || !step || step.storyId !== story.story.id) {
+      return 0;
+    }
+
+    return step.complete
+      ? storyProgressDurationMs(story)
+      : storyProgressElapsedMs(story, step.stepIndex);
+  });
+
   const activeRailRollOffsetPx = createMemo(() =>
     Math.max(activeRailIndex(), 0) * 188,
   );
@@ -366,7 +405,6 @@ function App() {
       return;
     }
 
-    setActiveShowcaseStep(null);
     demoFrameEl?.contentWindow?.postMessage(
       {
         type: 'demo.play_story',
@@ -377,8 +415,19 @@ function App() {
     );
   }
 
-  function requestShowcaseStory(storyIndex: number, stepIndex: number): void {
+  function requestShowcaseStory({
+    storyIndex,
+    stepIndex,
+    deferWhileInspecting,
+  }: RequestShowcaseStoryProps): void {
     setActiveShowcaseIndex(storyIndex);
+
+    if (deferWhileInspecting && isRailInspecting()) {
+      setPendingPlayRequest({ storyIndex, stepIndex });
+
+      return;
+    }
+
     setPlayRequest((request) => ({
       storyIndex,
       stepIndex,
@@ -398,6 +447,54 @@ function App() {
       },
       window.location.origin,
     );
+  }
+
+  function setRailInspecting(inspecting: boolean): void {
+    setIsRailInspecting(inspecting);
+
+    if (inspecting) {
+      return;
+    }
+
+    const request = pendingPlayRequest();
+
+    if (!request) {
+      return;
+    }
+
+    setPendingPlayRequest(null);
+    requestShowcaseStory({
+      storyIndex: request.storyIndex,
+      stepIndex: request.stepIndex,
+      deferWhileInspecting: false,
+    });
+  }
+
+  function clearRailClickTimer(): void {
+    if (!railClickTimer) {
+      return;
+    }
+
+    clearTimeout(railClickTimer);
+    railClickTimer = undefined;
+  }
+
+  function focusRailItem(item: ShowcaseRailItem): void {
+    setActiveShowcaseIndex(item.storyIndex);
+    setActiveShowcaseStep({
+      storyId: item.storyId,
+      stepIndex: item.type === 'step' ? item.stepIndex : 0,
+      title: item.title,
+      description: item.description,
+    });
+  }
+
+  function requestRailItemPlayback(item: ShowcaseRailItem): void {
+    requestShowcaseStory({
+      storyIndex: item.storyIndex,
+      stepIndex: item.type === 'step' ? item.stepIndex : 0,
+      deferWhileInspecting: true,
+    });
   }
 
   function postLandingChromeWideToDemoFrame(): void {
@@ -429,16 +526,47 @@ function App() {
   }
 
   function jumpToRailItem(item: ShowcaseRailItem): void {
+    const isCurrentItem = railKey(item) === activeRailKey();
+
+    focusRailItem(item);
+
+    if (isCurrentItem) {
+      setPendingPlayRequest(null);
+      setIsAutoplayPaused((value) => !value);
+
+      return;
+    }
+
     setIsAutoplayPaused(false);
-    requestShowcaseStory(
-      item.storyIndex,
-      item.type === 'step' ? item.stepIndex : 0,
-    );
+    requestRailItemPlayback(item);
+  }
+
+  function restartRailItem(item: ShowcaseRailItem): void {
+    setIsAutoplayPaused(false);
+    focusRailItem(item);
+    requestRailItemPlayback(item);
+  }
+
+  function scheduleRailItemClick(item: ShowcaseRailItem): void {
+    clearRailClickTimer();
+    railClickTimer = setTimeout(() => {
+      railClickTimer = undefined;
+      jumpToRailItem(item);
+    }, RAIL_CLICK_DELAY_MS);
+  }
+
+  function handleRailItemDoubleClick(item: ShowcaseRailItem): void {
+    clearRailClickTimer();
+    restartRailItem(item);
   }
 
   function selectShowcaseStory(storyIndex: number): void {
     setIsAutoplayPaused(false);
-    requestShowcaseStory(storyIndex, 0);
+    requestShowcaseStory({
+      storyIndex,
+      stepIndex: 0,
+      deferWhileInspecting: false,
+    });
   }
 
   onMount(async () => {
@@ -498,6 +626,7 @@ function App() {
 
     window.addEventListener('message', handleDemoMessage);
     onCleanup(() => window.removeEventListener('message', handleDemoMessage));
+    onCleanup(clearRailClickTimer);
   });
 
   createEffect(() => {
@@ -541,6 +670,20 @@ function App() {
       behavior: 'smooth',
       block: 'nearest',
       inline: 'center',
+    });
+  });
+
+  createEffect(() => {
+    const top = activeRailRollOffsetPx();
+    const inspecting = isRailInspecting();
+
+    if (!railViewportEl || inspecting) {
+      return;
+    }
+
+    railViewportEl.scrollTo({
+      top,
+      behavior: 'smooth',
     });
   });
 
@@ -684,6 +827,7 @@ function App() {
                               class="story-selector-progress"
                               style={{
                                 animation: `showcase-rail-progress ${activeStoryProgressDurationMs()}ms linear both`,
+                                'animation-delay': `-${activeStoryProgressElapsedMs()}ms`,
                                 'animation-play-state': isPlaybackPaused()
                                   ? 'paused'
                                   : 'running',
@@ -726,18 +870,13 @@ function App() {
                 </Show>
                 <div
                   ref={railViewportEl}
-                  onMouseEnter={() => setIsRailInspecting(true)}
-                  onMouseLeave={() => setIsRailInspecting(false)}
-                  onFocusIn={() => setIsRailInspecting(true)}
-                  onFocusOut={() => setIsRailInspecting(false)}
+                  onMouseEnter={() => setRailInspecting(true)}
+                  onMouseLeave={() => setRailInspecting(false)}
+                  onFocusIn={() => setRailInspecting(true)}
+                  onFocusOut={() => setRailInspecting(false)}
                   class="showcase-rail"
                 >
-                  <div
-                    class="showcase-rail-list"
-                    style={{
-                      transform: `translateY(-${activeRailRollOffsetPx()}px)`,
-                    }}
-                  >
+                  <div class="showcase-rail-list">
                     <For each={showcaseRailItems()}>
                       {(item, index) => {
                         const key = railKey(item);
@@ -750,8 +889,17 @@ function App() {
                         return (
                           <button
                             type="button"
-                            onClick={() => jumpToRailItem(item)}
+                            onClick={() => scheduleRailItemClick(item)}
+                            onDblClick={() => handleRailItemDoubleClick(item)}
                             class="showcase-rail-item"
+                            classList={{
+                              'is-current': isActive(),
+                              'is-manually-paused':
+                                isActive() && isAutoplayPaused(),
+                              'is-playback-paused':
+                                isActive() && isPlaybackPaused(),
+                            }}
+                            title="Click to pause or resume the current step. Double-click to restart this step."
                           >
                             <Show when={isActive()}>
                               <div
@@ -833,7 +981,7 @@ function App() {
                           <path d="M8 5v14l11-7z" fill="currentColor" />
                         </svg>
                       </Show>
-                      <span>{isAutoplayPaused() ? 'Paused' : 'Playing'}</span>
+                      <span>{isPlaybackPaused() ? 'Paused' : 'Playing'}</span>
                     </button>
                   </div>
                   <div class="demo-frame-shell">
