@@ -240,7 +240,9 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 
 ## After editing AppWeaver code
 
-- Use judgment when deciding whether to run verification. Run `bun run lint` after substantive code changes, TypeScript changes, broad refactors, or changes likely to affect formatting/types. For small, simple edits such as docs text, comments, or a narrow CSS variable/value change, lint is optional and can be skipped.
+- Use judgment when deciding whether to run verification. For additive or narrow changes, prefer targeted ESLint with fix enabled on the files you touched (for example `bunx eslint --fix path/to/file.ts path/to/other.ts`) instead of repo-wide `bun run lint`. Do not use `bun run lint path/to/file.ts` for targeted linting because the package script still includes `.` and will lint the whole repo. The codebase is large, and while rapid development cycle, we may lose time on linting unrelated files over and over again.
+- Run repo-wide `bun run lint` when the change is a broad refactor, changes shared types or conventions, affects formatting across many files, or is otherwise likely to surface project-wide issues.
+- For small, simple edits such as docs text, comments, or a narrow CSS variable/value change, lint is optional and can be skipped.
 - If the implementation changed any file under `src/` or `plugins/`, create/touch **`restart.requested`** in the project root after lint/verification passes and the change is ready for the user to test. This is the deliberate bot reload signal for `bun run watch`; do not expect restarts on every save.
 
 ## Codebase vs agent workspace
