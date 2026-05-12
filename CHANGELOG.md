@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.9.13] - 2026-05-12
+
+- added dhalsim to nip05 and lud16 (0b3cfb0)
+
 ## [v9.9.12] - 2026-05-12
 
-- fix: improve opencode stream patch handling (9e9a3e8)
+- fix: improve opencode stream patch handling (2a4ef0b)
 
 ## [v9.9.11] - 2026-05-12
 

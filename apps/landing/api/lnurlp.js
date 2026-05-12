@@ -15,6 +15,20 @@ const ADDRESSES = Object.freeze({
     nostrPubkey:
       '8fe53b37518e3dbe9bab26d912292001d8b882de9456b7b08b615f912dc8bf4a',
   }),
+  dhalsim: Object.freeze({
+    callback: 'https://blink.sv/lnurlp/dhalsim/callback',
+    minSendable: 1000,
+    maxSendable: 100000000000,
+    metadata: JSON.stringify([
+      ['text/plain', 'Payment to dhalsim@getappweaver.com'],
+      ['text/identifier', 'dhalsim@getappweaver.com'],
+    ]),
+    commentAllowed: 280,
+    tag: 'payRequest',
+    allowsNostr: true,
+    nostrPubkey:
+      '8fe53b37518e3dbe9bab26d912292001d8b882de9456b7b08b615f912dc8bf4a',
+  }),
 });
 
 const CORS_HEADERS = Object.freeze({

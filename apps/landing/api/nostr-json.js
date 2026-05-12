@@ -2,6 +2,7 @@ import { URL } from 'node:url';
 
 const NAMES = Object.freeze({
   _: '721e69c3f3f4e094a90ac00c3a4900c36271ee63aeebe67fbeedc112c31fb298',
+  "dhalsim": "6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8"
 });
 
 const CORS_HEADERS = Object.freeze({
