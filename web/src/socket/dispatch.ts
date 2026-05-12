@@ -146,7 +146,7 @@ export function handleServerMessage(params: {
       }
 
       if (chunk.kind === 'diff') {
-        adapters.chat.handleStreamDiff(chunk.files);
+        adapters.chat.handleStreamDiff(message.requestId, chunk.files);
 
         return;
       }

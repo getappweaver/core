@@ -2,7 +2,7 @@
 // backends/agent-stream-chunk.ts — Normalized streaming chunks (web + SDK)
 // ---------------------------------------------------------------------------
 
-import { log } from '../logger';
+import { debug, log } from '../logger';
 
 export type AgentFileDiff = {
   file: string;
@@ -34,7 +34,13 @@ export type AgentStreamChunk =
 export type OpencodeStreamLogState = {
   sessionId: string;
   warnOnceTypes: Set<string>;
+  assistantMessageIds: Set<string>;
+  partTextLengths: Map<string, number>;
+  emittedTextDeltas: Set<string>;
 };
+
+const DIFF_CONTEXT_LINES = 3;
+const MAX_COMPACT_DIFF_LINES = 360;
 
 export function createOpencodeStreamLogState(
   sessionId: string,
@@ -42,6 +48,9 @@ export function createOpencodeStreamLogState(
   return {
     sessionId,
     warnOnceTypes: new Set(),
+    assistantMessageIds: new Set(),
+    partTextLengths: new Map(),
+    emittedTextDeltas: new Set(),
   };
 }
 
@@ -53,6 +62,7 @@ export function createOpencodeStreamLogState(
 const SILENT_STREAM_EVENT_TYPES = new Set<string>([
   'server.connected',
   'server.heartbeat',
+  'sync',
 ]);
 
 function previewPayload(value: unknown, maxLen: number): string {
@@ -83,6 +93,26 @@ function logUnknownOnce(
   );
 }
 
+function logIgnoredOnce(
+  logState: OpencodeStreamLogState,
+  eventType: string,
+  reason: string,
+  payload: unknown,
+): void {
+  const key = `${logState.sessionId}:ignored:${eventType}:${reason}`;
+
+  if (logState.warnOnceTypes.has(key)) {
+    return;
+  }
+
+  logState.warnOnceTypes.add(key);
+
+  debug(
+    `opencode-sdk stream: ignored event "${eventType}" (${reason}) for session ${logState.sessionId}`,
+    previewPayload(payload, 240),
+  );
+}
+
 function extractSessionErrorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'data' in error) {
     const data = (error as { data?: { message?: string } }).data;
@@ -95,7 +125,146 @@ function extractSessionErrorMessage(error: unknown): string {
   return 'Session error';
 }
 
-function coerceFileDiff(value: unknown): AgentFileDiff | null {
+function isDiffChangedLine(line: string): boolean {
+  return (
+    (line.startsWith('+') && !line.startsWith('+++')) ||
+    (line.startsWith('-') && !line.startsWith('---'))
+  );
+}
+
+type DiffLinePosition = {
+  oldLine: number;
+  newLine: number;
+} | null;
+
+function parseHunkStart(line: string): DiffLinePosition {
+  const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    oldLine: Number(match[1]),
+    newLine: Number(match[2]),
+  };
+}
+
+function diffLinePositions(lines: string[]): DiffLinePosition[] {
+  const positions: DiffLinePosition[] = [];
+  let oldLine: number | null = null;
+  let newLine: number | null = null;
+
+  for (const line of lines) {
+    const hunkStart = parseHunkStart(line);
+
+    if (hunkStart) {
+      oldLine = hunkStart.oldLine;
+      newLine = hunkStart.newLine;
+      positions.push(null);
+      continue;
+    }
+
+    if (oldLine === null || newLine === null) {
+      positions.push(null);
+      continue;
+    }
+
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      positions.push({ oldLine, newLine });
+      newLine += 1;
+      continue;
+    }
+
+    if (line.startsWith('-') && !line.startsWith('---')) {
+      positions.push({ oldLine, newLine });
+      oldLine += 1;
+      continue;
+    }
+
+    positions.push({ oldLine, newLine });
+    oldLine += 1;
+    newLine += 1;
+  }
+
+  return positions;
+}
+
+function compactPatchAroundChanges(patch: string): string {
+  const lines = patch.split('\n');
+  const positions = diffLinePositions(lines);
+  const keep = new Set<number>();
+  let hasChangedLine = false;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? '';
+
+    if (
+      line.startsWith('diff --git ') ||
+      line.startsWith('index ') ||
+      line.startsWith('--- ') ||
+      line.startsWith('+++ ')
+    ) {
+      keep.add(i);
+      continue;
+    }
+
+    if (line.startsWith('@@')) {
+      keep.add(i);
+    }
+
+    if (!isDiffChangedLine(line)) {
+      continue;
+    }
+
+    hasChangedLine = true;
+
+    for (
+      let j = Math.max(0, i - DIFF_CONTEXT_LINES);
+      j <= Math.min(lines.length - 1, i + DIFF_CONTEXT_LINES);
+      j += 1
+    ) {
+      keep.add(j);
+    }
+
+    for (let j = i; j >= 0; j -= 1) {
+      if (lines[j]?.startsWith('@@')) {
+        keep.add(j);
+        break;
+      }
+    }
+  }
+
+  if (!hasChangedLine) {
+    return lines.length <= MAX_COMPACT_DIFF_LINES
+      ? patch
+      : lines.slice(0, MAX_COMPACT_DIFF_LINES).join('\n');
+  }
+
+  const compacted: string[] = [];
+  let previousKept = -1;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!keep.has(i)) {
+      continue;
+    }
+
+    if (previousKept >= 0 && i > previousKept + 1) {
+      const position = positions[i];
+
+      compacted.push(
+        position ? `⋮ @@ -${position.oldLine} +${position.newLine} @@` : '⋮',
+      );
+    }
+
+    compacted.push(lines[i] ?? '');
+    previousKept = i;
+  }
+
+  return compacted.join('\n');
+}
+
+export function coerceFileDiff(value: unknown): AgentFileDiff | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
@@ -115,7 +284,7 @@ function coerceFileDiff(value: unknown): AgentFileDiff | null {
 
   return {
     file: rec.file,
-    patch: rec.patch,
+    patch: compactPatchAroundChanges(rec.patch),
     additions: typeof rec.additions === 'number' ? rec.additions : 0,
     deletions: typeof rec.deletions === 'number' ? rec.deletions : 0,
     status,
@@ -212,6 +381,62 @@ function getPartType(properties: Record<string, unknown>): string {
   return '';
 }
 
+function rememberAssistantMessage(
+  properties: Record<string, unknown>,
+  logState: OpencodeStreamLogState,
+): void {
+  const info = properties.info;
+
+  if (!info || typeof info !== 'object') {
+    return;
+  }
+
+  const message = info as Record<string, unknown>;
+
+  if (message.role !== 'assistant' || typeof message.id !== 'string') {
+    return;
+  }
+
+  logState.assistantMessageIds.add(message.id);
+}
+
+function textDeltaFromUpdatedPart(
+  part: Record<string, unknown>,
+  logState: OpencodeStreamLogState,
+): string | null {
+  const partId = typeof part.id === 'string' ? part.id : null;
+  const messageId = typeof part.messageID === 'string' ? part.messageID : null;
+  const text = typeof part.text === 'string' ? part.text : null;
+
+  if (!partId || !messageId || text === null) {
+    return null;
+  }
+
+  if (!logState.assistantMessageIds.has(messageId)) {
+    return null;
+  }
+
+  const previousLength = logState.partTextLengths.get(partId) ?? 0;
+
+  if (text.length <= previousLength) {
+    return null;
+  }
+
+  logState.partTextLengths.set(partId, text.length);
+
+  const delta = text.slice(previousLength);
+  const partType = typeof part.type === 'string' ? part.type : 'text';
+  const emittedKey = `${messageId}:${partType}:${delta}`;
+
+  if (logState.emittedTextDeltas.has(emittedKey)) {
+    return null;
+  }
+
+  logState.emittedTextDeltas.add(emittedKey);
+
+  return delta;
+}
+
 /**
  * Map a single OpenCode `/event` SSE payload (SDK `Event` union shape) to a
  * normalized chunk, or `null` when the event should not be forwarded.
@@ -227,7 +452,13 @@ export function mapOpencodeSsePayloadToChunk(
     return null;
   }
 
-  const rec = raw as Record<string, unknown>;
+  const root = raw as Record<string, unknown>;
+
+  const rec =
+    root.payload && typeof root.payload === 'object'
+      ? (root.payload as Record<string, unknown>)
+      : root;
+
   const eventType = typeof rec.type === 'string' ? rec.type : '';
   const properties = rec.properties;
 
@@ -238,6 +469,8 @@ export function mapOpencodeSsePayloadToChunk(
   }
 
   if (SILENT_STREAM_EVENT_TYPES.has(eventType)) {
+    logIgnoredOnce(logState, eventType, 'silent transport event', raw);
+
     return null;
   }
 
@@ -251,6 +484,8 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
@@ -263,6 +498,17 @@ export function mapOpencodeSsePayloadToChunk(
     if (field === 'text') {
       return { kind: 'text_delta', text: p.delta };
     }
+
+    if (field === 'reasoning' || field === 'thinking') {
+      return { kind: 'text_delta', text: p.delta };
+    }
+
+    logIgnoredOnce(
+      logState,
+      eventType,
+      `unsupported delta field ${field}`,
+      raw,
+    );
 
     return null;
   }
@@ -277,6 +523,8 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
@@ -294,6 +542,8 @@ export function mapOpencodeSsePayloadToChunk(
       };
     }
 
+    logIgnoredOnce(logState, eventType, 'non-busy session status', raw);
+
     return null;
   }
 
@@ -307,6 +557,8 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
@@ -323,10 +575,23 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (!isMatchingSession(p, sessionId)) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
     const partType = getPartType(p);
+
+    const part =
+      p.part && typeof p.part === 'object'
+        ? (p.part as Record<string, unknown>)
+        : null;
+
+    if (part && (partType === 'text' || partType === 'reasoning')) {
+      const delta = textDeltaFromUpdatedPart(part, logState);
+
+      return delta ? { kind: 'text_delta', text: delta } : null;
+    }
 
     if (partType === 'tool') {
       const tool = coerceToolCall(p.part);
@@ -336,6 +601,13 @@ export function mapOpencodeSsePayloadToChunk(
 
         return null;
       }
+
+      debug('opencode-sdk stream: tool update', {
+        sessionId,
+        tool: tool.tool,
+        status: tool.status,
+        callId: tool.callId,
+      });
 
       return { kind: 'tool', tool };
     }
@@ -347,6 +619,13 @@ export function mapOpencodeSsePayloadToChunk(
     ) {
       return { kind: 'status', phase: 'completed', message: null };
     }
+
+    logIgnoredOnce(
+      logState,
+      eventType,
+      `unsupported part type ${partType}`,
+      raw,
+    );
 
     return null;
   }
@@ -361,6 +640,8 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
@@ -379,6 +660,8 @@ export function mapOpencodeSsePayloadToChunk(
     const p = properties as Record<string, unknown>;
 
     if (typeof p.sessionID !== 'string' || p.sessionID !== sessionId) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
       return null;
     }
 
@@ -392,7 +675,34 @@ export function mapOpencodeSsePayloadToChunk(
       .map(coerceFileDiff)
       .filter((file): file is AgentFileDiff => file !== null);
 
+    debug('opencode-sdk stream: session.diff', {
+      sessionId,
+      rawFiles: p.diff.length,
+      files: files.length,
+    });
+
     return files.length > 0 ? { kind: 'diff', files } : null;
+  }
+
+  if (eventType === 'message.updated') {
+    if (!properties || typeof properties !== 'object') {
+      logUnknownOnce(logState, eventType, raw);
+
+      return null;
+    }
+
+    const p = properties as Record<string, unknown>;
+
+    if (!isMatchingSession(p, sessionId)) {
+      logIgnoredOnce(logState, eventType, 'different session', raw);
+
+      return null;
+    }
+
+    rememberAssistantMessage(p, logState);
+    logIgnoredOnce(logState, eventType, 'message metadata update', raw);
+
+    return null;
   }
 
   const ignoredPrefixes = [
@@ -412,10 +722,13 @@ export function mapOpencodeSsePayloadToChunk(
     'question.',
     'permission.',
     'command.',
+    'session.next.',
   ];
 
   for (const prefix of ignoredPrefixes) {
     if (eventType.startsWith(prefix)) {
+      logIgnoredOnce(logState, eventType, `ignored prefix ${prefix}`, raw);
+
       return null;
     }
   }
@@ -439,6 +752,13 @@ export function mapOpencodeSsePayloadToChunk(
     ) {
       return null;
     }
+
+    logIgnoredOnce(
+      logState,
+      eventType,
+      'session-scoped event without stream chunk',
+      raw,
+    );
 
     return null;
   }

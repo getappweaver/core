@@ -17,21 +17,21 @@ Spaced repetition flashcard plugin. Users manage vocabulary study sets and pract
 
 | Command                        | Description               |
 | ------------------------------ | ------------------------- |
-| `!study create <name>`         | Create new study set      |
-| `!study list`                  | List all study sets       |
-| `!study set <id>`              | Switch active set         |
-| `!study add <source> <target>` | Add vocab to active set   |
-| `!study remove <id>`           | Remove vocab entry        |
-| `!study due`                   | Show items due for review |
-| `!study quiz`                  | Start quiz session        |
-| `!study stats`                 | Show learning statistics  |
-| `!study import <json>`         | Import study set (JSON)   |
-| `!study export`                | Export active set as JSON |
+| `<prefix>study create <name>`         | Create new study set      |
+| `<prefix>study list`                  | List all study sets       |
+| `<prefix>study set <id>`              | Switch active set         |
+| `<prefix>study add <source> <target>` | Add vocab to active set   |
+| `<prefix>study remove <id>`           | Remove vocab entry        |
+| `<prefix>study due`                   | Show items due for review |
+| `<prefix>study quiz`                  | Start quiz session        |
+| `<prefix>study stats`                 | Show learning statistics  |
+| `<prefix>study import <json>`         | Import study set (JSON)   |
+| `<prefix>study export`                | Export active set as JSON |
 
 ## Quiz Flow
 
 ```
-User: !study quiz
+User: /study quiz
 Bot:  [1] apple = ???
 User:  apple
 Bot:  ✓ Correct! Next: [2] dog = ???
@@ -171,7 +171,7 @@ export const studyPlugin: Plugin = {
 export default studyPlugin;
 ```
 
-- `PluginContext.registerCommand` registers a command with the bot; the bot later dispatches `!study ...` to the matching handler.
+- `PluginContext.registerCommand` registers a command with the bot; the bot later dispatches `<prefix>study ...` to the matching handler.
 - Handlers receive `CommandContext` (e.g. `userId`, `args`, `raw`) and return `CommandResult` (`type: 'text' | 'error'`, `content`).
 - Storage is obtained via `getCapability('storage')` and used in `commands/study.ts` and `commands/quiz.ts` for user state (see Data Model).
 

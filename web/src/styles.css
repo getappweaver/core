@@ -1019,18 +1019,6 @@ pre {
   padding: 0;
 }
 
-.chat-copy-btn {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.3rem;
-}
-
-.chat-copy-btn__icon {
-  display: block;
-  height: 0.78rem;
-  width: 0.78rem;
-}
-
 .card-head-speech-btn--manual {
   background: var(--color-accent);
   color: #000;
@@ -1422,6 +1410,33 @@ pre {
 .card-head-chrome-icon {
   display: block;
   flex-shrink: 0;
+}
+
+.chat-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  min-width: var(--card-head-chrome-hit, 1.125rem);
+  min-height: var(--card-head-chrome-hit, 1.125rem);
+  width: var(--card-head-chrome-hit, 1.125rem);
+  height: var(--card-head-chrome-hit, 1.125rem);
+  line-height: 0;
+}
+
+.chat-copy-btn.chat-copy-btn--show-text {
+  width: auto;
+  padding: 0 0.4em;
+  gap: 0.3rem;
+  line-height: normal;
+}
+
+.chat-copy-btn__icon {
+  display: block;
+  flex-shrink: 0;
+  height: 0.78rem;
+  width: 0.78rem;
 }
 
 .card-head--collapsed {

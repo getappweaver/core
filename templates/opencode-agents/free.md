@@ -3,7 +3,6 @@ description: Quick read-only analysis with a fast, cheap model. No file edits or
 mode: primary
 model: opencode/big-pickle
 color: info
-steps: 5
 permission:
   read: allow
   grep: allow

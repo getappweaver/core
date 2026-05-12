@@ -12,8 +12,10 @@ import { debug, log } from '../logger';
 import type { ProviderName } from '../providers/types';
 
 import {
+  coerceFileDiff,
   createOpencodeStreamLogState,
   mapOpencodeSsePayloadToChunk,
+  type AgentFileDiff,
 } from './agent-stream-chunk';
 import type { ParseModelProps } from './opencode-common';
 import {
@@ -618,6 +620,166 @@ type ParsePromptSdkResultProps = {
   effectiveModel: string;
 };
 
+type PromptSdkResult = ParsePromptSdkResultProps['result'];
+
+function unwrapPromptData(
+  result: PromptSdkResult,
+): Record<string, unknown> | null {
+  const rawData = result.data as Record<string, unknown> | undefined;
+
+  if (!rawData) {
+    return null;
+  }
+
+  return rawData && typeof rawData.data === 'object' && rawData.data !== null
+    ? (rawData.data as Record<string, unknown>)
+    : rawData;
+}
+
+function getPromptUserMessageId(result: PromptSdkResult): string | null {
+  const data = unwrapPromptData(result);
+  const info = data?.info;
+
+  if (!info || typeof info !== 'object') {
+    return null;
+  }
+
+  const parentID = (info as { parentID?: unknown }).parentID;
+
+  return typeof parentID === 'string' && parentID.length > 0 ? parentID : null;
+}
+
+function coerceDiffFiles(value: unknown): AgentFileDiff[] {
+  return Array.isArray(value)
+    ? value
+        .map(coerceFileDiff)
+        .filter((file): file is AgentFileDiff => file !== null)
+    : [];
+}
+
+function getPatchPartMessageId(raw: unknown, sessionId: string): string | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const root = raw as Record<string, unknown>;
+
+  const rec =
+    root.payload && typeof root.payload === 'object'
+      ? (root.payload as Record<string, unknown>)
+      : root;
+
+  if (rec.type !== 'message.part.updated') {
+    return null;
+  }
+
+  const properties = rec.properties;
+
+  if (!properties || typeof properties !== 'object') {
+    return null;
+  }
+
+  const p = properties as Record<string, unknown>;
+
+  if (p.sessionID !== sessionId) {
+    return null;
+  }
+
+  const part = p.part;
+
+  if (!part || typeof part !== 'object') {
+    return null;
+  }
+
+  const patchPart = part as Record<string, unknown>;
+
+  if (patchPart.type !== 'patch') {
+    return null;
+  }
+
+  const messageId = patchPart.messageID;
+
+  return typeof messageId === 'string' && messageId.length > 0
+    ? messageId
+    : null;
+}
+
+function getEventRecord(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const root = raw as Record<string, unknown>;
+
+  return root.payload && typeof root.payload === 'object'
+    ? (root.payload as Record<string, unknown>)
+    : root;
+}
+
+function isSessionCompletionEvent(raw: unknown, sessionId: string): boolean {
+  const rec = getEventRecord(raw);
+
+  if (!rec) {
+    return false;
+  }
+
+  const properties = rec.properties;
+
+  if (!properties || typeof properties !== 'object') {
+    return false;
+  }
+
+  const p = properties as Record<string, unknown>;
+
+  return rec.type === 'session.idle' && p.sessionID === sessionId;
+}
+
+function latestAssistantMessage(
+  value: unknown,
+): Record<string, unknown> | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  let latest: Record<string, unknown> | null = null;
+  let latestCreated = -1;
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const rec = item as Record<string, unknown>;
+    const info = rec.info;
+
+    if (!info || typeof info !== 'object') {
+      continue;
+    }
+
+    const message = info as Record<string, unknown>;
+
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    const time = message.time;
+
+    const created =
+      time && typeof time === 'object'
+        ? (time as { created?: unknown }).created
+        : null;
+
+    const createdNumber = typeof created === 'number' ? created : 0;
+
+    if (createdNumber >= latestCreated) {
+      latest = rec;
+      latestCreated = createdNumber;
+    }
+  }
+
+  return latest;
+}
+
 function partsFromV2PromptData(data: {
   parts?: Array<{ type?: string; text?: string; content?: string } | string>;
   output?: string;
@@ -729,13 +891,7 @@ function parsePromptSdkResult({
     } satisfies AgentErrorResult;
   }
 
-  const rawData = result.data as Record<string, unknown> | undefined;
-
-  const data = (
-    rawData && typeof rawData.data === 'object' && rawData.data !== null
-      ? (rawData.data as Record<string, unknown>)
-      : rawData
-  ) as
+  const data = unwrapPromptData(result) as
     | {
         info?: {
           cost?: number;
@@ -939,16 +1095,65 @@ export function createOpencodeSDKBackend({
 
       const logState = createOpencodeStreamLogState(sessionId);
       const streamMetrics = createStreamDebugMetrics('opencode', sessionId);
+      let diffEmitted = false;
+      const patchDiffMessageIds = new Set<string>();
+      let streamErrorMessage: string | null = null;
+      let resolveStreamComplete: () => void = () => {};
 
-      const sse = await client.event.subscribe({
-        directory: cwd,
+      const streamComplete = new Promise<void>((resolve) => {
+        resolveStreamComplete = resolve;
       });
+
+      const fetchAndEmitDiff = (messageID: string | null, reason: string) => {
+        void (async () => {
+          debug('opencode-sdk stream: fetching diff', {
+            sessionId,
+            messageID,
+            reason,
+          });
+
+          const diffResult = await client.session.diff({
+            sessionID: sessionId,
+            directory: cwd,
+            messageID: messageID ?? undefined,
+          });
+
+          const files = diffResult.error
+            ? []
+            : coerceDiffFiles(diffResult.data);
+
+          if (files.length > 0) {
+            diffEmitted = true;
+            recordStreamDebugChunk(streamMetrics, null);
+            onAgentStreamChunk({ kind: 'diff', files });
+
+            return;
+          }
+
+          debug('opencode-sdk stream: diff fetch returned no files', {
+            sessionId,
+            messageID,
+            reason,
+            error: diffResult.error,
+          });
+        })().catch((err) => {
+          debug('opencode-sdk stream: diff fetch failed', {
+            sessionId,
+            messageID,
+            reason,
+            error: String(err),
+          });
+        });
+      };
+
+      const sse = await client.global.event();
 
       const stream = sse.stream;
       let stopConsumer = false;
 
       const onExternalAbort = (): void => {
         stopConsumer = true;
+        resolveStreamComplete();
 
         void client.session
           .abort({
@@ -974,6 +1179,28 @@ export function createOpencodeSDKBackend({
         once: true,
       });
 
+      const pollUntilSessionIdle = async (): Promise<void> => {
+        while (!stopConsumer && !streamAbortSignal.aborted) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          const statusResult = await client.session.status({ directory: cwd });
+
+          if (statusResult.error || !statusResult.data) {
+            continue;
+          }
+
+          const status = (
+            statusResult.data as Record<string, { type?: string }>
+          )[sessionId];
+
+          if (status?.type === 'idle') {
+            resolveStreamComplete();
+
+            return;
+          }
+        }
+      };
+
       const pump = async (): Promise<void> => {
         try {
           for await (const evt of stream) {
@@ -988,12 +1215,40 @@ export function createOpencodeSDKBackend({
             );
 
             if (chunk) {
+              if (chunk.kind === 'diff') {
+                diffEmitted = true;
+              }
+
+              if (chunk.kind === 'error') {
+                streamErrorMessage = chunk.message;
+                resolveStreamComplete();
+              }
+
               recordStreamDebugChunk(
                 streamMetrics,
                 chunk.kind === 'text_delta' ? chunk.text : null,
               );
 
               onAgentStreamChunk(chunk);
+
+              if (isSessionCompletionEvent(evt, sessionId)) {
+                resolveStreamComplete();
+              }
+
+              continue;
+            }
+
+            const patchMessageId = getPatchPartMessageId(evt, sessionId);
+
+            if (patchMessageId && !patchDiffMessageIds.has(patchMessageId)) {
+              patchDiffMessageIds.add(patchMessageId);
+
+              debug('opencode-sdk stream: patch part observed', {
+                sessionId,
+                patchMessageId,
+              });
+
+              fetchAndEmitDiff(null, 'patch-part');
             }
           }
         } catch (err) {
@@ -1002,13 +1257,52 @@ export function createOpencodeSDKBackend({
       };
 
       const pumpPromise = pump();
+      const pollPromise = pollUntilSessionIdle();
 
-      let promptResult: Awaited<ReturnType<typeof client.session.prompt>>;
+      let promptResult: Awaited<
+        ReturnType<typeof client.session.prompt>
+      > | null = null;
 
       try {
-        promptResult = await client.session.prompt(promptParams);
+        const promptAsyncResult =
+          await client.session.promptAsync(promptParams);
+
+        if (promptAsyncResult.error) {
+          return {
+            type: 'error',
+            output: String(promptAsyncResult.error),
+            sessionId,
+          } satisfies AgentErrorResult;
+        }
+
+        await streamComplete;
+
+        if (streamErrorMessage) {
+          return {
+            type: 'error',
+            output: streamErrorMessage,
+            sessionId,
+          } satisfies AgentErrorResult;
+        }
+
+        const messagesResult = await client.session.messages({
+          sessionID: sessionId,
+          directory: cwd,
+          limit: 10,
+        });
+
+        const latest = messagesResult.error
+          ? null
+          : latestAssistantMessage(messagesResult.data);
+
+        promptResult = {
+          data: latest ?? undefined,
+          error: messagesResult.error,
+          response: messagesResult.response,
+        } as Awaited<ReturnType<typeof client.session.prompt>>;
       } finally {
         stopConsumer = true;
+        resolveStreamComplete();
         streamAbortSignal.removeEventListener('abort', onExternalAbort);
 
         try {
@@ -1024,7 +1318,27 @@ export function createOpencodeSDKBackend({
           debug('opencode-sdk stream: pump promise rejected', String(err));
         });
 
+        await pollPromise.catch((err) => {
+          debug('opencode-sdk stream: status poll rejected', String(err));
+        });
+
         logStreamDebugSummary(streamMetrics);
+      }
+
+      if (!promptResult) {
+        return {
+          type: 'success',
+          outputs: [{ type: 'text', value: '(no output)' }],
+          sessionId,
+          model: effectiveModel,
+        } satisfies AgentSuccessResult;
+      }
+
+      if (!diffEmitted) {
+        fetchAndEmitDiff(
+          getPromptUserMessageId(promptResult),
+          'prompt-complete',
+        );
       }
 
       debug(

@@ -74,16 +74,27 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     streamFlushTimerByRequestId.set(requestId, timer);
   }
 
-  function handleStreamDiff(files: TimelineFileDiff[]): void {
+  function handleStreamDiff(
+    requestId: string,
+    files: TimelineFileDiff[],
+  ): void {
+    const timer = streamFlushTimerByRequestId.get(requestId);
+
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      flushStreamTextDelta(requestId);
+    }
+
     adapters.setTimeline((prev) => [
       ...prev,
       {
         id: adapters.createId(),
-        type: 'diff_summary',
-        summary: {
-          fileCount: files.length,
-          additions: files.reduce((sum, file) => sum + file.additions, 0),
-          deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+        type: 'diff',
+        files,
+        meta: {
+          title: 'Patched',
+          subtitle: null,
+          origin: 'agent_patch',
         },
       } satisfies TimelineItem,
     ]);

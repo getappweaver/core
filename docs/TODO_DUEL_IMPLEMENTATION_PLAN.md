@@ -274,7 +274,7 @@ async function startDuelSession(
 
 ## 4. Command handlers
 
-### 4.1 `!todo duel [parent_id] [--reset]`
+### 4.1 `<prefix>todo duel [parent_id] [--reset]`
 
 ```typescript
 async function handleDuel(
@@ -321,7 +321,7 @@ async function handleDuel(
 }
 ```
 
-### 4.2 `!todo next [parent_id]`
+### 4.2 `<prefix>todo next [parent_id]`
 
 ```typescript
 async function handleNext(
@@ -352,7 +352,7 @@ async function handleNext(
 }
 ```
 
-### 4.3 Auto-duel on `!todo add`
+### 4.3 Auto-duel on `<prefix>todo add`
 
 ```typescript
 async function handleAdd(
@@ -453,7 +453,7 @@ At the very top of `handleUserMessage`, before any other logic:
 async function handleUserMessage(content: string, source: MessageSource): Promise<void> {
   if (pendingPrompt) {
     // Always allow hard exit even during an interactive session
-    if (content.trim().startsWith('!exit')) {
+    if (content.trim().startsWith(`${getDmCommandPrefix(seenDb)}exit`)) {
       await sendReplyForSource(source, 'Exiting...');
       return;
     }
@@ -471,7 +471,7 @@ async function handleUserMessage(content: string, source: MessageSource): Promis
 > **How it works:** the duel loop calls `promptFn("Which is more important?\nA)...\nB)...")`,
 > which sends the DM and suspends. The next incoming message resolves the promise and returns
 > control to the loop. All other command routing is bypassed until the duel completes or the
-> user sends `!exit`.
+> user sends the configured exit command (default `/exit`).
 
 ---
 
@@ -480,17 +480,17 @@ async function handleUserMessage(content: string, source: MessageSource): Promis
 1. **DB migration** — create `todo_comparisons`, drop `priority` column
 2. **Core utilities** — `getParentId`, `getRankedSiblings`, `getNextPair`, `recordComparison`, `resetComparisons`, `canReach`, `alreadyResolved`
 3. **`promptFn` wiring** — add `PromptFn` type, `pendingPrompt` slot, intercept in `handleUserMessage`
-4. **`!todo list`** — update to sort by win-rate, unscored items at bottom
-5. **`!todo next`** — win-rate sort, unscored warning + offer to duel
+4. **`<prefix>todo list`** — update to sort by win-rate, unscored items at bottom
+5. **`<prefix>todo next`** — win-rate sort, unscored warning + offer to duel
 6. **`startDuelSession`** — core loop with transitive auto-resolution
-7. **`!todo duel`** — command handler, scope prompt, reset flow
-8. **Auto-duel on `!todo add`**
+7. **`<prefix>todo duel`** — command handler, scope prompt, reset flow
+8. **Auto-duel on `<prefix>todo add`**
 
 ---
 
 ## 8. Open details
 
-- **Skip behaviour** — skipped pairs re-surface on the next `!todo duel` call since `getNextPair` only excludes already-compared pairs. If permanent-skip-within-session is needed, track skipped pairs in a local `Set<string>` (e.g. `"${aId}:${bId}"`) and filter them out in `getNextPair`.
+- **Skip behaviour** — skipped pairs re-surface on the next `<prefix>todo duel` call since `getNextPair` only excludes already-compared pairs. If permanent-skip-within-session is needed, track skipped pairs in a local `Set<string>` (e.g. `"${aId}:${bId}"`) and filter them out in `getNextPair`.
 - **`parent_id IS NULL`** — always use `IS ?` not `= ?` in SQLite when binding `null`. Bun's SQLite driver handles this correctly when you pass `null` as the parameter value.
 - **Invalid answer re-prompt** — on an invalid answer, `getNextPair` will return the same pair again (it's still uncompared), so the loop naturally re-presents it without any special handling needed.
 - **`canReach` scope** — the BFS in `canReach` traverses all of `todo_comparisons`, not just sibling rows. This is fine since comparisons are only ever recorded between siblings, so the graph is naturally scoped. No extra filtering needed.

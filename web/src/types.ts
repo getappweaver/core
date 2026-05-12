@@ -151,7 +151,7 @@ export type TimelineItem =
       meta?: {
         title: string | null;
         subtitle: string | null;
-        origin: 'workspace_diff' | 'git_commit' | null;
+        origin: 'workspace_diff' | 'git_commit' | 'agent_patch' | null;
       } | null;
     }
   | {

@@ -14,9 +14,9 @@ Review points from the plugins/jobs and core bot refactor, with status and follo
 
 ## 1. runAgent set before plugin dispatch
 
-**Issue:** `!jobs ai` could run with `runAgent === null` if `pluginContext.runAgent` was only set in the non-command path.
+**Issue:** `<prefix>jobs ai` could run with `runAgent === null` if `pluginContext.runAgent` was only set in the non-command path.
 
-**Status:** Fixed. In `src/index.ts`, `pluginContext.runAgent` is now set at the start of `handleUserMessage` (after backend/session are created), before the `if (input.startsWith('!'))` branch. So when `handleBangCommand` → `dispatchPluginCommand` runs, `runAgent` is already set and `!jobs ai` works.
+**Status:** Fixed. In `src/index.ts`, `pluginContext.runAgent` is now set at the start of `handleUserMessage` (after backend/session are created), before the configurable-prefix command dispatch branch. So when `routeCommand` dispatches plugin commands, `runAgent` is already set and `<prefix>jobs ai` works.
 
 **Double-check:** Confirm that every code path that can lead to `dispatchPluginCommand` runs after `pluginContext.runAgent = async (...) => ...` has been executed (e.g. no early returns before that assignment).
 

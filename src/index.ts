@@ -349,7 +349,7 @@ async function main() {
       return false;
     }
 
-    if (content.trim().startsWith('!exit')) {
+    if (content.trim().startsWith(`${getDmCommandPrefix(seenDb)}exit`)) {
       await sendReplyForSource(source, 'Exiting...');
 
       const resolve = pendingPrompt;

@@ -192,7 +192,7 @@ When editing or extending AppWeaver, use this as the map. AppWeaver is an AI-fir
 
 ## Agent backends
 
-Two backends are supported, switchable at runtime via `!backend cursor|opencode`. State persisted in DB.
+Two backends are supported, switchable at runtime via `<prefix>backend cursor|opencode` (default `/backend cursor|opencode`). State persisted in DB.
 
 ### Cursor backend (default)
 - Invokes `agent create-chat` to create sessions (returns a UUID)
@@ -209,9 +209,9 @@ Two backends are supported, switchable at runtime via `!backend cursor|opencode`
 ### Mode → agent mapping (OpenCode)
 | AppWeaver mode | OpenCode `--agent` | Model (in opencode.json) |
 |---|---|---|
-| `!ask` | `ask` | `ppq/google/gemini-2.5-flash-lite` |
-| `!plan` | `plan` | `ppq/claude-opus-4.5` |
-| `!agent` | `build` | `ppq/claude-sonnet-4.5` |
+| `<prefix>ask` | `ask` | `ppq/google/gemini-2.5-flash-lite` |
+| `<prefix>plan` | `plan` | `ppq/claude-opus-4.5` |
+| `<prefix>agent` | `build` | `ppq/claude-sonnet-4.5` |
 
 ## ANSI colors (local terminal only)
 
@@ -229,11 +229,11 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 
 ## Where to change what
 
-- **New `!` commands**: In `index.ts`, function `handleBangCommand`. Add a new `if (cmd === "my-cmd") { ... return "reply"; }`. The function now receives `workspaceRoot`, `dmBotRoot`, and `agentEnv` for commands that need to create sessions.
+- **New DM commands**: Add command definitions under `src/commands/`; routing uses the configurable DM prefix from core DB (default `/`).
 - **Agent backends**: `CursorBackend` and `OpenCodeBackend` classes implement `AgentBackend`. Add new backends by implementing the interface and registering in `createBackend()`.
 - **JSONL parsing**: `parseOpenCodeJsonl()` handles OpenCode `--format json` output. Accumulates tokens across multiple steps.
-- **Workspace targeting + auto session reset**: `!workspace [parent|appweaver]` sets the active workspace target and auto-creates a new session on change.
-- **Backend switching + auto session reset**: `!backend [cursor|opencode]` sets the active backend and auto-creates a new session on change.
+- **Workspace targeting + auto session reset**: `<prefix>workspace [parent|appweaver]` sets the active workspace target and auto-creates a new session on change.
+- **Backend switching + auto session reset**: `<prefix>backend [cursor|opencode]` sets the active backend and auto-creates a new session on change.
 - **Post-agent lint flow (agent mode)**: After an `agent`-mode run, bot runs `bun run lint` for the active workspace; on lint errors, performs one additional agent round with lint feedback.
 - **Reply formatting / chunking**: `chunkMessage` (max length), `modePrefix()` (colored prefix), `tokenFooter()` (token/cost line).
 - **DM relay discovery**: `getMasterDmRelays` (kind 10050) and `PROFILE_RELAYS`. `sendDm` uses these to decide where to publish.
@@ -245,7 +245,7 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 
 ## Codebase vs agent workspace
 
-- Agent backends are invoked with `cwd` set to the **project root** or the AppWeaver directory depending on `!workspace` setting. You may create, edit, or delete files under that root. Do not modify files outside the project root.
+- Agent backends are invoked with `cwd` set to the **project root** or the AppWeaver directory depending on the workspace setting. You may create, edit, or delete files under that root. Do not modify files outside the project root.
 
 ## Environment (runtime)
 

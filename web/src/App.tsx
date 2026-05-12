@@ -219,7 +219,8 @@ function AppInner(): JSX.Element {
     createId,
     chat: {
       clearRequest: (requestId) => chat.clearRequest(requestId),
-      handleStreamDiff: (files) => chat.handleStreamDiff(files),
+      handleStreamDiff: (requestId, files) =>
+        chat.handleStreamDiff(requestId, files),
       handleStreamTool: (requestId, tool) =>
         chat.handleStreamTool(requestId, tool),
       handleStreamTextDelta: (requestId, deltaText) =>

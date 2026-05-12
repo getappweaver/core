@@ -341,7 +341,7 @@ export const TimelineDiffEventSchema = z.object({
   files: z.array(TimelineFileDiffSchema),
   title: z.string().nullable(),
   subtitle: z.string().nullable(),
-  origin: z.enum(['workspace_diff', 'git_commit']).nullable(),
+  origin: z.enum(['workspace_diff', 'git_commit', 'agent_patch']).nullable(),
 });
 
 export const TimelineEventOutputSchema = z.object({

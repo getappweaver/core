@@ -290,7 +290,7 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
         <div class="card-head-tree-toolbar" role="toolbar" aria-label="Reply">
           <button
             type="button"
-            class="tag tag-button card-head__control card-head-tree-toolbar-btn chat-copy-btn"
+            class={`tag tag-button card-head__control card-head-tree-toolbar-btn card-head-chrome-btn chat-copy-btn${copied() ? ' chat-copy-btn--show-text' : ''}`}
             title={copied() ? 'Copied reply' : 'Copy reply'}
             aria-label={copied() ? 'Copied reply' : 'Copy reply'}
             onClick={copyReply}
@@ -307,7 +307,7 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
                 fill-rule="evenodd"
               />
             </svg>
-            <span>{copied() ? 'copied' : 'copy'}</span>
+            {copied() && <span>copied</span>}
           </button>
           <TimelineSpeechButton
             text={speechText()}
@@ -339,7 +339,13 @@ type TimelineDiffSummaryRowProps = {
 };
 
 function diffLineClass(line: string): string {
-  if (line.startsWith('+++') || line.startsWith('---')) {
+  if (
+    line.startsWith('+++') ||
+    line.startsWith('---') ||
+    line.startsWith('diff --git ') ||
+    line.startsWith('index ') ||
+    line.startsWith('⋮')
+  ) {
     return 'diff-line diff-line--meta';
   }
 
@@ -358,6 +364,137 @@ function diffLineClass(line: string): string {
   return 'diff-line';
 }
 
+type RenderedDiffLine = {
+  text: string;
+  className: string;
+  oldLine: number | null;
+  newLine: number | null;
+};
+
+function parseDiffHunkStart(
+  line: string,
+): { oldLine: number; newLine: number } | null {
+  const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    oldLine: Number(match[1]),
+    newLine: Number(match[2]),
+  };
+}
+
+function parseDiffElision(
+  line: string,
+): { oldLine: number; newLine: number } | null {
+  const match = /^⋮ @@ -(\d+) \+(\d+) @@$/.exec(line);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    oldLine: Number(match[1]),
+    newLine: Number(match[2]),
+  };
+}
+
+function renderDiffPatchLines(patch: string): RenderedDiffLine[] {
+  const rendered: RenderedDiffLine[] = [];
+  let oldLine: number | null = null;
+  let newLine: number | null = null;
+
+  for (const line of patch.split('\n')) {
+    const hunkStart = parseDiffHunkStart(line);
+
+    if (hunkStart) {
+      oldLine = hunkStart.oldLine;
+      newLine = hunkStart.newLine;
+
+      rendered.push({
+        text: line,
+        className: diffLineClass(line),
+        oldLine: null,
+        newLine: null,
+      });
+
+      continue;
+    }
+
+    const elision = parseDiffElision(line);
+
+    if (elision) {
+      oldLine = elision.oldLine;
+      newLine = elision.newLine;
+
+      rendered.push({
+        text: '⋮',
+        className: diffLineClass(line),
+        oldLine: null,
+        newLine: null,
+      });
+
+      continue;
+    }
+
+    if (
+      oldLine === null ||
+      newLine === null ||
+      line.startsWith('diff --git ') ||
+      line.startsWith('index ') ||
+      line.startsWith('---') ||
+      line.startsWith('+++')
+    ) {
+      rendered.push({
+        text: line,
+        className: diffLineClass(line),
+        oldLine: null,
+        newLine: null,
+      });
+
+      continue;
+    }
+
+    if (line.startsWith('+')) {
+      rendered.push({
+        text: line,
+        className: diffLineClass(line),
+        oldLine: null,
+        newLine,
+      });
+
+      newLine += 1;
+      continue;
+    }
+
+    if (line.startsWith('-')) {
+      rendered.push({
+        text: line,
+        className: diffLineClass(line),
+        oldLine,
+        newLine: null,
+      });
+
+      oldLine += 1;
+      continue;
+    }
+
+    rendered.push({
+      text: line,
+      className: diffLineClass(line),
+      oldLine,
+      newLine,
+    });
+
+    oldLine += 1;
+    newLine += 1;
+  }
+
+  return rendered;
+}
+
 export function TimelineDiffCard(props: TimelineDiffCardProps) {
   let cardEl: HTMLDivElement | undefined;
 
@@ -368,6 +505,19 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
     props.item.files.reduce((sum, file) => sum + file.deletions, 0);
 
   const [openFiles, setOpenFiles] = createSignal(new Set<number>());
+
+  const label = () => {
+    switch (props.item.meta?.origin) {
+      case 'agent_patch':
+        return 'patched';
+      case 'git_commit':
+        return 'commit diff';
+      case 'workspace_diff':
+      case null:
+      case undefined:
+        return 'diff';
+    }
+  };
 
   function toggleFile(index: number): void {
     setOpenFiles((prev) => {
@@ -385,9 +535,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
   const head = () => (
     <>
-      <span class="tag mode-tag">
-        {props.item.meta?.origin === 'git_commit' ? 'commit diff' : 'diff'}
-      </span>
+      <span class="tag mode-tag">{label()}</span>
       <Show when={props.item.meta}>
         {(meta) => (
           <>
@@ -453,11 +601,16 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
             </button>
             <Show when={openFiles().has(index())}>
               <pre class="diff-file__patch">
-                <For each={file.patch.split('\n')}>
-                  {(line, lineIndex) => (
-                    <span class={diffLineClass(line)}>
-                      <span class="diff-line__number">{lineIndex() + 1}</span>
-                      <span class="diff-line__text">{line || ' '}</span>
+                <For each={renderDiffPatchLines(file.patch)}>
+                  {(line) => (
+                    <span class={line.className}>
+                      <span class="diff-line__number">
+                        {line.oldLine ?? ''}
+                      </span>
+                      <span class="diff-line__number">
+                        {line.newLine ?? ''}
+                      </span>
+                      <span class="diff-line__text">{line.text || ' '}</span>
                     </span>
                   )}
                 </For>

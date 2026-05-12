@@ -7,10 +7,7 @@ import {
   listTimelineHistoryLatest,
   upsertTimelineCommandForm,
 } from '@src/timeline/db';
-import {
-  summarizeTimelineDiffFiles,
-  type TimelinePayload,
-} from '@src/timeline/types';
+import type { TimelinePayload } from '@src/timeline/types';
 import { assertUnreachable } from '@src/utils';
 import type { TimelineEventOutput, WebHandlerResult } from '@src/web/ui-schema';
 
@@ -532,11 +529,19 @@ async function handleChat(params: {
       content: message.content,
       onStreamChunk: useStream
         ? (chunk) => {
+            sendMessage(
+              ws,
+              createChatStreamChunkMessage({
+                requestId: message.requestId,
+                chunk,
+              }),
+            );
+
             if (chunk.kind === 'diff') {
               insertTimelineEvent(ctx.seenDb, {
                 timelineId: message.timelineId,
                 source: 'web',
-                kind: 'diff_summary',
+                kind: 'diff',
                 role: null,
                 command: null,
                 subcommand: null,
@@ -546,7 +551,12 @@ async function handleChat(params: {
                 text: null,
                 web: null,
                 clientView: null,
-                diffSummary: summarizeTimelineDiffFiles(chunk.files),
+                diff: chunk.files,
+                meta: {
+                  title: 'Patched',
+                  subtitle: null,
+                  origin: 'agent_patch',
+                },
                 prompt: null,
                 requestId: null,
               });
@@ -576,14 +586,6 @@ async function handleChat(params: {
             if (chunk.kind === 'text_delta') {
               streamedText += chunk.text;
             }
-
-            sendMessage(
-              ws,
-              createChatStreamChunkMessage({
-                requestId: message.requestId,
-                chunk,
-              }),
-            );
           }
         : null,
       streamAbortSignal: useStream ? chatAbort.signal : null,

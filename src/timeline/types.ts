@@ -25,7 +25,10 @@ export type TimelineDiffSummary = {
   deletions: number;
 };
 
-export type TimelineDiffOrigin = 'workspace_diff' | 'git_commit';
+export type TimelineDiffOrigin =
+  | 'workspace_diff'
+  | 'git_commit'
+  | 'agent_patch';
 
 export type TimelineEventMeta = {
   title: string | null;
