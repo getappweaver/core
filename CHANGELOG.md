@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.10.0] - 2026-05-12
+
+- feat: add WebNode scroll on mount support (bb61613)
+
 ## [v9.9.16] - 2026-05-12
 
-- docs: clarify plugin git status (417e0e6)
+- docs: clarify plugin git status (e5cf935)
 
 ## [v9.9.15] - 2026-05-12
 

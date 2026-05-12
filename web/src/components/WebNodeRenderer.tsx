@@ -58,6 +58,11 @@ type HljsHighlightedSpanProps = {
   language: string | null;
 };
 
+type WebElementRefProps = {
+  element: WebElementNode;
+  el: HTMLElement;
+};
+
 type SentenceRange = {
   index: number;
   start: number;
@@ -66,6 +71,22 @@ type SentenceRange = {
 
 const WEB_SPEECH_HIGHLIGHT_NAME = 'web-speech-active';
 const WEB_SPEECH_HOVER_HIGHLIGHT_NAME = 'web-speech-hover';
+
+function setupWebElementRef({ element, el }: WebElementRefProps): void {
+  if (element.props?.storyTargetId) {
+    registerStoryDomTarget(element.props.storyTargetId, el);
+  }
+
+  if (element.props?.autoFocus === true) {
+    queueMicrotask(() => el.focus());
+  }
+
+  if (element.props?.scrollIntoViewOnMount === true) {
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  }
+}
 
 function sentenceRangesInText(
   text: string,
@@ -2601,16 +2622,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                       data-ui={elementUi(element)}
                       data-story-target={element.props?.storyTargetId}
                       ref={(el) => {
-                        if (element.props?.storyTargetId) {
-                          registerStoryDomTarget(
-                            element.props.storyTargetId,
-                            el,
-                          );
-                        }
-
-                        if (element.props?.autoFocus === true) {
-                          queueMicrotask(() => el.focus());
-                        }
+                        setupWebElementRef({ element, el });
                       }}
                       style={elementStyle(element)}
                       role={element.props?.action ? 'button' : undefined}

@@ -214,6 +214,8 @@ export const WebPropsSchema = z.object({
   maxRows: z.number().int().positive().optional(),
   /** `textField`: focus the input when it is mounted. */
   autoFocus: z.literal(true).optional(),
+  /** Scroll this element into view when it is mounted/replaced. */
+  scrollIntoViewOnMount: z.literal(true).optional(),
   /** Stable target id used by story walkthrough focus/fill steps. */
   storyTargetId: z.string().min(1).optional(),
   /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
