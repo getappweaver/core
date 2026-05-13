@@ -191,6 +191,32 @@ function partType(properties: Record<string, unknown>): string | null {
   return typeof type === 'string' ? type : null;
 }
 
+function rememberTextDelta(
+  logState: OpencodeStreamLogState,
+  properties: Record<string, unknown>,
+  delta: string,
+): void {
+  const part = properties.part;
+
+  const partRec =
+    part && typeof part === 'object' ? (part as Record<string, unknown>) : null;
+
+  const partId =
+    (typeof properties.partID === 'string' && properties.partID) ||
+    (typeof properties.partId === 'string' && properties.partId) ||
+    (typeof partRec?.id === 'string' && partRec.id) ||
+    null;
+
+  if (partId) {
+    const previousLength = logState.parseState.partTextLengths.get(partId) ?? 0;
+
+    logState.parseState.partTextLengths.set(
+      partId,
+      previousLength + delta.length,
+    );
+  }
+}
+
 function segmentToChunk(
   segment: ReturnType<typeof parseOpenCodePart>,
 ): AgentStreamChunk | null {
@@ -288,14 +314,20 @@ export function mapOpencodeSsePayloadToChunk(
     const field = typeof p.field === 'string' ? p.field : '';
 
     if (field === 'text' && partType(p) === 'reasoning') {
+      rememberTextDelta(logState, p, p.delta);
+
       return [{ kind: 'reasoning_delta', text: p.delta }];
     }
 
     if (field === 'text') {
+      rememberTextDelta(logState, p, p.delta);
+
       return [{ kind: 'text_delta', text: p.delta }];
     }
 
     if (field === 'reasoning') {
+      rememberTextDelta(logState, p, p.delta);
+
       return [{ kind: 'reasoning_delta', text: p.delta }];
     }
 

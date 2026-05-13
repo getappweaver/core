@@ -667,18 +667,23 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
 function TimelineDiffSummaryRow(props: TimelineDiffSummaryRowProps) {
   return (
-    <div class="timeline-info timeline-info--diff">
-      <span class="tag mode-tag">diff</span>
-      <span class="diff-card__summary">
-        {props.summary.fileCount}{' '}
-        {props.summary.fileCount === 1 ? 'file' : 'files'}
-      </span>
-      <span class="diff-card__stat diff-card__stat--add">
-        +{props.summary.additions}
-      </span>
-      <span class="diff-card__stat diff-card__stat--del">
-        -{props.summary.deletions}
-      </span>
+    <div class="card tool-card tool-card--completed">
+      <div class="tool-card__line" title="Workspace diff summary">
+        <span class="tool-card__arrow">→</span>
+        <span>
+          check git diff:{' '}
+          <span class="diff-card__summary">
+            {props.summary.fileCount}{' '}
+            {props.summary.fileCount === 1 ? 'file' : 'files'}
+          </span>{' '}
+          <span class="diff-card__stat diff-card__stat--add">
+            +{props.summary.additions}
+          </span>{' '}
+          <span class="diff-card__stat diff-card__stat--del">
+            -{props.summary.deletions}
+          </span>
+        </span>
+      </div>
     </div>
   );
 }

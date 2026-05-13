@@ -7,7 +7,10 @@ import {
   listTimelineHistoryLatest,
   upsertTimelineCommandForm,
 } from '@src/timeline/db';
-import type { TimelinePayload } from '@src/timeline/types';
+import {
+  summarizeTimelineDiffFiles,
+  type TimelinePayload,
+} from '@src/timeline/types';
 import { assertUnreachable } from '@src/utils';
 import type { TimelineEventOutput, WebHandlerResult } from '@src/web/ui-schema';
 
@@ -523,7 +526,7 @@ async function handleChat(params: {
               insertTimelineEvent(ctx.seenDb, {
                 timelineId: message.timelineId,
                 source: 'web',
-                kind: 'diff',
+                kind: 'diff_summary',
                 role: null,
                 command: null,
                 subcommand: null,
@@ -533,12 +536,7 @@ async function handleChat(params: {
                 text: null,
                 web: null,
                 clientView: null,
-                diff: chunk.files,
-                meta: {
-                  title: 'Git diff',
-                  subtitle: null,
-                  origin: 'agent_patch',
-                },
+                diffSummary: summarizeTimelineDiffFiles(chunk.files),
                 prompt: null,
                 requestId: null,
               });

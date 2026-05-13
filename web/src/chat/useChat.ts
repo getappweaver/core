@@ -13,6 +13,14 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   const pendingStreamTextByRequestId = new Map<string, string>();
   const streamFlushTimerByRequestId = new Map<string, number>();
 
+  function summarizeDiffFiles(files: TimelineFileDiff[]) {
+    return {
+      fileCount: files.length,
+      additions: files.reduce((sum, file) => sum + file.additions, 0),
+      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+    };
+  }
+
   function flushStreamTextDelta(requestId: string): void {
     streamFlushTimerByRequestId.delete(requestId);
 
@@ -164,13 +172,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       ...prev,
       {
         id: adapters.createId(),
-        type: 'diff',
-        files,
-        meta: {
-          title: 'Git diff',
-          subtitle: null,
-          origin: 'agent_patch',
-        },
+        type: 'diff_summary',
+        summary: summarizeDiffFiles(files),
       } satisfies TimelineItem,
     ]);
   }
