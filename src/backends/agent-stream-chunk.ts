@@ -179,6 +179,18 @@ function isMatchingSession(
   return true;
 }
 
+function partType(properties: Record<string, unknown>): string | null {
+  const part = properties.part;
+
+  if (!part || typeof part !== 'object') {
+    return null;
+  }
+
+  const type = (part as { type?: unknown }).type;
+
+  return typeof type === 'string' ? type : null;
+}
+
 function segmentToChunk(
   segment: ReturnType<typeof parseOpenCodePart>,
 ): AgentStreamChunk | null {
@@ -274,6 +286,10 @@ export function mapOpencodeSsePayloadToChunk(
     }
 
     const field = typeof p.field === 'string' ? p.field : '';
+
+    if (field === 'text' && partType(p) === 'reasoning') {
+      return [{ kind: 'reasoning_delta', text: p.delta }];
+    }
 
     if (field === 'text') {
       return [{ kind: 'text_delta', text: p.delta }];

@@ -792,6 +792,109 @@ function isApplyPatchTool(tool: TimelineTool): boolean {
   return tool.tool === 'apply_patch' || tool.tool.endsWith('.apply_patch');
 }
 
+function isTodoWriteTool(tool: TimelineTool): boolean {
+  return tool.tool === 'todowrite' || tool.tool.endsWith('.todowrite');
+}
+
+type TodoWriteItem = {
+  content: string;
+  status: string;
+  priority: string | null;
+};
+
+function parseTodoWriteItems(tool: TimelineTool): TodoWriteItem[] {
+  const todos = tool.input.todos;
+
+  if (!Array.isArray(todos)) {
+    return [];
+  }
+
+  return todos
+    .map((todo): TodoWriteItem | null => {
+      if (!todo || typeof todo !== 'object') {
+        return null;
+      }
+
+      const rec = todo as Record<string, unknown>;
+
+      if (typeof rec.content !== 'string' || typeof rec.status !== 'string') {
+        return null;
+      }
+
+      return {
+        content: rec.content,
+        status: rec.status,
+        priority: typeof rec.priority === 'string' ? rec.priority : null,
+      };
+    })
+    .filter((todo): todo is TodoWriteItem => todo !== null);
+}
+
+function todoStatusMarker(status: string): string {
+  switch (status) {
+    case 'completed':
+      return '✓';
+    case 'in_progress':
+      return '◐';
+    case 'cancelled':
+      return '×';
+    case 'pending':
+    default:
+      return '○';
+  }
+}
+
+function TimelineTodoWriteCard(props: { tool: TimelineTool }) {
+  const todos = () => parseTodoWriteItems(props.tool);
+
+  if (props.tool.status !== 'completed' || todos().length === 0) {
+    return (
+      <div class={`card tool-card tool-card--${props.tool.status}`}>
+        <div class="tool-card__line" title={toolStatusLabel(props.tool.status)}>
+          <span class="tool-card__arrow">~</span>
+          <span>Updating todos...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div class="card todo-tool-card">
+      <div class="todo-tool-card__head">
+        <span class="tag mode-tag">todos</span>
+        <span class="diff-card__summary">
+          {todos().length} {todos().length === 1 ? 'item' : 'items'}
+        </span>
+      </div>
+      <div class="todo-tool-card__list">
+        <For each={todos()}>
+          {(todo) => (
+            <div
+              class="todo-tool-card__item"
+              classList={{
+                'todo-tool-card__item--completed': todo.status === 'completed',
+                'todo-tool-card__item--in-progress':
+                  todo.status === 'in_progress',
+                'todo-tool-card__item--cancelled': todo.status === 'cancelled',
+              }}
+            >
+              <span class="todo-tool-card__marker">
+                {todoStatusMarker(todo.status)}
+              </span>
+              <span class="todo-tool-card__content">{todo.content}</span>
+              <Show when={todo.priority}>
+                {(priority) => (
+                  <span class="todo-tool-card__priority">{priority()}</span>
+                )}
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
 function applyPatchStatus(header: string): TimelineFileDiff['status'] {
   if (header === 'Add') {
     return 'added';
@@ -893,6 +996,10 @@ export function TimelineToolCard(props: TimelineToolCardProps) {
 
   if (isApplyPatchTool(tool()) && tool().status !== 'completed') {
     return <TimelinePreparingPatchToolCard tool={tool()} />;
+  }
+
+  if (isTodoWriteTool(tool())) {
+    return <TimelineTodoWriteCard tool={tool()} />;
   }
 
   const patchFiles = () =>

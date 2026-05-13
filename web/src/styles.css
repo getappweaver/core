@@ -1230,6 +1230,56 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.todo-tool-card {
+  background: color-mix(in srgb, var(--color-panel) 88%, #000);
+  border-left: 3px solid color-mix(in srgb, var(--color-accent) 64%, #fff);
+  padding: 0.7rem 0.8rem;
+}
+
+.todo-tool-card__head {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.todo-tool-card__list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.todo-tool-card__item {
+  align-items: baseline;
+  color: var(--color-text);
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.todo-tool-card__item--completed .todo-tool-card__content {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.todo-tool-card__item--in-progress .todo-tool-card__marker {
+  color: #a5d6ff;
+}
+
+.todo-tool-card__item--cancelled {
+  color: #ff7b72;
+}
+
+.todo-tool-card__marker,
+.todo-tool-card__priority {
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.78rem;
+}
+
+.todo-tool-card__content {
+  overflow-wrap: anywhere;
+}
+
 .result-card pre {
   margin: 0.7rem 0 0;
   white-space: pre-wrap;

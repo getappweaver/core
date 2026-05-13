@@ -848,7 +848,7 @@ function AppInner(): JSX.Element {
   );
 
   onMount(() => {
-    timelineEl?.addEventListener('scroll', scheduleTimelineBottomFadeUpdate, {
+    timelineEl?.addEventListener('scroll', updateTimelineBottomFade, {
       passive: true,
     });
 
@@ -911,10 +911,7 @@ function AppInner(): JSX.Element {
         timelineBottomScrollFrame = null;
       }
 
-      timelineEl?.removeEventListener(
-        'scroll',
-        scheduleTimelineBottomFadeUpdate,
-      );
+      timelineEl?.removeEventListener('scroll', updateTimelineBottomFade);
 
       window.removeEventListener('resize', scheduleTimelineBottomFadeUpdate);
 
