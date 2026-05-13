@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.10.5] - 2026-05-13
+
+- fix: branding related changes (53c8e47)
+
 ## [v9.10.4] - 2026-05-13
 
-- fix: opencode scroll fix, added todo tool card (ba05d31)
+- fix: opencode scroll fix, added todo tool card (e3cfcd6)
 
 ## [v9.10.3] - 2026-05-13
 

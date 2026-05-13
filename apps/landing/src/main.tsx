@@ -246,7 +246,7 @@ function App() {
     {
       name: 'todo',
       summary:
-        'Track tasks with installable commands and AI-assisted draft flows.',
+        'Track tasks with installable commands and AI-assisted drafts.',
     },
     {
       name: 'job',
@@ -256,20 +256,20 @@ function App() {
     {
       name: 'file',
       summary:
-        'Work with project files through shared commands and automation.',
+        'Work with project files through shared commands and AI skills.',
     },
     {
       name: 'browser',
       summary:
-        'Browser automation is in progress for web-driven workflows and agents.',
+        'Browser actions are in progress for web-driven tasks and agents.',
     },
   ];
 
   const pillars = [
-    'Install AppWeaver inside any project or workspace directory and let it act as a shared app layer for that folder.',
-    'Chat through the web or over a chat client, then use commands provided by the plugins you have installed.',
+    'Install AppWeaver inside any project or workspace directory and let it act as an app hub for that folder.',
+    'Use regular chat prompts to work with the apps, skills, and commands you have installed.',
     'Choose model providers through OpenCode support, with a built-in Cashu wallet for Pay-per-request Routstr usage.',
-    'Create bot accounts, build plugins, and publish them without asking permission from a hosted platform.',
+    'Build and publish new apps without asking permission from a hosted platform.',
   ];
 
   const activeShowcaseStory = createMemo(
@@ -755,14 +755,14 @@ function App() {
           <section class="hero-stage">
             <div class="hero-copy">
               <h1 class="hero-title">
-                Installable apps, automation, and bots that live in your own
-                environment.
+                An AI-powered app hub on a computer you control.
               </h1>
               <p class="hero-description">
-                AppWeaver is an open-source platform for running plugin-powered
-                workflows from a project or workspace folder you control. Use it
-                through the web or over a chat client, choose the AI providers
-                you want, and compose focused apps into one shared system.
+                Run focused tools through chat, the web UI, or AI prompts —
+                from todos and bookmarks to scheduled jobs, files, browser
+                actions, publishing, and more.
+                Your data stays local-first, you choose which apps belong in your
+                hub, and anyone can create new ones.
               </p>
               <div class="hero-actions">
                   <button
@@ -1014,22 +1014,22 @@ function App() {
           <section id="plugins" class="content-section">
             <div class="section-heading-row">
               <div>
-                <div class="section-eyebrow">Official plugins</div>
+                <div class="section-eyebrow">Official apps</div>
                 <h2 class="section-title">
                   Start with a small set of focused apps.
                 </h2>
               </div>
               <p class="section-summary">
-                AppWeaver already ships with bookmarks, todos, jobs, and file
-                workflows, while browser automation is being added next. Anyone
-                can create and publish new plugins on top of the same core.
+                AppWeaver already ships with todos, bookmarks, scheduled jobs,
+                files, browser actions, publishing support, and more. Anyone can
+                create and publish new apps on top of the same core.
               </p>
             </div>
             <div class="plugin-grid">
               <For each={officialPlugins}>
                 {(plugin) => (
                   <div class="plugin-card">
-                    <div class="plugin-label">Plugin</div>
+                    <div class="plugin-label">App</div>
                     <div class="plugin-name">{plugin.name}</div>
                     <p class="plugin-summary">{plugin.summary}</p>
                   </div>
@@ -1043,10 +1043,9 @@ function App() {
               <div class="section-eyebrow">Open and permissionless</div>
               <h2 class="section-title">Own the stack instead of renting it.</h2>
               <p class="body-copy">
-                AppWeaver is fully open-source and self-hostable. You can create
-                bot accounts, install plugins, publish your own extensions, and
-                run the platform on infrastructure you control without needing
-                approval from a central service.
+                AppWeaver is fully open-source and self-hostable. You can install
+                apps and run the platform on infrastructure you control without
+                needing approval from a central service.
               </p>
             </div>
             <div class="ownership-panel">
@@ -1070,10 +1069,10 @@ function App() {
               A simple open core now, a broader app ecosystem after that.
             </h2>
             <p class="body-copy">
-              The platform is already useful as a personal assistant,
-              automation layer, and bot runtime. The next phase is making
-              plugin publishing, browser automation, and deployment flows even
-              smoother while keeping the core open and self-hostable.
+              The platform is already useful as an AI-enabled personal app hub.
+              The next phase is making app publishing, browser actions, and
+              deployment paths even smoother while keeping the core open and
+              self-hostable.
             </p>
             <div class="hero-actions">
               <a href="https://github.com/getappweaver" class="stage-primary-button">

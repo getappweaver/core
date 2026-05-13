@@ -1,57 +1,58 @@
 # AppWeaver
 
-Open-source, AI-first platform for installable apps, automation, and bot workflows that you run from your own environment.
+Open-source app hub for running AI-powered tools from a project or workspace folder you control.
 
 ## What it does
 
-- Install AppWeaver into a project or workspace directory and extend it with plugins
-- Chat with it over Nostr or in the web UI, then use commands from your installed plugins
+- Install AppWeaver into a project or workspace folder and add the apps you want
+- Use focused tools through chat, the web UI, or AI prompts
 - Choose different AI model providers through OpenCode, including pay-as-you-go via Routstr
 - Run with three safety modes: ask (read-only), plan (strategy), agent (full edits)
 
 ## Key features
 
-- **AI-first core** — OpenCode SDK under the hood with support for any model/provider OpenCode supports
-- **Multiple interaction surfaces** — Nostr chat, web UI, and local developer tooling
-- **Permissionless bot accounts** — Run and manage bot identities without a hosted gatekeeper
+- **AI-powered core** — OpenCode SDK under the hood with support for any model/provider OpenCode supports
+- **Prompt-driven apps** — Ask in chat, the web UI, or AI prompts, then let installed apps, skills, and commands do the work
+- **Self-hostable** — Run AppWeaver on infrastructure you control without a hosted gatekeeper
 - **Built-in wallet** — Pay-per-use AI with sats via Cashu and Routstr
 - **Session persistence** — Resume previous conversations and switch contexts
 - **Granular permissions** — Control what the agent can do
-- **Open plugin system** — Install official plugins for bookmarks, todos, jobs, and files, or publish your own
+- **Local-first data** — Your data stays on the computer you control, not in a hosted cloud account
+- **Open app system** — Install apps for todos, bookmarks, scheduled jobs, files, browser actions, publishing, and more, or publish your own
 
 Built with Bun, TypeScript, nostr-tools, and the OpenCode SDK.
 
 **Links:** [Nostr](https://nostr.com/) · [NIP-17 (encrypted DMs)](https://github.com/nostr-protocol/nips/blob/master/17.md) · [Cursor](https://cursor.com) · [OpenCode](https://opencode.ai) · [Cashu](https://cashu.space) · [Routstr](https://routstr.com)
 
-## Plugins
+## Apps
 
-AppWeaver supports installable plugins that add commands, data models, automations, and AI tools. Install one in seconds:
+AppWeaver supports installable apps that add focused tools, commands, data models, and AI skills. Install one in seconds:
 
 ```bash
 bun run plugin:install
 ```
 
-This opens an interactive discovery flow — browse available plugins, check version compatibility with your AppWeaver core, choose an alias, and the plugin is cloned and wired up automatically. Installed plugins register commands under your chosen alias (e.g. `/todo list`, `/todo ai add a high priority task` — examples use the default **`/`** command prefix) and expose AI tools to the OpenCode backend.
+This opens an interactive discovery flow — browse available apps, check version compatibility with your AppWeaver core, choose an alias, and the app is cloned and wired up automatically. Installed apps register commands under your chosen alias (e.g. `/todo list`, `/todo ai add a high priority task` — examples use the default **`/`** command prefix) and expose AI tools to the OpenCode backend.
 
-To update an installed plugin:
+To update an installed app:
 
 ```bash
 bun run plugin:install todo
 ```
 
-### Official plugins
+### Official apps
 
-| Plugin      | Current Nostr URI                                   | Description                                |
+| App         | Current install URI                                 | Description                                |
 | ----------- | --------------------------------------------------- | ------------------------------------------ |
 | **bm**      | `nostr://_@dhalsim.github.io/dm-bot-bm-plugin`      | Bookmark management                        |
 | **todo**    | `nostr://_@dhalsim.github.io/dm-bot-todo-plugin`    | Todo management and AI-assisted draft flow |
 | **job**     | `nostr://_@dhalsim.github.io/dm-bot-job-plugin`     | Scheduled and one-off jobs                 |
 | **file**    | `nostr://_@dhalsim.github.io/dm-bot-file-plugin`    | File management                            |
-| **browser** | `nostr://_@dhalsim.github.io/dm-bot-browser-plugin` | Browser automation plugin in development   |
+| **browser** | `nostr://_@dhalsim.github.io/dm-bot-browser-plugin` | Browser actions app in development         |
 
-See [PLUGINS.md](PLUGINS.md) for full documentation — installing, updating, and authoring your own plugins.
+See [PLUGINS.md](PLUGINS.md) for full documentation — installing, updating, and authoring your own apps.
 
-## How to use AppWeaver (practical workflow)
+## How to use AppWeaver (practical guide)
 
 You have an existing project or workspace. AppWeaver is meant to live inside it as a subfolder while operating on the parent directory by default.
 

@@ -173,7 +173,7 @@ When the bot runs in `agent` mode after an implementation/change request:
 
 # AppWeaver Codebase Context
 
-When editing or extending AppWeaver, use this as the map. AppWeaver is an AI-first platform for installable apps, automation, web workflows, and Nostr-based bot interactions. It can forward Nostr DMs to an agent CLI (Cursor or OpenCode) and send replies back.
+When editing or extending AppWeaver, use this as the map. AppWeaver is an open-source app hub for running AI-powered tools from a project or workspace folder the user controls. Installable apps like todos, bookmarks, scheduled jobs, file tools, browser actions, publishing, and more can be used through chat, the web UI, or AI prompts.
 
 ## File map
 
