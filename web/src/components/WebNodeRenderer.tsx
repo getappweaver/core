@@ -27,6 +27,7 @@ import {
   emitStoryTargetHovered,
   onStoryFillForm,
 } from '../story/events';
+import { writeClipboardText } from '../utils/clipboard';
 
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import { WebButton } from './WebButton';
@@ -2269,6 +2270,20 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
       revealContext?.toggleReveal(action.targetId);
 
       return;
+    }
+
+    if (action.type === 'clientAction') {
+      const clientActionName = action.action.trim();
+
+      if (clientActionName === 'clipboard.writeText') {
+        const text = action.payload?.text;
+
+        if (typeof text === 'string') {
+          void writeClipboardText(text).catch(() => {});
+        }
+
+        return;
+      }
     }
 
     props.onRunAction?.(action, {

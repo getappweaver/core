@@ -301,6 +301,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     if (action.type === 'clientAction') {
+      const clientActionName = action.action.trim();
+
       const runClientAction = (actionPromise: Promise<void>): void => {
         void actionPromise.then(() => {
           const refresh = action.refresh;
@@ -327,7 +329,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         });
       };
 
-      if (action.action === 'roadmap.lightningZap') {
+      if (clientActionName === 'roadmap.lightningZap') {
         runClientAction(
           handleRoadmapLightningZap({
             action,
@@ -338,7 +340,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             setChromeLoading: adapters.setChromeLoading,
           }),
         );
-      } else if (action.action === 'roadmap.createIssue') {
+      } else if (clientActionName === 'roadmap.createIssue') {
         runClientAction(
           handleRoadmapCreateIssue({
             action,
@@ -350,7 +352,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
-      } else if (action.action === 'roadmap.commentIssue') {
+      } else if (clientActionName === 'roadmap.commentIssue') {
         runClientAction(
           handleRoadmapCommentIssue({
             action,
@@ -362,7 +364,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
-      } else if (action.action === 'roadmap.markIssue') {
+      } else if (clientActionName === 'roadmap.markIssue') {
         runClientAction(
           handleRoadmapMarkIssue({
             action,
@@ -375,7 +377,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
-      } else if (action.action === 'roadmap.deleteIssue') {
+      } else if (clientActionName === 'roadmap.deleteIssue') {
         runClientAction(
           handleRoadmapDeleteIssue({
             action,
@@ -388,16 +390,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
-      } else if (action.action === 'clipboard.writeText') {
-        const text = action.payload?.text;
-
-        if (typeof text !== 'string') {
-          return;
-        }
-
-        runClientAction(navigator.clipboard.writeText(text).catch(() => {}));
       } else {
-        adapters.appendSystemMessage(`Unknown client action: ${action.action}`);
+        adapters.appendSystemMessage(
+          `Unknown client action: ${JSON.stringify(action.action)}`,
+        );
       }
 
       return;
