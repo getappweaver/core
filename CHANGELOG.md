@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.10.7] - 2026-05-13
+
+- fix: preparing branding (e9d4d62)
+
 ## [v9.10.6] - 2026-05-13
 
-- fix: agent stream git diff summary (b21f756)
+- fix: agent stream git diff summary (935a0ee)
 
 ## [v9.10.5] - 2026-05-13
 

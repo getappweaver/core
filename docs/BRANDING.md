@@ -42,9 +42,14 @@ Use short, predictable names under the `getappweaver` org:
 - `getappweaver/file-plugin`
 - `getappweaver/browser-plugin`
 
-Recommended plugin repo description pattern:
+Recommended official plugin repo descriptions:
 
-> Official AppWeaver app for `<capability>`. Adds focused AI-powered tools, commands, and data models to an AppWeaver workspace.
+| Alias | App name | Repo description |
+|------|----------|------------------|
+| `todo` | Todo app | Official AppWeaver Todo app. Adds focused AI-powered todo tools, commands, and data models to an AppWeaver workspace. |
+| `file` | File manager | Official AppWeaver File manager. Adds focused AI-powered file management tools, commands, and data models to an AppWeaver workspace. |
+| `job` | Job scheduler | Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace. |
+| `bm` | Bookmark manager | Official AppWeaver Bookmark manager. Adds focused AI-powered bookmark tools, commands, and data models to an AppWeaver workspace. |
 
 ## Nostr repository announcement metadata
 
