@@ -535,7 +535,7 @@ async function handleChat(params: {
                 clientView: null,
                 diff: chunk.files,
                 meta: {
-                  title: 'Patched',
+                  title: 'Git diff',
                   subtitle: null,
                   origin: 'agent_patch',
                 },

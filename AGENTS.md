@@ -24,6 +24,15 @@ Never retry a mutating tool if it returned a Draft ID.
 
 Each skill is a folder: `.claude/skills/<skill_name>/SKILL.md` (OpenCode-compatible YAML frontmatter with `name` matching `<skill_name>`).
 
+## User intent comes first
+
+Before changing files, running implementation commands, linting, or applying the post-edit workflow, infer the user's intent from the whole prompt and the current conversation.
+
+- Treat direct requests to implement, fix, update, rename, remove, add, refactor, run, verify, or commit as change requests. For those, proceed with the normal code-editing workflow.
+- Treat questions, debugging hypotheses, Q&A requests, brainstorming, product/branding discussion, design exploration, wording choices, and prompts like "can it be...", "what do you think...", "why...", or "let's figure out..." as discussion intent. Answer, investigate, or ask focused follow-up questions, but do not edit files or run implementation workflow until the user clearly asks for a change.
+- If the prompt mixes discussion and possible implementation, prefer discussion first. State what you understand and ask one concise question, or offer the likely next change without applying it.
+- Once the user confirms a concrete direction or asks for edits, switch to implementation mode and carry the change through verification as appropriate.
+
 ## Web command UI
 
 Rich command output uses `WebNodeRoot` and optional per-render `stylesheets` (Shadow DOM). See `docs/WEB_RENDERER.md` (section “Scoped styles”).
@@ -147,7 +156,7 @@ function parseModel({ dmBotRoot, mode, modelOverride, providerName }: ParseModel
 
 ## Post-agent lint behavior (agent mode)
 
-When the bot runs in `agent` mode:
+When the bot runs in `agent` mode after an implementation/change request:
 
 - After each agent response, the bot runs `bun run lint` for the active workspace target (`parent` or `appweaver`).
 - The lint result is appended to the response sent to the user.
@@ -156,7 +165,7 @@ When the bot runs in `agent` mode:
 
 ### Agent expectations
 
-- Assume lint may run immediately after your response in `agent` mode.
+- Assume lint may run immediately after your response in `agent` mode when you changed files.
 - If you receive a follow-up message prefixed with `[Post-edit lint feedback]`, treat it as authoritative runtime feedback and fix issues directly.
 - Provide a concise final summary after applying lint-driven fixes.
 
@@ -241,10 +250,11 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 ## After editing AppWeaver code
 
 - `plugins/` is ignored by the root Git repo because plugins are distributed as separate Git repos. Do not assume root `git status` or `git diff` will show plugin edits or new plugin files. For plugin changes, inspect the plugin repo directly, e.g. `git -C plugins/todo status` and `git -C plugins/todo diff`, or use direct file reads/listing when verifying files.
+- Only follow this section after the user has made or confirmed an implementation/change request. Do not run this workflow for questions, brainstorming, Q&A, or discussion-only prompts.
 - Use judgment when deciding whether to run verification. For additive or narrow changes, prefer targeted ESLint with fix enabled on the files you touched (for example `bunx eslint --fix path/to/file.ts path/to/other.ts`) instead of repo-wide `bun run lint`. Do not use `bun run lint path/to/file.ts` for targeted linting because the package script still includes `.` and will lint the whole repo. The codebase is large, and while rapid development cycle, we may lose time on linting unrelated files over and over again.
 - Run repo-wide `bun run lint` when the change is a broad refactor, changes shared types or conventions, affects formatting across many files, or is otherwise likely to surface project-wide issues.
 - For small, simple edits such as docs text, comments, or a narrow CSS variable/value change, lint is optional and can be skipped.
-- If the implementation changed any file under `src/` or `plugins/`, create/touch **`restart.requested`** in the project root after lint/verification passes and the change is ready for the user to test. This is the deliberate bot reload signal for `bun run watch`; do not expect restarts on every save.
+- In native CLI/OpenCode sessions, if the implementation changed any file under `src/` or `plugins/`, create/touch **`restart.requested`** in the project root after lint/verification passes and the change is ready for the user to test. This is the deliberate bot reload signal for `bun run watch`; do not expect restarts on every save. AppWeaver in-app chat may add stricter instructions that forbid touching this file to avoid interrupting the active chat; follow those runtime-specific instructions when present.
 
 ## Codebase vs agent workspace
 

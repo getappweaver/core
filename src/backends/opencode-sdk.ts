@@ -101,6 +101,15 @@ export type OpencodeSetupAuthorizeResult = {
 
 type StoredAuthJson = Record<string, unknown>;
 
+function diffSignature(files: AgentFileDiff[]): string {
+  return files
+    .map(
+      (file) =>
+        `${file.file}\0${file.status ?? ''}\0${file.additions}\0${file.deletions}\0${file.patch}`,
+    )
+    .join('\0\0');
+}
+
 type StartNativeOpenCodeAuthProps = {
   directory: string;
   providerID: string;
@@ -1025,6 +1034,7 @@ export function createOpencodeSDKBackend({
       const logState = createOpencodeStreamLogState(sessionId);
       const streamMetrics = createStreamDebugMetrics('opencode', sessionId);
       let diffEmitted = false;
+      const diffSignatures = new Set<string>();
       const patchDiffMessageIds = new Set<string>();
       let streamErrorMessage: string | null = null;
       let resolveStreamComplete: () => void = () => {};
@@ -1035,6 +1045,18 @@ export function createOpencodeSDKBackend({
 
       const emitStreamChunk = (chunk: AgentStreamChunk): void => {
         if (chunk.kind === 'diff') {
+          const signature = diffSignature(chunk.files);
+
+          if (diffSignatures.has(signature)) {
+            debug('opencode-sdk stream: duplicate diff ignored', {
+              sessionId,
+              files: chunk.files.length,
+            });
+
+            return;
+          }
+
+          diffSignatures.add(signature);
           diffEmitted = true;
         }
 
@@ -1180,8 +1202,6 @@ export function createOpencodeSDKBackend({
                 sessionId,
                 patchMessageId,
               });
-
-              fetchAndEmitDiff(patchMessageId, 'patch-part');
             }
           }
         } catch (err) {

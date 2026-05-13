@@ -8,6 +8,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   const STREAM_TEXT_FLUSH_MS = 80;
 
   const chatStreamAssistantByRequestId = new Map<string, string>();
+  const streamedAssistantRequestIds = new Set<string>();
   const reasoningStreamByRequestId = new Map<string, string>();
   const pendingStreamTextByRequestId = new Map<string, string>();
   const streamFlushTimerByRequestId = new Map<string, number>();
@@ -28,6 +29,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       if (!assistantId) {
         assistantId = adapters.createId();
         chatStreamAssistantByRequestId.set(requestId, assistantId);
+        streamedAssistantRequestIds.add(requestId);
 
         return [
           ...prev,
@@ -75,20 +77,22 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     streamFlushTimerByRequestId.set(requestId, timer);
   }
 
-  function flushBeforeStructuralChunk(requestId: string): void {
+  function closeTextSegmentBeforeStructuralChunk(requestId: string): void {
     const timer = streamFlushTimerByRequestId.get(requestId);
 
     if (timer !== undefined) {
       clearTimeout(timer);
       flushStreamTextDelta(requestId);
     }
+
+    chatStreamAssistantByRequestId.delete(requestId);
   }
 
   function handleStreamReasoningDelta(
     requestId: string,
     deltaText: string,
   ): void {
-    flushBeforeStructuralChunk(requestId);
+    closeTextSegmentBeforeStructuralChunk(requestId);
 
     const itemId = `${requestId}-reasoning`;
 
@@ -130,7 +134,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     id: string,
     text: string,
   ): void {
-    flushBeforeStructuralChunk(requestId);
+    closeTextSegmentBeforeStructuralChunk(requestId);
 
     adapters.setTimeline((prev) => {
       const itemId = `${requestId}-summary-${id}`;
@@ -154,7 +158,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     requestId: string,
     files: TimelineFileDiff[],
   ): void {
-    flushBeforeStructuralChunk(requestId);
+    closeTextSegmentBeforeStructuralChunk(requestId);
 
     adapters.setTimeline((prev) => [
       ...prev,
@@ -163,7 +167,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         type: 'diff',
         files,
         meta: {
-          title: 'Patched',
+          title: 'Git diff',
           subtitle: null,
           origin: 'agent_patch',
         },
@@ -172,6 +176,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleStreamTool(requestId: string, tool: TimelineToolCall): void {
+    closeTextSegmentBeforeStructuralChunk(requestId);
+
     const itemId = `${requestId}-tool-${tool.callId}`;
 
     adapters.setTimeline((prev) => {
@@ -211,11 +217,18 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     }
 
     const assistantId = chatStreamAssistantByRequestId.get(requestId);
+    const hasStreamedAssistant = streamedAssistantRequestIds.has(requestId);
+
     chatStreamAssistantByRequestId.delete(requestId);
+    streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
 
     adapters.setTimeline((prev) => {
+      if (hasStreamedAssistant) {
+        return prev;
+      }
+
       if (assistantId) {
         return prev.map((item) =>
           item.id === assistantId &&
@@ -250,6 +263,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     }
 
     chatStreamAssistantByRequestId.delete(requestId);
+    streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
   }

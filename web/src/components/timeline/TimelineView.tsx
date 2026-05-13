@@ -1,5 +1,7 @@
 import { For, Match, Show, Switch, createSignal } from 'solid-js';
 
+import type { TimelineFileDiff } from '@src/timeline/types';
+
 import { CommandFormCard } from '../../commands/CommandFormCard';
 import type { TimelineItem } from '../../types';
 import {
@@ -83,7 +85,8 @@ export function TimelineView(props: TimelineViewProps) {
 
             <Match when={isToolItem(item)}>
               <TimelineToolCard
-                tool={(item as Extract<TimelineItem, { type: 'tool' }>).tool}
+                item={item as Extract<TimelineItem, { type: 'tool' }>}
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
               />
             </Match>
 
@@ -548,7 +551,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
   const label = () => {
     switch (props.item.meta?.origin) {
       case 'agent_patch':
-        return 'patched';
+        return 'diff';
       case 'git_commit':
         return 'commit diff';
       case 'workspace_diff':
@@ -681,12 +684,13 @@ function TimelineDiffSummaryRow(props: TimelineDiffSummaryRowProps) {
 }
 
 type TimelineToolCardProps = {
-  tool: Extract<TimelineItem, { type: 'tool' }>['tool'];
+  item: Extract<TimelineItem, { type: 'tool' }>;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
 };
 
-function toolStatusLabel(
-  status: TimelineToolCardProps['tool']['status'],
-): string {
+type TimelineTool = TimelineToolCardProps['item']['tool'];
+
+function toolStatusLabel(status: TimelineTool['status']): string {
   switch (status) {
     case 'pending':
       return 'wants to use';
@@ -711,10 +715,7 @@ function stringifyToolValue(value: unknown): string | null {
   return null;
 }
 
-function getToolInputValue(
-  tool: TimelineToolCardProps['tool'],
-  keys: string[],
-): string | null {
+function getToolInputValue(tool: TimelineTool, keys: string[]): string | null {
   for (const key of keys) {
     const value = stringifyToolValue(tool.input[key]);
 
@@ -726,7 +727,7 @@ function getToolInputValue(
   return null;
 }
 
-function toolDisplayName(tool: TimelineToolCardProps['tool']): string {
+function toolDisplayName(tool: TimelineTool): string {
   const raw = tool.tool.split('.').at(-1) ?? tool.tool;
 
   return raw.length > 0 ? raw[0].toUpperCase() + raw.slice(1) : tool.tool;
@@ -743,7 +744,7 @@ function shortenToolTarget(value: string): string {
   return value;
 }
 
-function compactToolSummary(tool: TimelineToolCardProps['tool']): string {
+function compactToolSummary(tool: TimelineTool): string {
   const name = toolDisplayName(tool);
 
   const path = getToolInputValue(tool, [
@@ -772,7 +773,7 @@ function compactToolSummary(tool: TimelineToolCardProps['tool']): string {
   return target ? `${name} ${shortenToolTarget(target)}${suffix}` : name;
 }
 
-function compactToolArrow(tool: TimelineToolCardProps['tool']): string {
+function compactToolArrow(tool: TimelineTool): string {
   if (tool.status === 'error') {
     return '×';
   }
@@ -787,12 +788,149 @@ function compactToolArrow(tool: TimelineToolCardProps['tool']): string {
   return '→';
 }
 
-export function TimelineToolCard(props: TimelineToolCardProps) {
+function isApplyPatchTool(tool: TimelineTool): boolean {
+  return tool.tool === 'apply_patch' || tool.tool.endsWith('.apply_patch');
+}
+
+function applyPatchStatus(header: string): TimelineFileDiff['status'] {
+  if (header === 'Add') {
+    return 'added';
+  }
+
+  if (header === 'Delete') {
+    return 'deleted';
+  }
+
+  return 'modified';
+}
+
+function countPatchAdditions(lines: string[]): number {
+  return lines.filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+    .length;
+}
+
+function countPatchDeletions(lines: string[]): number {
+  return lines.filter((line) => line.startsWith('-') && !line.startsWith('---'))
+    .length;
+}
+
+function getApplyPatchText(tool: TimelineTool): string | null {
+  return getToolInputValue(tool, ['patchText', 'patch', 'diff']);
+}
+
+function parseApplyPatchFiles(tool: TimelineTool): TimelineFileDiff[] {
+  const patchText = getApplyPatchText(tool);
+
+  if (!patchText) {
+    return [];
+  }
+
+  const files: TimelineFileDiff[] = [];
+  let current: {
+    file: string;
+    status: TimelineFileDiff['status'];
+    lines: string[];
+  } | null = null;
+
+  function flushCurrent(): void {
+    if (!current) {
+      return;
+    }
+
+    files.push({
+      file: current.file,
+      patch: current.lines.join('\n'),
+      additions: countPatchAdditions(current.lines),
+      deletions: countPatchDeletions(current.lines),
+      status: current.status,
+    });
+  }
+
+  for (const line of patchText.split('\n')) {
+    const fileHeader = /^\*\*\* (Add|Update|Delete) File: (.+)$/.exec(line);
+
+    if (fileHeader) {
+      flushCurrent();
+
+      current = {
+        file: fileHeader[2] ?? '',
+        status: applyPatchStatus(fileHeader[1] ?? 'Update'),
+        lines: [],
+      };
+
+      continue;
+    }
+
+    if (
+      line === '*** Begin Patch' ||
+      line === '*** End Patch' ||
+      line.startsWith('*** Move to:')
+    ) {
+      continue;
+    }
+
+    current?.lines.push(line);
+  }
+
+  flushCurrent();
+
+  return files.filter((file) => file.file.length > 0);
+}
+
+function TimelinePreparingPatchToolCard(props: { tool: TimelineTool }) {
   return (
     <div class={`card tool-card tool-card--${props.tool.status}`}>
       <div class="tool-card__line" title={toolStatusLabel(props.tool.status)}>
-        <span class="tool-card__arrow">{compactToolArrow(props.tool)}</span>
-        <span>{compactToolSummary(props.tool)}</span>
+        <span class="tool-card__arrow">~</span>
+        <span>Preparing patch...</span>
+      </div>
+    </div>
+  );
+}
+
+export function TimelineToolCard(props: TimelineToolCardProps) {
+  const tool = () => props.item.tool;
+
+  if (isApplyPatchTool(tool()) && tool().status !== 'completed') {
+    return <TimelinePreparingPatchToolCard tool={tool()} />;
+  }
+
+  const patchFiles = () =>
+    isApplyPatchTool(tool()) && tool().status === 'completed'
+      ? parseApplyPatchFiles(tool())
+      : [];
+
+  if (patchFiles().length > 0) {
+    return (
+      <>
+        <For each={patchFiles()}>
+          {(file, index) => (
+            <TimelineDiffCard
+              item={{
+                id: `${props.item.id}-patch-${index()}`,
+                createdAt: props.item.createdAt,
+                source: props.item.source,
+                type: 'diff',
+                files: [file],
+                meta: {
+                  title: 'Patch',
+                  subtitle: null,
+                  origin: 'agent_patch',
+                },
+              }}
+              onDeleteTimelineItem={props.onDeleteTimelineItem}
+            />
+          )}
+        </For>
+      </>
+    );
+  }
+
+  return (
+    <div class={`card tool-card tool-card--${tool().status}`}>
+      <div class="tool-card__line" title={toolStatusLabel(tool().status)}>
+        <span class="tool-card__arrow">{compactToolArrow(tool())}</span>
+        <span>{compactToolSummary(tool())}</span>
       </div>
     </div>
   );

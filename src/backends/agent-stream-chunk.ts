@@ -48,9 +48,6 @@ export type OpencodeStreamLogState = {
   parseState: OpenCodeParseState;
 };
 
-const DIFF_CONTEXT_LINES = 3;
-const MAX_COMPACT_DIFF_LINES = 360;
-
 export function createOpencodeStreamLogState(
   sessionId: string,
 ): OpencodeStreamLogState {
@@ -132,145 +129,6 @@ function extractSessionErrorMessage(error: unknown): string {
   return 'Session error';
 }
 
-function isDiffChangedLine(line: string): boolean {
-  return (
-    (line.startsWith('+') && !line.startsWith('+++')) ||
-    (line.startsWith('-') && !line.startsWith('---'))
-  );
-}
-
-type DiffLinePosition = {
-  oldLine: number;
-  newLine: number;
-} | null;
-
-function parseHunkStart(line: string): DiffLinePosition {
-  const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    oldLine: Number(match[1]),
-    newLine: Number(match[2]),
-  };
-}
-
-function diffLinePositions(lines: string[]): DiffLinePosition[] {
-  const positions: DiffLinePosition[] = [];
-  let oldLine: number | null = null;
-  let newLine: number | null = null;
-
-  for (const line of lines) {
-    const hunkStart = parseHunkStart(line);
-
-    if (hunkStart) {
-      oldLine = hunkStart.oldLine;
-      newLine = hunkStart.newLine;
-      positions.push(null);
-      continue;
-    }
-
-    if (oldLine === null || newLine === null) {
-      positions.push(null);
-      continue;
-    }
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      positions.push({ oldLine, newLine });
-      newLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('-') && !line.startsWith('---')) {
-      positions.push({ oldLine, newLine });
-      oldLine += 1;
-      continue;
-    }
-
-    positions.push({ oldLine, newLine });
-    oldLine += 1;
-    newLine += 1;
-  }
-
-  return positions;
-}
-
-function compactPatchAroundChanges(patch: string): string {
-  const lines = patch.split('\n');
-  const positions = diffLinePositions(lines);
-  const keep = new Set<number>();
-  let hasChangedLine = false;
-
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] ?? '';
-
-    if (
-      line.startsWith('diff --git ') ||
-      line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ')
-    ) {
-      keep.add(i);
-      continue;
-    }
-
-    if (line.startsWith('@@')) {
-      keep.add(i);
-    }
-
-    if (!isDiffChangedLine(line)) {
-      continue;
-    }
-
-    hasChangedLine = true;
-
-    for (
-      let j = Math.max(0, i - DIFF_CONTEXT_LINES);
-      j <= Math.min(lines.length - 1, i + DIFF_CONTEXT_LINES);
-      j += 1
-    ) {
-      keep.add(j);
-    }
-
-    for (let j = i; j >= 0; j -= 1) {
-      if (lines[j]?.startsWith('@@')) {
-        keep.add(j);
-        break;
-      }
-    }
-  }
-
-  if (!hasChangedLine) {
-    return lines.length <= MAX_COMPACT_DIFF_LINES
-      ? patch
-      : lines.slice(0, MAX_COMPACT_DIFF_LINES).join('\n');
-  }
-
-  const compacted: string[] = [];
-  let previousKept = -1;
-
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!keep.has(i)) {
-      continue;
-    }
-
-    if (previousKept >= 0 && i > previousKept + 1) {
-      const position = positions[i];
-
-      compacted.push(
-        position ? `⋮ @@ -${position.oldLine} +${position.newLine} @@` : '⋮',
-      );
-    }
-
-    compacted.push(lines[i] ?? '');
-    previousKept = i;
-  }
-
-  return compacted.join('\n');
-}
-
 export function coerceFileDiff(value: unknown): AgentFileDiff | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -291,7 +149,7 @@ export function coerceFileDiff(value: unknown): AgentFileDiff | null {
 
   return {
     file: rec.file,
-    patch: compactPatchAroundChanges(rec.patch),
+    patch: rec.patch,
     additions: typeof rec.additions === 'number' ? rec.additions : 0,
     deletions: typeof rec.deletions === 'number' ? rec.deletions : 0,
     status,
