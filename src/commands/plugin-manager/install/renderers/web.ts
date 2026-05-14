@@ -26,7 +26,13 @@ const pluginsInstallStylesheet = {
 
     .web-stack.plugins-install-card-main {
       min-width: 0;
-      flex: 1;
+      flex: 1 1 auto;
+    }
+
+    .web-row.plugins-install-card-head > .web-badge {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .web-text.plugins-install-repo {

@@ -1,5 +1,6 @@
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
+import type { LayoutPrefs } from '../../layout/desktopLayoutPrefs';
 import type { TimelineItem } from '../../types';
 
 export type TimelineViewProps = {
@@ -40,4 +41,6 @@ export type TimelineViewProps = {
     value: unknown,
   ) => void;
   onSubmitForm: (itemId: string) => void;
+  layoutPrefs?: LayoutPrefs;
+  onUpdateLayoutPrefs?: (updater: (prefs: LayoutPrefs) => LayoutPrefs) => void;
 };

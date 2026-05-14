@@ -19,6 +19,7 @@
   right: 0;
   top: 100%;
   margin-top: 0.35rem;
+  margin-right: 0.4rem;
   z-index: var(--z-web-overflow-stack);
   display: flex;
   flex-direction: column;

@@ -43,6 +43,7 @@ type HeaderChromeProps = {
   onLogout: () => void;
   onEnablePush: () => void;
   onEnablePiperTts?: () => void;
+  onOpenLayoutSettings?: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
 
@@ -161,6 +162,14 @@ function IconGlyph(props: {
         d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"
         fill="currentColor"
       />
+    </svg>
+  );
+}
+
+function LayoutIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" class="topbar-menu-icon">
+      <path d="M4 5h6v14H4zm9 0h7v6h-7zm0 9h7v5h-7z" fill="currentColor" />
     </svg>
   );
 }
@@ -547,6 +556,19 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               </WebButton>
             )}
           </For>
+          <Show when={props.onOpenLayoutSettings}>
+            {(onOpenLayoutSettings) => (
+              <WebButton
+                type="button"
+                class="connect-btn topbar-menu-btn topbar-icon-btn"
+                onClick={() => onOpenLayoutSettings()()}
+                title="Open desktop layout settings"
+                aria-label="Open desktop layout settings"
+              >
+                <LayoutIcon />
+              </WebButton>
+            )}
+          </Show>
           <WebButton
             type="button"
             class="connect-btn topbar-menu-btn topbar-icon-btn"

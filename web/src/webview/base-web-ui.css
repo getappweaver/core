@@ -445,6 +445,8 @@ select {
   opacity: 0;
   transition: opacity 0.12s ease;
   color: #000;
+  margin-right: 0.4rem;
+  z-index: var(--z-web-overflow-trigger)
 }
 
 .web-overflow-menu.is-link-trigger {
@@ -547,6 +549,7 @@ select {
 .web-textArea .web-textArea__input {
   resize: none;
   line-height: 1.35;
+  min-height: calc(1.35em + 1rem);
 }
 
 .web-select .web-select__input {

@@ -13,7 +13,7 @@
   --color-text: #f5f5f5;
   --color-text-muted: #d6d6d6;
   --color-border: #6f6f6f;
-  --color-accent: #55ffff;
+  --color-accent: #61bebe;
   --color-success: #55ff55;
   --color-warning: #989800;
   --color-warning-muted: #98980091;
@@ -49,6 +49,7 @@
   --z-base: 0;
   --z-web-overflow-backdrop: 0;
   --z-web-overflow-stack: 1;
+  --z-web-overflow-trigger: 1;
   --z-sticky-local: 2;
   --z-chrome-sticky: 3;
   --z-dropdown: 4;
@@ -92,9 +93,245 @@ pre {
 .app-shell {
   min-height: var(--app-viewport-height, 100vh);
   height: var(--app-viewport-height, 100vh);
+  overflow: hidden;
+}
+
+.workspace-shell {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.workspace-main {
+  min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.singleton-dock,
+.workspace-resizer {
+  display: none;
+}
+
+.workspace-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+@media (min-width: 900px) {
+  .workspace-shell--dock-left {
+    grid-template-columns: var(--desktop-dock-width, 360px) 8px minmax(0, 1fr);
+    grid-template-areas: 'dock resizer main';
+  }
+
+  .workspace-shell--dock-right {
+    grid-template-columns: minmax(0, 1fr) 8px var(--desktop-dock-width, 360px);
+    grid-template-areas: 'main resizer dock';
+  }
+
+  .workspace-shell--dock-hidden {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'main';
+  }
+
+  .workspace-main {
+    grid-area: main;
+  }
+
+  .singleton-dock {
+    grid-area: dock;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.65rem;
+    padding: 0.7rem 0.8rem;
+    overflow: hidden;
+    border-right: 1px solid color-mix(in srgb, var(--color-panel-border) 75%, transparent);
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035)),
+      color-mix(in srgb, var(--color-bg) 96%, #000);
+  }
+
+  .workspace-shell--dock-right .singleton-dock {
+    border-right: 0;
+    border-left: 1px solid color-mix(in srgb, var(--color-panel-border) 75%, transparent);
+  }
+
+  .singleton-dock__header {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--color-text);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .singleton-dock__buttons {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .singleton-dock__button {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    border: none;
+    border-radius: 0;
+    background: var(--color-button);
+    color: #000;
+    box-shadow: 4px 4px 0 var(--color-panel-shadow);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    font-size: 0.82rem;
+    line-height: 0;
+  }
+
+  .singleton-dock__button:hover,
+  .singleton-dock__button:focus-visible {
+    background: var(--color-button-hover);
+  }
+
+  .singleton-dock__button:disabled {
+    background: var(--color-silver);
+    box-shadow: none;
+    cursor: default;
+  }
+
+  .singleton-dock__button--open {
+    background: var(--color-warning);
+  }
+
+  .singleton-dock__button--open:hover,
+  .singleton-dock__button--open:focus-visible {
+    background: color-mix(in srgb, var(--color-warning) 78%, #fff);
+  }
+
+  .singleton-dock__button--active {
+    background: var(--color-accent);
+  }
+
+  .singleton-dock__button--active:hover,
+  .singleton-dock__button--active:focus-visible {
+    background: color-mix(in srgb, var(--color-accent) 78%, #fff);
+  }
+
+  .singleton-dock__button-icon {
+    display: block;
+    width: 1.05rem;
+    height: 1.05rem;
+    object-fit: contain;
+  }
+
+  .card-head-widget-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0.22rem;
+    background: var(--color-button);
+    box-sizing: border-box;
+    object-fit: contain;
+  }
+
+  .singleton-dock__cards {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    overflow: hidden;
+    padding: 0 0.25rem 0.45rem 0;
+  }
+
+  .singleton-dock__placeholder {
+    min-height: 0;
+    overflow: auto;
+    padding: 0.65rem;
+    color: var(--color-text-muted);
+    border: 1px dashed color-mix(in srgb, var(--color-panel-border) 70%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+    font-size: 0.86rem;
+    line-height: 1.35;
+  }
+
+  .singleton-dock-card {
+    min-width: 0;
+    display: grid;
+    gap: 0.45rem;
+    outline: none;
+  }
+
+  .singleton-dock-card--active {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .singleton-dock-card--focused {
+    animation: web-highlight-flash 1.2s ease-in-out;
+  }
+
+  .singleton-dock-card__body {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .singleton-dock-card__body > .card {
+    box-shadow: 5px 5px 0 var(--color-panel-shadow);
+  }
+
+  .singleton-dock-card--active .singleton-dock-card__body,
+  .singleton-dock-card--active .singleton-dock-card__body > .card {
+    height: 100%;
+  }
+
+  .singleton-dock-card--active .singleton-dock-card__body > .card {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .singleton-dock-card--active .timeline-card-body {
+    min-height: 0;
+    overflow: auto;
+    scrollbar-width: none;
+  }
+
+  .singleton-dock-card--active .timeline-card-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .singleton-dock-card__body .card-head--timeline-sticky {
+    top: 0;
+  }
+
+  .workspace-resizer {
+    grid-area: resizer;
+    display: block;
+    min-width: 8px;
+    cursor: col-resize;
+    background: transparent;
+    touch-action: none;
+  }
+
+  .workspace-resizer:hover,
+  .workspace-resizer:focus-visible,
+  .workspace-resizing .workspace-resizer {
+    background: color-mix(in srgb, var(--color-warning) 45%, transparent);
+  }
 }
 
 .setup-shell {
@@ -1339,6 +1576,9 @@ pre {
   gap: 0.35rem;
   min-width: 0;
   flex: 1 1 auto;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
 /* Pinned to the timeline viewport while scrolling a tall command result (VSCode-style). */
@@ -1507,6 +1747,7 @@ pre {
   align-items: center;
   gap: 0.35rem;
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .card-head-collapsed-summary {
@@ -1676,6 +1917,43 @@ pre {
 .field-label {
   font-size: 0.86rem;
   color: var(--color-text);
+}
+
+.layout-settings-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 0.85rem;
+}
+
+.layout-settings-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.layout-settings-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.layout-settings-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.layout-settings-option--active {
+  background: var(--color-warning);
+  color: #000;
+}
+
+.layout-settings-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
 }
 
 .field-summary {

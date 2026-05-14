@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.11.0] - 2026-05-14
+
+- feat: add desktop widget dock layout controls (2260df4)
+
 ## [v9.10.7] - 2026-05-13
 
-- fix: preparing branding (e9d4d62)
+- fix: preparing branding (0e15d6c)
 
 ## [v9.10.6] - 2026-05-13
 

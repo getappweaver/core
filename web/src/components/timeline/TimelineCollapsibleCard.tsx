@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, createSignal } from 'solid-js';
+import { Show, createEffect, createSignal } from 'solid-js';
 
 import { WebButton } from '../WebButton';
 
@@ -33,6 +33,9 @@ type TimelineCollapsibleCardProps = {
   expandedTrailingButtonClass?: string;
   /** Shown left of expand/dismiss when minimized (e.g. mode / command tags). */
   collapsedHeadSummary?: JSX.Element;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  onHeadClick?: () => void;
 };
 
 /**
@@ -42,9 +45,44 @@ type TimelineCollapsibleCardProps = {
 export function TimelineCollapsibleCard(
   props: TimelineCollapsibleCardProps,
 ): JSX.Element {
-  const [collapsed, setCollapsed] = createSignal(false);
+  let bodyEl: HTMLDivElement | undefined;
+  const [localCollapsed, setLocalCollapsed] = createSignal(false);
   const dismissLabel = () => props.dismissAriaLabel ?? 'Remove';
   const trailBtn = () => props.expandedTrailingButtonClass ?? '';
+  const isControlled = () => props.collapsed !== undefined;
+  const collapsed = () => props.collapsed ?? localCollapsed();
+
+  const setCollapsed = (next: boolean) => {
+    if (!isControlled()) {
+      setLocalCollapsed(next);
+    }
+
+    props.onCollapsedChange?.(next);
+  };
+
+  const stopChromeClick = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
+
+  const onHeadClick: JSX.EventHandler<HTMLDivElement, MouseEvent> = (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest('button')) {
+      return;
+    }
+
+    props.onHeadClick?.();
+  };
+
+  createEffect(() => {
+    if (collapsed()) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      for (const textarea of bodyEl?.querySelectorAll('textarea') ?? []) {
+        textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+    });
+  });
 
   return (
     <div
@@ -57,6 +95,7 @@ export function TimelineCollapsibleCard(
         when={collapsed()}
         fallback={
           <div
+            onClick={onHeadClick}
             classList={{
               'card-head': true,
               ...(props.expandedHeadClass
@@ -73,7 +112,10 @@ export function TimelineCollapsibleCard(
                   class={`tag tag-button card-head-chrome-btn card-head-minimize ${trailBtn()}`}
                   aria-label="Minimize card"
                   title="Minimize"
-                  onClick={() => setCollapsed(true)}
+                  onClick={(event) => {
+                    stopChromeClick(event);
+                    setCollapsed(true);
+                  }}
                 >
                   {cardHeadUnderscoreIcon()}
                 </WebButton>
@@ -81,7 +123,10 @@ export function TimelineCollapsibleCard(
                   type="button"
                   class={`tag tag-button card-head-chrome-btn card-head-dismiss ${trailBtn()}`}
                   aria-label={dismissLabel()}
-                  onClick={() => props.onDismiss()}
+                  onClick={(event) => {
+                    stopChromeClick(event);
+                    props.onDismiss();
+                  }}
                 >
                   {cardHeadCloseIcon()}
                 </WebButton>
@@ -91,6 +136,7 @@ export function TimelineCollapsibleCard(
         }
       >
         <div
+          onClick={onHeadClick}
           classList={{
             'card-head': true,
             'card-head--collapsed': true,
@@ -110,7 +156,10 @@ export function TimelineCollapsibleCard(
               class={`tag tag-button card-head-chrome-btn card-head-expand ${trailBtn()}`}
               aria-label="Expand card"
               title="Expand"
-              onClick={() => setCollapsed(false)}
+              onClick={(event) => {
+                stopChromeClick(event);
+                setCollapsed(false);
+              }}
             >
               {cardHeadSquareIcon()}
             </WebButton>
@@ -118,7 +167,10 @@ export function TimelineCollapsibleCard(
               type="button"
               class={`tag tag-button card-head-chrome-btn card-head-dismiss ${trailBtn()}`}
               aria-label={dismissLabel()}
-              onClick={() => props.onDismiss()}
+              onClick={(event) => {
+                stopChromeClick(event);
+                props.onDismiss();
+              }}
             >
               {cardHeadCloseIcon()}
             </WebButton>
@@ -127,6 +179,9 @@ export function TimelineCollapsibleCard(
       </Show>
 
       <div
+        ref={(el) => {
+          bodyEl = el;
+        }}
         class="timeline-card-body"
         classList={{ 'timeline-card-body--collapsed': collapsed() }}
       >

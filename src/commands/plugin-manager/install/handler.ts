@@ -163,7 +163,6 @@ function attachInstalledState({
 async function queryPluginCatalog(
   ctx: RouteCommandContext,
 ): Promise<PluginCatalogEntry[]> {
-  const eventRelaysById = new Map<string, Set<string>>();
   const eventsById = new Map<string, NostrEvent>();
 
   const events = await new Promise<NostrEvent[]>((resolve) => {
@@ -175,11 +174,6 @@ async function queryPluginCatalog(
       { kinds: [PLUGIN_KIND], limit: 50 },
       {
         maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
-        receivedEvent: (relay, id) => {
-          const relays = eventRelaysById.get(id) ?? new Set<string>();
-          relays.add(relay.url);
-          eventRelaysById.set(id, relays);
-        },
         onevent: (event) => {
           eventsById.set(event.id, event as NostrEvent);
         },

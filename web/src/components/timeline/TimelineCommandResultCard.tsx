@@ -84,6 +84,10 @@ type TimelineCommandResultCardProps = {
   onRunJsonCommand: TimelineViewProps['onRunJsonCommand'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
   currentUserPubkey: TimelineViewProps['currentUserPubkey'];
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  onHeadClick?: () => void;
+  iconUrl?: string | null;
 };
 
 type SpeechSentenceState = {
@@ -301,9 +305,19 @@ export function TimelineCommandResultCard(
             tabIndex={-1}
             title="Scroll to top of this result"
             aria-label="Scroll to top of this result"
-            onClick={scrollCardToTop}
+            onClick={props.onHeadClick ?? scrollCardToTop}
           />
           <div class="card-head-leading">
+            <Show when={props.iconUrl}>
+              {(iconUrl) => (
+                <img
+                  src={iconUrl()}
+                  alt=""
+                  aria-hidden="true"
+                  class="topbar-menu-icon topbar-menu-icon--image card-head-widget-icon"
+                />
+              )}
+            </Show>
             <WebButton
               type="button"
               class="tag tag-button card-head__control"
@@ -361,6 +375,16 @@ export function TimelineCommandResultCard(
       }
       collapsedHeadSummary={
         <>
+          <Show when={props.iconUrl}>
+            {(iconUrl) => (
+              <img
+                src={iconUrl()}
+                alt=""
+                aria-hidden="true"
+                class="topbar-menu-icon topbar-menu-icon--image card-head-widget-icon"
+              />
+            )}
+          </Show>
           <WebButton
             type="button"
             class="tag tag-button card-head__control"
@@ -381,6 +405,9 @@ export function TimelineCommandResultCard(
         clearTreeItemExpandedStateForScope(props.item.id);
         props.onDeleteTimelineItem(props.item.id);
       }}
+      collapsed={props.collapsed}
+      onCollapsedChange={props.onCollapsedChange}
+      onHeadClick={props.onHeadClick}
     >
       <Show
         when={props.item.web || props.item.clientView}

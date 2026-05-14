@@ -11,6 +11,7 @@ import {
   isDiffItem,
   isDiffSummaryItem,
   isAgentSummaryItem,
+  isLayoutSettingsItem,
   isPromptItem,
   isReasoningItem,
   isSystemItem,
@@ -18,6 +19,7 @@ import {
 } from '../../types';
 
 import { ChatMarkdown } from '../ChatMarkdown';
+import { WebButton } from '../WebButton';
 
 import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
 import { TimelineCommandResultCard } from './TimelineCommandResultCard';
@@ -101,6 +103,19 @@ export function TimelineView(props: TimelineViewProps) {
               />
             </Match>
 
+            <Match when={isLayoutSettingsItem(item)}>
+              <Show when={props.layoutPrefs && props.onUpdateLayoutPrefs}>
+                <TimelineLayoutSettingsCard
+                  item={
+                    item as Extract<TimelineItem, { type: 'layout_settings' }>
+                  }
+                  layoutPrefs={props.layoutPrefs!}
+                  onUpdateLayoutPrefs={props.onUpdateLayoutPrefs!}
+                  onDeleteTimelineItem={props.onDeleteTimelineItem}
+                />
+              </Show>
+            </Match>
+
             <Match when={isCommandResultItem(item)}>
               <div
                 classList={{
@@ -144,6 +159,128 @@ export function TimelineView(props: TimelineViewProps) {
         )}
       </For>
     </div>
+  );
+}
+
+type TimelineLayoutSettingsCardProps = {
+  item: Extract<TimelineItem, { type: 'layout_settings' }>;
+  layoutPrefs: NonNullable<TimelineViewProps['layoutPrefs']>;
+  onUpdateLayoutPrefs: NonNullable<TimelineViewProps['onUpdateLayoutPrefs']>;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+};
+
+function TimelineLayoutSettingsCard(props: TimelineLayoutSettingsCardProps) {
+  const setDockPosition = (dockPosition: 'left' | 'right' | 'hidden') => {
+    props.onUpdateLayoutPrefs((prefs) => ({ ...prefs, dockPosition }));
+  };
+
+  const setDockExpandedLimit = (dockExpandedLimit: number) => {
+    props.onUpdateLayoutPrefs((prefs) => ({ ...prefs, dockExpandedLimit }));
+  };
+
+  return (
+    <TimelineCollapsibleCard
+      class="card command-card layout-settings-card"
+      expandedHeadClass="card-head--timeline-sticky"
+      expandedTrailingButtonClass="card-head__control"
+      expandedHead={
+        <div class="card-head-leading">
+          <span>Layout</span>
+          <span>Desktop</span>
+        </div>
+      }
+      collapsedHeadSummary={
+        <span class="tag card-head__control">
+          Layout: {props.layoutPrefs.dockPosition}
+        </span>
+      }
+      dismissAriaLabel="Close layout settings"
+      onDismiss={() => props.onDeleteTimelineItem(props.item.id)}
+    >
+      <div class="layout-settings-panel">
+        <div class="layout-settings-group">
+          <div class="layout-settings-label">Dock position</div>
+          <div class="layout-settings-options" role="radiogroup">
+            <WebButton
+              type="button"
+              class="tag tag-button layout-settings-option"
+              classList={{
+                'layout-settings-option--active':
+                  props.layoutPrefs.dockPosition === 'left',
+              }}
+              role="radio"
+              aria-checked={props.layoutPrefs.dockPosition === 'left'}
+              onClick={() => setDockPosition('left')}
+            >
+              Left {props.layoutPrefs.dockPosition === 'left' ? '✓' : ''}
+            </WebButton>
+            <WebButton
+              type="button"
+              class="tag tag-button layout-settings-option"
+              classList={{
+                'layout-settings-option--active':
+                  props.layoutPrefs.dockPosition === 'right',
+              }}
+              role="radio"
+              aria-checked={props.layoutPrefs.dockPosition === 'right'}
+              onClick={() => setDockPosition('right')}
+            >
+              Right {props.layoutPrefs.dockPosition === 'right' ? '✓' : ''}
+            </WebButton>
+            <WebButton
+              type="button"
+              class="tag tag-button layout-settings-option"
+              classList={{
+                'layout-settings-option--active':
+                  props.layoutPrefs.dockPosition === 'hidden',
+              }}
+              role="radio"
+              aria-checked={props.layoutPrefs.dockPosition === 'hidden'}
+              onClick={() => setDockPosition('hidden')}
+            >
+              Hidden {props.layoutPrefs.dockPosition === 'hidden' ? '✓' : ''}
+            </WebButton>
+          </div>
+        </div>
+        <div class="layout-settings-group">
+          <div class="layout-settings-label">Dock open cards</div>
+          <div class="layout-settings-options" role="radiogroup">
+            {[0, 1, 2, 3].map((limit) => (
+              <WebButton
+                type="button"
+                class="tag tag-button layout-settings-option"
+                classList={{
+                  'layout-settings-option--active':
+                    props.layoutPrefs.dockExpandedLimit === limit,
+                }}
+                role="radio"
+                aria-checked={props.layoutPrefs.dockExpandedLimit === limit}
+                onClick={() => setDockExpandedLimit(limit)}
+              >
+                {limit === 0 ? 'No limit' : `${limit}`}{' '}
+                {props.layoutPrefs.dockExpandedLimit === limit ? '✓' : ''}
+              </WebButton>
+            ))}
+          </div>
+        </div>
+        <label class="layout-settings-checkbox-row">
+          <input
+            type="checkbox"
+            class="checkbox-retro"
+            checked={props.layoutPrefs.dockResizable}
+            onChange={(event) => {
+              const dockResizable = event.currentTarget.checked;
+
+              props.onUpdateLayoutPrefs((prefs) => ({
+                ...prefs,
+                dockResizable,
+              }));
+            }}
+          />
+          <span>Resizable</span>
+        </label>
+      </div>
+    </TimelineCollapsibleCard>
   );
 }
 

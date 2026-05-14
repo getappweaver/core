@@ -195,6 +195,12 @@ export type TimelineItem =
       id: string;
       createdAt?: number;
       source?: MessageSource;
+      type: 'layout_settings';
+    }
+  | {
+      id: string;
+      createdAt?: number;
+      source?: MessageSource;
       type: 'command_result';
       command: string;
       subcommand: string;
@@ -265,6 +271,12 @@ export function isPromptItem(
   item: TimelineItem,
 ): item is Extract<TimelineItem, { type: 'prompt' }> {
   return item.type === 'prompt';
+}
+
+export function isLayoutSettingsItem(
+  item: TimelineItem,
+): item is Extract<TimelineItem, { type: 'layout_settings' }> {
+  return item.type === 'layout_settings';
 }
 
 export function isCommandResultItem(
