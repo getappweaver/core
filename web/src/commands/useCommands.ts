@@ -40,6 +40,20 @@ function shouldRefreshComposerAiState(
   );
 }
 
+function withInitialRevealedIds(
+  root: WebNodeRoot,
+  revealIds: string[] | undefined,
+): WebNodeRoot {
+  if (revealIds === undefined || revealIds.length === 0) {
+    return root;
+  }
+
+  return {
+    ...root,
+    initialRevealedIds: [...(root.initialRevealedIds ?? []), ...revealIds],
+  };
+}
+
 function taskbarLoadingWeb(command: string, subcommand: string): WebNodeRoot {
   return {
     kind: 'ui',
@@ -659,7 +673,9 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           !action.refresh &&
           !recordTl
         ) {
-          params.onReplaceRoot(output.web);
+          params.onReplaceRoot(
+            withInitialRevealedIds(output.web, commandAction.revealIds),
+          );
         }
 
         dispatchRefreshOnce('final');

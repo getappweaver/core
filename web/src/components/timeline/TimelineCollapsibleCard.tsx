@@ -104,7 +104,7 @@ export function TimelineCollapsibleCard(
             }}
           >
             {props.expandedHead}
-            <div class="card-head-right-cluster">
+            <div class="card-head-right-cluster" onClick={stopChromeClick}>
               {props.expandedHeadToolbar}
               <span class="card-head-trailing-actions">
                 <WebButton

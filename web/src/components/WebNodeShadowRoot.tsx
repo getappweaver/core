@@ -181,6 +181,24 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   });
 
   createEffect(() => {
+    const initialRevealedIds = currentRoot().initialRevealedIds ?? [];
+
+    if (initialRevealedIds.length === 0) {
+      return;
+    }
+
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+
+      for (const id of initialRevealedIds) {
+        next.add(id);
+      }
+
+      return next;
+    });
+  });
+
+  createEffect(() => {
     const c = ctx();
 
     if (!c) {

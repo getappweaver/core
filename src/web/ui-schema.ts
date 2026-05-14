@@ -107,6 +107,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     surface: z.enum(['timeline', 'modal']).optional(),
     /** Optional title when `surface` is `modal`. */
     modalTitle: z.string().min(1).optional(),
+    /** Reveal these local UI targets after replacing the current web root with this command result. */
+    revealIds: z.array(z.string().min(1)).optional(),
   }),
   z.object({
     /** Browser-side action handled by the web app; payload is client-specific JSON. */
@@ -208,6 +210,10 @@ export const WebPropsSchema = z.object({
   choiceLabels: z.record(z.string(), z.string()).optional(),
   /** `select`/`textField`: initially selected or prefilled value. */
   value: z.string().optional(),
+  /** `choiceField`: initially selected values for multi-select fields. */
+  values: z.array(z.string()).optional(),
+  /** `choiceField`: allow selecting multiple choices; submits one form value per selection. */
+  multiple: z.literal(true).optional(),
   /** `choiceField`: option value that opens a freeform numeric/text input. */
   customChoice: z.string().optional(),
   /** `textArea`: maximum auto-grown visible rows before internal scrolling. */
@@ -319,6 +325,7 @@ export const WebRenderResultSchema = z.object({
   meta: WebRenderMetaSchema,
   tree: WebNodeSchema,
   stylesheets: z.array(WebStyleSheetSchema).optional(),
+  initialRevealedIds: z.array(z.string().min(1)).optional(),
   shadowMountOverflow: WebShadowMountOverflowSchema.optional(),
 });
 

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.12.0] - 2026-05-15
+
+- feat: support persistent web UI reveal state (fe28a01)
+
 ## [v9.11.0] - 2026-05-14
 
-- feat: add desktop widget dock layout controls (2260df4)
+- feat: add desktop widget dock layout controls (57d04db)
 
 ## [v9.10.7] - 2026-05-13
 

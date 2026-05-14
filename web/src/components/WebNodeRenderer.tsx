@@ -928,6 +928,7 @@ function listScrollableAncestors(el: HTMLElement): HTMLElement[] {
 function WebOverflowMenuElement(props: WebOverflowMenuProps) {
   const [open, setOpen] = createSignal(false);
   const [flipUp, setFlipUp] = createSignal(false);
+  const getBusy = useContext(WebShadowUiBusyContext);
   let rootEl: HTMLDivElement | undefined;
   let panelEl: HTMLDivElement | undefined;
   const triggerProps = () => props.element.props;
@@ -1139,6 +1140,7 @@ function WebOverflowMenuElement(props: WebOverflowMenuProps) {
                 role="menuitem"
                 class={`${elementClass(mi)} web-button`}
                 data-story-target={mi.props?.storyTargetId}
+                disabled={mi.props?.disabled === true || getBusy() === true}
                 ref={(el) =>
                   mi.props?.storyTargetId
                     ? registerStoryDomTarget(mi.props.storyTargetId, el)
@@ -1155,7 +1157,19 @@ function WebOverflowMenuElement(props: WebOverflowMenuProps) {
                   props.runAction(mi.props?.action);
                 }}
               >
-                {mi.props?.label ?? ''}
+                <Show
+                  when={(mi.children ?? []).length > 0}
+                  fallback={mi.props?.label ?? ''}
+                >
+                  <For each={mi.children ?? []}>
+                    {(child) => (
+                      <WebNodeRenderer
+                        node={child}
+                        onRunAction={props.runAction}
+                      />
+                    )}
+                  </For>
+                </Show>
               </WebButton>
             )}
           </For>
@@ -1898,10 +1912,15 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
 
     for (const [key, value] of fd.entries()) {
       if (typeof value === 'string') {
-        if (optionFieldNames.has(key)) {
-          mergedOptions[key] = value;
+        const target = optionFieldNames.has(key) ? mergedOptions : mergedArgs;
+        const existing = target[key];
+
+        if (existing === undefined) {
+          target[key] = value;
+        } else if (Array.isArray(existing)) {
+          existing.push(value);
         } else {
-          mergedArgs[key] = value;
+          target[key] = [existing, value];
         }
       }
     }
@@ -2183,13 +2202,43 @@ function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
 function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
   const choices = () => props.element.props?.choices ?? [];
   const customChoice = () => props.element.props?.customChoice ?? 'custom';
+  const multiple = () => props.element.props?.multiple === true;
 
   const [selected, setSelected] = createSignal(
     props.element.props?.value ?? choices()[0] ?? '',
   );
 
+  const [selectedValues, setSelectedValues] = createSignal<Set<string>>(
+    new Set(props.element.props?.values ?? []),
+  );
+
   const name = props.element.props?.formFieldName;
   let customInputEl: HTMLInputElement | undefined;
+
+  const selectedValueList = createMemo(() => Array.from(selectedValues()));
+
+  const choiceSelected = (choice: string) =>
+    multiple() ? selectedValues().has(choice) : selected() === choice;
+
+  const toggleChoice = (choice: string) => {
+    if (!multiple()) {
+      setSelected(choice);
+
+      return;
+    }
+
+    setSelectedValues((current) => {
+      const next = new Set(current);
+
+      if (next.has(choice)) {
+        next.delete(choice);
+      } else {
+        next.add(choice);
+      }
+
+      return next.size === 0 ? current : next;
+    });
+  };
 
   createEffect(() => {
     if (selected() !== customChoice() || customInputEl == null) {
@@ -2205,8 +2254,17 @@ function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
       data-ui={elementUi(props.element)}
       style={elementStyle(props.element)}
     >
-      <Show when={selected() !== customChoice()}>
-        <input type="hidden" name={name} value={selected()} />
+      <Show
+        when={multiple()}
+        fallback={
+          <Show when={selected() !== customChoice()}>
+            <input type="hidden" name={name} value={selected()} />
+          </Show>
+        }
+      >
+        <For each={selectedValueList()}>
+          {(choice) => <input type="hidden" name={name} value={choice} />}
+        </For>
       </Show>
       <div class="web-choiceField__choices">
         <For each={choices()}>
@@ -2214,10 +2272,11 @@ function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
             <WebButton
               type="button"
               class="web-choiceField__choice"
-              classList={{ 'is-selected': selected() === choice }}
-              onClick={() => setSelected(choice)}
+              classList={{ 'is-selected': choiceSelected(choice) }}
+              data-choice={choice}
+              onClick={() => toggleChoice(choice)}
             >
-              {choice}
+              {props.element.props?.choiceLabels?.[choice] ?? choice}
             </WebButton>
           )}
         </For>
@@ -2390,7 +2449,22 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                         runAction(element.props?.action);
                       }}
                     >
-                      {element.props?.label ?? ''}
+                      <Show
+                        when={(element.children ?? []).length > 0}
+                        fallback={element.props?.label ?? ''}
+                      >
+                        <For each={element.children ?? []}>
+                          {(child) => (
+                            <WebNodeRenderer
+                              node={child}
+                              onReplaceRoot={props.onReplaceRoot}
+                              onError={props.onError}
+                              promptRequestId={props.promptRequestId}
+                              onRunAction={props.onRunAction}
+                            />
+                          )}
+                        </For>
+                      </Show>
                     </WebButton>
                   );
                 })()}
@@ -2456,7 +2530,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                       style={elementStyle(element)}
                       type="checkbox"
                       name={name()}
-                      value="true"
+                      value={element.props?.value ?? 'true'}
                       checked={element.props?.checked === true}
                       disabled={element.props?.disabled === true}
                     />
@@ -2519,7 +2593,22 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                     runAction(element.props?.action);
                   }}
                 >
-                  {element.props?.label ?? ''}
+                  <Show
+                    when={(element.children ?? []).length > 0}
+                    fallback={element.props?.label ?? ''}
+                  >
+                    <For each={element.children ?? []}>
+                      {(child) => (
+                        <WebNodeRenderer
+                          node={child}
+                          onReplaceRoot={props.onReplaceRoot}
+                          onError={props.onError}
+                          promptRequestId={props.promptRequestId}
+                          onRunAction={props.onRunAction}
+                        />
+                      )}
+                    </For>
+                  </Show>
                 </WebButton>
               </Match>
 
