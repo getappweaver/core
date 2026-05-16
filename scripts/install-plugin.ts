@@ -956,7 +956,7 @@ async function installPlugin(
   console.log('\nChoose a short, memorable name (e.g. "todo", "jobs").');
 
   const suggestedAlias = plugin.name
-    .replace(/^dm-bot-/, '')
+    .replace(/^(?:appweaver|dm-bot)-/, '')
     .replace(/-plugin$/, '');
 
   let alias = await ask(`Alias (default: ${suggestedAlias}): `);

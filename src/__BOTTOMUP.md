@@ -35,7 +35,7 @@ children:
 # src
 
 ## Purpose
-Source root for a NIP-17 Nostr DM bot that listens on NIP-17 DMs and routes commands to plugins. Entry point is index.ts; cli.ts serves as the local CLI runner for plugin tool invocations. Uses Bun SQLite for state, nostr-tools for protocol, and a provider abstraction for LLM backends.
+Source root for AppWeaver's NIP-17 command runtime that listens on encrypted Nostr DMs and routes commands to plugins. Entry point is index.ts; cli.ts serves as the local CLI runner for plugin tool invocations. Uses Bun SQLite for state, nostr-tools for protocol, and a provider abstraction for LLM backends.
 
 ## Files
 - `budget-annotation.ts` - Extracts !!N sats budget annotations from prompt strings for paid provider flows.

@@ -42,13 +42,14 @@ bun run plugin:install todo
 
 ### Official apps
 
-| App         | Current install URI                                 | Description                                |
-| ----------- | --------------------------------------------------- | ------------------------------------------ |
-| **bm**      | `nostr://_@dhalsim.github.io/dm-bot-bm-plugin`      | Bookmark management                        |
-| **todo**    | `nostr://_@dhalsim.github.io/dm-bot-todo-plugin`    | Todo management and AI-assisted draft flow |
-| **job**     | `nostr://_@dhalsim.github.io/dm-bot-job-plugin`     | Scheduled and one-off jobs                 |
-| **file**    | `nostr://_@dhalsim.github.io/dm-bot-file-plugin`    | File management                            |
-| **browser** | `nostr://_@dhalsim.github.io/dm-bot-browser-plugin` | Browser actions app in development         |
+| App         | Official repo                               | Description                                |
+| ----------- | ------------------------------------------- | ------------------------------------------ |
+| **bm**      | `getappweaver/bookmarks-plugin`             | Bookmark management                        |
+| **todo**    | `getappweaver/todo-plugin`                  | Todo management and AI-assisted draft flow |
+| **job**     | `getappweaver/jobs-plugin`                  | Scheduled and one-off jobs                 |
+| **file**    | `getappweaver/file-plugin`                  | File management                            |
+| **browser** | `getappweaver/browser-plugin`               | Browser actions app in development         |
+| **journal** | `getappweaver/journal-plugin`               | Private journaling and publishable notes   |
 
 See [PLUGINS.md](PLUGINS.md) for full documentation — installing, updating, and authoring your own apps.
 

@@ -178,7 +178,7 @@ async function main(): Promise<void> {
 
   const coreApiVersion = coreAnswer || defaultCore;
 
-  const packageName = `dm-bot-${alias}-plugin`;
+  const packageName = `appweaver-${alias}-plugin`;
   const outDir = join(PLUGINS_DIR, alias);
 
   if (existsSync(outDir)) {

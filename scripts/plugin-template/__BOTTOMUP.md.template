@@ -20,4 +20,4 @@ Scaffold plugin generated from `scripts/plugin-template/`. `list` and `show` inc
 - `db.ts` — SQLite open + table migration + CRUD in one file
 - `ai.ts` — tool schema + `executeTool` (used by `plugin:generate`)
 
-Regenerate bottom-up docs for this folder after substantive edits (`bun src/cli.ts file bottomup …` per dm-bot-file skill).
+Regenerate bottom-up docs for this folder after substantive edits (`bun src/cli.ts file bottomup …` per appweaver-file skill).

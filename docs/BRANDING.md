@@ -41,6 +41,7 @@ Use short, predictable names under the `getappweaver` org:
 - `getappweaver/jobs-plugin`
 - `getappweaver/file-plugin`
 - `getappweaver/browser-plugin`
+- `getappweaver/journal-plugin`
 
 Recommended official plugin repo descriptions:
 
@@ -51,6 +52,7 @@ Recommended official plugin repo descriptions:
 | `job` | Job scheduler | Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace. |
 | `bm` | Bookmark manager | Official AppWeaver Bookmark manager. Adds focused AI-powered bookmark tools, commands, and data models to an AppWeaver workspace. |
 | `browser` | Browser actions | Official AppWeaver Browser actions app. Adds focused AI-powered browser automation tools, commands, and data models to an AppWeaver workspace. |
+| `journal` | Captain's Log | Official AppWeaver Captain's Log journal app. Adds private journaling, searchable notes, drafts, and explicit Nostr publishing to an AppWeaver workspace. |
 
 ## Nostr repository announcement metadata
 
@@ -127,6 +129,7 @@ Use these for GitHub topics, Nostr repository announcement tags, Nostr profile h
 - `files`
 - `browser-actions`
 - `publishing`
+- `journaling`
 
 ### Recommended default sets
 
@@ -140,7 +143,7 @@ Nostr profile / social posts:
 
 Official plugin repos:
 
-> `appweaver`, `plugin`, `ai-tools`, `automation`, `typescript`, plus the app capability tag such as `todos`, `bookmarks`, `jobs`, `files`, `browser-actions`, or `publishing`
+> `appweaver`, `plugin`, `ai-tools`, `automation`, `typescript`, plus the app capability tag such as `todos`, `bookmarks`, `jobs`, `files`, `browser-actions`, `journaling`, or `publishing`
 
 ## Product vocabulary
 

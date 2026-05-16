@@ -40,7 +40,7 @@ Check `plugins.json` in the AppWeaver root:
   "plugins": [
     {
       "alias": "todo",
-      "repo": "nostr://npub1.../dm-bot-todo-plugin",
+      "repo": "nostr://npub1.../appweaver-todo-plugin",
       "version": "v1.0.1"
     }
   ]
@@ -114,7 +114,7 @@ my-plugin/
   format.ts                 ← display helpers
   reply-tone.ts             ← tone hints for plain-text replies (optional pattern)
   renderers/text.ts         ← render*Text + shared representation union
-  __BOTTOMUP.md             ← optional; scope_root for dm-bot-file bottom-up docs
+  __BOTTOMUP.md             ← optional; scope_root for appweaver-file bottom-up docs
   commands/
     help/module.ts          ← get*CommandDefinition + get*HelpLines
     help/adapter.ts
@@ -141,7 +141,7 @@ Older in-tree plugins may add `output/`, web renderers, or extra `db/` modules; 
 
 ```json
 {
-  "name": "dm-bot-todo-plugin",
+  "name": "appweaver-todo-plugin",
   "version": "1.0.1",
   "description": "Todo management plugin for AppWeaver",
   "dmBot": {
@@ -164,7 +164,7 @@ export let PluginContext: PluginContext | null = null;
 
 export const ExamplePlugin: BotPlugin = {
   identity: {
-    name: 'dm-bot-example-plugin',
+    name: 'appweaver-example-plugin',
     alias: 'example',
     version: '1.0.0',
     description: '…',
@@ -256,11 +256,11 @@ The published event looks like:
 {
   "kind": 32107,
   "tags": [
-    ["d", "dm-bot-todo-plugin"],
+    ["d", "appweaver-todo-plugin"],
     ["description", "Todo management plugin for AppWeaver"],
     ["version", "v1.0.1"],
     ["coreApiVersion", "5"],
-    ["t", "dm-bot-plugin"],
+    ["t", "appweaver-plugin"],
     ["ref", "v1.0.0", "5", "Initial release"],
     ["ref", "v1.0.1", "5", "Fix parent_id coercion"]
   ]
@@ -311,7 +311,7 @@ Plugins open `plugins/<alias>/db.sqlite` through `openDb()` in `db.ts` and run `
 
 Plugin repo URLs support both formats:
 
-- `nostr://npub1abc.../dm-bot-todo-plugin` — direct npub
-- `nostr://_@yourdomain.com/dm-bot-todo-plugin` — NIP-05 identity
+- `nostr://npub1abc.../appweaver-todo-plugin` — direct npub
+- `nostr://_@yourdomain.com/appweaver-todo-plugin` — NIP-05 identity
 
 The installer resolves NIP-05 identities via `.well-known/nostr.json?name=<name>` automatically.

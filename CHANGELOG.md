@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.15.3] - 2026-05-16
+
+- docs: update plugin branding names (c47bde2)
+
 ## [v9.15.2] - 2026-05-16
 
-- docs: add Captain's Log plan (77023e3)
+- docs: add Captain's Log plan (0d0c3f2)
 
 ## [v9.15.1] - 2026-05-16
 

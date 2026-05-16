@@ -52,7 +52,7 @@ Check the current version in `package.json`.
 
 If you use a **nested** Git repo for a plugin (for example `git init` in `plugins/todo` so you can tag releases separately), you can reuse the **same** hook scripts as the core repo—no need to copy `commit-msg` / `post-commit` into the plugin folder.
 
-From the plugin directory (repository root of that plugin), run once to point Git at the parent dm-bot `scripts` directory (same hooks as the core repo):
+From the plugin directory (repository root of that plugin), run once to point Git at the parent AppWeaver `scripts` directory (same hooks as the core repo):
 
 ```bash
 bun run contrib:setup
@@ -60,7 +60,7 @@ bun run contrib:setup
 
 Use the same commit messages as above (`--patch` / `--minor` / `--major`). The hooks bump **`package.json` in that plugin’s work tree**, not the AppWeaver root.
 
-If the plugin is cloned **standalone** (not inside a dm-bot checkout), copy the `scripts/` hook files from this repo or set `core.hooksPath` to an absolute path to your dm-bot `scripts` directory on that machine.
+If the plugin is cloned **standalone** (not inside an AppWeaver checkout), copy the `scripts/` hook files from this repo or set `core.hooksPath` to an absolute path to your AppWeaver `scripts` directory on that machine.
 
 ## For Developers: Using ngit-helper.sh
 

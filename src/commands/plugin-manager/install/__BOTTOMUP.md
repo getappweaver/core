@@ -11,7 +11,7 @@ children:
 # install
 
 ## Purpose
-Plugin installer subcommand for the dm-bot plugin manager. Discovers installable plugins from Nostr kind 32107 events, checks core version compatibility, and routes output to text or web renderers.
+Plugin installer subcommand for the AppWeaver plugin manager. Discovers installable plugins from Nostr kind 32107 events, checks core version compatibility, and routes output to text or web renderers.
 
 ## Files
 - `definition.ts` - Exports plugin install subcommand definition with web widget metadata
@@ -19,7 +19,7 @@ Plugin installer subcommand for the dm-bot plugin manager. Discovers installable
 
 ## Notes
 - Queries kind 32107 Nostr events from 4 hardcoded relays
-- Reads installed plugins from plugins.json in dm-bot root
+- Reads installed plugins from plugins.json in the AppWeaver root
 - Matches catalog plugins to installed ones via repo URL or alias
 
 ## Subdirectories
