@@ -1,10 +1,14 @@
 import type { TextRenderContext } from '@src/system/render-context';
 import { assertUnreachable } from '@src/utils';
 
+import { renderSessionAdoptText } from './adopt/renderers/text';
+import type { SessionAdoptRepresentation } from './adopt/representation';
 import { renderSessionAttachText } from './attach/renderers/text';
 import type { SessionAttachRepresentation } from './attach/representation';
 import { renderSessionListText } from './list/renderers/text';
 import type { SessionListRepresentation } from './list/representation';
+import { renderSessionListNativeText } from './list-native/renderers/text';
+import type { SessionListNativeRepresentation } from './list-native/representation';
 import { renderSessionMessagesText } from './messages/renderers/text';
 import type { SessionMessagesRepresentation } from './messages/representation';
 import { renderSessionNewText } from './new/renderers/text';
@@ -18,11 +22,13 @@ import type { SessionUsageRepresentation } from './usage/representation';
 
 export type SessionTextRepresentation =
   | SessionUsageRepresentation
+  | SessionAdoptRepresentation
   | SessionAttachRepresentation
   | SessionNewRepresentation
   | SessionResumeLastRepresentation
   | SessionResumeRepresentation
   | SessionListRepresentation
+  | SessionListNativeRepresentation
   | SessionMessagesRepresentation;
 
 export function renderSessionText(
@@ -32,6 +38,8 @@ export function renderSessionText(
   switch (representation.kind) {
     case 'session.usage':
       return renderSessionUsageText(representation, context);
+    case 'session.adopt':
+      return renderSessionAdoptText(representation, context);
     case 'session.attach':
       return renderSessionAttachText(representation, context);
     case 'session.new':
@@ -42,6 +50,8 @@ export function renderSessionText(
       return renderSessionResumeText(representation, context);
     case 'session.list':
       return renderSessionListText(representation, context);
+    case 'session.list-native':
+      return renderSessionListNativeText(representation, context);
     case 'session.messages':
       return renderSessionMessagesText(representation, context);
     default:

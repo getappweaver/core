@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.15.0] - 2026-05-16
+
+- feat: add native session adoption (347129a)
+
 ## [v9.14.1] - 2026-05-16
 
-- fix: support richer WebNode interactions (a9b7cc2)
+- fix: support richer WebNode interactions (a06508c)
 
 ## [v9.14.0] - 2026-05-16
 

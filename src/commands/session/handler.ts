@@ -6,8 +6,10 @@ import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 import { appendStatusBlock } from '../shared/with-status';
 
+import { handleSessionAdopt } from './adopt/handler';
 import { handleSessionAttach } from './attach/handler';
 import { handleSessionList } from './list/handler';
+import { handleSessionListNative } from './list-native/handler';
 import { handleSessionMessages } from './messages/handler';
 import { handleSessionNew } from './new/handler';
 import { handleSessionResume } from './resume/handler';
@@ -66,6 +68,24 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
     );
   }
 
+  if (sub === 'adopt') {
+    const sessionId = args[1];
+
+    return handleError(
+      async () =>
+        render(
+          await handleSessionAdopt({
+            db: ctx.seenDb,
+            sessionId: sessionId ?? '',
+            prefix: p,
+            activeBackend: ctx.backend.name,
+            cwd: ctx.cwd,
+          }),
+        ),
+      'Failed to adopt session',
+    );
+  }
+
   if (sub === 'resume-last') {
     return handleError(
       async () =>
@@ -99,6 +119,23 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
     return handleError(
       async () => render(handleSessionList({ db: ctx.seenDb })),
       'Failed to list sessions',
+    );
+  }
+
+  if (sub === 'list-native') {
+    const backendFlag = args[1] ?? '';
+
+    return handleError(
+      async () =>
+        render(
+          await handleSessionListNative({
+            db: ctx.seenDb,
+            backendFlag,
+            cwd: ctx.cwd,
+            prefix: p,
+          }),
+        ),
+      'Failed to list native sessions',
     );
   }
 
