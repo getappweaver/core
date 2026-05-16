@@ -541,6 +541,12 @@ type WebTreeItemProps = {
   ) => void;
 };
 
+type RunLocalWebActionProps = {
+  action: WebAction;
+  expandedById: Map<string, boolean> | undefined;
+  revealContext: WebRevealContextValue | undefined;
+};
+
 /** Bulk expand/collapse from the tree header; epoch increments on each user action. */
 type TreeBulkExpandState = {
   epoch: number;
@@ -616,6 +622,48 @@ function expandTreeItemsForAction(
   if (typeof value === 'string' && value.length > 0) {
     expandedById.set(fromOption.template.replace('$1', value), true);
   }
+}
+
+function runLocalWebAction({
+  action,
+  expandedById,
+  revealContext,
+}: RunLocalWebActionProps): boolean {
+  expandTreeItemsForAction(action, expandedById);
+
+  if (action.type === 'reveal') {
+    revealContext?.reveal(action.targetId);
+
+    return true;
+  }
+
+  if (action.type === 'hideReveal') {
+    revealContext?.hideReveal(action.targetId);
+
+    return true;
+  }
+
+  if (action.type === 'toggleReveal') {
+    revealContext?.toggleReveal(action.targetId);
+
+    return true;
+  }
+
+  if (action.type === 'clientAction') {
+    const clientActionName = action.action.trim();
+
+    if (clientActionName === 'clipboard.writeText') {
+      const text = action.payload?.text;
+
+      if (typeof text === 'string') {
+        void writeClipboardText(text).catch(() => {});
+      }
+
+      return true;
+    }
+  }
+
+  return false;
 }
 
 type TreeFilterState = {
@@ -1577,6 +1625,23 @@ function WebTreeElement(props: WebTreeElementProps) {
     );
   };
 
+  const runTreeAction = (action: WebAction) => {
+    if (
+      runLocalWebAction({
+        action,
+        expandedById,
+        revealContext,
+      })
+    ) {
+      return;
+    }
+
+    props.onRunAction?.(action, {
+      onReplaceRoot: props.onReplaceRoot,
+      promptRequestId: props.promptRequestId,
+    });
+  };
+
   createEffect(() => {
     if (parentBulk !== undefined) {
       return;
@@ -1598,30 +1663,7 @@ function WebTreeElement(props: WebTreeElementProps) {
       showTreeControls: childTreeItems(props.element).length > 0,
       showRefresh: meta != null,
       actions: props.element.props?.toolbarActions,
-      runAction: (action) => {
-        if (action.type === 'reveal') {
-          revealContext?.reveal(action.targetId);
-
-          return;
-        }
-
-        if (action.type === 'hideReveal') {
-          revealContext?.hideReveal(action.targetId);
-
-          return;
-        }
-
-        if (action.type === 'toggleReveal') {
-          revealContext?.toggleReveal(action.targetId);
-
-          return;
-        }
-
-        props.onRunAction?.(action, {
-          onReplaceRoot: props.onReplaceRoot,
-          promptRequestId: props.promptRequestId,
-        });
-      },
+      runAction: runTreeAction,
       collapseAll: () =>
         setBulk((prev) => ({
           epoch: prev.epoch + 1,
@@ -2107,6 +2149,17 @@ function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   });
 
   createEffect(() => {
+    const value = props.element.props?.value ?? '';
+
+    if (!textareaEl || textareaEl.value === value) {
+      return;
+    }
+
+    textareaEl.value = value;
+    queueMicrotask(resize);
+  });
+
+  createEffect(() => {
     if (props.element.props?.autoFocus !== true || textareaEl == null) {
       return;
     }
@@ -2135,6 +2188,7 @@ function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
         class="web-textArea__input"
         name={name}
         rows={1}
+        value={props.element.props?.value ?? ''}
         placeholder={props.element.props?.inputPlaceholder}
         disabled={props.element.props?.disabled === true || getBusy() === true}
         autocomplete="off"
@@ -2311,38 +2365,14 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
       return;
     }
 
-    expandTreeItemsForAction(action, expandedById);
-
-    if (action.type === 'reveal') {
-      revealContext?.reveal(action.targetId);
-
+    if (
+      runLocalWebAction({
+        action,
+        expandedById,
+        revealContext,
+      })
+    ) {
       return;
-    }
-
-    if (action.type === 'hideReveal') {
-      revealContext?.hideReveal(action.targetId);
-
-      return;
-    }
-
-    if (action.type === 'toggleReveal') {
-      revealContext?.toggleReveal(action.targetId);
-
-      return;
-    }
-
-    if (action.type === 'clientAction') {
-      const clientActionName = action.action.trim();
-
-      if (clientActionName === 'clipboard.writeText') {
-        const text = action.payload?.text;
-
-        if (typeof text === 'string') {
-          void writeClipboardText(text).catch(() => {});
-        }
-
-        return;
-      }
     }
 
     props.onRunAction?.(action, {
@@ -2416,7 +2446,22 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                           }
                         }}
                       >
-                        {element.props?.label ?? ''}
+                        <Show
+                          when={(element.children ?? []).length > 0}
+                          fallback={element.props?.label ?? ''}
+                        >
+                          <For each={element.children ?? []}>
+                            {(child) => (
+                              <WebNodeRenderer
+                                node={child}
+                                onReplaceRoot={props.onReplaceRoot}
+                                onError={props.onError}
+                                promptRequestId={props.promptRequestId}
+                                onRunAction={props.onRunAction}
+                              />
+                            )}
+                          </For>
+                        </Show>
                       </WebButton>
                     );
                   }
