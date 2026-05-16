@@ -1398,6 +1398,17 @@ pre {
   white-space: nowrap;
 }
 
+a.diff-line__number {
+  text-decoration: none;
+  cursor: copy;
+}
+
+a.diff-line__number:hover,
+a.diff-line__number:focus-visible {
+  color: var(--color-link, #8ab4f8);
+  text-decoration: underline;
+}
+
 .diff-line__text {
   display: table-cell;
   width: auto;

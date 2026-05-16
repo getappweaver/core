@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.16.0] - 2026-05-16
+
+- feat: copy current diff line references (20b715b)
+
 ## [v9.15.4] - 2026-05-16
 
-- docs: clarify journal publish wording (fde4d7e)
+- docs: clarify journal publish wording (f95564a)
 
 ## [v9.15.3] - 2026-05-16
 

@@ -17,6 +17,7 @@ import {
   isSystemItem,
   isToolItem,
 } from '../../types';
+import { writeClipboardText } from '../../utils/clipboard';
 
 import { ChatMarkdown } from '../ChatMarkdown';
 import { WebButton } from '../WebButton';
@@ -674,6 +675,10 @@ function renderDiffPatchLines(patch: string): RenderedDiffLine[] {
   return rendered;
 }
 
+function copyLineReference(text: string): void {
+  void writeClipboardText(text).catch(() => {});
+}
+
 export function TimelineDiffCard(props: TimelineDiffCardProps) {
   let cardEl: HTMLDivElement | undefined;
 
@@ -786,9 +791,24 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
                       <span class="diff-line__number">
                         {line.oldLine ?? ''}
                       </span>
-                      <span class="diff-line__number">
-                        {line.newLine ?? ''}
-                      </span>
+                      <Show
+                        when={line.newLine}
+                        fallback={<span class="diff-line__number" />}
+                      >
+                        {(newLine) => (
+                          <a
+                            class="diff-line__number diff-line__number--current"
+                            href="#"
+                            title="Copy line reference"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              copyLineReference(`${file.file}:${newLine()}`);
+                            }}
+                          >
+                            {newLine()}
+                          </a>
+                        )}
+                      </Show>
                       <span class="diff-line__text">{line.text || ' '}</span>
                     </span>
                   )}
