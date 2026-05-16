@@ -23,6 +23,7 @@ type TimelineCollapsibleCardProps = {
    * nothing to contribute — same idea as a slot, but Solid only has props/`children`, not `<slot>`.
    */
   expandedHeadToolbar?: JSX.Element;
+  expandedTrailingMiddle?: JSX.Element;
   onDismiss: () => void;
   dismissAriaLabel?: string;
   children: JSX.Element;
@@ -119,6 +120,7 @@ export function TimelineCollapsibleCard(
                 >
                   {cardHeadUnderscoreIcon()}
                 </WebButton>
+                {props.expandedTrailingMiddle}
                 <WebButton
                   type="button"
                   class={`tag tag-button card-head-chrome-btn card-head-dismiss ${trailBtn()}`}

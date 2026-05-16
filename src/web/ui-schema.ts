@@ -312,6 +312,20 @@ export const WebStyleSheetSchema = z.object({
   cssText: z.string(),
 });
 
+export const WebWidgetHelpStorySchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  pluginAlias: z.string().min(1),
+  iconUrl: z.string().optional(),
+});
+
+export const WebWidgetHelpSchema = z.object({
+  title: z.string().min(1),
+  body: z.array(z.string().min(1)),
+  stories: z.array(WebWidgetHelpStorySchema).optional(),
+});
+
 /**
  * How the Solid mount div inside the shadow root handles overflow.
  * - `scroll-y` (default when omitted): mount scrolls when the tree is taller than the host (e.g. timeline cards).
@@ -325,6 +339,7 @@ export const WebRenderResultSchema = z.object({
   meta: WebRenderMetaSchema,
   tree: WebNodeSchema,
   stylesheets: z.array(WebStyleSheetSchema).optional(),
+  widgetHelp: WebWidgetHelpSchema.optional(),
   initialRevealedIds: z.array(z.string().min(1)).optional(),
   shadowMountOverflow: WebShadowMountOverflowSchema.optional(),
 });

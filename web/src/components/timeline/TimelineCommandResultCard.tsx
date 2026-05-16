@@ -1,4 +1,4 @@
-import { Show, createMemo, createSignal, onCleanup } from 'solid-js';
+import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
 
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
@@ -118,6 +118,68 @@ function passiveStoryRuntimeStoryId(
   const payload = item.clientView!.payload as StoryRuntimePayload;
 
   return typeof payload.id === 'string' ? payload.id : null;
+}
+
+function WidgetHelpPanel(props: {
+  root: WebNodeRoot;
+  onStartStory: (storyId: string) => void;
+}) {
+  const help = () => props.root.widgetHelp;
+
+  return (
+    <Show when={help()}>
+      {(content) => (
+        <section class="widget-help-panel" aria-label="Widget help">
+          <div class="widget-help-panel__intro">
+            <h3>{content().title}</h3>
+            <For each={content().body}>{(line) => <p>{line}</p>}</For>
+          </div>
+          <Show when={(content().stories ?? []).length > 0}>
+            <div class="widget-help-panel__stories">
+              <div class="widget-help-panel__eyebrow">Related stories</div>
+              <div class="widget-help-story-list">
+                <For each={content().stories ?? []}>
+                  {(story) => (
+                    <button
+                      type="button"
+                      class="widget-help-story"
+                      onClick={() => props.onStartStory(story.id)}
+                    >
+                      <span class="widget-help-story__icon">
+                        <Show
+                          when={story.iconUrl}
+                          fallback={story.pluginAlias.slice(0, 2).toUpperCase()}
+                        >
+                          {(iconUrl) => <img src={iconUrl()} alt="" />}
+                        </Show>
+                      </span>
+                      <span class="widget-help-story__main">
+                        <span class="widget-help-story__head">
+                          <span class="widget-help-story__title">
+                            {story.title}
+                          </span>
+                          <span class="widget-help-story__plugin">
+                            {story.pluginAlias}
+                          </span>
+                        </span>
+                        <Show when={story.description}>
+                          {(description) => (
+                            <span class="widget-help-story__description">
+                              {description()}
+                            </span>
+                          )}
+                        </Show>
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </section>
+      )}
+    </Show>
+  );
 }
 
 function findTtsText(node: WebNode): string | null {
@@ -255,6 +317,8 @@ export function TimelineCommandResultCard(
   const [webTreeToolbar, setWebTreeToolbar] =
     createSignal<WebTreeToolbarRegistration | null>(null);
 
+  const [widgetHelpOpen, setWidgetHelpOpen] = createSignal(false);
+
   const [webTreeHeaderEl, setWebTreeHeaderEl] =
     createSignal<HTMLElement | null>(null);
 
@@ -273,6 +337,20 @@ export function TimelineCommandResultCard(
   const storyRuntimeId = createMemo(() =>
     passiveStoryRuntimeStoryId(props.item),
   );
+
+  const widgetHelp = createMemo(() => props.item.web?.widgetHelp ?? null);
+
+  const startStory = (storyId: string) => {
+    props.onRunWebAction({
+      type: 'command',
+      command: 'story',
+      subcommand: 'start',
+      arguments: { id: storyId },
+      options: {},
+      recordInTimeline: true,
+      surface: 'timeline',
+    });
+  };
 
   const ttsText = createMemo(() => webRootTtsText(props.item.web));
   const speechHighlightActive = () => speechState().active;
@@ -373,6 +451,20 @@ export function TimelineCommandResultCard(
           </Show>
         </>
       }
+      expandedTrailingMiddle={
+        <Show when={widgetHelp()}>
+          <WebButton
+            type="button"
+            class="tag tag-button card-head__control card-head-chrome-btn widget-help-toggle"
+            aria-label="Widget help"
+            title="Widget help"
+            aria-pressed={widgetHelpOpen()}
+            onClick={() => setWidgetHelpOpen((open) => !open)}
+          >
+            ?
+          </WebButton>
+        </Show>
+      }
       collapsedHeadSummary={
         <>
           <Show when={props.iconUrl}>
@@ -409,6 +501,9 @@ export function TimelineCommandResultCard(
       onCollapsedChange={props.onCollapsedChange}
       onHeadClick={props.onHeadClick}
     >
+      <Show when={widgetHelpOpen() && props.item.web}>
+        <WidgetHelpPanel root={props.item.web!} onStartStory={startStory} />
+      </Show>
       <Show
         when={props.item.web || props.item.clientView}
         fallback={<pre>{props.item.text ?? ''}</pre>}
