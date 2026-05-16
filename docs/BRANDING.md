@@ -52,7 +52,7 @@ Recommended official plugin repo descriptions:
 | `job` | Job scheduler | Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace. |
 | `bm` | Bookmark manager | Official AppWeaver Bookmark manager. Adds focused AI-powered bookmark tools, commands, and data models to an AppWeaver workspace. |
 | `browser` | Browser actions | Official AppWeaver Browser actions app. Adds focused AI-powered browser automation tools, commands, and data models to an AppWeaver workspace. |
-| `journal` | Captain's Log | Official AppWeaver Captain's Log journal app. Adds private journaling, searchable notes, drafts, and explicit Nostr publishing to an AppWeaver workspace. |
+| `journal` | Captain's Log | Official AppWeaver Captain's Log journal app. Adds private journaling, searchable notes, drafts, and optional publishing to Nostr. |
 
 ## Nostr repository announcement metadata
 
