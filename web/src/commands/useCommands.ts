@@ -4,6 +4,7 @@ import type {
   WebNodeRoot,
 } from '@src/web/ui-schema';
 
+import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
 import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
 import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
 import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
@@ -404,6 +405,47 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
+      } else if (clientActionName === 'nostr.publishKind1') {
+        void handleNostrPublishKind1Action({
+          action,
+          currentUserPubkey: adapters.currentUserPubkey(),
+          signEvent: adapters.signEvent,
+          setChromeWeb: adapters.setChromeWeb,
+          setChromeText: adapters.setChromeText,
+          setChromeError: adapters.setChromeError,
+          setChromeLoading: adapters.setChromeLoading,
+          appendSystemMessage: adapters.appendSystemMessage,
+        }).then((result) => {
+          if (!result) {
+            return;
+          }
+
+          const onSuccess = result.onSuccessCommand;
+
+          runWebAction(
+            {
+              type: 'command',
+              command: onSuccess.command,
+              subcommand: onSuccess.subcommand,
+              arguments: {
+                ...onSuccess.arguments,
+                nostrUrl: result.nostrUrl,
+                url: result.nostrUrl,
+              },
+              options: onSuccess.options,
+              refresh: action.refresh,
+              recordInTimeline: false,
+            },
+            {
+              onReplaceRoot: params?.onReplaceRoot,
+              promptRequestId: params?.promptRequestId,
+              uiExecutionPolicy: {
+                recordInTimeline: false,
+                suppressSystemMessage: true,
+              },
+            },
+          );
+        });
       } else {
         adapters.appendSystemMessage(
           `Unknown client action: ${JSON.stringify(action.action)}`,
