@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.15.1] - 2026-05-16
+
+- fix: refine web dock header spacing (2fe06c5)
+
 ## [v9.15.0] - 2026-05-16
 
-- feat: add native session adoption (347129a)
+- feat: add native session adoption (e634fd3)
 
 ## [v9.14.1] - 2026-05-16
 
