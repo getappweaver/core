@@ -158,9 +158,6 @@ function WidgetHelpPanel(props: {
                           <span class="widget-help-story__title">
                             {story.title}
                           </span>
-                          <span class="widget-help-story__plugin">
-                            {story.pluginAlias}
-                          </span>
                         </span>
                         <Show when={story.description}>
                           {(description) => (

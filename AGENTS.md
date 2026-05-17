@@ -37,6 +37,15 @@ Before changing files, running implementation commands, linting, or applying the
 
 Rich command output uses `WebNodeRoot` and optional per-render `stylesheets` (Shadow DOM). See `docs/WEB_RENDERER.md` (section “Scoped styles”).
 
+### Widget design defaults
+
+- Build compact widgets by default. Avoid excessive padding, redundant wrappers, unnecessary borders, shadows, and rounded corners.
+- Prefer alignment, typography, spacing, and subtle background changes over decorative containers.
+- Reuse space where it improves clarity: make labels, timestamps, status text, and small metadata carry actions when appropriate instead of adding extra buttons.
+- Use existing CSS variables via `var(...)` for colors. Define scoped variables in the widget stylesheet when a new repeated color is needed, instead of hard-coding similar one-off mixes.
+- Keep row/list item styles dense and readable. Use alternating row backgrounds only when they are visibly distinct from the parent surface.
+- Before doing substantial design coding, propose the visual structure briefly and ask the user to confirm or adjust it. Do this especially for new widgets or major layout changes.
+
 ### No plugin code under `src/` or `web/`
 
 `src/` (bot core, shared `WebNode` schema, Nostr, etc.) and `web/` (the web app) must stay **plugin-agnostic**. Do not add imports from `plugins/`, command-plugin–specific types, `WebElementTag` / `WebProps` values, renderer branches, or comments that exist only to support one plugin. Plugin behavior belongs under `plugins/` (renderers, adapters, definitions). The Web UI wire format is still **JSON** (`WebNodeRoot` / `WebNode`); the web app only implements **generic** tags and `WebAction` handling once. If a feature needs a new building block, add a **reusable** primitive in `src/web/ui-schema.ts` and the client renderer, not a one-off for a given plugin. See `docs/WEB_RENDERER.md` (e.g. “Scoped styles”) for the renderer model.

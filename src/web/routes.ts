@@ -9,7 +9,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 
 import type { SimplePool } from 'nostr-tools/pool';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 import {
   authorizeOpencodeSetupProvider,
@@ -19,6 +19,12 @@ import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-resta
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
+import {
+  BunkerSignerDataSchema,
+  getConnection,
+  listConnections,
+  saveConnection,
+} from '@src/nostr/connections';
 import type { ProviderDb } from '@src/providers/db';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import type { WalletDb } from '@src/wallet/db';
@@ -563,6 +569,61 @@ export function createWebFetchHandler(
       return jsonResponse({
         commands: listAllCommandsDetailForWeb(ctx.prefix),
       });
+    }
+
+    if (req.method === 'GET' && path === '/api/bunker/connections') {
+      return jsonResponse({
+        connections: listConnections(ctx.seenDb).map((connection) => ({
+          name: connection.name,
+          data: connection.data,
+          createdAtMs: connection.created_at,
+        })),
+      });
+    }
+
+    if (req.method === 'POST' && path === '/api/bunker/connections') {
+      return parseJsonBody(req)
+        .then((payload) => {
+          const parsed = z
+            .object({
+              name: z.string().trim().min(1),
+              data: BunkerSignerDataSchema,
+            })
+            .parse(payload);
+
+          if (getConnection(ctx.seenDb, parsed.name)) {
+            throw new Error('duplicate_bunker_connection');
+          }
+
+          saveConnection(ctx.seenDb, parsed.name, 'bunker', parsed.data);
+
+          const connection = getConnection(ctx.seenDb, parsed.name);
+
+          if (!connection) {
+            throw new Error('bunker_connection_save_failed');
+          }
+
+          return jsonResponse({
+            ok: true,
+            connection: {
+              name: connection.name,
+              data: connection.data,
+              createdAtMs: connection.created_at,
+            },
+          });
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+
+          const status =
+            message === 'invalid_json' || err instanceof ZodError
+              ? 400
+              : message === 'duplicate_bunker_connection'
+                ? 409
+                : 500;
+
+          return jsonResponse({ error: message }, { status });
+        });
     }
 
     if (req.method === 'POST' && path === '/api/chat') {

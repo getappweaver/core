@@ -3,6 +3,8 @@ import { assertUnreachable } from '@src/utils';
 
 import { renderBunkerAddCli } from './add/renderers/cli';
 import type { BunkerAddRepresentation } from './add/representation';
+import { renderBunkerDeleteCli } from './delete/renderers/cli';
+import type { BunkerDeleteRepresentation } from './delete/representation';
 import { renderBunkerListCli } from './list/renderers/cli';
 import type { BunkerListRepresentation } from './list/representation';
 import { renderBunkerUsageCli } from './usage/renderers/cli';
@@ -11,7 +13,8 @@ import type { BunkerUsageRepresentation } from './usage/representation';
 export type BunkerCliRepresentation =
   | BunkerUsageRepresentation
   | BunkerListRepresentation
-  | BunkerAddRepresentation;
+  | BunkerAddRepresentation
+  | BunkerDeleteRepresentation;
 
 export function renderBunkerCli(
   representation: BunkerCliRepresentation,
@@ -24,6 +27,8 @@ export function renderBunkerCli(
       return renderBunkerListCli(representation, context);
     case 'bunker.add':
       return renderBunkerAddCli(representation, context);
+    case 'bunker.delete':
+      return renderBunkerDeleteCli(representation, context);
     default:
       return assertUnreachable(representation);
   }

@@ -9,9 +9,15 @@ import type { EventTemplate } from 'nostr-tools';
 import { finalizeEvent, getPublicKey } from 'nostr-tools';
 import { decrypt } from 'nostr-tools/nip49';
 import type { Accessor, JSX } from 'solid-js';
-import { createContext, createSignal, useContext } from 'solid-js';
+import { Show, createContext, createSignal, useContext } from 'solid-js';
 
+import { SignEventModal } from '../components/SignEventModal';
 import { bunkerSignEvent } from '../nostr/bunker';
+import {
+  type BunkerConnection,
+  listBunkerConnections,
+  saveBunkerConnection,
+} from '../nostr/bunkerConnections';
 import { signEventWithNip55 } from '../nostr/nip55';
 import type { BunkerSignerData } from '../nostr/storage';
 import {
@@ -108,6 +114,25 @@ export type ConnectArgs =
       secretKey: Uint8Array;
     };
 
+type SignedNostrEvent = EventTemplate & {
+  id: string;
+  sig: string;
+  pubkey: string;
+};
+
+type SignEventChoice =
+  | { method: 'current' }
+  | { method: 'bunker'; bunkerData: BunkerSignerData };
+
+type SignEventRequest = {
+  title: string;
+  resolve: (choice: SignEventChoice | null) => void;
+};
+
+type SignEventOptions = {
+  title: string | null;
+};
+
 export type NostrAuthContextValue = {
   authState: Accessor<AuthState>;
   connect: (args: ConnectArgs) => void;
@@ -116,9 +141,8 @@ export type NostrAuthContextValue = {
   unlockNip49: (password: string) => Promise<void>;
   signEvent: (
     event: EventTemplate,
-  ) => Promise<
-    (EventTemplate & { id: string; sig: string; pubkey: string }) | null
-  >;
+    options?: SignEventOptions,
+  ) => Promise<SignedNostrEvent | null>;
   getNip98Token: (url: string, method: string) => Promise<string | null>;
 };
 
@@ -197,6 +221,13 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   const [authState, setAuthState] = createSignal<AuthState>(
     readInitialAuthState(),
   );
+
+  const [bunkerConnections, setBunkerConnections] = createSignal<
+    BunkerConnection[]
+  >([]);
+
+  const [signEventRequest, setSignEventRequest] =
+    createSignal<SignEventRequest | null>(null);
 
   let nip49ExpiryTimer: number | null = null;
 
@@ -331,11 +362,48 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     return btoa(JSON.stringify(signed));
   }
 
-  async function signEvent(
+  async function refreshBunkerConnections(): Promise<void> {
+    setBunkerConnections(await listBunkerConnections());
+  }
+
+  async function addBunkerConnection(props: {
+    name: string;
+    data: BunkerSignerData;
+  }): Promise<BunkerConnection> {
+    const { name, data } = props;
+
+    const connection = await saveBunkerConnection({
+      name,
+      data,
+    });
+
+    await refreshBunkerConnections();
+
+    return connection;
+  }
+
+  function requestSignEventChoice(
+    title: string,
+  ): Promise<SignEventChoice | null> {
+    return new Promise((resolve) => {
+      setSignEventRequest({ title, resolve });
+    });
+  }
+
+  function resolveSignEventChoice(choice: SignEventChoice | null): void {
+    const request = signEventRequest();
+
+    if (!request) {
+      return;
+    }
+
+    setSignEventRequest(null);
+    request.resolve(choice);
+  }
+
+  async function signWithCurrentAccount(
     event: EventTemplate,
-  ): Promise<
-    (EventTemplate & { id: string; sig: string; pubkey: string }) | null
-  > {
+  ): Promise<SignedNostrEvent | null> {
     const state = authState();
 
     if (state.status === 'disconnected' || state.status === 'locked') {
@@ -370,6 +438,35 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     }
 
     return bunkerSignEvent(state.bunkerData, event);
+  }
+
+  async function signEvent(
+    event: EventTemplate,
+    options?: SignEventOptions,
+  ): Promise<SignedNostrEvent | null> {
+    const state = authState();
+
+    if (state.status === 'disconnected' || state.status === 'locked') {
+      return null;
+    }
+
+    try {
+      await refreshBunkerConnections();
+    } catch {
+      setBunkerConnections([]);
+    }
+
+    const choice = await requestSignEventChoice(options?.title ?? 'Sign event');
+
+    if (!choice) {
+      return null;
+    }
+
+    if (choice.method === 'bunker') {
+      return bunkerSignEvent(choice.bunkerData, event);
+    }
+
+    return signWithCurrentAccount(event);
   }
 
   function connect(args: ConnectArgs): void {
@@ -476,6 +573,26 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   return (
     <NostrAuthContext.Provider value={value}>
       {props.children}
+      <Show when={signEventRequest()}>
+        {() => {
+          const state = authState();
+
+          if (state.status !== 'connected') {
+            return null;
+          }
+
+          return (
+            <SignEventModal
+              title={signEventRequest()?.title ?? 'Sign event'}
+              currentPubkey={state.pubkey}
+              bunkerConnections={bunkerConnections()}
+              onAddBunker={addBunkerConnection}
+              onChoose={resolveSignEventChoice}
+              onCancel={() => resolveSignEventChoice(null)}
+            />
+          );
+        }}
+      </Show>
     </NostrAuthContext.Provider>
   );
 }

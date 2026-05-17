@@ -19,12 +19,17 @@ export function renderBunkerListCli(
     case 'list':
       return d.items
         .map((item, index) => {
-          const firstRelay = item.relays[0] ?? '(none)';
+          const remoteSignerLine =
+            item.remoteSignerPubkey === item.userPubkey
+              ? ''
+              : `\nRemote signer: ${formatBunkerPubkey(item.remoteSignerPubkey)}`;
+
+          const relays =
+            item.relays.length > 0 ? item.relays.join(', ') : '(none)';
 
           return `${index + 1}. ${item.name}
-User: ${formatBunkerPubkey(item.userPubkey)}
-Remote signer: ${formatBunkerPubkey(item.remoteSignerPubkey)}
-Relays: ${item.relays.length} (${firstRelay})
+User: ${formatBunkerPubkey(item.userPubkey)}${remoteSignerLine}
+Relays: ${item.relays.length} (${relays})
 Created: ${formatBunkerCreatedAt(item.createdAtMs)}`;
         })
         .join('\n\n');

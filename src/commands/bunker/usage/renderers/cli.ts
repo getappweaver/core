@@ -8,5 +8,5 @@ export function renderBunkerUsageCli(
 ): string {
   const p = context.prefix;
 
-  return `Usage: ${p}bunker list | ${p}bunker add <name> <bunker://...>`;
+  return `Usage: ${p}bunker list | ${p}bunker add <name> <bunker://...> | ${p}bunker delete <name>`;
 }

@@ -6,6 +6,7 @@ import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
 import { getBunkerAddSubcommandDefinition } from './add/definition';
+import { getBunkerDeleteSubcommandDefinition } from './delete/definition';
 import { getBunkerListSubcommandDefinition } from './list/definition';
 
 type GetBunkerCommandDefinitionProps = {
@@ -19,15 +20,16 @@ export function getBunkerCommandDefinition({
 
   return {
     name: 'bunker',
-    summary: 'Bunker remote signers: list and add connections.',
+    summary: 'Bunker remote signers: list, add, and delete connections.',
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'bunker', {
-        topicArgSummary: 'Optional: list or add.',
-        exampleTopics: ['list', 'add'],
+        topicArgSummary: 'Optional: list, add, or delete.',
+        exampleTopics: ['list', 'add', 'delete'],
       }),
       getBunkerListSubcommandDefinition(p),
       getBunkerAddSubcommandDefinition(p),
+      getBunkerDeleteSubcommandDefinition(p),
     ],
   };
 }

@@ -18,6 +18,7 @@ const PublishKind1PayloadSchema = z.object({
   content: z.string().min(1),
   tags: z.array(z.array(z.string())),
   fallbackRelays: z.array(z.string().min(1)).min(1),
+  signTitle: z.string().min(1).optional(),
   statusTitle: z.string().min(1).default('Published to Nostr'),
   statusMessage: z.string().optional(),
   onSuccessCommand: OnSuccessCommandSchema,
@@ -26,7 +27,10 @@ const PublishKind1PayloadSchema = z.object({
 type PublishKind1Deps = {
   action: Extract<WebAction, { type: 'clientAction' }>;
   currentUserPubkey: string | null;
-  signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
+  signEvent: (
+    event: EventTemplate,
+    options?: { title: string | null },
+  ) => Promise<NostrEvent | null>;
   setChromeWeb: (root: WebNodeRoot | null) => void;
   setChromeText: (text: string | null) => void;
   setChromeError: (text: string | null) => void;
@@ -140,11 +144,6 @@ export async function handleNostrPublishKind1Action({
       throw new Error('Connect or unlock a Nostr signer to publish.');
     }
 
-    const relays = await fetchUserWriteRelays(
-      currentUserPubkey,
-      payload.fallbackRelays,
-    );
-
     const template: EventTemplate = {
       kind: 1,
       created_at: Math.floor(Date.now() / 1000),
@@ -152,11 +151,18 @@ export async function handleNostrPublishKind1Action({
       tags: payload.tags,
     };
 
-    const signed = await signEvent(template);
+    const signed = await signEvent(template, {
+      title: payload.signTitle ?? 'Sign event',
+    });
 
     if (!signed) {
       throw new Error('Connect or unlock a Nostr signer to publish.');
     }
+
+    const relays = await fetchUserWriteRelays(
+      signed.pubkey,
+      payload.fallbackRelays,
+    );
 
     const acceptedRelays = await publishEvent(relays, signed);
 

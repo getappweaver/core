@@ -7,6 +7,7 @@ import { renderBuiltinHelpText } from '../help/renderers/text';
 
 import { handleBunkerAdd } from './add/handler';
 import { renderBunkerCli } from './cli-representation';
+import { handleBunkerDelete } from './delete/handler';
 import { handleBunkerList } from './list/handler';
 import { createBunkerUsageRepresentation } from './usage/representation';
 
@@ -46,6 +47,15 @@ export const handleBunkerRoot: BuiltinHandler = (ctx) => {
       const rep = await handleBunkerAdd({
         db: ctx.seenDb,
         pool: ctx.pool,
+        args,
+      });
+
+      return renderBunkerCli(rep, { prefix: p });
+    }
+
+    if (subcmd === 'delete' || subcmd === 'remove' || subcmd === 'rm') {
+      const rep = handleBunkerDelete({
+        db: ctx.seenDb,
         args,
       });
 

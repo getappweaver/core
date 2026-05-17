@@ -248,7 +248,7 @@ export function clearNip49Bundle(): void {
   clearStorageValue(NIP49_PUBKEY_KEY, LEGACY_NIP49_PUBKEY_KEY);
 }
 
-/** Clears bunker, NIP-07, NIP-55, and NIP-49 signer data from localStorage. */
+/** Clears the active signer; saved bunker connections remain available for signing choices. */
 export function clearAllNostrSignerStorage(): void {
   clearBunkerData();
   clearNip07Pubkey();

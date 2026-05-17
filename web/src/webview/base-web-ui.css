@@ -514,7 +514,7 @@ select {
 .web-form--stacked .web-form__actions {
   margin-top: 0;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .web-form--stacked .web-form__actions .web-button {
