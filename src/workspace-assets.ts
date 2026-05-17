@@ -146,7 +146,7 @@ function updateParentGitignore({
   dmBotRoot,
   parentOfBotRoot,
 }: InstallParentWorkspaceAssetsProps): { added: string[]; kept: string[] } {
-  const botDirName = dmBotRoot.split('/').filter(Boolean).at(-1) ?? 'dm-bot';
+  const botDirName = dmBotRoot.split('/').filter(Boolean).at(-1) ?? 'appweaver';
 
   const entries = [
     `${botDirName}/`,

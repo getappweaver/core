@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.17.1] - 2026-05-17
+
+- fix:rename dm-bot to appweaver (cd07bcf)
+
 ## [v9.17.0] - 2026-05-17
 
-- feat: improve bunker signing UX (90423d3)
+- feat: improve bunker signing UX (9b53fd3)
 
 ## [v9.16.0] - 2026-05-16
 

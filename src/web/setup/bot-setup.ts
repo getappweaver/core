@@ -406,7 +406,7 @@ async function main(): Promise<void> {
       await removeSymlinks();
 
       const removeGitignore = await ask(
-        'Also remove dm-bot entries from parent .gitignore? (y/N): ',
+        'Also remove AppWeaver core entries from parent .gitignore? (y/N): ',
       );
 
       if (removeGitignore.toLowerCase() === 'y') {
