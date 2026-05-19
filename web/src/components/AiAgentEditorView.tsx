@@ -217,7 +217,7 @@ export function AiAgentEditorView(props: AiAgentEditorViewProps) {
         <div class="actions-row actions-row--form-run ai-agent-editor-view__actions">
           <WebButton
             type="button"
-            class="form-run-btn"
+            class="form-run-btn web-button"
             disabled={saving()}
             onClick={() => void handleSave()}
           >

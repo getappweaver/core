@@ -639,6 +639,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                 <div class="actions-row">
                   <WebButton
                     type="button"
+                    class="web-button"
                     disabled={loading()}
                     onClick={() => void handleNip07Connect()}
                   >
@@ -668,6 +669,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               <div class="actions-row">
                 <WebButton
                   type="button"
+                  class="web-button"
                   disabled={loading()}
                   onClick={() => void handleNip55Connect()}
                 >
@@ -709,6 +711,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               <div class="actions-row" style={{ 'margin-top': '0.65rem' }}>
                 <WebButton
                   type="button"
+                  class="web-button"
                   disabled={loading() || !nostrConnectRelays().trim()}
                   onClick={() => void handleNostrConnect()}
                 >
@@ -793,6 +796,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                     >
                       <WebButton
                         type="button"
+                        class="web-button"
                         onClick={() => void copyNostrConnectUri(uri())}
                       >
                         Copy URI
@@ -846,6 +850,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               <div class="actions-row" style={{ 'margin-top': '0.65rem' }}>
                 <WebButton
                   type="button"
+                  class="web-button"
                   disabled={loading() || !bunkerUrl().trim()}
                   onClick={() => void handleBunkerConnect()}
                 >
@@ -866,6 +871,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               <div class="actions-row" style={{ 'margin-bottom': '0.55rem' }}>
                 <WebButton
                   type="button"
+                  class="web-button"
                   disabled={loading()}
                   onClick={() => {
                     if (nip49QrScanning()) {
@@ -962,6 +968,7 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               <div class="actions-row" style={{ 'margin-top': '0.65rem' }}>
                 <WebButton
                   type="button"
+                  class="web-button"
                   disabled={
                     loading() ||
                     !ncryptsecField().trim() ||

@@ -46,6 +46,15 @@ Rich command output uses `WebNodeRoot` and optional per-render `stylesheets` (Sh
 - Keep row/list item styles dense and readable. Use alternating row backgrounds only when they are visibly distinct from the parent surface.
 - Before doing substantial design coding, propose the visual structure briefly and ask the user to confirm or adjust it. Do this especially for new widgets or major layout changes.
 
+### Web UI style conventions
+
+- The visual language is compact retro terminal UI: square corners, hard edges, dense rows, mono typography, limited shadows, black/yellow inputs, and subtle alignment over decorative cards.
+- Modals should use the shared `.modal-backdrop`, `.modal`, `.modal-header`, `.modal-title`, and `.modal-body` structure. Close buttons should use `.close-btn` with `aria-label="Close"` and the `✕` glyph.
+- Regular app buttons should reuse existing button classes. For web command/dialog actions, prefer adding `.web-button` alongside context classes when the control should match Web UI actions.
+- Text inputs in regular web UI should reuse the form input style beginning at `web/src/styles.css` around `.field-block input[type='text']`: black background, warning-colored text, no border/radius, muted placeholder via `--form-input-placeholder-color`, and warning background on focus. Add focused selectors there for new dialog-specific input containers instead of creating separate input skins.
+- Retro checkboxes should use `.checkbox-retro` or `.web-checkbox.web-checkbox--retro` as appropriate. They should be `1rem` square, no box-shadow, dim warning background by default via `--form-checkbox-warning-dim`, brighten to `--color-warning` on hover/checked, and keep the small black checkmark.
+- Shadow-root plugin UI uses `web/src/webview/base-web-ui.css`; avoid broad visual changes there unless plugin widgets need that change. If a style is only for the regular web app, put it in `web/src/styles.css` instead. For values that must match in both light DOM and Shadow DOM, prefer shared CSS variables defined on `:root` because they inherit into shadow hosts; duplicate only the necessary selectors.
+
 ### No plugin code under `src/` or `web/`
 
 `src/` (bot core, shared `WebNode` schema, Nostr, etc.) and `web/` (the web app) must stay **plugin-agnostic**. Do not add imports from `plugins/`, command-plugin–specific types, `WebElementTag` / `WebProps` values, renderer branches, or comments that exist only to support one plugin. Plugin behavior belongs under `plugins/` (renderers, adapters, definitions). The Web UI wire format is still **JSON** (`WebNodeRoot` / `WebNode`); the web app only implements **generic** tags and `WebAction` handling once. If a feature needs a new building block, add a **reusable** primitive in `src/web/ui-schema.ts` and the client renderer, not a one-off for a given plugin. See `docs/WEB_RENDERER.md` (e.g. “Scoped styles”) for the renderer model.

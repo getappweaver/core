@@ -411,6 +411,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
               <div class="actions-row">
                 <WebButton
                   type="button"
+                  class="web-button"
                   style={warningButtonStyle}
                   onClick={() => props.onChoose({ method: 'current' })}
                 >
@@ -452,6 +453,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                         <div class="actions-row">
                           <WebButton
                             type="button"
+                            class="web-button"
                             style={warningButtonStyle}
                             onClick={() =>
                               props.onChoose({
@@ -568,6 +570,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     <div class="actions-row">
                       <WebButton
                         type="button"
+                        class="web-button"
                         disabled={connecting()}
                         style={warningButtonStyle}
                         onClick={addRelay}
@@ -578,6 +581,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     <div class="actions-row">
                       <WebButton
                         type="button"
+                        class="web-button"
                         disabled={connecting()}
                         style={warningButtonStyle}
                         onClick={() => void handleGenerateNostrConnect()}
@@ -615,6 +619,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     <div class="actions-row">
                       <WebButton
                         type="button"
+                        class="web-button"
                         disabled={connecting() || !bunkerUrl().trim()}
                         style={warningButtonStyle}
                         onClick={() => void handleConnectBunkerUrl()}
@@ -665,6 +670,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     <div class="actions-row">
                       <WebButton
                         type="button"
+                        class="web-button"
                         style={warningButtonStyle}
                         onClick={() =>
                           void copyPreparedUri(preparedConnect().uri)
@@ -702,6 +708,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     <div class="actions-row">
                       <WebButton
                         type="button"
+                        class="web-button"
                         style={warningButtonStyle}
                         onClick={() =>
                           void handleSignWithConnectedBunker(data())

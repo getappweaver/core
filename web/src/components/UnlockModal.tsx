@@ -105,6 +105,7 @@ export function UnlockModal(props: UnlockModalProps): JSX.Element {
             <div class="actions-row" style={{ 'margin-top': '0.75rem' }}>
               <WebButton
                 type="submit"
+                class="web-button"
                 disabled={loading() || !password().trim()}
               >
                 {loading() ? 'Unlocking…' : 'Unlock'}
