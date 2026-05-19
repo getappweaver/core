@@ -733,6 +733,14 @@ type WebTreeElementProps = {
   onRunAction?: WebNodeRendererProps['onRunAction'];
 };
 
+type WebTabsElementProps = {
+  element: WebElementNode;
+  onReplaceRoot?: (root: WebNodeRoot) => void;
+  onError?: (message: string) => void;
+  promptRequestId?: string;
+  onRunAction?: WebNodeRendererProps['onRunAction'];
+};
+
 function normalizedFilterQuery(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -1530,6 +1538,9 @@ function WebTreeElement(props: WebTreeElementProps) {
   const reportTreeHeaderEl = useContext(WebTreeHeaderElCallbackContext);
   const revealContext = useContext(WebRevealContext);
 
+  const expandedById =
+    useContext(TreeItemExpandedStateContext) ?? new Map<string, boolean>();
+
   const [bulk, setBulk] = createSignal<TreeBulkExpandState>({
     epoch: 0,
     expanded: true,
@@ -1715,130 +1726,228 @@ function WebTreeElement(props: WebTreeElementProps) {
    * `useContext(TreeBulkExpandContext)` undefined under `treeItem`. Keep `For` inside Provider.
    */
   return (
-    <TreeBulkExpandContext.Provider value={bulk}>
-      <TreeFilterStateContext.Provider
-        value={{ query: filterQuery, visibleIds: visibleFilterIds }}
-      >
-        <div
-          class={elementClass(props.element)}
-          data-ui={elementUi(props.element)}
-          style={elementStyle(props.element)}
+    <TreeItemExpandedStateContext.Provider value={expandedById}>
+      <TreeBulkExpandContext.Provider value={bulk}>
+        <TreeFilterStateContext.Provider
+          value={{ query: filterQuery, visibleIds: visibleFilterIds }}
         >
-          <Show when={showInlineHeader()}>
-            <div
-              class="web-tree-header"
-              ref={(el) => {
-                reportTreeHeaderEl?.(el ?? null);
-              }}
-            >
-              <Show when={filterEnabled()}>
-                <div
-                  class="web-tree-filter"
-                  classList={{ 'is-open': filterOpen() || hasFilterValue() }}
-                >
-                  <WebButton
-                    type="button"
-                    class="web-button web-button--link web-tree-filter-toggle"
-                    data-ui="tree-filter-toggle"
-                    aria-label="Filter tree"
-                    title="Filter"
-                    onClick={() => {
-                      setFilterOpen((open) => !open);
-                      queueMicrotask(() => filterInputEl?.focus());
-                    }}
+          <div
+            class={elementClass(props.element)}
+            data-ui={elementUi(props.element)}
+            style={elementStyle(props.element)}
+          >
+            <Show when={showInlineHeader()}>
+              <div
+                class="web-tree-header"
+                ref={(el) => {
+                  reportTreeHeaderEl?.(el ?? null);
+                }}
+              >
+                <Show when={filterEnabled()}>
+                  <div
+                    class="web-tree-filter"
+                    classList={{ 'is-open': filterOpen() || hasFilterValue() }}
                   >
-                    Search
-                  </WebButton>
-                  <Show when={filterOpen() || hasFilterValue()}>
-                    <input
-                      ref={(el) => {
-                        filterInputEl = el;
+                    <WebButton
+                      type="button"
+                      class="web-button web-button--link web-tree-filter-toggle"
+                      data-ui="tree-filter-toggle"
+                      aria-label="Filter tree"
+                      title="Filter"
+                      onClick={() => {
+                        setFilterOpen((open) => !open);
+                        queueMicrotask(() => filterInputEl?.focus());
                       }}
-                      class="web-tree-filter-input"
-                      type="search"
-                      value={filterInput()}
-                      placeholder={
-                        props.element.props?.filterPlaceholder ?? 'Filter'
-                      }
-                      onInput={(event) => {
-                        const value = event.currentTarget.value;
-
-                        setFilterInput(value);
-                        setDebouncedFilterQuery(value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          if (filterDebounceTimer !== undefined) {
-                            clearTimeout(filterDebounceTimer);
-                            filterDebounceTimer = undefined;
-                          }
-
-                          setFilterInput('');
-                          setFilterQuery('');
-                          setFilterOpen(false);
+                    >
+                      Search
+                    </WebButton>
+                    <Show when={filterOpen() || hasFilterValue()}>
+                      <input
+                        ref={(el) => {
+                          filterInputEl = el;
+                        }}
+                        class="web-tree-filter-input"
+                        type="search"
+                        value={filterInput()}
+                        placeholder={
+                          props.element.props?.filterPlaceholder ?? 'Filter'
                         }
-                      }}
-                    />
-                  </Show>
-                </div>
-              </Show>
-              <WebButton
-                type="button"
-                class="web-button web-button--link"
-                data-ui="tree-collapse-all"
-                aria-label="Collapse all tree branches"
-                onClick={() =>
-                  setBulk((prev) => ({
-                    epoch: prev.epoch + 1,
-                    expanded: false,
-                  }))
-                }
-              >
-                Collapse all
-              </WebButton>
-              <WebButton
-                type="button"
-                class="web-button web-button--link"
-                data-ui="tree-expand-all"
-                aria-label="Expand all tree branches"
-                onClick={() =>
-                  setBulk((prev) => ({
-                    epoch: prev.epoch + 1,
-                    expanded: true,
-                  }))
-                }
-              >
-                Expand all
-              </WebButton>
-              <Show when={renderMeta()}>
+                        onInput={(event) => {
+                          const value = event.currentTarget.value;
+
+                          setFilterInput(value);
+                          setDebouncedFilterQuery(value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') {
+                            if (filterDebounceTimer !== undefined) {
+                              clearTimeout(filterDebounceTimer);
+                              filterDebounceTimer = undefined;
+                            }
+
+                            setFilterInput('');
+                            setFilterQuery('');
+                            setFilterOpen(false);
+                          }
+                        }}
+                      />
+                    </Show>
+                  </div>
+                </Show>
                 <WebButton
                   type="button"
                   class="web-button web-button--link"
-                  data-ui="tree-refresh"
-                  aria-label="Refresh list"
-                  onClick={() => {
-                    runRefreshCommand();
-                  }}
+                  data-ui="tree-collapse-all"
+                  aria-label="Collapse all tree branches"
+                  onClick={() =>
+                    setBulk((prev) => ({
+                      epoch: prev.epoch + 1,
+                      expanded: false,
+                    }))
+                  }
                 >
-                  Refresh
+                  Collapse all
                 </WebButton>
-              </Show>
+                <WebButton
+                  type="button"
+                  class="web-button web-button--link"
+                  data-ui="tree-expand-all"
+                  aria-label="Expand all tree branches"
+                  onClick={() =>
+                    setBulk((prev) => ({
+                      epoch: prev.epoch + 1,
+                      expanded: true,
+                    }))
+                  }
+                >
+                  Expand all
+                </WebButton>
+                <Show when={renderMeta()}>
+                  <WebButton
+                    type="button"
+                    class="web-button web-button--link"
+                    data-ui="tree-refresh"
+                    aria-label="Refresh list"
+                    onClick={() => {
+                      runRefreshCommand();
+                    }}
+                  >
+                    Refresh
+                  </WebButton>
+                </Show>
+              </div>
+            </Show>
+            <For each={props.element.children ?? []}>
+              {(child) => (
+                <WebNodeRenderer
+                  node={child}
+                  onReplaceRoot={props.onReplaceRoot}
+                  onError={props.onError}
+                  promptRequestId={props.promptRequestId}
+                  onRunAction={props.onRunAction}
+                />
+              )}
+            </For>
+          </div>
+        </TreeFilterStateContext.Provider>
+      </TreeBulkExpandContext.Provider>
+    </TreeItemExpandedStateContext.Provider>
+  );
+}
+
+function tabPanels(element: WebElementNode): WebElementNode[] {
+  return (element.children ?? []).filter(
+    (child): child is WebElementNode =>
+      child.type === 'element' && child.tag === 'tabPanel',
+  );
+}
+
+function WebTabsElement(props: WebTabsElementProps): JSX.Element {
+  const panels = createMemo(() => tabPanels(props.element));
+
+  const firstPanelId = createMemo(() => panels()[0]?.props?.id ?? null);
+
+  const initialPanelId = () =>
+    props.element.props?.defaultActiveTabId ?? firstPanelId() ?? '';
+
+  const [activeTabId, setActiveTabId] = createSignal(initialPanelId());
+
+  createEffect(() => {
+    const ids = new Set(
+      panels()
+        .map((panel) => panel.props?.id)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+
+    if (!ids.has(activeTabId())) {
+      setActiveTabId(initialPanelId());
+    }
+  });
+
+  const activePanel = createMemo(
+    () =>
+      panels().find((panel) => panel.props?.id === activeTabId()) ??
+      panels()[0] ??
+      null,
+  );
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <div class="widget-tabs" role="tablist">
+        <For each={panels()}>
+          {(panel) => {
+            const panelId = panel.props?.id ?? '';
+
+            return (
+              <WebButton
+                type="button"
+                class="web-button widget-tab"
+                classList={{ active: activeTabId() === panelId }}
+                role="tab"
+                aria-selected={activeTabId() === panelId}
+                aria-controls={
+                  panelId.length > 0 ? `${panelId}-panel` : undefined
+                }
+                onClick={() => setActiveTabId(panelId)}
+              >
+                {panel.props?.label ?? panelId}
+              </WebButton>
+            );
+          }}
+        </For>
+      </div>
+      <Show when={activePanel()} keyed>
+        {(panelNode) => {
+          const panelId = panelNode.props?.id;
+
+          return (
+            <div
+              class={elementClass(panelNode)}
+              data-ui={elementUi(panelNode)}
+              id={panelId != null ? `${panelId}-panel` : undefined}
+              role="tabpanel"
+              style={elementStyle(panelNode)}
+            >
+              <For each={panelNode.children ?? []}>
+                {(child) => (
+                  <WebNodeRenderer
+                    node={child}
+                    onReplaceRoot={props.onReplaceRoot}
+                    onError={props.onError}
+                    promptRequestId={props.promptRequestId}
+                    onRunAction={props.onRunAction}
+                  />
+                )}
+              </For>
             </div>
-          </Show>
-          <For each={props.element.children ?? []}>
-            {(child) => (
-              <WebNodeRenderer
-                node={child}
-                onReplaceRoot={props.onReplaceRoot}
-                onError={props.onError}
-                promptRequestId={props.promptRequestId}
-                onRunAction={props.onRunAction}
-              />
-            )}
-          </For>
-        </div>
-      </TreeFilterStateContext.Provider>
-    </TreeBulkExpandContext.Provider>
+          );
+        }}
+      </Show>
+    </div>
   );
 }
 
@@ -1940,13 +2049,19 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
       return;
     }
 
-    const mergedArgs: Record<string, unknown> = {
-      ...(action.arguments ?? {}),
-    };
+    const mergedArgs: Record<string, unknown> = Object.fromEntries(
+      Object.entries(action.arguments ?? {}).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? [...value] : value,
+      ]),
+    );
 
-    const mergedOptions: Record<string, unknown> = {
-      ...(action.options ?? {}),
-    };
+    const mergedOptions: Record<string, unknown> = Object.fromEntries(
+      Object.entries(action.options ?? {}).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? [...value] : value,
+      ]),
+    );
 
     const optionFieldNames = new Set(
       props.element.props?.formOptionFieldNames ?? [],
@@ -2530,9 +2645,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                       e.preventDefault();
                     }
 
-                    if (element.props?.stopPropagation) {
-                      e.stopPropagation();
-                    }
+                    e.stopPropagation();
 
                     runAction(element.props?.action);
                   }}
@@ -2592,6 +2705,16 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
 
               <Match when={element.tag === 'tree'}>
                 <WebTreeElement
+                  element={element}
+                  onReplaceRoot={props.onReplaceRoot}
+                  onError={props.onError}
+                  promptRequestId={props.promptRequestId}
+                  onRunAction={props.onRunAction}
+                />
+              </Match>
+
+              <Match when={element.tag === 'tabs'}>
+                <WebTabsElement
                   element={element}
                   onReplaceRoot={props.onReplaceRoot}
                   onError={props.onError}

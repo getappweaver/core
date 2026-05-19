@@ -43,6 +43,7 @@ type HeaderChromeProps = {
   onLogout: () => void;
   onEnablePush: () => void;
   onEnablePiperTts?: () => void;
+  onOpenNostrSearchRelays: () => void;
   onOpenLayoutSettings?: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
@@ -185,6 +186,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   const [compactToolbar, setCompactToolbar] = createSignal(false);
   const [globalMenuOpen, setGlobalMenuOpen] = createSignal(false);
   const [accountMenuOpen, setAccountMenuOpen] = createSignal(false);
+  const [accountNostrOpen, setAccountNostrOpen] = createSignal(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = createSignal(false);
 
   const sortedWidgets = createMemo(() => {
@@ -201,7 +203,11 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   });
 
   const anyMenuOpen = createMemo(
-    () => globalMenuOpen() || accountMenuOpen() || accountSettingsOpen(),
+    () =>
+      globalMenuOpen() ||
+      accountMenuOpen() ||
+      accountNostrOpen() ||
+      accountSettingsOpen(),
   );
 
   createEffect(() => {
@@ -209,6 +215,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   });
 
   function closeAccountMenus(): void {
+    setAccountNostrOpen(false);
     setAccountSettingsOpen(false);
     setAccountMenuOpen(false);
   }
@@ -301,7 +308,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
         }
       }
 
-      if (accountMenuOpen() || accountSettingsOpen()) {
+      if (accountMenuOpen() || accountNostrOpen() || accountSettingsOpen()) {
         // Expanded: account popover is accountMenuPanelEl. Compact: Account / Settings live
         // inside globalMenuPanelEl (hamburger panel), so accountMenuPanelEl is unset/stale.
         const insideExpandedAccount =
@@ -330,6 +337,12 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
 
       if (accountSettingsOpen()) {
         setAccountSettingsOpen(false);
+
+        return;
+      }
+
+      if (accountNostrOpen()) {
+        setAccountNostrOpen(false);
 
         return;
       }
@@ -475,8 +488,40 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
                       <WebButton
                         type="button"
                         class="connect-btn topbar-submenu-toggle"
+                        aria-expanded={accountNostrOpen()}
+                        onClick={() => {
+                          setAccountSettingsOpen(false);
+                          setAccountNostrOpen((open) => !open);
+                        }}
+                      >
+                        Nostr
+                        <span class="topbar-submenu-chevron" aria-hidden="true">
+                          {accountNostrOpen() ? '▾' : '▸'}
+                        </span>
+                      </WebButton>
+                      <Show when={accountNostrOpen()}>
+                        <div class="topbar-submenu-section topbar-submenu-section--nested">
+                          <WebButton
+                            type="button"
+                            class="connect-btn"
+                            disabled={!props.isConnected()}
+                            onClick={() => {
+                              closeAllMenus();
+                              props.onOpenNostrSearchRelays();
+                            }}
+                          >
+                            Search relays
+                          </WebButton>
+                        </div>
+                      </Show>
+                      <WebButton
+                        type="button"
+                        class="connect-btn topbar-submenu-toggle"
                         aria-expanded={accountSettingsOpen()}
-                        onClick={() => setAccountSettingsOpen((open) => !open)}
+                        onClick={() => {
+                          setAccountNostrOpen(false);
+                          setAccountSettingsOpen((open) => !open);
+                        }}
                       >
                         Settings
                         <span class="topbar-submenu-chevron" aria-hidden="true">
@@ -583,6 +628,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
 
               setAccountMenuOpen((open) => {
                 if (!open) {
+                  setAccountNostrOpen(false);
                   setAccountSettingsOpen(false);
                 }
 
@@ -626,8 +672,40 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               <WebButton
                 type="button"
                 class="connect-btn topbar-submenu-toggle"
+                aria-expanded={accountNostrOpen()}
+                onClick={() => {
+                  setAccountSettingsOpen(false);
+                  setAccountNostrOpen((open) => !open);
+                }}
+              >
+                Nostr
+                <span class="topbar-submenu-chevron" aria-hidden="true">
+                  {accountNostrOpen() ? '▾' : '▸'}
+                </span>
+              </WebButton>
+              <Show when={accountNostrOpen()}>
+                <div class="topbar-submenu-section topbar-submenu-section--nested">
+                  <WebButton
+                    type="button"
+                    class="connect-btn"
+                    disabled={!props.isConnected()}
+                    onClick={() => {
+                      closeAllMenus();
+                      props.onOpenNostrSearchRelays();
+                    }}
+                  >
+                    Search relays
+                  </WebButton>
+                </div>
+              </Show>
+              <WebButton
+                type="button"
+                class="connect-btn topbar-submenu-toggle"
                 aria-expanded={accountSettingsOpen()}
-                onClick={() => setAccountSettingsOpen((open) => !open)}
+                onClick={() => {
+                  setAccountNostrOpen(false);
+                  setAccountSettingsOpen((open) => !open);
+                }}
               >
                 Settings
                 <span class="topbar-submenu-chevron" aria-hidden="true">

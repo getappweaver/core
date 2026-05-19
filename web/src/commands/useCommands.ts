@@ -5,6 +5,7 @@ import type {
 } from '@src/web/ui-schema';
 
 import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
+import { loadSearchRelays } from '../nostr/searchRelays';
 import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
 import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
 import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
@@ -455,6 +456,58 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       return;
     }
 
+    if (action.type === 'agentPrompt') {
+      const recordTl = action.recordInTimeline ?? true;
+      const requestId = adapters.createId();
+
+      adapters.pendingRequests.set(requestId, {
+        onChatResult: (message) => {
+          if (!recordTl) {
+            return;
+          }
+
+          adapters.setTimeline((prev) => [
+            ...prev,
+            {
+              id: adapters.createId(),
+              type: 'chat',
+              role: 'assistant',
+              text: message.output || '(no output)',
+            },
+          ]);
+        },
+      });
+
+      if (recordTl) {
+        adapters.setTimeline((prev) => [
+          ...prev,
+          {
+            id: adapters.createId(),
+            type: 'chat',
+            role: 'user',
+            text: action.prompt,
+          },
+        ]);
+      }
+
+      try {
+        adapters.sendSocketMessage({
+          type: 'chat',
+          requestId,
+          timelineId: adapters.timelineId(),
+          content: action.prompt,
+        });
+      } catch (err) {
+        adapters.pendingRequests.delete(requestId);
+
+        adapters.appendSystemMessage(
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      return;
+    }
+
     if (action.type !== 'command') {
       return;
     }
@@ -497,6 +550,55 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
     if (commandAction.surface === 'timeline') {
       closeChromeModal();
+    }
+
+    if (commandAction.clientContext?.includes('nostrSearchRelays')) {
+      void (async () => {
+        const pubkey = adapters.currentUserPubkey();
+
+        if (!pubkey) {
+          runWebAction(
+            {
+              ...commandAction,
+              clientContext: undefined,
+            },
+            params,
+          );
+
+          return;
+        }
+
+        const searchRelays = await loadSearchRelays({
+          pubkey,
+          decryptSelf: adapters.nip44DecryptSelf,
+        });
+
+        runWebAction(
+          {
+            ...commandAction,
+            clientContext: undefined,
+            options: {
+              ...(commandAction.options ?? {}),
+              nostrSearchRelays: searchRelays.relays.join(','),
+            },
+          },
+          params,
+        );
+      })().catch((err) => {
+        adapters.appendSystemMessage(
+          err instanceof Error ? err.message : String(err),
+        );
+
+        runWebAction(
+          {
+            ...commandAction,
+            clientContext: undefined,
+          },
+          params,
+        );
+      });
+
+      return;
     }
 
     const requestId = adapters.createId();

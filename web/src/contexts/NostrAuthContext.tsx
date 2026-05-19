@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { EventTemplate } from 'nostr-tools';
-import { finalizeEvent, getPublicKey } from 'nostr-tools';
+import { finalizeEvent, getPublicKey, nip44 } from 'nostr-tools';
 import { decrypt } from 'nostr-tools/nip49';
 import type { Accessor, JSX } from 'solid-js';
 import { Show, createContext, createSignal, useContext } from 'solid-js';
@@ -45,6 +45,10 @@ declare global {
       signEvent(
         event: EventTemplate,
       ): Promise<EventTemplate & { id: string; sig: string; pubkey: string }>;
+      nip44?: {
+        encrypt(pubkey: string, plaintext: string): Promise<string>;
+        decrypt(pubkey: string, ciphertext: string): Promise<string>;
+      };
     };
   }
 }
@@ -143,6 +147,8 @@ export type NostrAuthContextValue = {
     event: EventTemplate,
     options?: SignEventOptions,
   ) => Promise<SignedNostrEvent | null>;
+  nip44EncryptSelf: (plaintext: string) => Promise<string | null>;
+  nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   getNip98Token: (url: string, method: string) => Promise<string | null>;
 };
 
@@ -440,6 +446,82 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     return bunkerSignEvent(state.bunkerData, event);
   }
 
+  async function nip44EncryptSelf(plaintext: string): Promise<string | null> {
+    const state = authState();
+
+    if (state.status !== 'connected') {
+      return null;
+    }
+
+    if (state.method === 'nip07') {
+      if (!window.nostr) {
+        const ready = await waitForNostrExtension({ maxMs: 5000 });
+
+        if (!ready) {
+          return null;
+        }
+      }
+
+      return window.nostr!.nip44?.encrypt(state.pubkey, plaintext) ?? null;
+    }
+
+    if (state.method === 'nip49') {
+      lockNip49IfExpired();
+      const after = authState();
+
+      if (after.status !== 'connected' || after.method !== 'nip49') {
+        return null;
+      }
+
+      const conversationKey = nip44.v2.utils.getConversationKey(
+        after.secretKey,
+        after.pubkey,
+      );
+
+      return nip44.encrypt(plaintext, conversationKey);
+    }
+
+    return null;
+  }
+
+  async function nip44DecryptSelf(ciphertext: string): Promise<string | null> {
+    const state = authState();
+
+    if (state.status !== 'connected') {
+      return null;
+    }
+
+    if (state.method === 'nip07') {
+      if (!window.nostr) {
+        const ready = await waitForNostrExtension({ maxMs: 5000 });
+
+        if (!ready) {
+          return null;
+        }
+      }
+
+      return window.nostr!.nip44?.decrypt(state.pubkey, ciphertext) ?? null;
+    }
+
+    if (state.method === 'nip49') {
+      lockNip49IfExpired();
+      const after = authState();
+
+      if (after.status !== 'connected' || after.method !== 'nip49') {
+        return null;
+      }
+
+      const conversationKey = nip44.v2.utils.getConversationKey(
+        after.secretKey,
+        after.pubkey,
+      );
+
+      return nip44.decrypt(ciphertext, conversationKey);
+    }
+
+    return null;
+  }
+
   async function signEvent(
     event: EventTemplate,
     options?: SignEventOptions,
@@ -567,6 +649,8 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     logout,
     unlockNip49,
     signEvent,
+    nip44EncryptSelf,
+    nip44DecryptSelf,
     getNip98Token,
   };
 

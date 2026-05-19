@@ -15,7 +15,8 @@ const OnSuccessCommandSchema = z.object({
 });
 
 const PublishKind1PayloadSchema = z.object({
-  content: z.string().min(1),
+  kind: z.number().int().positive().default(1),
+  content: z.string().default(''),
   tags: z.array(z.array(z.string())),
   fallbackRelays: z.array(z.string().min(1)).min(1),
   signTitle: z.string().min(1).optional(),
@@ -145,7 +146,7 @@ export async function handleNostrPublishKind1Action({
     }
 
     const template: EventTemplate = {
-      kind: 1,
+      kind: payload.kind,
       created_at: Math.floor(Date.now() / 1000),
       content: payload.content,
       tags: payload.tags,

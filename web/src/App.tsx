@@ -22,6 +22,7 @@ import { useCommandForms } from './commands/useCommandForms';
 import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
+import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
 import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
@@ -195,6 +196,9 @@ function AppInner(): JSX.Element {
   >(null);
 
   const [headerMenusOpen, setHeaderMenusOpen] = createSignal(false);
+
+  const [nostrSearchRelaysOpen, setNostrSearchRelaysOpen] = createSignal(false);
+
   const [pushBusy, setPushBusy] = createSignal(false);
   const [piperTtsBusy, setPiperTtsBusy] = createSignal(false);
 
@@ -987,6 +991,7 @@ function AppInner(): JSX.Element {
     setComposerAiState,
     appendSystemMessage,
     signEvent: auth.signEvent,
+    nip44DecryptSelf: auth.nip44DecryptSelf,
     createId,
     requestComposerAiState,
     beginWebUiBusy,
@@ -1446,6 +1451,7 @@ function AppInner(): JSX.Element {
             onEnablePiperTts={() => {
               void onEnablePiperTts();
             }}
+            onOpenNostrSearchRelays={() => setNostrSearchRelaysOpen(true)}
             onOpenLayoutSettings={
               desktopLayoutEnabled() ? openLayoutSettings : undefined
             }
@@ -1622,6 +1628,12 @@ function AppInner(): JSX.Element {
             }}
           />
         )}
+      </Show>
+      <Show when={nostrSearchRelaysOpen()}>
+        <NostrSearchRelaysModal
+          onClose={() => setNostrSearchRelaysOpen(false)}
+          onStatus={appendSystemMessage}
+        />
       </Show>
     </div>
   );

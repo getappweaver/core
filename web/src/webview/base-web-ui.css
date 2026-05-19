@@ -68,6 +68,7 @@ select {
   padding: 1px 10px;
   background: color-mix(in srgb, var(--color-warning) 88%, transparent);
   color: #000;
+  font-weight: 700;
   box-shadow: 6px 6px 0 var(--color-panel-shadow);
   cursor: pointer;
   text-align: center;
@@ -193,6 +194,40 @@ select {
 
 .web-row > * {
   min-width: 0;
+}
+
+.widget-tabs {
+  display: flex;
+  border-bottom: 0;
+  background: var(--color-surface-alt);
+}
+
+.widget-tab.web-button {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  border-right: 0;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  box-shadow: none;
+  cursor: pointer;
+  transform: none;
+}
+
+.widget-tab.web-button:last-child {
+  border-right: none;
+}
+
+.widget-tab.web-button:hover,
+.widget-tab.web-button:focus-visible {
+  color: var(--color-warning);
+  background: var(--color-bg);
+}
+
+.widget-tab.web-button.active,
+.widget-tab.web-button[aria-selected='true'] {
+  color: var(--color-warning);
+  background: var(--color-panel);
 }
 
 .web-tree {
@@ -393,6 +428,11 @@ select {
   transform: translate(-50%, -50%) rotate(45deg);
 }
 
+.web-checkbox.web-checkbox--retro:focus-visible {
+  outline: 2px solid var(--color-border);
+  outline-offset: 2px;
+}
+
 .web-checkbox.web-checkbox--retro:indeterminate {
   background: var(--color-warning);
   border: 2px solid transparent;
@@ -558,7 +598,7 @@ select {
 
 .web-textField .web-textField__input::placeholder,
 .web-textArea .web-textArea__input::placeholder {
-  color: #8f8f00;
+  color: var(--form-input-placeholder-color);
   opacity: 1;
 }
 
@@ -571,7 +611,7 @@ select {
 
 .web-textField .web-textField__input:focus::placeholder,
 .web-textArea .web-textArea__input:focus::placeholder {
-  color: #000;
+  color: var(--form-input-placeholder-color);
 }
 
 .web-textField .web-textField__input:disabled,

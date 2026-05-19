@@ -42,6 +42,11 @@ type FetchNip65WriteRelaysProps = {
   authorPubkey: string;
 };
 
+type FetchNip65ReadRelaysProps = {
+  pool: SimplePool;
+  authorPubkey: string;
+};
+
 /**
  * Write-capable relays from `authorPubkey`'s kind 10050. Use with `pool.get` when
  * fetching other events (e.g. kind 10063 for `userPubkey`). Falls back to
@@ -68,6 +73,30 @@ export async function fetchNip65WriteRelays({
   }
 
   return [...new Set(writeRelays)];
+}
+
+/** Read-capable relays from `authorPubkey`'s kind 10050. Falls back to profile relays. */
+export async function fetchNip65ReadRelays({
+  pool,
+  authorPubkey,
+}: FetchNip65ReadRelaysProps): Promise<string[]> {
+  const nip65Event = await pool.get([...PROFILE_RELAYS_FOR_QUERY], {
+    kinds: [NIP65_RELAY_LIST_KIND],
+    authors: [authorPubkey],
+    limit: 1,
+  });
+
+  if (!nip65Event) {
+    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+  }
+
+  const { readRelays } = parseNip65RelayTags(nip65Event.tags);
+
+  if (readRelays.length === 0) {
+    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+  }
+
+  return [...new Set(readRelays)];
 }
 
 type FetchNip65RelaySetProps = {

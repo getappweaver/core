@@ -77,6 +77,7 @@ export type CommandsAdapters = {
   setComposerAiState: Setter<ComposerAiState | null>;
   appendSystemMessage: (text: string) => void;
   signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
+  nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   createId: () => string;
   requestComposerAiState: () => void;
   beginWebUiBusy: (sourceId: string) => void;

@@ -109,6 +109,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     modalTitle: z.string().min(1).optional(),
     /** Reveal these local UI targets after replacing the current web root with this command result. */
     revealIds: z.array(z.string().min(1)).optional(),
+    /** Client-side context values to resolve and include before command execution. */
+    clientContext: z.array(z.enum(['nostrSearchRelays'])).optional(),
   }),
   z.object({
     /** Browser-side action handled by the web app; payload is client-specific JSON. */
@@ -116,6 +118,13 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     action: z.string().min(1),
     payload: z.record(z.string(), z.unknown()).optional().default({}),
     refresh: WebRefreshSchema.optional(),
+  }),
+  z.object({
+    /** Run a plain agent/chat prompt from a web widget without routing through a command. */
+    type: z.literal('agentPrompt'),
+    prompt: z.string().min(1),
+    /** Whether this web-triggered prompt should create timeline entries. */
+    recordInTimeline: z.boolean().optional(),
   }),
   z.object({
     type: z.literal('prompt_answer'),
@@ -173,6 +182,8 @@ export const WebPropsSchema = z.object({
   filterPath: z.string().optional(),
   /** `treeItem`: when set, only clicks matching this selector toggle the item. */
   toggleSelector: z.string().min(1).optional(),
+  /** `tabs`: initially selected tab panel id. */
+  defaultActiveTabId: z.string().min(1).optional(),
   /** Cache key for a client-built filter index. */
   filterIndexKey: z.string().optional(),
   /** Placeholder for built-in filter inputs. */
@@ -256,6 +267,10 @@ export const WebElementTagSchema = z.enum([
   'tree',
   /** Hierarchical item. Prefer `summary` for the row and `children` for child items. */
   'treeItem',
+  /** Generic tab list; direct children should be `tabPanel` elements. */
+  'tabs',
+  /** Panel inside `tabs`; `label` is shown in the tab button. */
+  'tabPanel',
   /** One-line text input; use `formFieldName` with parent `form`. */
   'textField',
   /** Dropdown/select input; use `formFieldName` with parent `form`. */

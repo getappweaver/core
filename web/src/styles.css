@@ -9,6 +9,7 @@
 
   --color-bg: #202020;
   --color-surface-alt: #1a1a1a;
+  --color-panel: #242424;
   --color-panel-shadow: #000;
   --color-text: #f5f5f5;
   --color-text-muted: #d6d6d6;
@@ -22,6 +23,11 @@
     in srgb,
     var(--color-warning) 70%,
     transparent
+  );
+  --form-input-placeholder-color: color-mix(
+    in srgb,
+    var(--color-warning) 45%,
+    #000
   );
   --color-danger: #ff5555;
   --color-danger-pressed: color-mix(in srgb, var(--color-danger) 90%, #000);
@@ -424,7 +430,7 @@ pre {
 .setup-runtime-grid div {
   min-width: 0;
   padding: 0.55rem;
-  background: #242424;
+  background: var(--color-panel);
 }
 
 .setup-runtime-grid dt {
@@ -451,7 +457,7 @@ pre {
   align-items: center;
   gap: 0.55rem;
   padding: 0.45rem 0.55rem;
-  background: #242424;
+  background: var(--color-panel);
 }
 
 .setup-status-dot {
@@ -492,7 +498,7 @@ pre {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.7rem;
   padding: 0.7rem;
-  background: #242424;
+  background: var(--color-panel);
   border-left: 4px solid var(--color-danger);
 }
 
@@ -711,7 +717,7 @@ pre {
   display: grid;
   gap: 0.75rem;
   z-index: var(--z-dropdown);
-  background: #242424;
+  background: var(--color-panel);
   box-shadow: 8px 8px 0 var(--color-panel-shadow);
 }
 
@@ -746,7 +752,6 @@ pre {
 }
 
 .connect-btn,
-.actions-row button,
 .command-launcher,
 .palette-item,
 .close-btn {
@@ -767,8 +772,6 @@ pre {
 
 .connect-btn:hover,
 .connect-btn:focus-visible,
-.actions-row button:hover,
-.actions-row button:focus-visible,
 .command-launcher:hover,
 .command-launcher:focus-visible,
 .palette-item:hover,
@@ -791,7 +794,6 @@ pre {
 }
 
 .connect-btn:active,
-.actions-row button:active,
 .command-launcher:active,
 .palette-item:active,
 .close-btn:active {
@@ -801,7 +803,6 @@ pre {
 }
 
 .connect-btn:disabled,
-.actions-row button:disabled,
 .command-launcher:disabled,
 .close-btn:disabled {
   background: var(--color-silver);
@@ -867,7 +868,7 @@ pre {
   position: fixed;
   max-width: min(38rem, calc(100vw - 2rem));
   padding: 0.85rem;
-  background: #242424;
+  background: var(--color-panel);
   color: var(--color-text);
   box-shadow: 8px 8px 0 var(--color-panel-shadow);
   pointer-events: auto;
@@ -919,6 +920,7 @@ pre {
   padding: 1px 10px;
   background: color-mix(in srgb, var(--color-warning) 88%, transparent);
   color: #000;
+  font-weight: 700;
   box-shadow: 6px 6px 0 var(--color-panel-shadow);
   cursor: pointer;
   text-align: center;
@@ -990,7 +992,7 @@ pre {
 .modal,
 .palette,
 .card {
-  background: #242424;
+  background: var(--color-panel);
   color: var(--color-text);
   border: 0;
   border-radius: 0;
@@ -1006,7 +1008,7 @@ pre {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky-local);
-  background: #242424;
+  background: var(--color-panel);
   padding-bottom: 0.5rem;
 }
 
@@ -1042,13 +1044,15 @@ pre {
   font-size: 0.95rem;
 }
 
-.modal-tabs {
+.modal-tabs,
+.widget-tabs {
   display: flex;
   border-bottom: 0;
   background: var(--color-surface-alt);
 }
 
-.modal-tab {
+.modal-tab,
+.widget-tab {
   flex: 1;
   padding: 0.5rem;
   border: none;
@@ -1058,18 +1062,22 @@ pre {
   cursor: pointer;
 }
 
-.modal-tab:last-child {
+.modal-tab:last-child,
+.widget-tab:last-child {
   border-right: none;
 }
 
-.modal-tab:hover {
+.modal-tab:hover,
+.widget-tab:hover {
   color: var(--color-warning);
   background: var(--color-bg);
 }
 
-.modal-tab.active {
+.modal-tab.active,
+.widget-tab.active,
+.widget-tab[aria-selected='true'] {
   color: var(--color-warning);
-  background: #242424;
+  background: var(--color-panel);
 }
 
 .modal-body {
@@ -1159,7 +1167,7 @@ pre {
   inset: 0;
   z-index: var(--z-sticky-local);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(1px);
@@ -1167,6 +1175,9 @@ pre {
 }
 
 .web-ui-shadow-busy-label {
+  position: sticky;
+  top: min(45vh, 18rem);
+  margin-top: min(45vh, 18rem);
   font-size: 0.85rem;
   color: var(--color-text);
   padding: 0.35rem 0.65rem;
@@ -1705,7 +1716,7 @@ a.diff-line__number:focus-visible {
 .widget-help-panel {
   margin: 0 0 0.65rem;
   padding: 0.75rem;
-  background: color-mix(in srgb, var(--color-panel, #242424) 90%, transparent);
+  background: color-mix(in srgb, var(--color-panel) 90%, transparent);
   color: var(--color-text);
 }
 
@@ -1980,13 +1991,14 @@ a.diff-line__number:focus-visible {
 }
 
 .checkbox-retro,
+.web-checkbox.web-checkbox--retro,
 .field-flag-line input[type='checkbox'] {
   -webkit-appearance: none;
   appearance: none;
   flex-shrink: 0;
   box-sizing: border-box;
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1rem;
+  height: 1rem;
   margin: 0;
   border: 2px solid transparent;
   border-radius: 0;
@@ -1996,44 +2008,66 @@ a.diff-line__number:focus-visible {
   vertical-align: middle;
   transition:
     background-color 0.12s ease,
-    border-color 0.12s ease,
     box-shadow 0.12s ease;
 }
 
 .checkbox-retro:hover,
+.web-checkbox.web-checkbox--retro:hover,
 .field-flag-line input[type='checkbox']:hover {
   background: var(--color-warning);
   border: 2px solid var(--color-border);
 }
 
 .checkbox-retro:checked,
+.web-checkbox.web-checkbox--retro:checked,
 .field-flag-line input[type='checkbox']:checked {
   background: var(--color-warning);
   border: 2px solid transparent;
 }
 
 .checkbox-retro:checked:hover,
+.web-checkbox.web-checkbox--retro:checked:hover,
 .field-flag-line input[type='checkbox']:checked:hover {
   border: 2px solid var(--color-border);
 }
 
 .checkbox-retro:checked::after,
+.web-checkbox.web-checkbox--retro:checked::after,
 .field-flag-line input[type='checkbox']:checked::after {
   content: '';
   box-sizing: border-box;
   position: absolute;
   left: 50%;
   top: 44%;
-  width: 0.42rem;
-  height: 0.82rem;
+  width: 0.3rem;
+  height: 0.6rem;
   border: solid #101010;
-  border-width: 0 3px 3px 0;
+  border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
 
+.web-checkbox.web-checkbox--retro:indeterminate {
+  background: var(--color-warning);
+}
+
+.web-checkbox.web-checkbox--retro:indeterminate::after {
+  content: '';
+  box-sizing: border-box;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.55rem;
+  height: 3px;
+  background: #101010;
+  transform: translate(-50%, -50%);
+  border: none;
+}
+
+.checkbox-retro:focus-visible,
+.web-checkbox.web-checkbox--retro:focus-visible,
 .field-flag-line input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--color-border);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-warning);
+  outline-offset: 3px;
 }
 
 .field-flag-line--text-opt .field-label {
@@ -2116,6 +2150,7 @@ a.diff-line__number:focus-visible {
 .field-row input[type='text'],
 .field-row input[type='number'],
 .field-row select,
+.nostr-search-relays-modal__row input[type='text'],
 .composer textarea,
 .palette-filter {
   width: 100%;
@@ -2152,9 +2187,10 @@ a.diff-line__number:focus-visible {
 .field-block textarea::placeholder,
 .field-row input[type='text']::placeholder,
 .field-row input[type='number']::placeholder,
+.nostr-search-relays-modal__row input[type='text']::placeholder,
 .composer textarea::placeholder,
 .palette-filter::placeholder {
-  color: #8f8f00;
+  color: var(--form-input-placeholder-color);
   opacity: 1;
 }
 
@@ -2163,9 +2199,10 @@ a.diff-line__number:focus-visible {
 .field-block textarea:focus::placeholder,
 .field-row input[type='text']:focus::placeholder,
 .field-row input[type='number']:focus::placeholder,
+.nostr-search-relays-modal__row input[type='text']:focus::placeholder,
 .composer textarea:focus::placeholder,
 .palette-filter:focus::placeholder {
-  color: #000;
+  color: var(--form-input-placeholder-color);
 }
 
 .field-block input[type='text']:focus,
@@ -2175,6 +2212,7 @@ a.diff-line__number:focus-visible {
 .field-row input[type='text']:focus,
 .field-row input[type='number']:focus,
 .field-row select:focus,
+.nostr-search-relays-modal__row input[type='text']:focus,
 .composer textarea:focus,
 .palette-filter:focus {
   background: var(--color-warning);
@@ -2216,6 +2254,7 @@ a.diff-line__number:focus-visible {
   padding: 1px 10px;
   background: color-mix(in srgb, var(--color-warning) 88%, transparent);
   color: #000;
+  font-weight: 700;
   box-shadow: 6px 6px 0 var(--color-panel-shadow);
   cursor: pointer;
   text-align: center;
@@ -2431,6 +2470,45 @@ button.composer-chip.composer-chip--model-override {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+}
+
+.nostr-search-relays-modal__body {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.nostr-search-relays-modal__list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.nostr-search-relays-modal__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.25rem;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.nostr-search-relays-modal__row .web-button {
+  width: 100%;
+}
+
+.nostr-search-relays-modal__row input[type='text'] {
+  min-width: 0;
+}
+
+.nostr-search-relays-modal__private {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.nostr-search-relays-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .opencode-agents-toolbar {
