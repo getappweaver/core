@@ -11,6 +11,7 @@
 //   kind: 32107
 //   tags:
 //     ["d", "<plugin-name>"]
+//     ["title", "<user-friendly-title>"]
 //     ["description", "<description>"]
 //     ["version", "<latest-version>"]
 //     ["coreApiVersion", "<latest-core-major>"]
@@ -64,6 +65,7 @@ const PackageJsonSchema = z.object({
   version: z.string().min(1),
   description: z.string().optional(),
   dmBot: z.object({
+    title: z.string().min(1),
     coreApiVersion: z.string().min(1),
     description: z.string().optional(),
   }),
@@ -306,7 +308,7 @@ async function main(): Promise<void> {
   if (!pkgParsed.success) {
     console.error(
       `Invalid package.json at ${pkgPath}:\n${pkgParsed.error.toString()}\n\n` +
-        `Required fields: name, version, dmBot.coreApiVersion\n` +
+        `Required fields: name, version, dmBot.title, dmBot.coreApiVersion\n` +
         `Optional fields: description`,
     );
 
@@ -314,6 +316,7 @@ async function main(): Promise<void> {
   }
 
   const pkg = pkgParsed.data;
+  const title = pkg.dmBot.title;
   const coreApiVersion = getCoreApiVersion(pkg);
   const coreMajor = coreApiVersion.replace(/[^0-9]/g, '').slice(0, 1);
 
@@ -329,6 +332,7 @@ async function main(): Promise<void> {
   const description = pkg.dmBot.description ?? pkg.description;
 
   console.log(`Plugin:         ${pkg.name} v${pkg.version}`);
+  console.log(`Title:          ${title}`);
 
   if (description) {
     console.log(`Description:    ${description}`);
@@ -501,6 +505,7 @@ async function main(): Promise<void> {
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['d', pkg.name],
+      ['title', title],
       ['repo', repoUrl],
       ['version', gitTag],
       ['coreApiVersion', coreMajor],
