@@ -354,6 +354,11 @@ pre {
   overflow: auto;
 }
 
+.setup-app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .setup-app-shell .setup-shell {
   min-height: 0;
 }
