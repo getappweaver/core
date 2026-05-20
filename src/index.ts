@@ -61,6 +61,8 @@ import {
   getWorkspaceTarget,
   getWotScore,
   getRoutstrSkKey,
+  needsSetupBillboard,
+  readSetupConfigurationSnapshot,
 } from './db';
 import { getMissingRequiredBotEnv, loadBotConfig } from './env';
 import { runAgentConversation } from './flow/agent-conversation';
@@ -108,6 +110,7 @@ async function startSetupOnlyMode(props: {
   setupSecret: string;
   version: string;
   missingEnv: string[];
+  setupBillboard: boolean;
 }): Promise<never> {
   const seenDb = openCoreDb();
   const parentOfBotRoot = getParentWorkspaceRoot();
@@ -160,6 +163,7 @@ async function startSetupOnlyMode(props: {
     },
     setupSecret: props.setupSecret,
     setupMode: true,
+    setupBillboard: props.setupBillboard,
   });
 
   return waitForever();
@@ -178,9 +182,15 @@ async function main() {
   const setupSecret = createSetupSecret();
   const VERSION = readPackageVersion();
   const missingEnv = getMissingRequiredBotEnv();
+  const setupBillboard = needsSetupBillboard(readSetupConfigurationSnapshot());
 
   if (missingEnv.length > 0) {
-    return startSetupOnlyMode({ setupSecret, version: VERSION, missingEnv });
+    return startSetupOnlyMode({
+      setupSecret,
+      version: VERSION,
+      missingEnv,
+      setupBillboard,
+    });
   }
 
   const config = loadBotConfig();
@@ -288,6 +298,7 @@ async function main() {
     config,
     setupSecret,
     setupMode: false,
+    setupBillboard,
   });
 
   const pwdOutput = process.cwd();

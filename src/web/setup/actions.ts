@@ -15,6 +15,7 @@ import {
   setDefaultMode,
   setDmCommandPrefix,
   setLinting,
+  markSetupConfigured,
   setProviderName,
   setWorkspaceTarget,
   type CoreDb,
@@ -378,6 +379,7 @@ export function setSetupDefaults({
   setDefaultMode(db, mode);
   setWorkspaceTarget(db, workspace);
   setLinting(db, linting);
+  markSetupConfigured(db);
 
   const readyValue = readyNotification ? '1' : '0';
   setEnvInFile(join(dmBotRoot, '.env'), 'READY_ENABLED', readyValue);

@@ -6,7 +6,7 @@ import type { SimplePool } from 'nostr-tools/pool';
 
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
-import { log } from '@src/logger';
+import { C, log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -33,6 +33,7 @@ export type StartLocalWebServerOptions = {
   config: BotConfig;
   setupSecret: string;
   setupMode: boolean;
+  setupBillboard: boolean;
   host?: string;
   port?: number;
 };
@@ -67,6 +68,40 @@ function displayHost(host: string): string {
 
 function setupUrl(origin: string, setupSecret: string): string {
   return `${origin}/setup?secret=${setupSecret}`;
+}
+
+type LogSetupUrlProps = {
+  origin: string;
+  setupSecret: string;
+  billboard: boolean;
+};
+
+function logSetupUrl({
+  origin,
+  setupSecret,
+  billboard,
+}: LogSetupUrlProps): void {
+  const url = setupUrl(origin, setupSecret);
+
+  if (!billboard) {
+    log.info(`Setup web: ${url}`);
+
+    return;
+  }
+
+  log.sep();
+
+  log.info(
+    `${C.bold}${C.yellow}Setup web:${C.reset} ${C.cyan}${url}${C.reset}`,
+  );
+
+  log.info('Open setup: Ctrl+Click the link in your terminal.');
+
+  log.info(
+    'If your terminal does not open links, copy and paste it into your browser.',
+  );
+
+  log.sep();
 }
 
 export function startLocalWebServer(options: StartLocalWebServerOptions): void {
@@ -140,7 +175,11 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     const backendOrigin = `http://${displayHost(host)}:${port}`;
     const preferredOrigin = frontendOrigin || backendOrigin;
 
-    log.info(`Setup web: ${setupUrl(preferredOrigin, options.setupSecret)}`);
+    logSetupUrl({
+      origin: preferredOrigin,
+      setupSecret: options.setupSecret,
+      billboard: options.setupBillboard || options.setupMode,
+    });
   } catch (err) {
     const code =
       err && typeof err === 'object' && 'code' in err

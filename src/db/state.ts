@@ -1,8 +1,12 @@
+import { existsSync } from 'fs';
+
+import { Database } from 'bun:sqlite';
 import { decrypt, encrypt, getConversationKey } from 'nostr-tools/nip44';
 import { hexToBytes } from 'nostr-tools/utils';
 import { z } from 'zod';
 
 import { log } from '../logger';
+import { CORE_DB_PATH } from '../paths';
 import { msats, msatsRaw } from '../types';
 import { assertUnreachable } from '../utils';
 
@@ -31,6 +35,7 @@ import {
   STATE_ROUTSTR_MODELS_CACHE,
   STATE_ROUTSTR_MODELS_CACHE_TS,
   STATE_ROUTSTR_SK_KEY,
+  STATE_SETUP_CONFIGURED_AT,
   STATE_WORKSPACE_TARGET,
   type AgentBackendName,
   type AgentMode,
@@ -45,6 +50,64 @@ import {
 } from './shared';
 
 let skKeyConversationKey: Uint8Array | null = null;
+
+export type SetupConfigurationSnapshot = {
+  dbExists: boolean;
+  stateTableExists: boolean;
+  configuredAtExists: boolean;
+};
+
+export function readSetupConfigurationSnapshot(): SetupConfigurationSnapshot {
+  if (!existsSync(CORE_DB_PATH)) {
+    return {
+      dbExists: false,
+      stateTableExists: false,
+      configuredAtExists: false,
+    };
+  }
+
+  const db = new Database(CORE_DB_PATH);
+
+  try {
+    const stateTable = db
+      .prepare(
+        "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = 'state'",
+      )
+      .get() as { found: number } | undefined;
+
+    const stateTableExists = stateTable !== undefined;
+
+    if (!stateTableExists) {
+      return {
+        dbExists: true,
+        stateTableExists: false,
+        configuredAtExists: false,
+      };
+    }
+
+    const configuredAt = db
+      .prepare('SELECT 1 AS found FROM state WHERE key = ?')
+      .get(STATE_SETUP_CONFIGURED_AT) as { found: number } | undefined;
+
+    return {
+      dbExists: true,
+      stateTableExists: true,
+      configuredAtExists: configuredAt !== undefined,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+export function needsSetupBillboard(
+  snapshot: SetupConfigurationSnapshot,
+): boolean {
+  return (
+    !snapshot.dbExists ||
+    !snapshot.stateTableExists ||
+    !snapshot.configuredAtExists
+  );
+}
 
 export function initSkKeyEncryption(
   botKeyHex: string,
@@ -66,6 +129,10 @@ export function setState(db: CoreDb, key: string, value: string): void {
     key,
     value,
   ]);
+}
+
+export function markSetupConfigured(db: CoreDb): void {
+  setState(db, STATE_SETUP_CONFIGURED_AT, new Date().toISOString());
 }
 
 export function getCurrentOrDefaultMode(db: CoreDb): AgentMode {
