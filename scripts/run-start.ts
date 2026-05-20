@@ -21,6 +21,10 @@ let botChild: ReturnType<typeof spawn> | null = null;
 let shuttingDown = false;
 let restartRequested = false;
 
+function shouldShowSetup(): boolean {
+  return process.argv.slice(2).includes('--setup');
+}
+
 function isWebUiEnabled(): boolean {
   return (process.env.START_WEB_UI ?? '1') !== '0';
 }
@@ -28,6 +32,9 @@ function isWebUiEnabled(): boolean {
 function botEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    BOT_SETUP_BILLBOARD: shouldShowSetup()
+      ? '1'
+      : process.env.BOT_SETUP_BILLBOARD,
     BOT_WEB_STATIC: isWebUiEnabled() ? '1' : '0',
   };
 }

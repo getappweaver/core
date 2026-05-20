@@ -17,12 +17,18 @@ const INDEX_TS = join(DM_BOT_DIR, 'src', 'index.ts');
 
 const RAPID_CRASH_WINDOW_MS = 5_000;
 const MAX_RAPID_CRASHES = 5;
+const WEB_UI_BACKEND_WAIT_TIMEOUT_MS = 15_000;
+const WEB_UI_BACKEND_POLL_MS = 250;
 
 let botChild: ReturnType<typeof spawn>;
 let webChild: ReturnType<typeof spawn> | null = null;
 let restartRequested = false;
 let rapidCrashCount = 0;
 let lastStartTime = 0;
+
+function shouldShowSetup(): boolean {
+  return process.argv.slice(2).includes('--setup');
+}
 
 function isWebUiEnabled(): boolean {
   return (process.env.WATCH_WEB_UI ?? '1') !== '0';
@@ -38,16 +44,72 @@ function resolveWebUiPort(): string {
   return process.env.BOT_WEB_UI_PORT?.trim() || '5552';
 }
 
+function resolveBotWebHost(): string {
+  const host = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+
+  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+}
+
+function resolveBotWebPort(): string {
+  return process.env.BOT_WEB_PORT?.trim() || '5551';
+}
+
+function botWebHealthUrl(): string {
+  return `http://${resolveBotWebHost()}:${resolveBotWebPort()}/api/health`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type WaitForHttpReadyProps = {
+  url: string;
+  timeoutMs: number;
+  pollMs: number;
+};
+
+async function waitForHttpReady({
+  url,
+  timeoutMs,
+  pollMs,
+}: WaitForHttpReadyProps): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url);
+
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // The bot process may still be booting.
+    }
+
+    await sleep(pollMs);
+  }
+
+  return false;
+}
+
 function botEnv(): NodeJS.ProcessEnv {
+  const setupEnv = {
+    BOT_SETUP_BILLBOARD: shouldShowSetup()
+      ? '1'
+      : process.env.BOT_SETUP_BILLBOARD,
+  };
+
   if (!isWebUiEnabled()) {
     return {
       ...process.env,
+      ...setupEnv,
       BOT_WEB_STATIC: '0',
     };
   }
 
   return {
     ...process.env,
+    ...setupEnv,
     BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
     BOT_WEB_STATIC: '0',
   };
@@ -152,6 +214,29 @@ function ensureWebUi(): void {
   });
 }
 
+async function ensureWebUiAfterBotReady(): Promise<void> {
+  if (!isWebUiEnabled() || webChild) {
+    return;
+  }
+
+  const url = botWebHealthUrl();
+  console.log(`[run-with-restart] Waiting for bot web server at ${url}...`);
+
+  const ready = await waitForHttpReady({
+    url,
+    timeoutMs: WEB_UI_BACKEND_WAIT_TIMEOUT_MS,
+    pollMs: WEB_UI_BACKEND_POLL_MS,
+  });
+
+  if (!ready) {
+    console.error(
+      `[run-with-restart] Bot web server did not respond within ${WEB_UI_BACKEND_WAIT_TIMEOUT_MS}ms; starting web UI anyway.`,
+    );
+  }
+
+  ensureWebUi();
+}
+
 function start(): void {
   lastStartTime = Date.now();
   botChild = runBot();
@@ -205,7 +290,7 @@ function start(): void {
 }
 
 start();
-ensureWebUi();
+void ensureWebUiAfterBotReady();
 
 function shutdownAll(): void {
   try {

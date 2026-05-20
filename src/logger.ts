@@ -70,6 +70,11 @@ export const log = {
       console.error(`  [✗]     ${msg}`);
     }
   },
+  raw: (msg: string) => {
+    if (LOG_ENABLED && INFO_ENABLED) {
+      console.log(msg);
+    }
+  },
   sep: () => {
     if (LOG_ENABLED) {
       console.log('─'.repeat(60));

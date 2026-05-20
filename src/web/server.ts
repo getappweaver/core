@@ -6,7 +6,7 @@ import type { SimplePool } from 'nostr-tools/pool';
 
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
-import { C, log } from '@src/logger';
+import { log } from '@src/logger';
 import type { ProviderDb } from '@src/providers/db';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -17,6 +17,8 @@ import { WebSocketPromptSession } from './ws-prompt-session';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 5551;
+const BILLBOARD_WIDTH = 80;
+const BILLBOARD_INNER_WIDTH = BILLBOARD_WIDTH - 4;
 
 export type StartLocalWebServerOptions = {
   prefix: string;
@@ -70,38 +72,130 @@ function setupUrl(origin: string, setupSecret: string): string {
   return `${origin}/setup?secret=${setupSecret}`;
 }
 
+function originWithTrailingSlash(origin: string): string {
+  return origin.endsWith('/') ? origin : `${origin}/`;
+}
+
+function terminalLink(url: string, text: string): string {
+  return `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`;
+}
+
+function stripTerminalControls(text: string): string {
+  return text
+    .replace(
+      // eslint-disable-next-line no-control-regex
+      /\x1b\]8;;.*?\x1b\\/g,
+      '',
+    )
+    .replace(
+      // eslint-disable-next-line no-control-regex
+      /\x1b\[[0-9;]*m/g,
+      '',
+    );
+}
+
+function visibleLength(text: string): number {
+  return stripTerminalControls(text).length;
+}
+
+function chunkText(text: string, width: number): string[] {
+  const chunks: string[] = [];
+
+  for (let i = 0; i < text.length; i += width) {
+    chunks.push(text.slice(i, i + width));
+  }
+
+  return chunks;
+}
+
+function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of text.split(' ')) {
+    if (word.length > width) {
+      if (current.length > 0) {
+        lines.push(current);
+        current = '';
+      }
+
+      lines.push(...chunkText(word, width));
+      continue;
+    }
+
+    const candidate = current.length === 0 ? word : `${current} ${word}`;
+
+    if (candidate.length <= width) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+
+  if (current.length > 0) {
+    lines.push(current);
+  }
+
+  return lines;
+}
+
+function billboardLine(text: string): string {
+  const padding = Math.max(0, BILLBOARD_INNER_WIDTH - visibleLength(text));
+
+  return `| ${text}${' '.repeat(padding)} |`;
+}
+
+function logBillboard(lines: string[]): void {
+  const border = `+${'-'.repeat(BILLBOARD_WIDTH - 2)}+`;
+
+  log.raw(border);
+
+  for (const line of lines) {
+    log.raw(billboardLine(line));
+  }
+
+  log.raw(border);
+}
+
+function linkedUrlLines(url: string): string[] {
+  return chunkText(url, BILLBOARD_INNER_WIDTH).map((chunk) =>
+    terminalLink(url, chunk),
+  );
+}
+
+function logWebLocalUrlBillboard(origin: string): void {
+  const url = originWithTrailingSlash(origin);
+
+  logBillboard([
+    'Local web',
+    ...linkedUrlLines(url),
+    '',
+    ...wrapWords(
+      'Open app: Ctrl+Click the link in your terminal, or copy and paste it into your browser.',
+      BILLBOARD_INNER_WIDTH,
+    ),
+  ]);
+}
+
 type LogSetupUrlProps = {
   origin: string;
   setupSecret: string;
-  billboard: boolean;
 };
 
-function logSetupUrl({
-  origin,
-  setupSecret,
-  billboard,
-}: LogSetupUrlProps): void {
+function logSetupUrl({ origin, setupSecret }: LogSetupUrlProps): void {
   const url = setupUrl(origin, setupSecret);
 
-  if (!billboard) {
-    log.info(`Setup web: ${url}`);
-
-    return;
-  }
-
-  log.sep();
-
-  log.info(
-    `${C.bold}${C.yellow}Setup web:${C.reset} ${C.cyan}${url}${C.reset}`,
-  );
-
-  log.info('Open setup: Ctrl+Click the link in your terminal.');
-
-  log.info(
-    'If your terminal does not open links, copy and paste it into your browser.',
-  );
-
-  log.sep();
+  logBillboard([
+    'Setup web',
+    ...linkedUrlLines(url),
+    '',
+    'Open setup: Ctrl+Click the link in your terminal.',
+    ...wrapWords(
+      'If your terminal does not open links, copy and paste it into your browser.',
+      BILLBOARD_INNER_WIDTH,
+    ),
+  ]);
 }
 
 export function startLocalWebServer(options: StartLocalWebServerOptions): void {
@@ -175,11 +269,14 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     const backendOrigin = `http://${displayHost(host)}:${port}`;
     const preferredOrigin = frontendOrigin || backendOrigin;
 
-    logSetupUrl({
-      origin: preferredOrigin,
-      setupSecret: options.setupSecret,
-      billboard: options.setupBillboard || options.setupMode,
-    });
+    logWebLocalUrlBillboard(preferredOrigin);
+
+    if (options.setupBillboard) {
+      logSetupUrl({
+        origin: preferredOrigin,
+        setupSecret: options.setupSecret,
+      });
+    }
   } catch (err) {
     const code =
       err && typeof err === 'object' && 'code' in err

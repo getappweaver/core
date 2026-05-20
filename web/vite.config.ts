@@ -4,6 +4,15 @@ import solid from 'vite-plugin-solid';
 
 const devHost = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
 const devPort = Number.parseInt(process.env.BOT_WEB_UI_PORT ?? '5552', 10);
+const backendHostRaw = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+const backendHost =
+  backendHostRaw === '0.0.0.0' || backendHostRaw === '::'
+    ? '127.0.0.1'
+    : backendHostRaw;
+const backendPort = Number.parseInt(process.env.BOT_WEB_PORT ?? '5551', 10);
+const backendPortSafe = Number.isNaN(backendPort) ? 5551 : backendPort;
+const backendHttpOrigin = `http://${backendHost}:${backendPortSafe}`;
+const backendWsOrigin = `ws://${backendHost}:${backendPortSafe}`;
 const setupOnlyMode = ['BOT_KEY', 'BOT_MASTER_PUBKEY', 'BOT_RELAYS'].some(
   (name) => (process.env[name]?.trim() ?? '').length === 0,
 );
@@ -60,14 +69,14 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5551',
+        target: backendHttpOrigin,
         changeOrigin: true,
       },
       ...(setupOnlyMode
         ? {}
         : {
             '/ws': {
-              target: 'ws://127.0.0.1:5551',
+              target: backendWsOrigin,
               ws: true,
               changeOrigin: true,
             },

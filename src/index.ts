@@ -106,6 +106,15 @@ function readPackageVersion(): string {
   return packageJsonData.version;
 }
 
+function shouldShowSetupBillboard(missingEnv: string[]): boolean {
+  return (
+    process.argv.slice(2).includes('--setup') ||
+    process.env.BOT_SETUP_BILLBOARD === '1' ||
+    missingEnv.length > 0 ||
+    needsSetupBillboard(readSetupConfigurationSnapshot())
+  );
+}
+
 async function startSetupOnlyMode(props: {
   setupSecret: string;
   version: string;
@@ -182,7 +191,7 @@ async function main() {
   const setupSecret = createSetupSecret();
   const VERSION = readPackageVersion();
   const missingEnv = getMissingRequiredBotEnv();
-  const setupBillboard = needsSetupBillboard(readSetupConfigurationSnapshot());
+  const setupBillboard = shouldShowSetupBillboard(missingEnv);
 
   if (missingEnv.length > 0) {
     return startSetupOnlyMode({
