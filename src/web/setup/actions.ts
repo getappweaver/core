@@ -1,4 +1,5 @@
-import { join } from 'path';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 
 import { nip19 } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
@@ -86,6 +87,33 @@ type SetupWebPushResult = {
   publicKey: string;
   subject: string;
 };
+
+type SetPiperConfigProps = {
+  dmBotRoot: string;
+  binaryPath: string;
+  modelPath: string;
+  libraryPath: string;
+};
+
+type SetPiperConfigResult = {
+  binaryPath: string;
+  modelPath: string;
+  libraryPath: string;
+};
+
+type DownloadPiperModelProps = {
+  dmBotRoot: string;
+};
+
+type DownloadPiperModelResult = {
+  modelPath: string;
+  configPath: string;
+};
+
+const DEFAULT_PIPER_MODEL_URL =
+  'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/en_US-libritts_r-medium.onnx';
+
+const DEFAULT_PIPER_MODEL_CONFIG_URL = `${DEFAULT_PIPER_MODEL_URL}.json`;
 
 export type SetupDefaultsInput = {
   prefix: string;
@@ -267,6 +295,67 @@ export function setupWebPush({
   process.env.BOT_WEB_PUSH_SUBJECT = subject;
 
   return { publicKey: keys.publicKey, subject };
+}
+
+export function setSetupPiperConfig({
+  dmBotRoot,
+  binaryPath,
+  modelPath,
+  libraryPath,
+}: SetPiperConfigProps): SetPiperConfigResult {
+  const values = {
+    binaryPath: binaryPath.trim(),
+    modelPath: modelPath.trim(),
+    libraryPath: libraryPath.trim(),
+  };
+
+  const envPath = join(dmBotRoot, '.env');
+
+  setEnvInFile(envPath, 'BOT_PIPER_BINARY_PATH', values.binaryPath);
+  setEnvInFile(envPath, 'BOT_PIPER_MODEL_PATH', values.modelPath);
+  setEnvInFile(envPath, 'BOT_PIPER_LIBRARY_PATH', values.libraryPath);
+
+  process.env.BOT_PIPER_BINARY_PATH = values.binaryPath;
+  process.env.BOT_PIPER_MODEL_PATH = values.modelPath;
+  process.env.BOT_PIPER_LIBRARY_PATH = values.libraryPath;
+
+  return values;
+}
+
+async function downloadFile(url: string, filePath: string): Promise<void> {
+  if (existsSync(filePath)) {
+    return;
+  }
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`piper_model_download_failed:${res.status}`);
+  }
+
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
+}
+
+export async function downloadSetupPiperModel({
+  dmBotRoot,
+}: DownloadPiperModelProps): Promise<DownloadPiperModelResult> {
+  const modelPath = join(
+    dmBotRoot,
+    'models',
+    'piper',
+    'en_US-libritts_r-medium.onnx',
+  );
+
+  const configPath = `${modelPath}.json`;
+
+  await downloadFile(DEFAULT_PIPER_MODEL_URL, modelPath);
+  await downloadFile(DEFAULT_PIPER_MODEL_CONFIG_URL, configPath);
+
+  setEnvInFile(join(dmBotRoot, '.env'), 'BOT_PIPER_MODEL_PATH', modelPath);
+  process.env.BOT_PIPER_MODEL_PATH = modelPath;
+
+  return { modelPath, configPath };
 }
 
 export function setSetupDefaults({

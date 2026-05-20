@@ -9,6 +9,9 @@ export type SetupStatus = {
     cashuMnemonic: boolean;
     webPush: boolean;
     cursorApiKey: boolean;
+    piperBinaryPath: boolean;
+    piperModelPath: boolean;
+    piperLibraryPath: boolean;
   };
   defaults: SetupDefaults;
   runtime: {
@@ -20,6 +23,23 @@ export type SetupStatus = {
     botPubkey: string | null;
     masterPubkey: string | null;
   };
+  piper: {
+    binaryPath: string;
+    binaryExists: boolean;
+    modelPath: string;
+    modelExists: boolean;
+    libraryPath: string;
+  };
+  dependencies: SetupDependencyStatus[];
+};
+
+export type SetupDependencyStatus = {
+  name: string;
+  command: string;
+  installed: boolean;
+  path: string | null;
+  required: boolean;
+  installHint: string;
 };
 
 export type SetupDefaults = {
@@ -91,6 +111,21 @@ export type SetupWebPushResponse = {
   ok: true;
   publicKey: string;
   subject: string;
+  status: SetupStatus;
+};
+
+export type SetPiperConfigResponse = {
+  ok: true;
+  binaryPath: string;
+  modelPath: string;
+  libraryPath: string;
+  status: SetupStatus;
+};
+
+export type DownloadPiperModelResponse = {
+  ok: true;
+  modelPath: string;
+  configPath: string;
   status: SetupStatus;
 };
 
@@ -322,6 +357,47 @@ export async function setupWebPush(
   }
 
   return (await res.json()) as SetupWebPushResponse;
+}
+
+export async function setPiperConfig(props: {
+  token: string;
+  binaryPath: string;
+  modelPath: string;
+  libraryPath: string;
+}): Promise<SetPiperConfigResponse> {
+  const res = await fetch('/api/setup/piper', {
+    method: 'POST',
+    headers: {
+      ...setupAuthHeaders(props.token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      binaryPath: props.binaryPath,
+      modelPath: props.modelPath,
+      libraryPath: props.libraryPath,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`setup_piper_failed:${res.status}`);
+  }
+
+  return (await res.json()) as SetPiperConfigResponse;
+}
+
+export async function downloadPiperModel(
+  token: string,
+): Promise<DownloadPiperModelResponse> {
+  const res = await fetch('/api/setup/piper/model', {
+    method: 'POST',
+    headers: setupAuthHeaders(token),
+  });
+
+  if (!res.ok) {
+    throw new Error(`setup_piper_model_failed:${res.status}`);
+  }
+
+  return (await res.json()) as DownloadPiperModelResponse;
 }
 
 export async function setSetupDefaults(

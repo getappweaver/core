@@ -2,6 +2,7 @@ import type { JSX } from 'solid-js';
 import {
   createEffect,
   createResource,
+  createMemo,
   createSignal,
   For,
   Match,
@@ -17,12 +18,14 @@ import { useNostrAuth } from '../contexts/NostrAuthContext';
 
 import {
   authorizeOpenCodeProvider,
+  downloadPiperModel,
   fetchOpenCodeAuthStatus,
   fetchSetupStatus,
   generateSetupBotKey,
   initializeSetupSession,
   restartSetupApp,
   setCursorApiKey,
+  setPiperConfig,
   setProviderApiKey,
   setSetupDefaults,
   setSetupMasterPubkey,
@@ -31,6 +34,7 @@ import {
   type OpenCodeAuthProvider,
   type OpenCodeAuthorizeResponse,
   type ParentWorkspaceInstallResult,
+  type SetupDependencyStatus,
   type SetupDefaults,
   type SetupStatus,
   type SetupWebPushResponse,
@@ -141,6 +145,71 @@ function SetupStatusCard(props: { status: SetupStatus }): JSX.Element {
 
       <ul class="setup-status-list">
         <For each={setupRows(status())}>{(row) => <StatusRow {...row} />}</For>
+      </ul>
+    </section>
+  );
+}
+
+function dependencyDetail(dependency: SetupDependencyStatus): string {
+  if (dependency.installed) {
+    return dependency.path ?? 'found';
+  }
+
+  return dependency.required ? 'missing' : 'optional';
+}
+
+function SystemCheckCard(props: { status: SetupStatus }): JSX.Element {
+  const missingRequired = createMemo(
+    () =>
+      props.status.dependencies.filter((dep) => dep.required && !dep.installed)
+        .length,
+  );
+
+  return (
+    <section
+      class="card setup-card setup-card--system"
+      aria-labelledby="system-check-title"
+    >
+      <div class="setup-card-head">
+        <div>
+          <h1 id="system-check-title">System Check</h1>
+        </div>
+        <span
+          class="setup-badge"
+          classList={{ 'is-ok': missingRequired() === 0 }}
+        >
+          {missingRequired() === 0 ? 'ready' : `${missingRequired()} missing`}
+        </span>
+      </div>
+      <p class="setup-copy">
+        These checks read executables from this server process PATH. Optional
+        tools can be configured later.
+      </p>
+      <ul class="setup-status-list setup-status-list--system">
+        <For each={props.status.dependencies}>
+          {(dependency) => (
+            <li class="setup-status-row setup-status-row--system">
+              <span
+                class="setup-status-dot"
+                classList={{
+                  'is-ok': dependency.installed,
+                  'is-missing': dependency.required && !dependency.installed,
+                }}
+                aria-hidden="true"
+              />
+              <span class="setup-status-label">
+                {dependency.name}
+                <small>{dependency.required ? 'required' : 'optional'}</small>
+              </span>
+              <span class="setup-status-detail">
+                {dependencyDetail(dependency)}
+              </span>
+              <Show when={!dependency.installed}>
+                <span class="setup-install-hint">{dependency.installHint}</span>
+              </Show>
+            </li>
+          )}
+        </For>
       </ul>
     </section>
   );
@@ -912,6 +981,7 @@ function WebPushSetupCard(props: WebPushSetupCardProps): JSX.Element {
         <span class="setup-checkbox-row">
           <input
             type="checkbox"
+            class="checkbox-retro"
             checked={generateNewKeys()}
             onChange={(event) =>
               setGenerateNewKeys(event.currentTarget.checked)
@@ -949,6 +1019,194 @@ function WebPushSetupCard(props: WebPushSetupCardProps): JSX.Element {
       </Show>
       <Show when={error()}>
         {(message) => <p class="setup-error-line">{message()}</p>}
+      </Show>
+    </section>
+  );
+}
+
+type PiperSetupCardProps = {
+  token: string;
+  status: SetupStatus;
+  onSaved: () => void;
+};
+
+function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
+  const detectedPiper = createMemo(
+    () =>
+      props.status.dependencies.find((dep) => dep.command === 'piper')?.path ??
+      '',
+  );
+
+  const [binaryPath, setBinaryPath] = createSignal(
+    props.status.piper.binaryPath,
+  );
+
+  const [modelPath, setModelPath] = createSignal(props.status.piper.modelPath);
+
+  const [libraryPath, setLibraryPath] = createSignal(
+    props.status.piper.libraryPath,
+  );
+
+  const [saving, setSaving] = createSignal(false);
+  const [downloading, setDownloading] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+  const [message, setMessage] = createSignal<string | null>(null);
+
+  createEffect(() => {
+    setBinaryPath(props.status.piper.binaryPath);
+    setModelPath(props.status.piper.modelPath);
+    setLibraryPath(props.status.piper.libraryPath);
+  });
+
+  async function save(): Promise<void> {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await setPiperConfig({
+        token: props.token,
+        binaryPath: binaryPath(),
+        modelPath: modelPath(),
+        libraryPath: libraryPath(),
+      });
+
+      setMessage('Piper environment saved.');
+      props.onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function downloadModel(): Promise<void> {
+    setDownloading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const result = await downloadPiperModel(props.token);
+
+      setModelPath(result.modelPath);
+      setMessage(`Downloaded model and config to ${result.modelPath}`);
+      props.onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <section class="card setup-card setup-card--piper">
+      <div class="setup-card-head">
+        <div>
+          <h1>Piper Speech</h1>
+        </div>
+        <span
+          class="setup-badge"
+          classList={{
+            'is-ok':
+              props.status.piper.binaryExists && props.status.piper.modelExists,
+          }}
+        >
+          {props.status.piper.binaryExists && props.status.piper.modelExists
+            ? 'ready'
+            : 'optional'}
+        </span>
+      </div>
+      <p class="setup-copy">
+        Local speech uses Piper only when these environment variables are set.
+        Download the default voice model here, or point to any compatible Piper{' '}
+        <code>.onnx</code> voice model.
+      </p>
+      <div class="setup-defaults-grid setup-piper-grid">
+        <label class="field-block">
+          <span class="field-label">BOT_PIPER_BINARY_PATH</span>
+          <input
+            type="text"
+            value={binaryPath()}
+            placeholder={detectedPiper() || '/path/to/piper'}
+            onInput={(event) => setBinaryPath(event.currentTarget.value)}
+          />
+          <small>
+            {detectedPiper()
+              ? `Detected on PATH: ${detectedPiper()}`
+              : 'Install Piper, then enter the full binary path.'}
+          </small>
+        </label>
+        <label class="field-block">
+          <span class="field-label">BOT_PIPER_MODEL_PATH</span>
+          <input
+            type="text"
+            value={modelPath()}
+            placeholder="/path/to/voice.onnx"
+            onInput={(event) => setModelPath(event.currentTarget.value)}
+          />
+          <small>
+            The matching .onnx.json config should sit next to the model.
+          </small>
+        </label>
+        <label class="field-block">
+          <span class="field-label">BOT_PIPER_LIBRARY_PATH</span>
+          <input
+            type="text"
+            value={libraryPath()}
+            placeholder="optional library path"
+            onInput={(event) => setLibraryPath(event.currentTarget.value)}
+          />
+          <small>
+            Usually empty. Set this only for custom Piper library folders.
+          </small>
+        </label>
+      </div>
+      <div class="setup-step-actions">
+        <Show when={detectedPiper()}>
+          {(path) => (
+            <button
+              type="button"
+              class="web-button"
+              onClick={() => setBinaryPath(path())}
+            >
+              Use detected Piper
+            </button>
+          )}
+        </Show>
+        <button
+          type="button"
+          class="web-button"
+          disabled={downloading()}
+          onClick={() => void downloadModel()}
+        >
+          {downloading() ? 'Downloading...' : 'Download default voice'}
+        </button>
+        <button
+          type="button"
+          class="web-button"
+          disabled={saving()}
+          onClick={() => void save()}
+        >
+          {saving() ? 'Saving...' : 'Save Piper env'}
+        </button>
+      </div>
+      <ul class="setup-status-list setup-status-list--compact">
+        <StatusRow
+          label="Binary"
+          ok={props.status.piper.binaryExists}
+          detail={props.status.piper.binaryExists ? 'found' : 'not configured'}
+        />
+        <StatusRow
+          label="Model"
+          ok={props.status.piper.modelExists}
+          detail={props.status.piper.modelExists ? 'found' : 'not configured'}
+        />
+      </ul>
+      <Show when={message()}>
+        {(text) => <p class="setup-inline-code">{text()}</p>}
+      </Show>
+      <Show when={error()}>
+        {(text) => <p class="setup-error-line">{text()}</p>}
       </Show>
     </section>
   );
@@ -1375,6 +1633,7 @@ function SetupTimeline(props: SetupTimelineProps): JSX.Element {
                   <span class="setup-checkbox-row">
                     <input
                       type="checkbox"
+                      class="checkbox-retro"
                       checked={readyNotification()}
                       onChange={(event) =>
                         setReadyNotification(event.currentTarget.checked)
@@ -1521,6 +1780,7 @@ export function SetupView(): JSX.Element {
           <Match when={latestStatus()}>
             {(loaded) => (
               <>
+                <SystemCheckCard status={loaded()} />
                 <SetupTimeline
                   token={setupToken()!}
                   status={loaded()}
@@ -1533,6 +1793,11 @@ export function SetupView(): JSX.Element {
                   onSaved={() => void refetch()}
                 />
                 <WebPushSetupCard
+                  token={setupToken()!}
+                  status={loaded()}
+                  onSaved={() => void refetch()}
+                />
+                <PiperSetupCard
                   token={setupToken()!}
                   status={loaded()}
                   onSaved={() => void refetch()}

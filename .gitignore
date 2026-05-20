@@ -13,6 +13,7 @@ TOOLS.md
 .claude/skills/appweaver*/
 .logs/
 .piper-test/
+models/piper/
 apps/landing/dist/
 web/dist/
 web/public/plugin-icons/

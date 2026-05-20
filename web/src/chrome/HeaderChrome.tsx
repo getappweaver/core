@@ -539,7 +539,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
                                 closeAllMenus();
                                 props.onEnablePiperTts?.();
                               }}
-                              title="Download and enable Piper TTS for local speech playback"
+                              title="Enable Piper TTS for local speech playback"
                             >
                               {props.piperTtsBusy?.()
                                 ? 'Piper TTS …'
@@ -723,7 +723,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
                         closeAllMenus();
                         props.onEnablePiperTts?.();
                       }}
-                      title="Download and enable Piper TTS for local speech playback"
+                      title="Enable Piper TTS for local speech playback"
                     >
                       {props.piperTtsBusy?.()
                         ? 'Piper TTS …'

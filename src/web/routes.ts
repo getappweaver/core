@@ -48,10 +48,12 @@ import {
   upsertWebPushSubscription,
 } from './push-subscriptions';
 import {
+  downloadSetupPiperModel,
   generateSetupBotKey,
   setSetupCursorApiKey,
   setSetupDefaults,
   setSetupMasterPubkey,
+  setSetupPiperConfig,
   setSetupProviderApiKey,
   setSetupRelays,
   setupWebPush,
@@ -484,6 +486,65 @@ export function createWebFetchHandler(
                 : 500;
 
             return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/piper') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const input = payload as {
+              binaryPath?: unknown;
+              modelPath?: unknown;
+              libraryPath?: unknown;
+            } | null;
+
+            if (
+              !input ||
+              typeof input.binaryPath !== 'string' ||
+              typeof input.modelPath !== 'string' ||
+              typeof input.libraryPath !== 'string'
+            ) {
+              throw new Error('invalid_piper_config');
+            }
+
+            const result = setSetupPiperConfig({
+              dmBotRoot: ctx.dmBotRoot,
+              binaryPath: input.binaryPath,
+              modelPath: input.modelPath,
+              libraryPath: input.libraryPath,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' || message === 'invalid_piper_config'
+                ? 400
+                : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/piper/model') {
+        return downloadSetupPiperModel({ dmBotRoot: ctx.dmBotRoot })
+          .then((result) =>
+            jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            }),
+          )
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            return jsonResponse({ error: message }, { status: 500 });
           });
       }
 

@@ -1,5 +1,4 @@
 import { existsSync } from 'fs';
-import { join } from 'path';
 
 import { spawn } from 'bun';
 
@@ -29,17 +28,12 @@ type SpawnNativePiperProps = NativePiperPaths & {
 };
 
 function resolveNativePiperPaths(dmBotRoot: string): NativePiperPaths {
-  const piperRoot = join(dmBotRoot, '.piper-test', 'piper');
-  const phonemizeLib = join(piperRoot, 'piper-phonemize', 'lib');
+  void dmBotRoot;
 
   return {
-    binaryPath: process.env.BOT_PIPER_BINARY_PATH ?? join(piperRoot, 'piper'),
-    modelPath:
-      process.env.BOT_PIPER_MODEL_PATH ??
-      join(dmBotRoot, '.piper-test', 'en_US-libritts_r-medium.onnx'),
-    libraryPath:
-      process.env.BOT_PIPER_LIBRARY_PATH ??
-      [phonemizeLib, piperRoot, '/usr/local/opt/espeak-ng/lib'].join(':'),
+    binaryPath: process.env.BOT_PIPER_BINARY_PATH?.trim() ?? '',
+    modelPath: process.env.BOT_PIPER_MODEL_PATH?.trim() ?? '',
+    libraryPath: process.env.BOT_PIPER_LIBRARY_PATH?.trim() ?? '',
   };
 }
 
@@ -48,8 +42,8 @@ export function getNativePiperStatus(dmBotRoot: string): NativePiperStatus {
 
   return {
     ...paths,
-    binaryExists: existsSync(paths.binaryPath),
-    modelExists: existsSync(paths.modelPath),
+    binaryExists: paths.binaryPath.length > 0 && existsSync(paths.binaryPath),
+    modelExists: paths.modelPath.length > 0 && existsSync(paths.modelPath),
   };
 }
 
@@ -81,8 +75,12 @@ async function spawnNativePiper(props: SpawnNativePiperProps): Promise<Blob> {
       stderr: 'pipe',
       env: {
         ...process.env,
-        DYLD_LIBRARY_PATH: props.libraryPath,
-        LD_LIBRARY_PATH: props.libraryPath,
+        ...(props.libraryPath.length > 0
+          ? {
+              DYLD_LIBRARY_PATH: props.libraryPath,
+              LD_LIBRARY_PATH: props.libraryPath,
+            }
+          : {}),
       },
     },
   );

@@ -389,6 +389,14 @@ pre {
   border-left: 4px solid var(--color-success);
 }
 
+.setup-card--piper {
+  border-left: 4px solid var(--color-warning);
+}
+
+.setup-card--system {
+  border-left: 4px solid var(--color-accent);
+}
+
 .setup-card-head {
   display: flex;
   align-items: flex-start;
@@ -484,6 +492,29 @@ pre {
   text-align: right;
 }
 
+.setup-status-row--system {
+  grid-template-columns: auto minmax(7rem, 0.7fr) minmax(0, 1fr);
+}
+
+.setup-status-row--system .setup-status-label {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.setup-status-row--system .setup-status-label small,
+.setup-install-hint {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.setup-status-row--system .setup-status-detail {
+  overflow-wrap: anywhere;
+}
+
+.setup-install-hint {
+  grid-column: 2 / -1;
+}
+
 .setup-error-detail {
   margin: 0.8rem 0 0;
   color: var(--color-danger);
@@ -556,15 +587,23 @@ pre {
   margin-top: 0.7rem;
 }
 
+.setup-piper-grid {
+  margin-top: 1rem;
+}
+
 .setup-checkbox-field {
   align-content: start;
 }
 
 .setup-checkbox-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   color: var(--color-text-muted);
+}
+
+.setup-checkbox-row .checkbox-retro {
+  flex: 0 0 auto;
 }
 
 .setup-auth-result {
