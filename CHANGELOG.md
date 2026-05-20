@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.21.3] - 2026-05-21
+
+- fix: style widget help open state (cec46a0)
+
 ## [v9.21.2] - 2026-05-20
 
-- fix: highlight first-run setup URL (2cf1192)
+- fix: highlight first-run setup URL (268b8a0)
 
 ## [v9.21.1] - 2026-05-20
 
