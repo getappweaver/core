@@ -6,6 +6,10 @@ import type {
 
 import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
 import { loadSearchRelays } from '../nostr/searchRelays';
+import {
+  beginPluginInstallRestartStatus,
+  clearPluginInstallRestartStatus,
+} from '../restartStatus';
 import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
 import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
 import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
@@ -604,6 +608,26 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const requestId = adapters.createId();
     const uiExecutionPolicy = params?.uiExecutionPolicy;
 
+    if (commandAction.clientStatus?.pending) {
+      adapters.appendSystemMessage(commandAction.clientStatus.pending);
+    }
+
+    if (
+      commandAction.command === 'plugins' &&
+      commandAction.subcommand === 'install' &&
+      commandAction.clientStatus?.restarting &&
+      commandAction.clientStatus.success
+    ) {
+      beginPluginInstallRestartStatus({
+        title:
+          typeof commandAction.arguments?.target === 'string'
+            ? commandAction.arguments.target
+            : 'plugin',
+        restarting: commandAction.clientStatus.restarting,
+        success: commandAction.clientStatus.success,
+      });
+    }
+
     const recordTl =
       commandAction.recordInTimeline ??
       uiExecutionPolicy?.recordInTimeline ??
@@ -912,6 +936,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         recordInTimeline: recordTl,
       });
     } catch (err) {
+      clearPluginInstallRestartStatus();
       endUserWebUiBusyOnce();
       adapters.pendingRequests.delete(requestId);
 

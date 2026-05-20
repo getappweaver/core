@@ -21,6 +21,7 @@ export function renderPluginsInstallText(
         : `not compatible with core ${representation.coreVersion}`;
 
     lines.push(`- ${entry.title || entry.name} (${status})`);
+    lines.push(`  author: ${entry.author.label}`);
 
     if (entry.title) {
       lines.push(`  d: ${entry.name}`);

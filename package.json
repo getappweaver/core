@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "9.20.0",
+  "version": "9.20.1",
   "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
   "type": "module",
   "workspaces": [

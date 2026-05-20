@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.20.1] - 2026-05-20
+
+- fix: improve plugin install feedback (a8fc1cd)
+
 ## [v9.20.0] - 2026-05-20
 
-- feat: add plugin install metadata support (90ecf35)
+- feat: add plugin install metadata support (1110dbb)
 
 ## [v9.19.0] - 2026-05-20
 

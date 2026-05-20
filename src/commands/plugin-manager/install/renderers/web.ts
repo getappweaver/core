@@ -46,6 +46,12 @@ const pluginsInstallStylesheet = {
       gap: 0.5rem;
     }
 
+    .web-link.plugins-install-author {
+      margin-left: auto;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
     .web-link.plugins-install-source-link {
       width: fit-content;
     }
@@ -100,6 +106,11 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
         arguments: { target: entry.id },
         options: {},
         recordInTimeline: false,
+        clientStatus: {
+          pending: `Installing ${entry.title || entry.name} plugin...`,
+          restarting: 'Restarting AppWeaver...',
+          success: `Successfully installed ${entry.title || entry.name} plugin.`,
+        },
       },
     },
   };
@@ -149,6 +160,20 @@ function pluginTitle(entry: PluginCatalogEntry): WebNode {
     tag: 'text',
     props: { weight: 'bold' },
     children: [textNode(label)],
+  };
+}
+
+function pluginAuthor(entry: PluginCatalogEntry): WebNode {
+  return {
+    type: 'element',
+    tag: 'link',
+    props: {
+      href: entry.author.href,
+      external: true,
+      tone: entry.author.verified ? 'success' : 'muted',
+      className: 'plugins-install-author',
+    },
+    children: [textNode(entry.author.label)],
   };
 }
 
@@ -206,7 +231,11 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
             type: 'element',
             tag: 'row',
             props: { className: 'plugins-install-title-row' },
-            children: [...(icon ? [icon] : []), pluginTitle(entry)],
+            children: [
+              ...(icon ? [icon] : []),
+              pluginTitle(entry),
+              pluginAuthor(entry),
+            ],
           },
           ...(entry.description ? [textBlock(entry.description, 'muted')] : []),
           ...(source ? [source] : []),

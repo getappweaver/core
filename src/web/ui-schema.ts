@@ -40,6 +40,12 @@ export const WebRefreshSchema = z.object({
     .optional(),
 });
 
+export const WebCommandStatusSchema = z.object({
+  pending: z.string().min(1).optional(),
+  restarting: z.string().min(1).optional(),
+  success: z.string().min(1).optional(),
+});
+
 /** Optional line under a command option in the web form; not sent to the bot. */
 export const WebOptionFieldHintObjectSchema = z.object({
   /** Human-readable context for the current option value (e.g. todo title for `--under`). */
@@ -111,6 +117,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     revealIds: z.array(z.string().min(1)).optional(),
     /** Client-side context values to resolve and include before command execution. */
     clientContext: z.array(z.enum(['nostrSearchRelays'])).optional(),
+    /** Optional client-visible lifecycle messages for long-running command actions. */
+    clientStatus: WebCommandStatusSchema.optional(),
   }),
   z.object({
     /** Browser-side action handled by the web app; payload is client-specific JSON. */

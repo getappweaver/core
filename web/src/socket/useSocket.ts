@@ -1,5 +1,10 @@
 import { createEffect, createMemo, createSignal } from 'solid-js';
 
+import {
+  consumePluginInstallRestartMessage,
+  consumePluginInstallSuccessMessage,
+  hasActivePluginInstallRestartStatus,
+} from '../restartStatus';
 import { handleStorySandboxSocketMessage } from '../story/sandbox';
 import type { TimelineItem } from '../types';
 import { createId as createRequestId } from '../utils';
@@ -237,6 +242,12 @@ export function useSocket(adapters: SocketAppAdapters) {
               clearReconnectTimer();
               setWsConnected(true);
 
+              const pluginInstallSuccess = consumePluginInstallSuccessMessage();
+
+              if (pluginInstallSuccess) {
+                adapters.appendSystemMessage(pluginInstallSuccess);
+              }
+
               try {
                 loadBootstrapData();
               } catch (err) {
@@ -296,8 +307,29 @@ export function useSocket(adapters: SocketAppAdapters) {
       }
     });
 
+    socket.addEventListener('close', () => {
+      const pluginInstallRestart = consumePluginInstallRestartMessage();
+
+      if (pluginInstallRestart) {
+        adapters.appendSystemMessage(pluginInstallRestart);
+      }
+    });
+
     socket.addEventListener('error', () => {
       setWsConnected(false);
+
+      const pluginInstallRestart = consumePluginInstallRestartMessage();
+
+      if (pluginInstallRestart) {
+        adapters.appendSystemMessage(pluginInstallRestart);
+
+        return;
+      }
+
+      if (hasActivePluginInstallRestartStatus()) {
+        return;
+      }
+
       adapters.appendSystemMessage('WebSocket connection failed.');
     });
   }

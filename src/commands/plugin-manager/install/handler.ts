@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import type { NostrEvent } from 'nostr-tools';
+import { nip19, type NostrEvent } from 'nostr-tools';
 
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
 
@@ -20,6 +20,8 @@ const PLUGIN_QUERY_RELAYS = [
 ];
 
 const PLUGIN_QUERY_MAX_WAIT_MS = 10_000;
+const AUTHOR_PROFILE_QUERY_MAX_WAIT_MS = 2_000;
+const NIP05_VERIFY_MAX_WAIT_MS = 3_000;
 
 type RefEntry = {
   tag: string;
@@ -39,11 +41,18 @@ export type PluginCatalogEntry = {
   version: string;
   coreApiVersion: string;
   repo: string;
+  author: PluginAuthorIdentity;
   refs: RefEntry[];
   installedAlias: string | null;
   installedVersion: string | null;
   compatibleRef: RefEntry | null;
   latestRef: RefEntry | null;
+};
+
+export type PluginAuthorIdentity = {
+  label: string;
+  href: string;
+  verified: boolean;
 };
 
 type InstalledPluginEntry = {
@@ -94,12 +103,212 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     version: tagValue(event.tags, 'version'),
     coreApiVersion: tagValue(event.tags, 'coreApiVersion'),
     repo,
+    author: fallbackAuthorIdentity(event.pubkey),
     refs,
     installedAlias: null,
     installedVersion: null,
     compatibleRef: null,
     latestRef: refs.at(-1) ?? null,
   };
+}
+
+function maskedNpub(pubkey: string): string {
+  try {
+    const npub = nip19.npubEncode(pubkey);
+
+    return `${npub.slice(0, 12)}...${npub.slice(-6)}`;
+  } catch {
+    return `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
+  }
+}
+
+function npubHref(pubkey: string): string {
+  try {
+    return `https://nosta.me/${nip19.npubEncode(pubkey)}`;
+  } catch {
+    return `https://nosta.me/${pubkey}`;
+  }
+}
+
+function fallbackAuthorIdentity(pubkey: string): PluginAuthorIdentity {
+  return {
+    label: maskedNpub(pubkey),
+    href: npubHref(pubkey),
+    verified: false,
+  };
+}
+
+function authorHref(nip05: string): string {
+  return `https://nosta.me/${nip05.replace(/^_@/, '')}`;
+}
+
+function repoAuthorHint(repo: string): string | null {
+  if (!repo.startsWith('nostr://')) {
+    return null;
+  }
+
+  const rest = repo.slice('nostr://'.length);
+  const firstSegment = rest.split('/')[0]?.trim() ?? '';
+
+  return firstSegment || null;
+}
+
+function normalizeNip05(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('@')) {
+    return `_${trimmed}`;
+  }
+
+  if (!trimmed.includes('@')) {
+    return `_${trimmed.startsWith('@') ? '' : '@'}${trimmed}`;
+  }
+
+  return trimmed;
+}
+
+function decodeNpub(value: string): string | null {
+  try {
+    const decoded = nip19.decode(value);
+
+    return decoded.type === 'npub' && typeof decoded.data === 'string'
+      ? decoded.data
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+type VerifyNip05Props = {
+  nip05: string;
+  expectedPubkey: string;
+};
+
+async function verifyNip05({
+  nip05,
+  expectedPubkey,
+}: VerifyNip05Props): Promise<boolean> {
+  const normalized = normalizeNip05(nip05);
+
+  if (!normalized) {
+    return false;
+  }
+
+  const [name, domain] = normalized.split('@');
+
+  if (!name || !domain) {
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NIP05_VERIFY_MAX_WAIT_MS);
+
+  try {
+    const url = `https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`;
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = (await response.json()) as { names?: Record<string, unknown> };
+    const pubkey = data.names?.[name];
+
+    return typeof pubkey === 'string' && pubkey === expectedPubkey;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function queryProfileNip05(
+  ctx: RouteCommandContext,
+  pubkey: string,
+): Promise<string | null> {
+  const events = await ctx.pool.querySync(
+    PLUGIN_QUERY_RELAYS,
+    { kinds: [0], authors: [pubkey], limit: 1 },
+    { maxWait: AUTHOR_PROFILE_QUERY_MAX_WAIT_MS },
+  );
+
+  const latest = events.sort((a, b) => b.created_at - a.created_at)[0];
+
+  if (!latest) {
+    return null;
+  }
+
+  try {
+    const content = JSON.parse(latest.content) as { nip05?: unknown };
+
+    return typeof content.nip05 === 'string' ? content.nip05 : null;
+  } catch {
+    return null;
+  }
+}
+
+async function authorIdentityForEntry(
+  ctx: RouteCommandContext,
+  entry: PluginCatalogEntry,
+): Promise<PluginAuthorIdentity> {
+  const hint = repoAuthorHint(entry.repo);
+  const fallback = fallbackAuthorIdentity(entry.pubkey);
+
+  if (!hint) {
+    return fallback;
+  }
+
+  const [primaryHint, secondaryHint] = hint.split('|');
+  const hintedPubkey = decodeNpub(primaryHint);
+
+  if (hintedPubkey) {
+    if (hintedPubkey !== entry.pubkey) {
+      return fallback;
+    }
+
+    const nip05 = secondaryHint || (await queryProfileNip05(ctx, entry.pubkey));
+    const normalized = nip05 ? normalizeNip05(nip05) : null;
+
+    if (
+      normalized &&
+      (await verifyNip05({ nip05: normalized, expectedPubkey: entry.pubkey }))
+    ) {
+      return {
+        label: normalized,
+        href: authorHref(normalized),
+        verified: true,
+      };
+    }
+
+    return fallback;
+  }
+
+  const normalized = normalizeNip05(primaryHint);
+
+  if (
+    normalized &&
+    (await verifyNip05({ nip05: normalized, expectedPubkey: entry.pubkey }))
+  ) {
+    return { label: normalized, href: authorHref(normalized), verified: true };
+  }
+
+  return fallback;
+}
+
+async function attachAuthorIdentities(
+  ctx: RouteCommandContext,
+  entries: PluginCatalogEntry[],
+): Promise<PluginCatalogEntry[]> {
+  return Promise.all(
+    entries.map(async (entry) => ({
+      ...entry,
+      author: await authorIdentityForEntry(ctx, entry),
+    })),
+  );
 }
 
 function readCoreVersion(dmBotRoot: string): string {
@@ -445,9 +654,11 @@ async function queryPluginCatalog(
     }
   }
 
-  return [...latestByPlugin.values()].sort((a, b) =>
+  const entries = [...latestByPlugin.values()].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
+
+  return attachAuthorIdentities(ctx, entries);
 }
 
 export async function handlePluginsInstall(
