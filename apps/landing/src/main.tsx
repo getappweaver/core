@@ -755,14 +755,16 @@ function App() {
           <section class="hero-stage">
             <div class="hero-copy">
               <h1 class="hero-title">
-                An AI-powered app hub on a computer you control.
+                An <span class="hero-title-ai">AI</span>-powered app hub on a computer{' '}
+                <span class="hero-title-mark hero-title-mark--computer">
+                  you control
+                </span>
+                .
               </h1>
               <p class="hero-description">
-                Run focused tools through chat, the web UI, or AI prompts —
-                from todos and bookmarks to scheduled jobs, files, browser
-                actions, publishing, and more.
-                Your data stays local-first, you choose which apps belong in your
-                hub, and anyone can create new ones.
+                Your data stays local-first, you <span class="hero-description-mark">choose</span> which
+                apps belong in your hub. Use them through desktop & mobile web UI and prompts,
+                local terminal input, or your favourite Nostr chat app.
               </p>
               <div class="hero-actions">
                   <button

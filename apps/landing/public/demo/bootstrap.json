@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-12T23:16:43.729Z",
+  "generatedAt": "2026-05-20T22:50:05.503Z",
   "prefix": "/",
   "plugins": [
     {
       "alias": "todo",
-      "name": "dm-bot-todo-plugin",
+      "name": "appweaver-todo-plugin",
       "repo": "nostr://_@getappweaver.com/todo",
       "version": "4.1.0",
       "commandStoryCount": 3,
@@ -12,7 +12,7 @@
     },
     {
       "alias": "job",
-      "name": "dm-bot-job-plugin",
+      "name": "appweaver-job-plugin",
       "repo": "nostr://_@getappweaver.com/job",
       "version": "3.0.0",
       "commandStoryCount": 1,
@@ -20,7 +20,7 @@
     },
     {
       "alias": "bm",
-      "name": "dm-bot-bm-plugin",
+      "name": "appweaver-bm-plugin",
       "repo": "nostr://_@getappweaver.com/bm",
       "version": "3.0.0",
       "commandStoryCount": 1,
@@ -28,7 +28,7 @@
     },
     {
       "alias": "file",
-      "name": "dm-bot-file-plugin",
+      "name": "appweaver-file-plugin",
       "repo": "nostr://_@getappweaver.com/file",
       "version": "2.0.0",
       "commandStoryCount": 2,
@@ -36,10 +36,18 @@
     },
     {
       "alias": "browser",
-      "name": "dm-bot-browser-plugin",
+      "name": "appweaver-browser-plugin",
       "repo": "nostr://_@getappweaver.com/browser",
       "version": "1.0.3",
       "commandStoryCount": 0,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "journal",
+      "name": "appweaver-journal-plugin",
+      "repo": "nostr://_@getappweaver.com/journal",
+      "version": "0.1.0",
+      "commandStoryCount": 1,
       "aiStoryCount": 0
     }
   ]

@@ -74,7 +74,7 @@ Lead with ownership, tools, and composability:
 
 Supporting copy:
 
-> Run focused tools through chat, the web UI, or AI prompts — from todos and bookmarks to scheduled jobs, files, browser actions, publishing, and more. Your data stays local-first, you choose which apps belong in your hub, and anyone can create new ones.
+> Your data stays local-first, you choose which apps belong in your hub. Use them through web/mobile interfaces and prompts, local terminal input, or your favourite Nostr chat app.
 
 ## Possible tags and topics
 

@@ -34,7 +34,7 @@
   },
   {
     "name": "session",
-    "summary": "Agent sessions: new, attach, resume, list, and inspect messages.",
+    "summary": "Agent sessions: new, attach, adopt, resume, list, and inspect messages.",
     "aliases": [],
     "source": "builtin",
     "subcommands": [
@@ -46,7 +46,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name such as new, attach, list, resume, or messages.",
+            "summary": "Optional subcommand name such as new, attach, adopt, list, list-native, resume, or messages.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -57,7 +57,9 @@
           "/session help",
           "/session help new",
           "/session help attach",
+          "/session help adopt",
           "/session help list",
+          "/session help list-native",
           "/session help resume",
           "/session help messages"
         ],
@@ -105,6 +107,29 @@
         "options": [],
         "examples": [
           "/session attach opencode <session_id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "adopt",
+        "summary": "Adopt an existing native OpenCode session and set it current.",
+        "usage": "adopt <session_id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "session_id",
+            "summary": "Native OpenCode session id to adopt.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session adopt ses_..."
         ],
         "inferredWeb": {
           "generated": true,
@@ -162,6 +187,32 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "list-native",
+        "summary": "List native OpenCode sessions discoverable on this machine.",
+        "usage": "list-native --opencode",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "opencode",
+            "summary": "List native OpenCode sessions for the active workspace.",
+            "flag": "--opencode",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": true,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/session list-native --opencode"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       },
       {
@@ -521,19 +572,29 @@
       },
       {
         "name": "install",
-        "summary": "Discover installable plugins from the Nostr plugin catalog.",
-        "usage": "install",
+        "summary": "Discover or install plugins from the Nostr plugin catalog.",
+        "usage": "install [<target>]",
         "aliases": [
           "list"
         ],
-        "arguments": [],
+        "arguments": [
+          {
+            "name": "target",
+            "summary": "Optional plugin event id, package name, or title to install.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "choices": null
+          }
+        ],
         "options": [],
         "examples": [
-          "/plugins install"
+          "/plugins install",
+          "/plugins install appweaver-todo-plugin"
         ],
         "inferredWeb": {
           "generated": true,
-          "executionMode": "runnable_default"
+          "executionMode": "runnable_customizable"
         },
         "webWidget": {
           "placement": "header",
@@ -1806,7 +1867,7 @@
   },
   {
     "name": "bunker",
-    "summary": "Bunker remote signers: list and add connections.",
+    "summary": "Bunker remote signers: list, add, and delete connections.",
     "aliases": [],
     "source": "builtin",
     "subcommands": [
@@ -1818,7 +1879,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional: list or add.",
+            "summary": "Optional: list, add, or delete.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -1828,7 +1889,8 @@
         "examples": [
           "/bunker help",
           "/bunker help list",
-          "/bunker help add"
+          "/bunker help add",
+          "/bunker help delete"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1874,6 +1936,32 @@
         "options": [],
         "examples": [
           "/bunker add mysigner bunker://..."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a saved bunker signer connection.",
+        "usage": "delete <name>",
+        "aliases": [
+          "remove",
+          "rm"
+        ],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Connection name",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/bunker delete mysigner"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2278,7 +2366,7 @@
       {
         "name": "search",
         "summary": "Search published bookmarks, paginate results, or import a hit (see help search).",
-        "usage": "search [<args...>]",
+        "usage": "search [<args...>] [--limit <limit>] [--relays <nostrSearchRelays>]",
         "aliases": [],
         "arguments": [
           {
@@ -2288,7 +2376,20 @@
             "variadic": true
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "summary": "Maximum relay results to fetch.",
+            "kind": "integer"
+          },
+          {
+            "name": "nostrSearchRelays",
+            "flag": "--relays",
+            "summary": "Comma-separated search relays supplied by the web client.",
+            "kind": "string"
+          }
+        ],
         "examples": [
           "/bm search rust",
           "/bm search import 2",
@@ -2387,8 +2488,8 @@
       },
       {
         "name": "publish",
-        "summary": "Publish one bookmark via bunker signer.",
-        "usage": "publish <id>",
+        "summary": "Publish one bookmark or mark it published with a Nostr event URL.",
+        "usage": "publish <id> [<nostrUrl>]",
         "aliases": [],
         "arguments": [
           {
@@ -2396,11 +2497,18 @@
             "summary": "Bookmark id.",
             "kind": "integer",
             "required": true
+          },
+          {
+            "name": "nostrUrl",
+            "summary": "nostr://nevent URL for the published bookmark.",
+            "kind": "string",
+            "required": false
           }
         ],
         "options": [],
         "examples": [
-          "/bm publish 4"
+          "/bm publish 4",
+          "/bm publish 4 nostr://nevent1..."
         ],
         "inferredWeb": {
           "generated": true,
@@ -3624,6 +3732,299 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "journal",
+    "summary": "Captain's Log: private journaling and searchable personal notes.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "journal",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for journal or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: add, list, today, search, edit, delete, publish, config, drafts, accept, decline",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal help",
+          "/journal help add",
+          "/journal help today",
+          "/journal help search"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Add a journal entry.",
+        "usage": "add <text...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "text",
+            "summary": "Journal entry body.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal add Today I shipped the first journal MVP."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List recent journal entries.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "today",
+        "summary": "Show today's journal entries.",
+        "usage": "today",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal today"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Captain's Log",
+          "modalTitle": "Captain's Log",
+          "icon": "commands/today/renderers/captains-log.svg",
+          "order": 40
+        }
+      },
+      {
+        "name": "search",
+        "summary": "Search journal entries.",
+        "usage": "search <query...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "query",
+            "summary": "Search query.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal search renderer"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "edit",
+        "summary": "Edit a journal entry.",
+        "usage": "edit <id> <text...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "text",
+            "summary": "Replacement journal entry body.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal edit 1 Updated entry text."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "edit-form",
+        "summary": "Open the journal widget with an entry loaded for editing.",
+        "usage": "edit-form <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal edit-form 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a journal entry.",
+        "usage": "delete <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal delete 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "publish",
+        "summary": "Mark a journal entry as published with a Nostr event URL.",
+        "usage": "publish <id> [<url>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "url",
+            "summary": "nostr://nevent URL for the published entry.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal publish 1 nostr://nevent1..."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "config",
+        "summary": "Show journal configuration.",
+        "usage": "config",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal config"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "drafts",
+        "summary": "List pending AI-created journal drafts.",
+        "usage": "drafts",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal drafts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "accept",
+        "summary": "Accept a journal draft.",
+        "usage": "accept",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal accept 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "decline",
+        "summary": "Decline a journal draft.",
+        "usage": "decline",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/journal decline 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
         }
       }
     ]

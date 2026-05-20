@@ -1,10 +1,10 @@
 [
   {
     "pluginAlias": "todo",
-    "pluginName": "dm-bot-todo-plugin",
+    "pluginName": "appweaver-todo-plugin",
     "sourceType": "command",
     "sourceName": "stories",
-    "summary": "dm-bot-todo-plugin walkthroughs",
+    "summary": "appweaver-todo-plugin walkthroughs",
     "examples": [],
     "storyIds": [
       "todo-add",
@@ -14,10 +14,10 @@
   },
   {
     "pluginAlias": "job",
-    "pluginName": "dm-bot-job-plugin",
+    "pluginName": "appweaver-job-plugin",
     "sourceType": "command",
     "sourceName": "stories",
-    "summary": "dm-bot-job-plugin walkthroughs",
+    "summary": "appweaver-job-plugin walkthroughs",
     "examples": [],
     "storyIds": [
       "job-schedule-ai"
@@ -25,10 +25,10 @@
   },
   {
     "pluginAlias": "bm",
-    "pluginName": "dm-bot-bm-plugin",
+    "pluginName": "appweaver-bm-plugin",
     "sourceType": "command",
     "sourceName": "stories",
-    "summary": "dm-bot-bm-plugin walkthroughs",
+    "summary": "appweaver-bm-plugin walkthroughs",
     "examples": [],
     "storyIds": [
       "bm-save-ai"
@@ -36,14 +36,25 @@
   },
   {
     "pluginAlias": "file",
-    "pluginName": "dm-bot-file-plugin",
+    "pluginName": "appweaver-file-plugin",
     "sourceType": "command",
     "sourceName": "stories",
-    "summary": "dm-bot-file-plugin walkthroughs",
+    "summary": "appweaver-file-plugin walkthroughs",
     "examples": [],
     "storyIds": [
       "file-tree-read-markdown",
       "file-tree-git-diff"
+    ]
+  },
+  {
+    "pluginAlias": "journal",
+    "pluginName": "appweaver-journal-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-journal-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "journal-capture-publish"
     ]
   }
 ]
