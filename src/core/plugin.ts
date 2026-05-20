@@ -93,7 +93,7 @@ export type PluginContext = {
 const PluginPackageJsonSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
-  dmBot: z.object({
+  appweaver: z.object({
     coreApiVersion: z.string().min(1),
     description: z.string().min(1),
   }),
@@ -154,13 +154,13 @@ export function parsePluginPackageJson({
     return null;
   }
 
-  const { name, version, dmBot } = result.data;
+  const { name, version, appweaver } = result.data;
 
   return {
     name,
     version,
-    coreApiVersion: dmBot.coreApiVersion,
-    description: dmBot.description,
+    coreApiVersion: appweaver.coreApiVersion,
+    description: appweaver.description,
   };
 }
 

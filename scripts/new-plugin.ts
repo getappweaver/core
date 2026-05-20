@@ -192,6 +192,7 @@ async function main(): Promise<void> {
   const vars: Record<string, string> = {
     ALIAS: alias,
     PASCAL_ALIAS: pascalAlias,
+    TITLE: `${pascalAlias} app`,
     PACKAGE_NAME: packageName,
     DESCRIPTION: description,
     CORE_API_VERSION: coreApiVersion,

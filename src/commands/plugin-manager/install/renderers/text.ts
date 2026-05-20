@@ -9,7 +9,7 @@ export function renderPluginsInstallText(
   }
 
   const lines = [
-    `Found ${representation.entries.length} plugin(s) for bot core ${representation.coreMajor}:`,
+    `Found ${representation.entries.length} plugin(s) for bot core ${representation.coreVersion}:`,
     '',
   ];
 
@@ -18,9 +18,13 @@ export function renderPluginsInstallText(
       ? `installed as ${entry.installedAlias} @ ${entry.installedVersion}`
       : entry.compatibleRef
         ? `compatible: ${entry.compatibleRef.tag}`
-        : `not compatible with core ${representation.coreMajor}`;
+        : `not compatible with core ${representation.coreVersion}`;
 
-    lines.push(`- ${entry.name} (${status})`);
+    lines.push(`- ${entry.title || entry.name} (${status})`);
+
+    if (entry.title) {
+      lines.push(`  d: ${entry.name}`);
+    }
 
     if (entry.description) {
       lines.push(`  ${entry.description}`);
@@ -29,7 +33,10 @@ export function renderPluginsInstallText(
     lines.push(`  repo: ${entry.repo}`);
   }
 
-  lines.push('', `Use ${options.prefix}plugins install to refresh this list.`);
+  lines.push(
+    '',
+    `Use ${options.prefix}plugins install <plugin-id-or-name> to install a compatible release.`,
+  );
 
   return lines.join('\n');
 }

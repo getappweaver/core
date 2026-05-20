@@ -5,11 +5,23 @@ export function getPluginsInstallSubcommandDefinition(
 ): SubcommandDefinition {
   return {
     name: 'install',
-    summary: 'Discover installable plugins from the Nostr plugin catalog.',
+    summary: 'Discover or install plugins from the Nostr plugin catalog.',
     aliases: ['list'],
-    arguments: [],
+    arguments: [
+      {
+        name: 'target',
+        summary: 'Optional plugin event id, package name, or title to install.',
+        kind: 'string',
+        required: false,
+        variadic: false,
+        choices: null,
+      },
+    ],
     options: [],
-    examples: [`${prefix}plugins install`],
+    examples: [
+      `${prefix}plugins install`,
+      `${prefix}plugins install appweaver-todo-plugin`,
+    ],
     webWidget: {
       placement: 'header',
       surface: 'timeline_singleton',

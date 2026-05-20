@@ -1,7 +1,8 @@
 {
   "name": "{{PACKAGE_NAME}}",
   "version": "1.0.0",
-  "dmBot": {
+  "appweaver": {
+    "title": "{{TITLE}}",
     "coreApiVersion": "{{CORE_API_VERSION}}",
     "description": "{{DESCRIPTION}}"
   },

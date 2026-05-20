@@ -12,15 +12,17 @@
 //   tags:
 //     ["d", "<plugin-name>"]
 //     ["title", "<user-friendly-title>"]
+//     ["icon", "<blossom-url>", "<source-path>"]
+//     ["website", "<plugin-website-url>"]
 //     ["description", "<description>"]
 //     ["version", "<latest-version>"]
-//     ["coreApiVersion", "<latest-core-major>"]
+//     ["coreApiVersion", "<latest-core-api-range>"]
 //     ["t", "appweaver-plugin"]
-//     ["ref", "<git-tag>", "<core-major>", "<changelog>"]  (one per release)
+//     ["ref", "<git-tag>", "<core-api-range>", "<changelog>"]  (one per release)
 // ---------------------------------------------------------------------------
 
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import * as readline from 'readline';
 
 import { SimplePool } from 'nostr-tools';
@@ -28,6 +30,13 @@ import { z } from 'zod';
 
 import type { CoreDb } from '@src/db';
 import { openCoreDb } from '@src/db';
+import {
+  createBlossomAuthBase64,
+  fetchBlossomServerUrls,
+  sha256Hex,
+  uploadBufferToServer,
+} from '@src/nostr/blossom';
+import { fetchNip65WriteRelays as fetchNip65WriteRelaysForPubkey } from '@src/nostr/nip65';
 
 import { connectBunker, bunkerSignEvent } from '../src/nostr/bunker';
 import {
@@ -41,6 +50,7 @@ import {
 const PLUGIN_KIND = 32107;
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
+const MAX_ICON_BYTES = 2 * 1024;
 
 const PROFILE_RELAYS = [
   'wss://purplepag.es',
@@ -64,8 +74,10 @@ const PackageJsonSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   description: z.string().optional(),
-  dmBot: z.object({
+  appweaver: z.object({
     title: z.string().min(1),
+    icon: z.string().min(1).optional(),
+    website: z.url().optional(),
     coreApiVersion: z.string().min(1),
     description: z.string().optional(),
   }),
@@ -90,8 +102,13 @@ type PluginsJson = z.infer<typeof PluginsJsonSchema>;
 
 type RefEntry = {
   tag: string;
-  coreMajor: string;
+  coreApiVersion: string;
   changelog: string;
+};
+
+type SvgIcon = {
+  path: string;
+  data: Uint8Array;
 };
 
 // ---------------------------------------------------------------------------
@@ -113,7 +130,119 @@ function ask(question: string): Promise<string> {
 }
 
 function getCoreApiVersion(pkg: PackageJson): string {
-  return pkg.dmBot.coreApiVersion;
+  return pkg.appweaver.coreApiVersion;
+}
+
+function readSvgIcon(pluginDir: string, iconPath: string): SvgIcon {
+  if (!iconPath.endsWith('.svg')) {
+    throw new Error('appweaver.icon must point to an .svg file.');
+  }
+
+  const pluginRoot = resolve(pluginDir);
+  const fullPath = resolve(pluginRoot, iconPath);
+
+  if (!fullPath.startsWith(`${pluginRoot}/`)) {
+    throw new Error('appweaver.icon must stay inside the plugin directory.');
+  }
+
+  if (!existsSync(fullPath)) {
+    throw new Error(`appweaver.icon file not found: ${fullPath}`);
+  }
+
+  const icon = readFileSync(fullPath);
+
+  if (icon.byteLength > MAX_ICON_BYTES) {
+    throw new Error(
+      `appweaver.icon must be ${MAX_ICON_BYTES} bytes or smaller; got ${icon.byteLength} bytes.`,
+    );
+  }
+
+  const text = icon.toString('utf8').trimStart();
+
+  if (!text.startsWith('<svg')) {
+    throw new Error(
+      'appweaver.icon must be an SVG file whose content starts with <svg.',
+    );
+  }
+
+  return { path: iconPath, data: Uint8Array.from(icon) };
+}
+
+async function uploadIconToBlossom(
+  pool: SimplePool,
+  bunkerData: BunkerSignerData,
+  icon: SvgIcon,
+): Promise<string> {
+  console.log('\nFetching Blossom servers...');
+
+  const relayUrls = await fetchNip65WriteRelaysForPubkey({
+    pool,
+    authorPubkey: bunkerData.remoteSignerPubkey,
+  });
+
+  const servers = await fetchBlossomServerUrls({
+    pool,
+    relayUrls,
+    authorPubkey: bunkerData.userPubkey,
+  });
+
+  if (servers.length === 0) {
+    throw new Error(
+      'No Blossom servers found (kind 10063) for this identity. Publish a Blossom server list first.',
+    );
+  }
+
+  const hashHex = await sha256Hex(icon.data);
+
+  const auth = await createBlossomAuthBase64({
+    action: 'upload',
+    xTags: [hashHex],
+    expirationSeconds: null,
+    signEvent: (template) => bunkerSignEvent(pool, bunkerData, template),
+  });
+
+  const results = await Promise.allSettled(
+    servers.map(async (server) => {
+      const descriptor = await uploadBufferToServer(
+        server,
+        icon.data,
+        'image/svg+xml',
+        auth,
+      );
+
+      return { server, url: descriptor.url };
+    }),
+  );
+
+  const succeeded = results.filter(
+    (
+      result,
+    ): result is PromiseFulfilledResult<{ server: string; url: string }> =>
+      result.status === 'fulfilled',
+  );
+
+  if (succeeded.length === 0) {
+    const messages = results
+      .filter(
+        (result): result is PromiseRejectedResult =>
+          result.status === 'rejected',
+      )
+      .map((result) =>
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason),
+      );
+
+    throw new Error(
+      `Icon upload failed on all Blossom servers: ${messages.join('; ') || 'unknown error'}`,
+    );
+  }
+
+  console.log(
+    `✓ Icon uploaded to ${succeeded.length}/${servers.length} Blossom server(s).`,
+  );
+
+  return succeeded[0].value.url;
 }
 
 async function connectAndMaybeSave(
@@ -214,7 +343,7 @@ async function fetchExistingRefs(
 
     return event.tags
       .filter((t) => t[0] === 'ref' && t[1] && t[2] && t[3])
-      .map((t) => ({ tag: t[1], coreMajor: t[2], changelog: t[3] }));
+      .map((t) => ({ tag: t[1], coreApiVersion: t[2], changelog: t[3] }));
   } finally {
     pool.destroy();
   }
@@ -308,37 +437,55 @@ async function main(): Promise<void> {
   if (!pkgParsed.success) {
     console.error(
       `Invalid package.json at ${pkgPath}:\n${pkgParsed.error.toString()}\n\n` +
-        `Required fields: name, version, dmBot.title, dmBot.coreApiVersion\n` +
-        `Optional fields: description`,
+        `Required fields: name, version, appweaver.title, appweaver.coreApiVersion\n` +
+        `Optional fields: appweaver.icon, appweaver.website, description`,
     );
 
     process.exit(1);
   }
 
   const pkg = pkgParsed.data;
-  const title = pkg.dmBot.title;
+  const title = pkg.appweaver.title;
+  const website = pkg.appweaver.website ?? null;
   const coreApiVersion = getCoreApiVersion(pkg);
-  const coreMajor = coreApiVersion.replace(/[^0-9]/g, '').slice(0, 1);
 
-  if (!coreMajor) {
+  if (!coreApiVersion) {
     console.error(
       'No coreApiVersion found in package.json.\n' +
-        "Add dmBot.coreApiVersion to the plugin's package.json.",
+        "Add appweaver.coreApiVersion to the plugin's package.json.",
     );
 
     process.exit(1);
   }
 
-  const description = pkg.dmBot.description ?? pkg.description;
+  const description = pkg.appweaver.description ?? pkg.description;
+  let icon: SvgIcon | null = null;
+
+  if (pkg.appweaver.icon) {
+    try {
+      icon = readSvgIcon(pluginDir, pkg.appweaver.icon);
+    } catch (err) {
+      console.error(String(err));
+      process.exit(1);
+    }
+  }
 
   console.log(`Plugin:         ${pkg.name} v${pkg.version}`);
   console.log(`Title:          ${title}`);
+
+  if (icon) {
+    console.log(`Icon:           ${icon.path} (${icon.data.byteLength} bytes)`);
+  }
+
+  if (website) {
+    console.log(`Website:        ${website}`);
+  }
 
   if (description) {
     console.log(`Description:    ${description}`);
   }
 
-  console.log(`Core API major: ${coreMajor}`);
+  console.log(`Core API range: ${coreApiVersion}`);
 
   // Read repo URL from git remote
   const gitRemote = Bun.spawnSync(['git', 'remote', 'get-url', 'origin'], {
@@ -364,6 +511,18 @@ async function main(): Promise<void> {
   } catch (err) {
     console.error(`Bunker connection failed: ${String(err)}`);
     process.exit(1);
+  }
+
+  let iconUrl: string | null = null;
+
+  if (icon) {
+    try {
+      iconUrl = await uploadIconToBlossom(pool, bunkerData, icon);
+      console.log(`Icon URL:       ${iconUrl}`);
+    } catch (err) {
+      console.error(`Icon upload failed: ${String(err)}`);
+      process.exit(1);
+    }
   }
 
   // Step 4: fetch existing ref history from relays
@@ -411,13 +570,15 @@ async function main(): Promise<void> {
 
   // Step 7: build updated ref list
   const updatedRefs: RefEntry[] = alreadyPublished
-    ? existingRefs
-    : [...existingRefs, { tag: gitTag, coreMajor, changelog }];
+    ? existingRefs.map((ref) =>
+        ref.tag === gitTag ? { ...ref, coreApiVersion, changelog } : ref,
+      )
+    : [...existingRefs, { tag: gitTag, coreApiVersion, changelog }];
 
   console.log('\nFull ref history to publish:');
   for (const ref of updatedRefs) {
     console.log(
-      `  ["ref", "${ref.tag}", "${ref.coreMajor}", "${ref.changelog}"]`,
+      `  ["ref", "${ref.tag}", "${ref.coreApiVersion}", "${ref.changelog}"]`,
     );
   }
 
@@ -451,7 +612,7 @@ async function main(): Promise<void> {
     console.error('\n✗ The following refs are missing from the remote:');
     for (const r of missingTags) {
       console.error(
-        `  ${r.tag} (core ${r.coreMajor}) — push with: git push origin ${r.tag}`,
+        `  ${r.tag} (core ${r.coreApiVersion}) — push with: git push origin ${r.tag}`,
       );
     }
 
@@ -506,11 +667,13 @@ async function main(): Promise<void> {
     tags: [
       ['d', pkg.name],
       ['title', title],
+      ...(iconUrl && icon ? [['icon', iconUrl, icon.path]] : []),
+      ...(website ? [['website', website]] : []),
       ['repo', repoUrl],
       ['version', gitTag],
-      ['coreApiVersion', coreMajor],
+      ['coreApiVersion', coreApiVersion],
       ['t', 'appweaver-plugin'],
-      ...updatedRefs.map((r) => ['ref', r.tag, r.coreMajor, r.changelog]),
+      ...updatedRefs.map((r) => ['ref', r.tag, r.coreApiVersion, r.changelog]),
     ],
     content: eventContent,
   };

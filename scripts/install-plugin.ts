@@ -49,7 +49,7 @@ type PluginsJson = z.infer<typeof PluginsJsonSchema>;
 
 type RefEntry = {
   tag: string;
-  coreMajor: string;
+  coreApiVersion: string;
   changelog: string;
 };
 
@@ -65,6 +65,9 @@ type PluginEvent = {
   created_at: number;
   pubkey: string;
   name: string;
+  title: string;
+  iconPath: string;
+  website: string;
   description: string;
   version: string;
   coreApiVersion: string;
@@ -90,10 +93,10 @@ function ask(question: string): Promise<string> {
   });
 }
 
-function botCoreMajor(): string {
+function botCoreVersion(): string {
   const pkg = JSON.parse(readFileSync(PKG_JSON, 'utf8')) as { version: string };
 
-  return pkg.version.split('.')[0] ?? '0';
+  return pkg.version;
 }
 
 function readPluginsJson(): PluginsJson {
@@ -130,13 +133,16 @@ function parsePluginEvent(event: NostrEvent): PluginEvent | null {
 
   const refs: RefEntry[] = event.tags
     .filter((t) => t[0] === 'ref' && t[1] && t[2] && t[3])
-    .map((t) => ({ tag: t[1], coreMajor: t[2], changelog: t[3] }));
+    .map((t) => ({ tag: t[1], coreApiVersion: t[2], changelog: t[3] }));
 
   return {
     id: event.id,
     created_at: event.created_at,
     pubkey: event.pubkey,
     name,
+    title: tagValue(event.tags, 'title'),
+    iconPath: event.tags.find((t) => t[0] === 'icon')?.[2] ?? '',
+    website: tagValue(event.tags, 'website'),
     description: event.content,
     version: tagValue(event.tags, 'version'),
     coreApiVersion: tagValue(event.tags, 'coreApiVersion'),
@@ -147,9 +153,69 @@ function parsePluginEvent(event: NostrEvent): PluginEvent | null {
 
 function findCompatibleRef(
   refs: RefEntry[],
-  coreMajor: string,
+  coreVersion: string,
 ): RefEntry | null {
-  return refs.filter((r) => r.coreMajor === coreMajor).at(-1) ?? null;
+  return (
+    refs
+      .filter((r) => coreVersionSatisfies(coreVersion, r.coreApiVersion))
+      .at(-1) ?? null
+  );
+}
+
+function parseVersionParts(value: string): [number, number, number] | null {
+  const match = value.trim().match(/^(?:\^)?(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+
+  if (!match) {
+    return null;
+  }
+
+  return [
+    Number.parseInt(match[1], 10),
+    Number.parseInt(match[2] ?? '0', 10),
+    Number.parseInt(match[3] ?? '0', 10),
+  ];
+}
+
+function compareVersionParts(
+  left: [number, number, number],
+  right: [number, number, number],
+): number {
+  for (let i = 0; i < 3; i += 1) {
+    if (left[i] !== right[i]) {
+      return left[i] - right[i];
+    }
+  }
+
+  return 0;
+}
+
+function coreVersionSatisfies(coreVersion: string, range: string): boolean {
+  const normalizedRange = range.trim();
+  const core = parseVersionParts(coreVersion);
+
+  if (!core) {
+    return false;
+  }
+
+  if (/^\d+$/.test(normalizedRange)) {
+    return String(core[0]) === normalizedRange;
+  }
+
+  const minimum = parseVersionParts(normalizedRange);
+
+  if (!minimum) {
+    return false;
+  }
+
+  if (normalizedRange.startsWith('^')) {
+    return core[0] === minimum[0] && compareVersionParts(core, minimum) >= 0;
+  }
+
+  return compareVersionParts(core, minimum) >= 0;
+}
+
+function coreMajorFromVersion(value: string): number | null {
+  return parseVersionParts(value)?.[0] ?? null;
 }
 
 function latestRef(refs: RefEntry[]): RefEntry | null {
@@ -302,17 +368,17 @@ async function remoteHeadDiffersFromTag(
 type BuildPluginDiscoveryVersionLinesProps = {
   plugin: PluginEvent;
   installed: PluginEntry | null;
-  coreMajor: string;
+  coreVersion: string;
   headAheadOfRelease: boolean | null;
 };
 
 function buildPluginDiscoveryVersionLines({
   plugin,
   installed,
-  coreMajor,
+  coreVersion,
   headAheadOfRelease,
 }: BuildPluginDiscoveryVersionLinesProps): string[] {
-  const compatible = findCompatibleRef(plugin.refs, coreMajor);
+  const compatible = findCompatibleRef(plugin.refs, coreVersion);
   const lines: string[] = [];
 
   if (installed) {
@@ -328,7 +394,7 @@ function buildPluginDiscoveryVersionLines({
 
       if (installedRef) {
         lines.push(
-          `version: ${installedRef.tag} for core ${installedRef.coreMajor} ✓ installed`,
+          `version: ${installedRef.tag} for core ${installedRef.coreApiVersion} ✓ installed`,
         );
       } else {
         lines.push(
@@ -342,7 +408,7 @@ function buildPluginDiscoveryVersionLines({
         normalizeRefTag(compatible.tag) !== normalizeRefTag(installed.version)
       ) {
         lines.push(
-          `version: ${compatible.tag} for core ${compatible.coreMajor} (upgrade available)`,
+          `version: ${compatible.tag} for core ${compatible.coreApiVersion} (upgrade available)`,
         );
       }
 
@@ -358,12 +424,12 @@ function buildPluginDiscoveryVersionLines({
       const latest = latestRef(plugin.refs);
 
       lines.push(
-        `version: no ref for bot core ${coreMajor} (latest catalog ref: ${latest?.tag ?? '?'} for core ${latest?.coreMajor ?? '?'})`,
+        `version: no ref for bot core ${coreVersion} (latest catalog ref: ${latest?.tag ?? '?'} for core ${latest?.coreApiVersion ?? '?'})`,
       );
     }
   } else if (compatible) {
     lines.push(
-      `version: ${compatible.tag} for core ${compatible.coreMajor} ✓ compatible`,
+      `version: ${compatible.tag} for core ${compatible.coreApiVersion} ✓ compatible`,
     );
 
     if (headAheadOfRelease === true) {
@@ -373,7 +439,7 @@ function buildPluginDiscoveryVersionLines({
     const latest = latestRef(plugin.refs);
 
     lines.push(
-      `version: latest ${latest?.tag ?? '?'} for core ${latest?.coreMajor ?? '?'} — not compatible with bot core ${coreMajor}`,
+      `version: latest ${latest?.tag ?? '?'} for core ${latest?.coreApiVersion ?? '?'} — not compatible with bot core ${coreVersion}`,
     );
   }
 
@@ -496,12 +562,12 @@ async function queryPluginEvents(pool: SimplePool): Promise<PluginEvent[]> {
 
 type FallbackSelectWhenNoCompatibleRefProps = {
   plugin: PluginEvent;
-  coreMajor: string;
+  coreVersion: string;
 };
 
 async function fallbackSelectWhenNoCompatibleRef({
   plugin,
-  coreMajor,
+  coreVersion,
 }: FallbackSelectWhenNoCompatibleRefProps): Promise<RefEntry | null> {
   const latest = latestRef(plugin.refs);
 
@@ -511,23 +577,29 @@ async function fallbackSelectWhenNoCompatibleRef({
     return null;
   }
 
-  console.log(`\n⚠ No compatible ref for your bot core (${coreMajor}).`);
+  console.log(`\n⚠ No compatible ref for your bot core (${coreVersion}).`);
 
   console.log(
-    `  Latest available: ${latest.tag} requires core ${latest.coreMajor}`,
+    `  Latest available: ${latest.tag} requires core ${latest.coreApiVersion}`,
   );
 
   console.log(
-    `  → Upgrade your bot to core ${latest.coreMajor} to use the latest version.`,
+    `  → Upgrade your bot to core ${latest.coreApiVersion} to use the latest version.`,
   );
 
-  const older = [...plugin.refs]
-    .reverse()
-    .find((r) => parseInt(r.coreMajor) < parseInt(coreMajor));
+  const currentMajor = coreMajorFromVersion(coreVersion);
+
+  const older = [...plugin.refs].reverse().find((r) => {
+    const refMajor = coreMajorFromVersion(r.coreApiVersion);
+
+    return (
+      currentMajor !== null && refMajor !== null && refMajor < currentMajor
+    );
+  });
 
   if (older) {
     console.log(
-      `\n  Older ref available: ${older.tag} (core ${older.coreMajor})`,
+      `\n  Older ref available: ${older.tag} (core ${older.coreApiVersion})`,
     );
 
     console.log(`  ${older.changelog}`);
@@ -545,18 +617,18 @@ async function fallbackSelectWhenNoCompatibleRef({
 
 type SelectPluginVersionProps = {
   plugin: PluginEvent;
-  coreMajor: string;
+  coreVersion: string;
   installedEntry: PluginEntry | null;
   headAheadFromDiscovery: boolean | null;
 };
 
 async function selectPluginVersion({
   plugin,
-  coreMajor,
+  coreVersion,
   installedEntry,
   headAheadFromDiscovery,
 }: SelectPluginVersionProps): Promise<SelectedPluginVersion | null> {
-  const compatible = findCompatibleRef(plugin.refs, coreMajor);
+  const compatible = findCompatibleRef(plugin.refs, coreVersion);
 
   if (installedEntry) {
     console.log(
@@ -569,15 +641,15 @@ async function selectPluginVersion({
         normalizeRefTag(installedEntry.version)
       ) {
         console.log(
-          `Latest compatible ref matches installed (${compatible.tag}, core ${compatible.coreMajor}).`,
+          `Latest compatible ref matches installed (${compatible.tag}, core ${compatible.coreApiVersion}).`,
         );
       } else if (installedEntry.version !== PLUGIN_VERSION_HEAD) {
         console.log(
-          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreMajor}) — upgrade from ${installedEntry.version}`,
+          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreApiVersion}) — upgrade from ${installedEntry.version}`,
         );
       } else {
         console.log(
-          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreMajor}) — you are on ${PLUGIN_VERSION_HEAD}`,
+          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreApiVersion}) — you are on ${PLUGIN_VERSION_HEAD}`,
         );
       }
     }
@@ -586,7 +658,7 @@ async function selectPluginVersion({
   if (!compatible) {
     const fallback = await fallbackSelectWhenNoCompatibleRef({
       plugin,
-      coreMajor,
+      coreVersion,
     });
 
     if (!fallback) {
@@ -611,7 +683,7 @@ async function selectPluginVersion({
         normalizeRefTag(compatible.tag)
     ) {
       console.log(
-        `✓ Compatible ref: ${compatible.tag} (core ${compatible.coreMajor})`,
+        `✓ Compatible ref: ${compatible.tag} (core ${compatible.coreApiVersion})`,
       );
     }
 
@@ -625,7 +697,7 @@ async function selectPluginVersion({
   );
 
   console.log(
-    `  1. ${compatible.tag} (recommended) — stable release for core ${compatible.coreMajor}`,
+    `  1. ${compatible.tag} (recommended) — stable release for core ${compatible.coreApiVersion}`,
   );
 
   console.log(
@@ -728,7 +800,7 @@ function checkoutRemoteDefaultBranch(pluginDir: string): boolean {
 async function updatePlugin(
   pool: SimplePool,
   entry: PluginEntry,
-  coreMajor: string,
+  coreVersion: string,
   pluginsData: PluginsJson,
 ): Promise<void> {
   console.log(`\nChecking for updates to "${entry.alias}"...`);
@@ -752,7 +824,7 @@ async function updatePlugin(
 
   const selected = await selectPluginVersion({
     plugin,
-    coreMajor,
+    coreVersion,
     installedEntry: entry,
     headAheadFromDiscovery: null,
   });
@@ -852,7 +924,7 @@ async function updatePlugin(
 
 async function installPlugin(
   pool: SimplePool,
-  coreMajor: string,
+  coreVersion: string,
   pluginsData: PluginsJson,
 ): Promise<void> {
   console.log('\nQuerying plugins from relays...');
@@ -879,7 +951,7 @@ async function installPlugin(
 
   const headAheadForEvents = await Promise.all(
     events.map(async (p) => {
-      const c = findCompatibleRef(p.refs, coreMajor);
+      const c = findCompatibleRef(p.refs, coreVersion);
 
       if (!c) {
         return null;
@@ -895,7 +967,19 @@ async function installPlugin(
     const installed = installedForEvents[i] ?? null;
     const headAhead = headAheadForEvents[i];
 
-    console.log(`  ${i + 1}. ${p.name}`);
+    console.log(`  ${i + 1}. ${p.title || p.name}`);
+
+    if (p.title) {
+      console.log(`${indent}d: ${p.name}`);
+    }
+
+    if (p.iconPath) {
+      console.log(`${indent}icon: ${p.iconPath}`);
+    }
+
+    if (p.website) {
+      console.log(`${indent}website: ${p.website}`);
+    }
 
     if (p.description) {
       console.log(`${indent}description: ${p.description}`);
@@ -904,7 +988,7 @@ async function installPlugin(
     for (const line of buildPluginDiscoveryVersionLines({
       plugin: p,
       installed,
-      coreMajor,
+      coreVersion,
       headAheadOfRelease: headAhead,
     })) {
       console.log(`${indent}${line}`);
@@ -930,14 +1014,14 @@ async function installPlugin(
   }
 
   const plugin = events[idx];
-  console.log(`\nSelected: ${plugin.name}`);
+  console.log(`\nSelected: ${plugin.title || plugin.name}`);
 
   const installedForSelected = installedForEvents[idx] ?? null;
   const headAheadFromDiscovery = headAheadForEvents[idx];
 
   const selected = await selectPluginVersion({
     plugin,
-    coreMajor,
+    coreVersion,
     installedEntry: installedForSelected,
     headAheadFromDiscovery,
   });
@@ -1052,8 +1136,8 @@ async function installPlugin(
 async function main(): Promise<void> {
   console.log('\n── Bot Plugin Manager ──\n');
 
-  const coreMajor = botCoreMajor();
-  console.log(`Bot core major: ${coreMajor}`);
+  const coreVersion = botCoreVersion();
+  console.log(`Bot core version: ${coreVersion}`);
 
   const pluginsData = readPluginsJson();
   const pool = new SimplePool();
@@ -1064,16 +1148,16 @@ async function main(): Promise<void> {
       const existing = pluginsData.plugins.find((p) => p.alias === aliasArg);
 
       if (existing) {
-        await updatePlugin(pool, existing, coreMajor, pluginsData);
+        await updatePlugin(pool, existing, coreVersion, pluginsData);
       } else {
         console.log(
           `Alias "${aliasArg}" not found in plugins.json — running install flow.`,
         );
 
-        await installPlugin(pool, coreMajor, pluginsData);
+        await installPlugin(pool, coreVersion, pluginsData);
       }
     } else {
-      await installPlugin(pool, coreMajor, pluginsData);
+      await installPlugin(pool, coreVersion, pluginsData);
     }
   } finally {
     pool.destroy();
