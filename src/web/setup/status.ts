@@ -32,6 +32,8 @@ type DependencyStatusProps = {
   command: string;
   required: boolean;
   installHint: string;
+  installUrl: string | null;
+  installCommand: string | null;
 };
 
 export type SetupDependencyStatus = {
@@ -41,6 +43,8 @@ export type SetupDependencyStatus = {
   path: string | null;
   required: boolean;
   installHint: string;
+  installUrl: string | null;
+  installCommand: string | null;
 };
 
 export type SetupStatus = {
@@ -91,42 +95,66 @@ function setupDependencies(): SetupDependencyStatus[] {
       command: 'bun',
       required: true,
       installHint: 'Install Bun from https://bun.sh/docs/installation',
+      installUrl: 'https://bun.sh/docs/installation',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'Node.js',
       command: 'node',
       required: true,
       installHint: 'Install Node.js from https://nodejs.org/',
+      installUrl: 'https://nodejs.org/',
+      installCommand: null,
+    }),
+    dependencyStatus({
+      name: 'Python',
+      command: 'python3',
+      required: false,
+      installHint:
+        'Python is optional, but may be needed if you install Piper through pip.',
+      installUrl: 'https://www.python.org/downloads/',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'Git',
       command: 'git',
       required: true,
       installHint: 'Install Git from https://git-scm.com/downloads',
+      installUrl: 'https://git-scm.com/downloads',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'OpenCode',
       command: 'opencode',
       required: false,
       installHint: 'Install OpenCode, or select Cursor Agent as backend.',
+      installUrl: 'https://opencode.ai/',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'Cursor Agent',
       command: 'agent',
       required: false,
       installHint: 'Install Cursor Agent, or select OpenCode as backend.',
+      installUrl: 'https://docs.cursor.com/en/cli/installation',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'ngit',
       command: 'ngit',
-      required: false,
+      required: true,
       installHint: 'Install ngit for Nostr Git remotes and plugin updates.',
+      installUrl: 'https://gitworkshop.dev/ngit',
+      installCommand: null,
     }),
     dependencyStatus({
       name: 'Piper',
       command: 'piper',
       required: false,
-      installHint: 'Install Piper TTS, then set BOT_PIPER_BINARY_PATH.',
+      installHint:
+        'Install Piper TTS, then reload this page. Use the detected path in Piper Speech below, or set BOT_PIPER_BINARY_PATH manually.',
+      installUrl: 'https://github.com/OHF-Voice/piper1-gpl',
+      installCommand: 'pip install piper-tts',
     }),
   ];
 }

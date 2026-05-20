@@ -40,6 +40,8 @@ export type SetupDependencyStatus = {
   path: string | null;
   required: boolean;
   installHint: string;
+  installUrl: string | null;
+  installCommand: string | null;
 };
 
 export type SetupDefaults = {

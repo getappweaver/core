@@ -205,7 +205,19 @@ function SystemCheckCard(props: { status: SetupStatus }): JSX.Element {
                 {dependencyDetail(dependency)}
               </span>
               <Show when={!dependency.installed}>
-                <span class="setup-install-hint">{dependency.installHint}</span>
+                <span class="setup-install-hint">
+                  {dependency.installHint}{' '}
+                  <Show when={dependency.installUrl}>
+                    {(url) => (
+                      <a href={url()} target="_blank" rel="noreferrer">
+                        Open install guide
+                      </a>
+                    )}
+                  </Show>
+                  <Show when={dependency.installCommand}>
+                    {(command) => <pre>{command()}</pre>}
+                  </Show>
+                </span>
               </Show>
             </li>
           )}
@@ -285,7 +297,7 @@ function SetupCompletionCard(props: SetupCompletionCardProps): JSX.Element {
         <div class="setup-step-actions">
           <button
             type="button"
-            class="web-button"
+            class="web-button setup-success-action"
             disabled={restartState() === 'requested'}
             onClick={() => void restartAndOpen()}
           >
@@ -743,9 +755,6 @@ function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                     {savingApiKey() ? 'Saving key...' : 'Save API key'}
                   </button>
                 </Show>
-                <span class="setup-inline-code">
-                  {loaded().providers.length} provider(s)
-                </span>
               </div>
 
               <Show when={selectedProvider()}>

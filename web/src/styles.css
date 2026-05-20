@@ -515,6 +515,17 @@ pre {
   grid-column: 2 / -1;
 }
 
+.setup-install-hint a {
+  color: var(--color-warning);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.setup-install-hint pre {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+}
+
 .setup-error-detail {
   margin: 0.8rem 0 0;
   color: var(--color-danger);
@@ -572,6 +583,7 @@ pre {
   align-items: center;
   gap: 0.7rem;
   margin-top: 0.7rem;
+  padding: 0.45rem 0.55rem;
 }
 
 .setup-relay-field {
@@ -2189,10 +2201,12 @@ a.diff-line__number:focus-visible {
 
 .field-block input[type='text'],
 .field-block input[type='number'],
+.field-block input[type='password'],
 .field-block select,
 .field-block textarea,
 .field-row input[type='text'],
 .field-row input[type='number'],
+.field-row input[type='password'],
 .field-row select,
 .nostr-search-relays-modal__row input[type='text'],
 .composer textarea,
@@ -2322,6 +2336,19 @@ a.diff-line__number:focus-visible {
   background: color-mix(in srgb, var(--color-warning) 72%, #000);
   box-shadow: 2px 2px 0 var(--color-panel-shadow);
   transform: translate(4px, 4px);
+}
+
+.web-button.setup-success-action {
+  background: color-mix(in srgb, var(--color-success) 88%, transparent);
+}
+
+.web-button.setup-success-action:hover,
+.web-button.setup-success-action:focus-visible {
+  background: var(--color-success);
+}
+
+.web-button.setup-success-action:active {
+  background: color-mix(in srgb, var(--color-success) 72%, #000);
 }
 
 .web-button:disabled {
