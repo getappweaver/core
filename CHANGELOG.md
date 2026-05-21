@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.22.1] - 2026-05-21
+
+- fix: expand landing demo timeline (6fe2666)
+
 ## [v9.22.0] - 2026-05-21
 
-- feat: refresh landing copy and demo assets (39e26da)
+- feat: refresh landing copy and demo assets (9043b4f)
 
 ## [v9.21.4] - 2026-05-21
 
