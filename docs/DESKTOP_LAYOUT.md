@@ -54,7 +54,7 @@ Default preferences:
 {
   dockPosition: 'left',
   dockResizable: true,
-  dockWidthPx: 360,
+  dockWidthPx: 400,
 }
 ```
 

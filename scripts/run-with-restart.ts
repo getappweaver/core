@@ -30,6 +30,10 @@ function shouldShowSetup(): boolean {
   return process.argv.slice(2).includes('--setup');
 }
 
+function isDemoMode(): boolean {
+  return process.argv.slice(2).includes('--demo');
+}
+
 function isWebUiEnabled(): boolean {
   return (process.env.WATCH_WEB_UI ?? '1') !== '0';
 }
@@ -97,6 +101,7 @@ function botEnv(): NodeJS.ProcessEnv {
     BOT_SETUP_BILLBOARD: shouldShowSetup()
       ? '1'
       : process.env.BOT_SETUP_BILLBOARD,
+    APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
   };
 
   if (!isWebUiEnabled()) {
@@ -133,7 +138,10 @@ function runWebUi(): ReturnType<typeof spawn> {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
-    env: process.env,
+    env: {
+      ...process.env,
+      APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
+    },
   });
 }
 

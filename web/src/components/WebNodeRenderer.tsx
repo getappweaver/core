@@ -1369,9 +1369,23 @@ function WebTreeItemElement(props: WebTreeItemProps) {
               type="button"
               class="web-tree-toggle"
               data-ui="tree-item-toggle"
+              data-story-target={props.element.props?.storyTargetId}
+              ref={(el) =>
+                props.element.props?.storyTargetId
+                  ? registerStoryDomTarget(
+                      props.element.props.storyTargetId,
+                      el,
+                    )
+                  : undefined
+              }
               aria-expanded={expanded()}
               onClick={(e) => {
                 e.stopPropagation();
+
+                if (props.element.props?.storyTargetId) {
+                  emitStoryTargetClicked(props.element.props.storyTargetId);
+                }
+
                 toggleExpanded();
               }}
             >

@@ -13,7 +13,7 @@ export const DESKTOP_LAYOUT_STORAGE_KEY = 'appweaver.desktop-layout';
 export const DEFAULT_LAYOUT_PREFS: LayoutPrefs = {
   dockPosition: 'left',
   dockResizable: true,
-  dockWidthPx: 360,
+  dockWidthPx: 480,
   dockExpandedLimit: 1,
 };
 

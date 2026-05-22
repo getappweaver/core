@@ -53,6 +53,10 @@ type DemoStoryEntry = {
 type DemoBootstrap = {
   generatedAt: string;
   prefix: string;
+  widgets: Array<{
+    command: string;
+    subcommand: string;
+  }>;
   plugins: Array<{
     alias: string;
     name: string;
@@ -65,8 +69,8 @@ type DemoBootstrap = {
 
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
-const DEMO_DIR = join(ROOT, 'apps', 'landing', 'public', 'demo');
-const LANDING_PUBLIC_DIR = join(ROOT, 'apps', 'landing', 'public');
+const WEB_PUBLIC_DIR = join(ROOT, 'web', 'public');
+const DEMO_DIR = join(WEB_PUBLIC_DIR, 'demo');
 const DEMO_BOOTSTRAP_JSON = join(DEMO_DIR, 'bootstrap.json');
 const DEMO_COMMANDS_JSON = join(DEMO_DIR, 'commands.json');
 const DEMO_COMMAND_STORIES_JSON = join(DEMO_DIR, 'command-stories.json');
@@ -145,6 +149,39 @@ function serializeCommand(params: {
   };
 }
 
+function collectBootstrapWidgets(params: {
+  stories: DemoStoryEntry[];
+}): DemoBootstrap['widgets'] {
+  const seen = new Set<string>();
+  const widgets: DemoBootstrap['widgets'] = [];
+
+  for (const entry of params.stories) {
+    for (const step of entry.story.steps) {
+      if (
+        step.type !== 'focus_target' ||
+        step.target.type !== 'header_widget'
+      ) {
+        continue;
+      }
+
+      const key = `${step.target.command}:${step.target.subcommand}`;
+
+      if (seen.has(key) || key === 'file:tree') {
+        continue;
+      }
+
+      seen.add(key);
+
+      widgets.push({
+        command: step.target.command,
+        subcommand: step.target.subcommand,
+      });
+    }
+  }
+
+  return widgets;
+}
+
 type DemoCommandDetail = ReturnType<typeof serializeCommand>;
 
 function publishWidgetIcon(params: {
@@ -195,7 +232,7 @@ function publishWidgetIcon(params: {
       })()
     : `builtin-icons/${flattenIconPath(rootedIcon.slice(1))}`;
 
-  const targetPath = join(LANDING_PUBLIC_DIR, targetRel);
+  const targetPath = join(WEB_PUBLIC_DIR, targetRel);
   mkdirSync(dirname(targetPath), { recursive: true });
   copyFileSync(sourcePath, targetPath);
 }
@@ -397,6 +434,7 @@ async function main(): Promise<void> {
   const bootstrap: DemoBootstrap = {
     generatedAt: new Date().toISOString(),
     prefix: DEMO_PREFIX,
+    widgets: [],
     plugins: [],
   };
 
@@ -456,6 +494,7 @@ async function main(): Promise<void> {
   }
 
   pluginCommands.sort((a, b) => a.name.localeCompare(b.name));
+  bootstrap.widgets = collectBootstrapWidgets({ stories: storyEntries });
 
   writeJson(DEMO_BOOTSTRAP_JSON, bootstrap);
   writeJson(DEMO_COMMANDS_JSON, [...builtinCommands, ...pluginCommands]);

@@ -246,6 +246,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
               promptSession: new WebSocketPromptSession(),
               currentChatAbort: null,
               nip98Authenticated: nip98.ok,
+              demoAuthenticated: false,
             },
           });
 

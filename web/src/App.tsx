@@ -28,6 +28,7 @@ import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
 import { useConnect } from './connect/useConnect';
 import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
+import { isWebDemoMode } from './demo/runtime';
 import {
   clampDockWidth,
   DESKTOP_LAYOUT_STORAGE_KEY,
@@ -50,13 +51,20 @@ import { getStoryDomTarget } from './story/dom-targets';
 import {
   emitStoryWalkthroughChange,
   emitStoryQuitRequested,
+  emitStoryFillForm,
+  emitStoryPassivePlaybackDiagnostic,
+  emitStoryTargetHovered,
   emitStoryWidgetOpened,
+  onStoryPassivePlaybackChange,
   onStoryCloseWidgetRequested,
   onStoryClearPromptsRequested,
   onStoryWalkthroughChange,
 } from './story/events';
 import { canStorySandboxHandleCommand } from './story/sandbox';
-import type { StoryWalkthroughState } from './story/types';
+import type {
+  StoryPassivePlaybackState,
+  StoryWalkthroughState,
+} from './story/types';
 import { WalkthroughOverlay } from './story/WalkthroughOverlay';
 import {
   appendSystemMessageToTimeline,
@@ -207,6 +215,24 @@ function AppInner(): JSX.Element {
 
   const [storyWalkthrough, setStoryWalkthrough] =
     createSignal<StoryWalkthroughState | null>(null);
+
+  const [passivePlayback, setPassivePlayback] =
+    createSignal<StoryPassivePlaybackState | null>(null);
+
+  const [passiveCursor, setPassiveCursor] = createSignal<{
+    x: number;
+    y: number;
+    visible: boolean;
+    pressed: boolean;
+    rippleKey: number;
+  }>({ x: 36, y: 92, visible: false, pressed: false, rippleKey: 0 });
+
+  const [lastPassiveActionKey, setLastPassiveActionKey] = createSignal<
+    string | null
+  >(null);
+
+  let passiveActionQueue = Promise.resolve();
+  let passiveHoveredElement: HTMLElement | null = null;
 
   const headerWidgetTargets = new Map<string, HTMLElement>();
 
@@ -430,6 +456,437 @@ function AppInner(): JSX.Element {
     ].find((el) => el.offsetParent !== null);
 
     return visibleTarget ?? headerWidgetTargets.get(key) ?? null;
+  }
+
+  function storyPassivePlaybackTargetElement(): HTMLElement | null {
+    const playback = passivePlayback();
+
+    if (playback?.target?.type === 'web_node') {
+      return getStoryDomTarget(playback.target.targetId);
+    }
+
+    if (playback?.target?.type !== 'header_widget') {
+      return null;
+    }
+
+    const key = storyTargetHeaderWidgetKey(
+      playback.target.command,
+      playback.target.subcommand,
+    );
+
+    const selector = `[data-story-target="header-widget:${CSS.escape(key)}"]`;
+
+    const visibleTarget = [
+      ...document.querySelectorAll<HTMLElement>(selector),
+    ].find((el) => el.offsetParent !== null);
+
+    return visibleTarget ?? headerWidgetTargets.get(key) ?? null;
+  }
+
+  function movePassiveCursorToTarget(): void {
+    const playback = passivePlayback();
+
+    if (!isWebDemoMode() || !playback || playback.complete) {
+      setPassiveCursor((prev) => ({ ...prev, visible: false }));
+
+      return;
+    }
+
+    if (!playback.target) {
+      return;
+    }
+
+    const target = storyPassivePlaybackTargetElement();
+
+    if (!target) {
+      emitStoryPassivePlaybackDiagnostic({
+        storyId: playback.storyId,
+        stepIndex: playback.stepIndex,
+        message: `Missing passive story target for ${storyTargetDebugLabel(playback.target)}.`,
+      });
+
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      emitStoryPassivePlaybackDiagnostic({
+        storyId: playback.storyId,
+        stepIndex: playback.stepIndex,
+        message: `Passive story target has an empty rectangle: ${storyTargetDebugLabel(playback.target)}.`,
+      });
+
+      return;
+    }
+
+    setPassiveCursor((prev) => ({
+      ...prev,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      visible: true,
+    }));
+  }
+
+  function storyTargetDebugLabel(
+    target: StoryPassivePlaybackState['target'],
+  ): string {
+    if (!target) {
+      return 'no target';
+    }
+
+    if (target.type === 'header_widget') {
+      return `header_widget:${target.command}:${target.subcommand}`;
+    }
+
+    if (target.type === 'web_node') {
+      return `web_node:${target.targetId}`;
+    }
+
+    return `${target.command}:${target.subcommand}`;
+  }
+
+  async function pressPassiveCursor(): Promise<void> {
+    setPassiveCursor((prev) => ({
+      ...prev,
+      pressed: true,
+      rippleKey: prev.rippleKey + 1,
+    }));
+
+    await new Promise((resolve) => window.setTimeout(resolve, 140));
+    setPassiveCursor((prev) => ({ ...prev, pressed: false }));
+  }
+
+  function setPassiveHoveredElement(element: HTMLElement | null): void {
+    if (passiveHoveredElement === element) {
+      return;
+    }
+
+    passiveHoveredElement?.classList.remove('is-story-passive-hover');
+    passiveHoveredElement = element;
+    passiveHoveredElement?.classList.add('is-story-passive-hover');
+  }
+
+  type WaitForStoryTargetProps = {
+    targetId: string;
+    timeoutMs: number;
+    intervalMs: number;
+  };
+
+  async function waitForStoryTarget({
+    targetId,
+    timeoutMs,
+    intervalMs,
+  }: WaitForStoryTargetProps): Promise<HTMLElement | null> {
+    const start = performance.now();
+
+    while (performance.now() - start < timeoutMs) {
+      const target = getStoryDomTarget(targetId);
+
+      if (target) {
+        return target;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+    }
+
+    return getStoryDomTarget(targetId);
+  }
+
+  async function typeIntoField(
+    field: HTMLInputElement | HTMLTextAreaElement,
+    value: string,
+  ): Promise<void> {
+    const resizeTextArea = () => {
+      if (!(field instanceof HTMLTextAreaElement)) {
+        return;
+      }
+
+      field.style.height = 'auto';
+      field.style.height = `${field.scrollHeight}px`;
+      field.style.overflowY = 'hidden';
+    };
+
+    field.value = '';
+    field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    resizeTextArea();
+
+    for (const char of value) {
+      field.value += char;
+
+      field.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          data: char,
+          inputType: 'insertText',
+        }),
+      );
+
+      resizeTextArea();
+      await new Promise((resolve) => window.setTimeout(resolve, 22));
+    }
+  }
+
+  async function typePassiveFormValues(
+    values: {
+      arguments: Record<string, unknown>;
+      options: Record<string, unknown>;
+    },
+    preferredField: HTMLElement | null,
+  ): Promise<boolean> {
+    const preferredFields =
+      preferredField instanceof HTMLInputElement ||
+      preferredField instanceof HTMLTextAreaElement
+        ? [preferredField]
+        : [];
+
+    const documentFields = Array.from(
+      document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        'input[name], textarea[name]',
+      ),
+    ).filter((field) => field.offsetParent !== null && !field.disabled);
+
+    const fields = [...preferredFields, ...documentFields].filter(
+      (field, index, list) => list.indexOf(field) === index,
+    );
+
+    let typed = false;
+
+    for (const field of fields) {
+      const name = field.name;
+      const value = values.arguments[name] ?? values.options[name];
+
+      if (typeof value !== 'string' && typeof value !== 'number') {
+        continue;
+      }
+
+      await typeIntoField(field, String(value));
+      typed = true;
+    }
+
+    return typed;
+  }
+
+  async function executePassivePlaybackAction(
+    playback: StoryPassivePlaybackState,
+  ): Promise<void> {
+    const action = playback.action;
+
+    if (!isWebDemoMode() || action.type === 'none') {
+      return;
+    }
+
+    if (playback.catchingUp !== true) {
+      await new Promise((resolve) => window.setTimeout(resolve, 420));
+    }
+
+    if (action.type === 'open_widget') {
+      setPassiveHoveredElement(null);
+
+      const widget = headerChromeWidgets().find(
+        (entry) =>
+          entry.command === action.command &&
+          entry.subcommand === action.subcommand,
+      );
+
+      if (!widget) {
+        return;
+      }
+
+      if (playback.catchingUp !== true) {
+        await pressPassiveCursor();
+      }
+
+      if (
+        widget.surface === 'timeline_singleton' ||
+        (dockVisible() && isDockRoutedWidget(widget))
+      ) {
+        await openTaskbarWidgetForStory(widget);
+
+        return;
+      }
+
+      openChromeWidget({
+        command: widget.command,
+        subcommand: widget.subcommand,
+        title: widget.modalTitle,
+      });
+
+      emitStoryWidgetOpened({
+        type: 'widget_opened',
+        command: widget.command,
+        subcommand: widget.subcommand,
+      });
+
+      return;
+    }
+
+    if (action.type === 'fill_form') {
+      setPassiveHoveredElement(null);
+
+      const field =
+        playback.target?.type === 'web_node'
+          ? await waitForStoryTarget({
+              targetId: playback.target.targetId,
+              timeoutMs: 1600,
+              intervalMs: 80,
+            })
+          : null;
+
+      const didType = await typePassiveFormValues(action.values, field);
+
+      if (!didType) {
+        emitStoryFillForm(action.values);
+      }
+
+      return;
+    }
+
+    const target = await waitForStoryTarget({
+      targetId: action.targetId,
+      timeoutMs: 1600,
+      intervalMs: 80,
+    });
+
+    if (!target) {
+      emitStoryPassivePlaybackDiagnostic({
+        storyId: playback.storyId,
+        stepIndex: playback.stepIndex,
+        message: `Could not execute passive story action; target not found: web_node:${action.targetId}.`,
+      });
+
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      emitStoryPassivePlaybackDiagnostic({
+        storyId: playback.storyId,
+        stepIndex: playback.stepIndex,
+        message: `Could not execute passive story action; target is not visible: web_node:${action.targetId}.`,
+      });
+
+      return;
+    }
+
+    if (action.type === 'hover_target') {
+      setPassiveHoveredElement(target);
+      target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+      emitStoryTargetHovered(action.targetId);
+
+      return;
+    }
+
+    if (playback.catchingUp !== true) {
+      await pressPassiveCursor();
+    }
+
+    target.click();
+    window.setTimeout(() => setPassiveHoveredElement(null), 400);
+  }
+
+  async function openTaskbarWidgetForStory(widget: {
+    command: string;
+    subcommand: string;
+    label: string;
+  }): Promise<void> {
+    const key = taskbarDockKey(widget.command, widget.subcommand);
+
+    if (canStorySandboxHandleCommand(widget.command, widget.subcommand)) {
+      setTaskbarSingletonByKey((prev) => {
+        const rest = { ...prev };
+        delete rest[key];
+
+        return rest;
+      });
+
+      setTimeline((prev) =>
+        prev.filter(
+          (item) =>
+            item.type !== 'command_result' || item.timelineSingletonKey !== key,
+        ),
+      );
+
+      const commandDetail = await ensureCommandDetail(widget.command);
+
+      const subcommand = commandDetail?.subcommands.find(
+        (entry) => entry.name === widget.subcommand,
+      );
+
+      if (!subcommand) {
+        appendSystemMessage(
+          `Unable to open /${widget.command} ${widget.subcommand} taskbar widget.`,
+        );
+
+        return;
+      }
+
+      await runCommand(widget.command, subcommand, defaultPayload(subcommand));
+
+      emitStoryWidgetOpened({
+        type: 'widget_opened',
+        command: widget.command,
+        subcommand: widget.subcommand,
+      });
+
+      return;
+    }
+
+    const existing = taskbarSingletonByKey()[key];
+
+    const hasTimelineItem =
+      existing !== undefined &&
+      timeline().some(
+        (item) => item.type === 'command_result' && item.id === existing.itemId,
+      );
+
+    if (existing && hasTimelineItem) {
+      if (dockVisible()) {
+        setTaskbarSingletonByKey((prev) => ({
+          ...prev,
+          [key]: { ...existing, visible: true },
+        }));
+
+        expandDockWidget(key);
+      } else if (existing.visible) {
+        activateSingleTaskbarKey(key, existing.itemId, true);
+      } else {
+        setTimeline((prev) => {
+          const rest: TimelineItem[] = [];
+          let singleton: Extract<
+            TimelineItem,
+            { type: 'command_result' }
+          > | null = null;
+
+          for (const item of prev) {
+            if (item.type === 'command_result' && item.id === existing.itemId) {
+              singleton = item;
+              continue;
+            }
+
+            rest.push(item);
+          }
+
+          return singleton ? [...rest, singleton] : prev;
+        });
+
+        activateSingleTaskbarKey(key, existing.itemId, true);
+        scrollTimelineToBottomSoon();
+      }
+
+      emitStoryWidgetOpened({
+        type: 'widget_opened',
+        command: widget.command,
+        subcommand: widget.subcommand,
+      });
+
+      return;
+    }
+
+    await toggleTaskbarWidget(widget);
   }
 
   function isTaskbarSubcommand(command: string, subcommand: string): boolean {
@@ -1084,7 +1541,10 @@ function AppInner(): JSX.Element {
 
   useComposerFocus({
     blocked: () =>
-      paletteOpen() || activeFormId() !== null || headerMenusOpen(),
+      isWebDemoMode() ||
+      paletteOpen() ||
+      activeFormId() !== null ||
+      headerMenusOpen(),
     focusInput: () => composerInputEl?.focus(),
   });
 
@@ -1202,6 +1662,12 @@ function AppInner(): JSX.Element {
       setStoryWalkthrough(state);
     });
 
+    const stopStoryPassivePlaybackListener = onStoryPassivePlaybackChange(
+      (state) => {
+        setPassivePlayback(state);
+      },
+    );
+
     const stopStoryCloseWidgetListener = onStoryCloseWidgetRequested(
       (event) => {
         closeTaskbarWidget(event.command, event.subcommand);
@@ -1240,10 +1706,37 @@ function AppInner(): JSX.Element {
       );
 
       stopStoryWalkthroughListener();
+      stopStoryPassivePlaybackListener();
       stopStoryCloseWidgetListener();
       stopStoryClearPromptsListener();
+      setPassiveHoveredElement(null);
       finishDockResize();
     });
+  });
+
+  createEffect(() => {
+    const playback = passivePlayback();
+    queueMicrotask(movePassiveCursorToTarget);
+
+    if (!isWebDemoMode() || !playback || playback.complete) {
+      setLastPassiveActionKey(null);
+
+      return;
+    }
+
+    const actionKey = `${playback.storyId}:${playback.stepIndex}:${JSON.stringify(playback.action)}`;
+
+    if (lastPassiveActionKey() === actionKey) {
+      return;
+    }
+
+    setLastPassiveActionKey(actionKey);
+
+    passiveActionQueue = passiveActionQueue
+      .then(() => executePassivePlaybackAction(playback))
+      .catch(() => undefined);
+
+    void passiveActionQueue;
   });
 
   createEffect(() => {
@@ -1339,6 +1832,10 @@ function AppInner(): JSX.Element {
   }
 
   onMount(() => {
+    if (isWebDemoMode()) {
+      return;
+    }
+
     if (isPiperTtsEnabled()) {
       setPiperTtsEnabled(true);
 
@@ -1356,6 +1853,7 @@ function AppInner(): JSX.Element {
   return (
     <div
       class="app-shell"
+      data-demo-mode={isWebDemoMode() ? 'true' : undefined}
       data-web-ui-busy-digest={webUiBusyDigest()}
       style={`--desktop-dock-width:${layoutPrefs().dockWidthPx}px`}
     >
@@ -1628,6 +2126,62 @@ function AppInner(): JSX.Element {
             }}
           />
         )}
+      </Show>
+      <style>{`
+        @keyframes demo-cursor-ripple {
+          0% { opacity: 0.85; transform: translate(-34%, -30%) scale(0.45); }
+          100% { opacity: 0; transform: translate(-34%, -30%) scale(1.6); }
+        }
+      `}</style>
+      <Show when={isWebDemoMode() && passiveCursor().visible}>
+        <div
+          style={{
+            position: 'fixed',
+            left: `${passiveCursor().x}px`,
+            top: `${passiveCursor().y}px`,
+            opacity: passiveCursor().visible ? 1 : 0,
+            transform: 'translate(-20%, -12%)',
+            width: '20px',
+            height: '20px',
+            'pointer-events': 'none',
+            'z-index': 80,
+            transition:
+              'left 500ms ease-out, top 500ms ease-out, opacity 180ms ease-out',
+          }}
+          aria-hidden="true"
+        >
+          <Show when={passiveCursor().pressed}>
+            <div
+              style={{
+                position: 'absolute',
+                left: '0',
+                top: '0',
+                width: '28px',
+                height: '28px',
+                'border-radius': '999px',
+                border: '2px solid rgba(239, 68, 68, 0.85)',
+                transform: 'translate(-34%, -30%)',
+                animation: 'demo-cursor-ripple 420ms ease-out 1',
+              }}
+            />
+          </Show>
+          <div
+            style={{
+              width: '20px',
+              height: '20px',
+              'clip-path':
+                'polygon(0 0, 0 100%, 32% 72%, 52% 100%, 70% 90%, 50% 62%, 88% 62%)',
+              background: '#ef4444',
+              border: '1px solid rgba(127, 29, 29, 0.85)',
+              filter:
+                'drop-shadow(0 0 8px rgba(248, 113, 113, 0.85)) drop-shadow(0 8px 18px rgba(0,0,0,0.5))',
+              transition: 'transform 100ms ease-out',
+              transform: passiveCursor().pressed
+                ? 'rotate(-18deg) scale(0.86)'
+                : 'rotate(-18deg) scale(1)',
+            }}
+          />
+        </div>
       </Show>
       <Show when={nostrSearchRelaysOpen()}>
         <NostrSearchRelaysModal

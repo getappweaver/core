@@ -4,34 +4,56 @@ import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import tailwindcss from '@tailwindcss/vite';
 
-function trailingSlashRedirectPlugin(): Plugin {
-  const redirects = new Map([
-    ['/demo', '/demo/'],
-    ['/demo/app', '/demo/app/'],
-  ]);
+type LandingRouteRequestProps = {
+  req: { url?: string };
+  res: {
+    statusCode: number;
+    setHeader: (name: string, value: string) => void;
+    end: () => void;
+  };
+  next: () => void;
+};
+
+function landingRoutesPlugin(): Plugin {
+  const redirects = new Map([['/demo/app', '/demo/app/']]);
+  const appRoutes = new Set(['/one-page']);
+
+  function handleRequest({ req, res, next }: LandingRouteRequestProps): void {
+    const url = req.url ? req.url.split('?')[0] : null;
+    const target = url ? redirects.get(url) : null;
+
+    if (target) {
+      res.statusCode = 302;
+      res.setHeader('Location', target);
+      res.end();
+
+      return;
+    }
+
+    if (url && appRoutes.has(url)) {
+      req.url = '/index.html';
+    }
+
+    next();
+  }
 
   return {
-    name: 'landing-demo-trailing-slash-redirect',
+    name: 'landing-routes',
     configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url ? req.url.split('?')[0] : null;
-        const target = url ? redirects.get(url) : null;
-
-        if (!target) {
-          next();
-          return;
-        }
-
-        res.statusCode = 302;
-        res.setHeader('Location', target);
-        res.end();
-      });
+      server.middlewares.use((req, res, next) =>
+        handleRequest({ req, res, next }),
+      );
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) =>
+        handleRequest({ req, res, next }),
+      );
     },
   };
 }
 
 export default defineConfig({
-  plugins: [trailingSlashRedirectPlugin(), solid(), tailwindcss()],
+  plugins: [landingRoutesPlugin(), solid(), tailwindcss()],
   resolve: {
     alias: {
       '@src': resolve(import.meta.dirname, '../../src'),
@@ -50,8 +72,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
-        demo: resolve(import.meta.dirname, 'demo/index.html'),
-        demoApp: resolve(import.meta.dirname, 'demo/app/index.html'),
       },
     },
   },

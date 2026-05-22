@@ -1,4 +1,5 @@
 import type {
+  StoryPassivePlaybackDiagnostic,
   StoryPassivePlaybackState,
   StoryWalkthroughState,
   StoryWidgetOpenedEvent,
@@ -16,6 +17,9 @@ const PASSIVE_PLAYBACK_REPLAY_REQUESTED_EVENT =
 
 const PASSIVE_PLAYBACK_SEEK_REQUESTED_EVENT =
   'appweaver-story-passive-playback-seek-requested';
+
+const PASSIVE_PLAYBACK_DIAGNOSTIC_EVENT =
+  'appweaver-story-passive-playback-diagnostic';
 
 const WIDGET_OPENED_EVENT = 'appweaver-story-widget-opened';
 const TARGET_CLICKED_EVENT = 'appweaver-story-target-clicked';
@@ -131,7 +135,7 @@ export function onStoryPassivePlaybackReplayRequested(
 
 export type StoryPassivePlaybackSeekRequest = {
   storyId: string;
-  direction: 'previous' | 'next';
+  direction: 'previous';
 };
 
 export function emitStoryPassivePlaybackSeekRequested(
@@ -156,6 +160,32 @@ export function onStoryPassivePlaybackSeekRequested(
 
   return () =>
     window.removeEventListener(PASSIVE_PLAYBACK_SEEK_REQUESTED_EVENT, listener);
+}
+
+export function emitStoryPassivePlaybackDiagnostic(
+  diagnostic: StoryPassivePlaybackDiagnostic,
+): void {
+  window.dispatchEvent(
+    new CustomEvent<StoryPassivePlaybackDiagnostic>(
+      PASSIVE_PLAYBACK_DIAGNOSTIC_EVENT,
+      { detail: diagnostic },
+    ),
+  );
+
+  console.warn('[story playback]', diagnostic.message, diagnostic);
+}
+
+export function onStoryPassivePlaybackDiagnostic(
+  handler: (diagnostic: StoryPassivePlaybackDiagnostic) => void,
+): () => void {
+  const listener = (event: Event) => {
+    handler((event as CustomEvent<StoryPassivePlaybackDiagnostic>).detail);
+  };
+
+  window.addEventListener(PASSIVE_PLAYBACK_DIAGNOSTIC_EVENT, listener);
+
+  return () =>
+    window.removeEventListener(PASSIVE_PLAYBACK_DIAGNOSTIC_EVENT, listener);
 }
 
 export function emitStoryWidgetOpened(event: StoryWidgetOpenedEvent): void {

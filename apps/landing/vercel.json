@@ -43,14 +43,13 @@
     {
       "source": "/.well-known/lnurlp/:name",
       "destination": "/api/lnurlp?name=:name"
+    },
+    {
+      "source": "/one-page",
+      "destination": "/index.html"
     }
   ],
   "redirects": [
-    {
-      "source": "/demo",
-      "destination": "/demo/",
-      "permanent": false
-    },
     {
       "source": "/demo/app",
       "destination": "/demo/app/",

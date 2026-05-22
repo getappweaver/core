@@ -1,4 +1,8 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 import { getAgentBackend } from '@src/db';
+import { isDemoMode } from '@src/demo-mode';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
@@ -12,14 +16,18 @@ import {
   type TimelinePayload,
 } from '@src/timeline/types';
 import { assertUnreachable } from '@src/utils';
-import type { TimelineEventOutput, WebHandlerResult } from '@src/web/ui-schema';
+import type {
+  TimelineEventOutput,
+  WebHandlerResult,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
 
 import { runWebChat } from './chat';
 import {
   getCommandDefinitionForWeb,
   listAllCommandsDetailForWeb,
 } from './command-catalog';
-import { getComposerAiState } from './composer-ai-state';
+import { getComposerAiState, type ComposerAiState } from './composer-ai-state';
 import { executeBuiltinCommand, executeBuiltinJsonCommand } from './execute';
 import { verifyNip98Authorization } from './nip98-verify';
 import type { WebRouteContext } from './routes';
@@ -42,6 +50,7 @@ import {
   type LoadTimelineClientMessage,
   type RunCommandClientMessage,
   type SaveTimelineFormClientMessage,
+  type WebSocketClientMessage,
   WebSocketClientMessageSchema,
   type WebSocketServerMessage,
 } from './ws-schema';
@@ -51,6 +60,8 @@ export type WebSocketData = {
   currentChatAbort: AbortController | null;
   /** Set from NIP-98 on HTTP upgrade and/or first `authenticate` message. */
   nip98Authenticated: boolean;
+  /** Demo sessions are intentionally restricted; they are not full backend auth. */
+  demoAuthenticated: boolean;
 };
 
 function isTimelineEventOutput(
@@ -116,6 +127,261 @@ function normalizeIncomingMessage(
   }
 
   return message.toString('utf8');
+}
+
+function isDemoAuthorization(value: string): boolean {
+  return isDemoMode() && value === 'Nostr demo-token';
+}
+
+function demoComposerAiState(): ComposerAiState {
+  return {
+    backend: 'demo',
+    executionProfileLabel: 'Agent',
+    executionProfileName: 'Demo Agent',
+    executionProfileColor: 'info',
+    effectiveModel: 'demo/model',
+    provider: 'demo',
+    modelOverride: null,
+    opencodeModelFormChoices: [],
+    contextStats: null,
+  };
+}
+
+type DemoStoryEntry = {
+  pluginAlias: string;
+  iconUrl?: string;
+  story: {
+    id: string;
+    title: string;
+    description?: string;
+    sandbox?: {
+      __outputs?: Record<string, unknown[]>;
+    };
+  };
+};
+
+function loadGeneratedDemoStories(dmBotRoot: string): DemoStoryEntry[] {
+  const filePath = join(dmBotRoot, 'web', 'public', 'demo', 'stories.json');
+
+  return JSON.parse(readFileSync(filePath, 'utf8')) as DemoStoryEntry[];
+}
+
+function isWebNodeRoot(value: unknown): value is WebNodeRoot {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { kind?: unknown }).kind === 'ui' &&
+    (value as { version?: unknown }).version === 1
+  );
+}
+
+function demoWidgetOutput(params: {
+  dmBotRoot: string;
+  command: string;
+  subcommand: string;
+}): WebNodeRoot | null {
+  const stories = loadGeneratedDemoStories(params.dmBotRoot);
+  const outputKey = `${params.command}:${params.subcommand}`;
+
+  const relatedStories = stories
+    .filter((entry) => entry.pluginAlias === params.command)
+    .map((entry) => ({
+      id: entry.story.id,
+      title: entry.story.title,
+      description: entry.story.description,
+      pluginAlias: entry.pluginAlias,
+      iconUrl: entry.iconUrl,
+    }));
+
+  const outputs = stories.flatMap(
+    (entry) => entry.story.sandbox?.__outputs?.[outputKey] ?? [],
+  );
+
+  const output = [...outputs].reverse().find(isWebNodeRoot);
+
+  if (!output) {
+    return null;
+  }
+
+  return {
+    ...output,
+    widgetHelp: output.widgetHelp
+      ? {
+          ...output.widgetHelp,
+          stories:
+            relatedStories.length > 0
+              ? relatedStories
+              : output.widgetHelp.stories,
+          defaultOpen: true,
+        }
+      : undefined,
+  };
+}
+
+function sendDemoWidgetOutput(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  ctx: WebRouteContext;
+  message: RunCommandClientMessage;
+  output: WebNodeRoot;
+}): void {
+  const { ws, ctx, message, output } = params;
+
+  if (message.recordInTimeline !== false) {
+    insertTimelineEvent(ctx.seenDb, {
+      timelineId: message.timelineId,
+      source: 'web',
+      kind: 'command_result',
+      role: null,
+      command: message.command,
+      subcommand: message.subcommand,
+      subcommandTag: getResultSubcommandTag(
+        message.command,
+        message.subcommand,
+        message.payload,
+      ),
+      values: message.payload,
+      form: null,
+      text: null,
+      web: output,
+      clientView: null,
+      prompt: null,
+      requestId: null,
+    });
+  }
+
+  sendMessage(
+    ws,
+    createCommandResultMessage({
+      requestId: message.requestId,
+      output,
+    }),
+  );
+
+  sendMessage(ws, createDoneMessage(message.requestId));
+}
+
+async function handleDemoWebSocketMessage(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  ctx: WebRouteContext;
+  message: WebSocketClientMessage;
+}): Promise<void> {
+  const { ws, ctx, message } = params;
+
+  switch (message.type) {
+    case 'authenticate':
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'request_commands':
+      sendMessage(
+        ws,
+        createCommandsResultMessage({
+          requestId: message.requestId,
+          commands: listAllCommandsDetailForWeb(ctx.prefix),
+        }),
+      );
+
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'request_composer_ai_state':
+      sendMessage(
+        ws,
+        createComposerAiStateResultMessage({
+          requestId: message.requestId,
+          state: demoComposerAiState(),
+        }),
+      );
+
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'load_timeline':
+    case 'load_timeline_before':
+      sendMessage(
+        ws,
+        createTimelineEventsResultMessage({
+          requestId: message.requestId,
+          timelineId: message.timelineId,
+          items: [],
+          hasMore: false,
+        }),
+      );
+
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'run_command':
+      if (
+        message.command !== 'story' ||
+        (message.subcommand !== 'list' && message.subcommand !== 'start')
+      ) {
+        const output = demoWidgetOutput({
+          dmBotRoot: ctx.dmBotRoot,
+          command: message.command,
+          subcommand: message.subcommand,
+        });
+
+        if (output) {
+          sendDemoWidgetOutput({ ws, ctx, message, output });
+
+          return;
+        }
+
+        sendMessage(
+          ws,
+          createErrorMessage({
+            requestId: message.requestId,
+            message: 'demo_mode_only_allows_story_commands',
+          }),
+        );
+
+        return;
+      }
+
+      await handleRunCommand({
+        ws,
+        ctx,
+        message: { ...message, recordInTimeline: false },
+      });
+
+      return;
+
+    case 'chat':
+      sendMessage(
+        ws,
+        createChatResultMessage({
+          requestId: message.requestId,
+          output:
+            'Demo mode only runs generated stories. Open /story list to start.',
+        }),
+      );
+
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'prompt_answer':
+    case 'cancel_chat':
+    case 'delete_timeline_event':
+    case 'save_timeline_form':
+      sendMessage(ws, createDoneMessage(message.requestId));
+
+      return;
+
+    case 'json_command':
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: 'demo_mode_json_command_not_allowed',
+        }),
+      );
+  }
 }
 
 function summarizeInvocation(
@@ -701,12 +967,16 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             return;
           }
 
-          const nip = verifyNip98Authorization({
-            authorizationHeader: authTry.data.authorization,
-            pathname: '/ws',
-            requestMethod: 'GET',
-            masterPubkey: ctx.config.masterPubkey,
-          });
+          const demoAuth = isDemoAuthorization(authTry.data.authorization);
+
+          const nip = demoAuth
+            ? ({ ok: true } as const)
+            : verifyNip98Authorization({
+                authorizationHeader: authTry.data.authorization,
+                pathname: '/ws',
+                requestMethod: 'GET',
+                masterPubkey: ctx.config.masterPubkey,
+              });
 
           if (!nip.ok) {
             sendMessage(
@@ -723,6 +993,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
           }
 
           ws.data.nip98Authenticated = true;
+          ws.data.demoAuthenticated = demoAuth;
           sendMessage(ws, createDoneMessage(authTry.data.requestId));
 
           return;
@@ -754,6 +1025,12 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
         const message = clientParsed.data;
 
         try {
+          if (ws.data.demoAuthenticated) {
+            await handleDemoWebSocketMessage({ ws, ctx, message });
+
+            return;
+          }
+
           switch (message.type) {
             case 'authenticate': {
               sendMessage(ws, createDoneMessage(message.requestId));

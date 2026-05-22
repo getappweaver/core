@@ -7,6 +7,7 @@ import {
   emitStoryPassivePlaybackChange,
   emitStoryWalkthroughChange,
   emitStoryCloseWidgetRequested,
+  onStoryPassivePlaybackDiagnostic,
   onStoryPassivePlaybackPausedChange,
   onStoryPassivePlaybackReplayRequested,
   onStoryPassivePlaybackSeekRequested,
@@ -73,12 +74,8 @@ function stepLabel(step: StoryStep<unknown>): string {
 }
 
 export function StoryRuntimeView(props: StoryRuntimeViewProps) {
-  const navigationType = performance.getEntriesByType('navigation')[0] as
-    | PerformanceNavigationTiming
-    | undefined;
-
   const autoStartOnMount =
-    (props.payload.autoStart === true && navigationType?.type !== 'reload') ||
+    props.payload.autoStart === true ||
     window.location.pathname.startsWith('/demo/') ||
     false;
 
@@ -110,8 +107,15 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
         'Watching the story play through the app.',
     );
 
+  const [passiveDiagnostics, setPassiveDiagnostics] = createSignal<string[]>(
+    [],
+  );
+
   const [complete, setComplete] = createSignal(false);
-  const [passivePaused, setPassivePaused] = createSignal(false);
+
+  const [passivePaused, setPassivePaused] = createSignal(
+    props.payload.walkthrough === false,
+  );
 
   const isPassivePlayback = () => props.payload.walkthrough === false;
 
@@ -144,6 +148,8 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     step: StoryStep<unknown> | null;
     currentStepIndex: number;
     instructionText: string;
+    stepDurationMs: number | null;
+    stepStartedAtMs: number | null;
     target: NonNullable<
       Parameters<typeof emitStoryPassivePlaybackChange>[0]
     >['target'];
@@ -154,6 +160,12 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     if (!isPassivePlayback()) {
       return;
     }
+
+    const displayStep = passiveDisplayStep({
+      currentStepIndex: params.currentStepIndex,
+      catchingUp: params.catchingUp,
+      currentStepStartedAtMs: params.stepStartedAtMs,
+    });
 
     const title = params.step?.showcase?.title ?? passiveDisplayTitle();
 
@@ -166,6 +178,14 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     emitStoryPassivePlaybackChange({
       storyId: props.payload.id,
       stepIndex: params.currentStepIndex,
+      totalSteps: steps().length,
+      displayStepIndex: displayStep.index,
+      displayStepCount: displayStep.count,
+      displayDurationMs: displayStep.durationMs,
+      displayStartedAtMs: displayStep.startedAtMs,
+      stepLabel: params.instructionText,
+      stepDurationMs: params.stepDurationMs,
+      stepStartedAtMs: params.stepStartedAtMs,
       title,
       description,
       target: params.target,
@@ -260,16 +280,100 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     return steps().flatMap((step, index) => (step.showcase ? [index] : []));
   }
 
-  function seekPassivePlayback(direction: 'previous' | 'next'): void {
+  function passiveStepDelayForDisplay(params: {
+    step: StoryStep<unknown>;
+    catchingUp: boolean;
+  }): number {
+    return params.catchingUp
+      ? PASSIVE_CATCH_UP_STEP_DELAY_MS
+      : stepPassiveDelayMs(params.step);
+  }
+
+  function passiveDisplayStep(params: {
+    currentStepIndex: number;
+    catchingUp: boolean;
+    currentStepStartedAtMs: number | null;
+  }): {
+    index: number;
+    count: number;
+    durationMs: number | null;
+    startedAtMs: number | null;
+  } {
     const indexes = showcaseStepIndexes();
-    const current = stepIndex();
+
+    if (indexes.length === 0) {
+      const step = steps()[params.currentStepIndex];
+
+      return {
+        index: Math.min(params.currentStepIndex, steps().length - 1),
+        count: steps().length,
+        durationMs: step
+          ? passiveStepDelayForDisplay({ step, catchingUp: params.catchingUp })
+          : null,
+        startedAtMs: params.currentStepStartedAtMs,
+      };
+    }
+
+    let activeIndex = -1;
+
+    for (let index = 0; index < indexes.length; index += 1) {
+      if (indexes[index]! <= params.currentStepIndex) {
+        activeIndex = index;
+      }
+    }
+
+    const sceneIndex = activeIndex < 0 ? 0 : activeIndex;
+    const sceneStart = indexes[sceneIndex]!;
+    const sceneEnd = indexes[sceneIndex + 1] ?? steps().length;
+    let durationMs = 0;
+    let elapsedBeforeCurrentMs = 0;
+
+    for (let index = sceneStart; index < sceneEnd; index += 1) {
+      const step = steps()[index];
+
+      if (!step) {
+        continue;
+      }
+
+      const delayMs = passiveStepDelayForDisplay({
+        step,
+        catchingUp: params.catchingUp,
+      });
+
+      durationMs += delayMs;
+
+      if (index < params.currentStepIndex) {
+        elapsedBeforeCurrentMs += delayMs;
+      }
+    }
+
+    return {
+      index: sceneIndex,
+      count: indexes.length,
+      durationMs,
+      startedAtMs:
+        params.currentStepStartedAtMs === null
+          ? null
+          : params.currentStepStartedAtMs - elapsedBeforeCurrentMs,
+    };
+  }
+
+  function seekPassivePlaybackPrevious(): void {
+    const indexes = showcaseStepIndexes();
+
+    const currentDisplayStep = passiveDisplayStep({
+      currentStepIndex: stepIndex(),
+      catchingUp: false,
+      currentStepStartedAtMs: null,
+    });
 
     const target =
-      direction === 'next'
-        ? (indexes.find((index) => index > current) ?? steps().length)
-        : ([...indexes].reverse().find((index) => index < current) ?? 0);
+      indexes.length === 0
+        ? Math.max(stepIndex() - 1, 0)
+        : indexes[Math.max(currentDisplayStep.index - 1, 0)]!;
 
     activateStorySandbox(props.payload);
+    setPassivePaused(false);
     setComplete(false);
     setStarted(true);
     setStepIndex(target);
@@ -309,6 +413,8 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
         step: null,
         currentStepIndex: stepIndex(),
         instructionText: 'Story complete.',
+        stepDurationMs: null,
+        stepStartedAtMs: null,
         target: null,
         action: { type: 'none' },
         complete: true,
@@ -327,10 +433,6 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     }
 
     if (isPassivePlayback()) {
-      if (passivePaused()) {
-        return;
-      }
-
       const passiveInstruction =
         step.type === 'instruction' ? step.text : stepLabel(step);
 
@@ -339,17 +441,19 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
 
       setInstruction(passiveInstruction);
 
-      emitPassivePlayback({
-        step,
-        currentStepIndex: stepIndex(),
-        instructionText: passiveInstruction,
-        target: passiveTarget,
-        action: passiveStepAction(step),
-        complete: step.type === 'complete',
-        catchingUp,
-      });
-
       if (step.type === 'complete') {
+        emitPassivePlayback({
+          step,
+          currentStepIndex: stepIndex(),
+          instructionText: passiveInstruction,
+          stepDurationMs: null,
+          stepStartedAtMs: null,
+          target: passiveTarget,
+          action: passiveStepAction(step),
+          complete: true,
+          catchingUp,
+        });
+
         setComplete(true);
 
         return;
@@ -358,6 +462,34 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       const delayMs = catchingUp
         ? PASSIVE_CATCH_UP_STEP_DELAY_MS
         : stepPassiveDelayMs(step);
+
+      if (passivePaused()) {
+        emitPassivePlayback({
+          step,
+          currentStepIndex: stepIndex(),
+          instructionText: passiveInstruction,
+          stepDurationMs: null,
+          stepStartedAtMs: null,
+          target: passiveTarget,
+          action: { type: 'none' },
+          complete: false,
+          catchingUp,
+        });
+
+        return;
+      }
+
+      emitPassivePlayback({
+        step,
+        currentStepIndex: stepIndex(),
+        instructionText: passiveInstruction,
+        stepDurationMs: delayMs,
+        stepStartedAtMs: performance.now(),
+        target: passiveTarget,
+        action: passiveStepAction(step),
+        complete: false,
+        catchingUp,
+      });
 
       const timeoutId = window.setTimeout(() => {
         advance();
@@ -560,7 +692,19 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
         return;
       }
 
-      seekPassivePlayback(request.direction);
+      seekPassivePlaybackPrevious();
+    },
+  );
+
+  const stopPassiveDiagnosticListener = onStoryPassivePlaybackDiagnostic(
+    (diagnostic) => {
+      if (diagnostic.storyId !== props.payload.id || !isPassivePlayback()) {
+        return;
+      }
+
+      const line = `Step ${diagnostic.stepIndex + 1}: ${diagnostic.message}`;
+
+      setPassiveDiagnostics((previous) => [...previous, line]);
     },
   );
 
@@ -573,6 +717,7 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     stopPassivePausedListener();
     stopPassiveReplayRequestedListener();
     stopPassiveSeekRequestedListener();
+    stopPassiveDiagnosticListener();
     clearWalkthrough();
     emitStoryPassivePlaybackChange(null);
     deactivateStorySandbox(props.payload);
@@ -581,11 +726,22 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   if (isPassivePlayback()) {
     return (
       <div class="story-runtime-card">
-        <div class="story-runtime-card__eyebrow">Now playing</div>
         <div class="story-runtime-card__title">{passiveDisplayTitle()}</div>
         <div class="story-runtime-card__body">
           {passiveDisplayDescription()}
         </div>
+        {passiveDiagnostics().length > 0 ? (
+          <div class="story-runtime-card__debug" aria-live="polite">
+            <div class="story-runtime-card__debug-title">
+              Story playback diagnostics
+            </div>
+            <ul>
+              {passiveDiagnostics().map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     );
   }

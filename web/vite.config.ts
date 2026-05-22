@@ -1,3 +1,5 @@
+import { resolve } from 'path';
+
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import solid from 'vite-plugin-solid';
@@ -16,8 +18,11 @@ const backendWsOrigin = `ws://${backendHost}:${backendPortSafe}`;
 const setupOnlyMode = ['BOT_KEY', 'BOT_MASTER_PUBKEY', 'BOT_RELAYS'].some(
   (name) => (process.env[name]?.trim() ?? '').length === 0,
 );
+const demoMode = process.env.APPWEAVER_DEMO === '1';
+const embeddedDemoBuild = process.env.APPWEAVER_DEMO_EMBEDDED === '1';
 
 export default defineConfig({
+  base: embeddedDemoBuild ? '/demo/app/' : '/',
   plugins: [
     solid(),
     VitePWA({
@@ -60,7 +65,14 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    alias: {
+      '@src': resolve(import.meta.dirname, '..', 'src'),
+      '@web': resolve(import.meta.dirname, '..', 'web'),
+    },
     dedupe: ['solid-js', 'solid-js/web'],
+  },
+  define: {
+    'import.meta.env.VITE_APPWEAVER_DEMO': JSON.stringify(demoMode),
   },
   root: import.meta.dirname,
   server: {

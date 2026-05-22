@@ -1,7 +1,15 @@
-import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from 'solid-js';
 
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
+import { isWebDemoMode } from '../../demo/runtime';
 import {
   emitStoryPassivePlaybackPausedChange,
   emitStoryPassivePlaybackReplayRequested,
@@ -9,7 +17,10 @@ import {
   onStoryPassivePlaybackChange,
   onStoryPassivePlaybackPausedChange,
 } from '../../story/events';
-import type { StoryRuntimePayload } from '../../story/types';
+import type {
+  StoryPassivePlaybackState,
+  StoryRuntimePayload,
+} from '../../story/types';
 import type { TimelineItem } from '../../types';
 
 import { ClientViewHost } from '../ClientViewHost';
@@ -25,7 +36,6 @@ import {
   cardHeadStoryPauseIcon,
   cardHeadStoryPlayIcon,
   cardHeadStoryPreviousIcon,
-  cardHeadStoryNextIcon,
 } from './timelineCardHeadIcons';
 import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
 import { TimelineSpeechButton } from './TimelineSpeechButton';
@@ -206,8 +216,15 @@ function webRootTtsText(root: WebNodeRoot | null | undefined): string | null {
 }
 
 function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
-  const [paused, setPaused] = createSignal(false);
+  const [paused, setPaused] = createSignal(true);
   const [completed, setCompleted] = createSignal(false);
+  const [interacted, setInteracted] = createSignal(false);
+
+  const [playback, setPlayback] =
+    createSignal<StoryPassivePlaybackState | null>(null);
+
+  const [stepProgress, setStepProgress] = createSignal(0);
+  const [sceneElapsedMs, setSceneElapsedMs] = createSignal(0);
 
   const stopPausedListener = onStoryPassivePlaybackPausedChange(setPaused);
 
@@ -216,6 +233,7 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
       return;
     }
 
+    setPlayback(state);
     setCompleted(state.complete === true);
 
     if (state.complete === true) {
@@ -234,6 +252,8 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
   };
 
   const togglePlayback = (): void => {
+    setInteracted(true);
+
     if (completed()) {
       setCompleted(false);
       setPaused(false);
@@ -243,15 +263,6 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
     }
 
     setPlaybackPaused(!paused());
-  };
-
-  const seekPlayback = (direction: 'previous' | 'next'): void => {
-    setCompleted(false);
-
-    emitStoryPassivePlaybackSeekRequested({
-      storyId: props.storyId,
-      direction,
-    });
   };
 
   const btnClass = () =>
@@ -265,19 +276,151 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
       .filter(Boolean)
       .join(' ');
 
+  const rewindPlayback = (): void => {
+    setCompleted(false);
+
+    emitStoryPassivePlaybackSeekRequested({
+      storyId: props.storyId,
+      direction: 'previous',
+    });
+  };
+
+  const currentStepNumber = createMemo(() => {
+    const state = playback();
+
+    if (!state) {
+      return 0;
+    }
+
+    return Math.min(state.displayStepIndex + 1, state.displayStepCount);
+  });
+
+  const stepSegments = createMemo(() => {
+    const state = playback();
+
+    return Array.from(
+      { length: state?.displayStepCount ?? 0 },
+      (_, index) => index,
+    );
+  });
+
+  createEffect(() => {
+    const state = playback();
+    const durationMs = state?.displayDurationMs;
+    const startedAtMs = state?.displayStartedAtMs;
+
+    if (state?.complete === true) {
+      setStepProgress(1);
+      setSceneElapsedMs(durationMs ?? 0);
+
+      return;
+    }
+
+    if (!state || !durationMs || startedAtMs === null) {
+      setStepProgress(0);
+      setSceneElapsedMs(0);
+
+      return;
+    }
+
+    if (paused()) {
+      return;
+    }
+
+    let frameId: number | null = null;
+
+    const update = () => {
+      const elapsedMs = startedAtMs
+        ? Math.min(durationMs, Math.max(0, performance.now() - startedAtMs))
+        : durationMs;
+
+      const progress = Math.min(1, elapsedMs / durationMs);
+
+      setStepProgress(progress);
+      setSceneElapsedMs(elapsedMs);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(update);
+      }
+    };
+
+    update();
+
+    onCleanup(() => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    });
+  });
+
+  const sceneRemainingText = createMemo(() => {
+    const durationMs = playback()?.displayDurationMs;
+
+    if (!durationMs) {
+      return null;
+    }
+
+    const durationSeconds = Math.ceil(durationMs / 1000);
+
+    const remainingSeconds = Math.max(
+      0,
+      durationSeconds - Math.floor(sceneElapsedMs() / 1000),
+    );
+
+    return `${remainingSeconds} sec`;
+  });
+
   return (
     <div
-      class="card-head-tree-toolbar"
+      class="card-head-tree-toolbar story-playback-toolbar"
       role="toolbar"
       aria-label="Story playback"
     >
+      <Show when={playback()}>
+        {(state) => (
+          <div class="story-playback-status" aria-live="polite">
+            <div class="story-playback-strip">
+              <div
+                class="story-playback-segments"
+                aria-label={`Scene ${currentStepNumber()} of ${state().displayStepCount}`}
+              >
+                <For each={stepSegments()}>
+                  {(index) => (
+                    <span
+                      class="story-playback-segment"
+                      classList={{
+                        'story-playback-segment--done':
+                          index < state().displayStepIndex,
+                        'story-playback-segment--current':
+                          index === state().displayStepIndex &&
+                          state().complete !== true,
+                        'story-playback-segment--complete':
+                          state().complete === true,
+                      }}
+                    />
+                  )}
+                </For>
+              </div>
+              <Show when={sceneRemainingText()}>
+                {(timerText) => (
+                  <span class="story-playback-time">{timerText()}</span>
+                )}
+              </Show>
+            </div>
+            <div class="story-playback-progress" aria-hidden="true">
+              <span style={{ transform: `scaleX(${stepProgress()})` }} />
+            </div>
+          </div>
+        )}
+      </Show>
       <WebButton
         type="button"
         class={btnClass()}
         data-ui="story-playback-previous"
-        title="Previous story step"
-        aria-label="Previous story step"
-        onClick={() => seekPlayback('previous')}
+        title="Rewind story scene"
+        aria-label="Rewind story scene"
+        disabled={(playback()?.displayStepIndex ?? 0) <= 0}
+        onClick={rewindPlayback}
       >
         {cardHeadStoryPreviousIcon()}
       </WebButton>
@@ -285,22 +428,15 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
         type="button"
         class={btnClass()}
         data-ui="story-playback-toggle"
+        classList={{
+          'story-playback-toggle--attention': !interacted() && paused(),
+        }}
         title={paused() ? 'Play story' : 'Pause story'}
         aria-label={paused() ? 'Play story' : 'Pause story'}
         aria-pressed={!paused()}
         onClick={togglePlayback}
       >
         {paused() ? cardHeadStoryPlayIcon() : cardHeadStoryPauseIcon()}
-      </WebButton>
-      <WebButton
-        type="button"
-        class={btnClass()}
-        data-ui="story-playback-next"
-        title="Next story step"
-        aria-label="Next story step"
-        onClick={() => seekPlayback('next')}
-      >
-        {cardHeadStoryNextIcon()}
       </WebButton>
     </div>
   );
@@ -314,7 +450,9 @@ export function TimelineCommandResultCard(
   const [webTreeToolbar, setWebTreeToolbar] =
     createSignal<WebTreeToolbarRegistration | null>(null);
 
-  const [widgetHelpOpen, setWidgetHelpOpen] = createSignal(false);
+  const [widgetHelpOpen, setWidgetHelpOpen] = createSignal(
+    props.item.web?.widgetHelp?.defaultOpen === true,
+  );
 
   const [webTreeHeaderEl, setWebTreeHeaderEl] =
     createSignal<HTMLElement | null>(null);
@@ -336,6 +474,18 @@ export function TimelineCommandResultCard(
   );
 
   const widgetHelp = createMemo(() => props.item.web?.widgetHelp ?? null);
+
+  createEffect(() => {
+    if (isWebDemoMode() && widgetHelp()) {
+      setWidgetHelpOpen(true);
+
+      return;
+    }
+
+    if (props.item.web?.widgetHelp?.defaultOpen === true) {
+      setWidgetHelpOpen(true);
+    }
+  });
 
   const startStory = (storyId: string) => {
     props.onRunWebAction({

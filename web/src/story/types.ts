@@ -19,6 +19,14 @@ export type StoryWalkthroughTarget = StoryTarget;
 export type StoryPassivePlaybackState = {
   storyId: string;
   stepIndex: number;
+  totalSteps: number;
+  displayStepIndex: number;
+  displayStepCount: number;
+  displayDurationMs: number | null;
+  displayStartedAtMs: number | null;
+  stepLabel: string;
+  stepDurationMs: number | null;
+  stepStartedAtMs: number | null;
   title: string;
   description: string;
   target: StoryWalkthroughTarget | null;
@@ -40,6 +48,12 @@ export type StoryPassivePlaybackState = {
       };
   complete?: boolean;
   catchingUp?: boolean;
+};
+
+export type StoryPassivePlaybackDiagnostic = {
+  storyId: string;
+  stepIndex: number;
+  message: string;
 };
 
 export type StoryWalkthroughState = {

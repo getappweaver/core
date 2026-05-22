@@ -70,6 +70,7 @@ function resolveWidgetIconUrl(widget: {
   }
 
   const flatten = (value: string): string => value.replace(/[\\/]/g, '__');
+  const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
 
   if (widget.source === 'plugin') {
     const alias = widget.pluginAlias?.trim();
@@ -83,7 +84,7 @@ function resolveWidgetIconUrl(widget: {
       const slashIdx = rel.indexOf('/');
 
       if (slashIdx <= 0) {
-        return `/plugin-icons/${alias}/${flatten(rel)}`;
+        return asset(`plugin-icons/${alias}/${flatten(rel)}`);
       }
 
       const relAlias = rel.slice(0, slashIdx);
@@ -93,19 +94,19 @@ function resolveWidgetIconUrl(widget: {
         return null;
       }
 
-      return `/plugin-icons/${relAlias}/${flatten(relIcon)}`;
+      return asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`);
     }
 
     const rel = raw.startsWith('/') ? raw.slice(1) : raw;
 
-    return `/plugin-icons/${alias}/${flatten(rel)}`;
+    return asset(`plugin-icons/${alias}/${flatten(rel)}`);
   }
 
   if (!raw.startsWith('/')) {
     return null;
   }
 
-  return `/builtin-icons/${flatten(raw.slice(1))}`;
+  return asset(`builtin-icons/${flatten(raw.slice(1))}`);
 }
 
 function IconGlyph(props: {
@@ -395,7 +396,11 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
           rel="noopener noreferrer"
           aria-label="Open AppWeaver website"
         >
-          <img class="topbar-logo" src="/appweaver-logo.svg" alt="AppWeaver" />
+          <img
+            class="topbar-logo"
+            src={`${import.meta.env.BASE_URL}appweaver-logo.svg`}
+            alt="AppWeaver"
+          />
         </a>
       </h1>
       <div class="topbar-actions">

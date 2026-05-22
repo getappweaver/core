@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "9.22.1",
+  "version": "9.23.0",
   "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
   "type": "module",
   "workspaces": [
@@ -12,7 +12,9 @@
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
     "demo:generate": "DEMO_BUILD=1 bun run scripts/generate-demo.ts",
-    "web:demo:build": "bun run demo:generate && bun run landing:build",
+    "web:demo:build": "bun run demo:generate && APPWEAVER_DEMO=1 APPWEAVER_DEMO_EMBEDDED=1 bun run web:build",
+    "landing:demo:copy": "bun run scripts/copy-web-demo-to-landing.ts",
+    "demo:build": "bun run web:demo:build && bun run landing:build && bun run landing:demo:copy",
     "landing:dev": "bun run --cwd apps/landing dev",
     "landing:build": "bun run --cwd apps/landing build",
     "web:pwa-icons": "bun run scripts/write-pwa-placeholder-icons.ts",

@@ -1,13 +1,19 @@
 import { createEffect, createMemo, createSignal } from 'solid-js';
 
+import { renderStoryListRoot } from '@src/commands/story/renderers/story-list-component';
+import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
+
+import type { ComposerAiState } from '../commands/types';
+import { isWebDemoMode } from '../demo/runtime';
 import {
   consumePluginInstallRestartMessage,
   consumePluginInstallSuccessMessage,
   hasActivePluginInstallRestartStatus,
 } from '../restartStatus';
 import { handleStorySandboxSocketMessage } from '../story/sandbox';
-import type { TimelineItem } from '../types';
+import type { CommandDetail, CommandOutput, TimelineItem } from '../types';
 import { createId as createRequestId } from '../utils';
+import type { WebSocketServerMessage } from '../ws-types';
 
 import { handleServerMessage } from './dispatch';
 import {
@@ -18,6 +24,140 @@ import {
 import type { PendingRequest, SocketAppAdapters, SocketState } from './types';
 
 const WS_RECONNECT_DELAY_MS = 1500;
+
+type DemoStoryEntry = {
+  pluginAlias: string;
+  pluginName: string;
+  iconUrl?: string;
+  story: {
+    id: string;
+    title: string;
+    description?: string;
+    commandOutput?: {
+      text?: string;
+      web?: WebNodeRoot;
+      clientView?: ClientViewRoot;
+    };
+    sandbox?: Record<string, unknown>;
+  };
+};
+
+type ClientMessageRecord = Record<string, unknown> & {
+  requestId?: string;
+  type?: string;
+};
+
+const demoComposerAiState: ComposerAiState = {
+  backend: 'demo',
+  executionProfileLabel: 'Mode',
+  executionProfileName: 'Demo',
+  executionProfileColor: '#facc15',
+  effectiveModel: 'demo-fixture-model',
+  provider: 'AppWeaver Demo',
+  modelOverride: null,
+  opencodeModelFormChoices: [],
+  contextStats: null,
+};
+
+function demoAssetPath(path: string): string {
+  return `${import.meta.env.BASE_URL}${path}`;
+}
+
+async function fetchDemoJson<T>(path: string): Promise<T> {
+  const response = await fetch(path);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load ${path}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+function storyStartRoot(entry: DemoStoryEntry): ClientViewRoot {
+  return {
+    kind: 'client_view',
+    version: 1,
+    view: 'story-runtime',
+    meta: { command: 'story', subcommand: 'start' },
+    payload: {
+      id: entry.story.id,
+      pluginAlias: entry.pluginAlias,
+      pluginName: entry.pluginName,
+      iconUrl: entry.iconUrl,
+      story: entry.story,
+      autoStart: true,
+      walkthrough: false,
+    },
+  };
+}
+
+function firstFixtureOutput(stories: DemoStoryEntry[], key: string): unknown {
+  for (const entry of stories) {
+    const outputs = entry.story.sandbox?.__outputs;
+
+    if (!outputs || typeof outputs !== 'object') {
+      continue;
+    }
+
+    const value = (outputs as Record<string, unknown>)[key];
+
+    if (Array.isArray(value) && value.length > 0) {
+      return value[0];
+    }
+  }
+
+  return null;
+}
+
+function relatedDemoStories(params: {
+  stories: DemoStoryEntry[];
+  command: string;
+}): NonNullable<WebNodeRoot['widgetHelp']>['stories'] {
+  return params.stories
+    .filter((entry) => entry.pluginAlias === params.command)
+    .map((entry) => ({
+      id: entry.story.id,
+      title: entry.story.title,
+      description: entry.story.description,
+      pluginAlias: entry.pluginAlias,
+      iconUrl: entry.iconUrl,
+    }));
+}
+
+function demoWidgetOutput(params: {
+  stories: DemoStoryEntry[];
+  command: string;
+  subcommand: string;
+}): CommandOutput | null {
+  const output = firstFixtureOutput(
+    params.stories,
+    `${params.command}:${params.subcommand}`,
+  );
+
+  if (!output || typeof output !== 'object') {
+    return output === null ? null : (output as CommandOutput);
+  }
+
+  const root = output as Partial<WebNodeRoot>;
+
+  if (root.kind !== 'ui' || root.version !== 1) {
+    return output as CommandOutput;
+  }
+
+  return {
+    ...(output as WebNodeRoot),
+    widgetHelp: root.widgetHelp
+      ? {
+          ...root.widgetHelp,
+          stories: relatedDemoStories({
+            stories: params.stories,
+            command: params.command,
+          }),
+          defaultOpen: true,
+        }
+      : undefined,
+  };
+}
 
 export function useSocket(adapters: SocketAppAdapters) {
   const [wsConnected, setWsConnected] = createSignal(false);
@@ -114,7 +254,183 @@ export function useSocket(adapters: SocketAppAdapters) {
       return;
     }
 
+    if (isWebDemoMode()) {
+      void handleDemoSocketMessage(message).catch((err) => {
+        adapters.appendSystemMessage(
+          err instanceof Error ? err.message : String(err),
+        );
+      });
+
+      return;
+    }
+
     sendSocketMessage(getState(), message);
+  }
+
+  function emitDemoMessage(message: WebSocketServerMessage): void {
+    handleServerMessage({
+      message,
+      pendingRequests,
+      adapters: {
+        appendSystemMessage: adapters.appendSystemMessage,
+        chat: adapters.chat,
+        setAgentWorking: adapters.setAgentWorking,
+      },
+    });
+  }
+
+  function emitDemoDone(requestId: string): void {
+    emitDemoMessage({ type: 'done', requestId });
+  }
+
+  async function handleDemoSocketMessage(message: unknown): Promise<void> {
+    if (!message || typeof message !== 'object') {
+      return;
+    }
+
+    const record = message as ClientMessageRecord;
+    const requestId = record.requestId;
+
+    if (!requestId) {
+      return;
+    }
+
+    if (record.type === 'request_commands') {
+      const commands = await fetchDemoJson<CommandDetail[]>(
+        demoAssetPath('demo/commands.json'),
+      );
+
+      emitDemoMessage({ type: 'commands_result', requestId, commands });
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    if (record.type === 'load_timeline') {
+      emitDemoMessage({
+        type: 'timeline_events_result',
+        requestId,
+        timelineId:
+          typeof record.timelineId === 'string'
+            ? record.timelineId
+            : adapters.timelineId(),
+        items: [],
+        hasMore: false,
+      });
+
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    if (record.type === 'request_composer_ai_state') {
+      emitDemoMessage({
+        type: 'composer_ai_state_result',
+        requestId,
+        state: demoComposerAiState,
+      });
+
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    if (
+      record.type === 'delete_timeline_event' ||
+      record.type === 'save_timeline_form'
+    ) {
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    if (record.type !== 'run_command') {
+      emitDemoMessage({
+        type: 'error',
+        requestId,
+        message: 'Demo mode does not support this socket action.',
+      });
+
+      return;
+    }
+
+    const command = typeof record.command === 'string' ? record.command : '';
+
+    const subcommand =
+      typeof record.subcommand === 'string' ? record.subcommand : '';
+
+    const stories = await fetchDemoJson<DemoStoryEntry[]>(
+      demoAssetPath('demo/stories.json'),
+    );
+
+    if (command === 'story' && subcommand === 'list') {
+      emitDemoMessage({
+        type: 'command_result',
+        requestId,
+        output: renderStoryListRoot(
+          stories.map((entry) => ({
+            id: entry.story.id,
+            pluginAlias: entry.pluginAlias,
+            iconUrl: entry.iconUrl ?? null,
+            title: entry.story.title,
+            description: entry.story.description ?? null,
+          })),
+        ),
+      });
+
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    if (command === 'story' && subcommand === 'start') {
+      const payload = record.payload as
+        | { arguments?: Record<string, unknown> }
+        | undefined;
+
+      const storyId = payload?.arguments?.id;
+      const story = stories.find((entry) => entry.story.id === storyId);
+
+      if (!story) {
+        emitDemoMessage({
+          type: 'error',
+          requestId,
+          message: `Unknown story: ${String(storyId ?? '')}`,
+        });
+
+        return;
+      }
+
+      emitDemoMessage({
+        type: 'command_result',
+        requestId,
+        output: storyStartRoot(story),
+      });
+
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    const output = demoWidgetOutput({ stories, command, subcommand });
+
+    if (output) {
+      emitDemoMessage({
+        type: 'command_result',
+        requestId,
+        output,
+      });
+
+      emitDemoDone(requestId);
+
+      return;
+    }
+
+    emitDemoMessage({
+      type: 'error',
+      requestId,
+      message: `Demo fixture not available for /${command} ${subcommand}.`,
+    });
   }
 
   function loadBootstrapData(): void {
@@ -191,6 +507,14 @@ export function useSocket(adapters: SocketAppAdapters) {
   }
 
   function connectSocket(): void {
+    if (isWebDemoMode()) {
+      clearReconnectTimer();
+      setWsConnected(true);
+      loadBootstrapData();
+
+      return;
+    }
+
     connectSocketTransport({
       state: getState(),
       setSocket,

@@ -25,6 +25,10 @@ function shouldShowSetup(): boolean {
   return process.argv.slice(2).includes('--setup');
 }
 
+function isDemoMode(): boolean {
+  return process.argv.slice(2).includes('--demo');
+}
+
 function isWebUiEnabled(): boolean {
   return (process.env.START_WEB_UI ?? '1') !== '0';
 }
@@ -35,6 +39,7 @@ function botEnv(): NodeJS.ProcessEnv {
     BOT_SETUP_BILLBOARD: shouldShowSetup()
       ? '1'
       : process.env.BOT_SETUP_BILLBOARD,
+    APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
     BOT_WEB_STATIC: isWebUiEnabled() ? '1' : '0',
   };
 }
@@ -59,7 +64,10 @@ function ensureWebDistBuilt(): void {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    env: process.env,
+    env: {
+      ...process.env,
+      APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
+    },
   });
 
   if (result.exitCode !== 0 || !isWebDistUsable(DM_BOT_DIR)) {

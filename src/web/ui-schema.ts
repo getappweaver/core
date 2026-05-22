@@ -347,6 +347,7 @@ export const WebWidgetHelpSchema = z.object({
   title: z.string().min(1),
   body: z.array(z.string().min(1)),
   stories: z.array(WebWidgetHelpStorySchema).optional(),
+  defaultOpen: z.boolean().optional(),
 });
 
 /**

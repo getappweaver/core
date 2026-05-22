@@ -12,6 +12,7 @@ import type { Accessor, JSX } from 'solid-js';
 import { Show, createContext, createSignal, useContext } from 'solid-js';
 
 import { SignEventModal } from '../components/SignEventModal';
+import { isWebDemoMode } from '../demo/runtime';
 import { bunkerSignEvent } from '../nostr/bunker';
 import {
   type BunkerConnection,
@@ -54,6 +55,9 @@ declare global {
 }
 
 const NIP49_UNLOCK_MS = 86_400_000;
+
+const DEMO_PUBKEY =
+  'demoappweaverpubkey0000000000000000000000000000000000000000';
 
 function zeroizeSecretKey(key: Uint8Array): void {
   key.fill(0);
@@ -163,6 +167,10 @@ const NostrAuthContext = createContext<NostrAuthContextValue>();
 // ---------------------------------------------------------------------------
 
 function readInitialAuthState(): AuthState {
+  if (isWebDemoMode()) {
+    return { status: 'connected', method: 'nip07', pubkey: DEMO_PUBKEY };
+  }
+
   try {
     if (typeof localStorage === 'undefined') {
       return { status: 'disconnected' };
@@ -303,6 +311,10 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     url: string,
     httpMethod: string,
   ): Promise<string | null> {
+    if (isWebDemoMode()) {
+      return 'demo-token';
+    }
+
     const state = authState();
 
     if (state.status === 'disconnected' || state.status === 'locked') {
@@ -526,6 +538,10 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     event: EventTemplate,
     options?: SignEventOptions,
   ): Promise<SignedNostrEvent | null> {
+    if (isWebDemoMode()) {
+      return null;
+    }
+
     const state = authState();
 
     if (state.status === 'disconnected' || state.status === 'locked') {
@@ -629,6 +645,16 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   }
 
   function disconnect(): void {
+    if (isWebDemoMode()) {
+      setAuthState({
+        status: 'connected',
+        method: 'nip07',
+        pubkey: DEMO_PUBKEY,
+      });
+
+      return;
+    }
+
     clearNip49ExpiryTimer();
     zeroizeCurrentNip49IfAny();
     clearAllNostrSignerStorage();
