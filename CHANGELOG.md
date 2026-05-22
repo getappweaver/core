@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.23.1] - 2026-05-23
+
+- fix: suppress demo programmatic focus (33a3cc7)
+
 ## [v9.23.0] - 2026-05-22
 
-- feat: add fixture-backed landing demo (363f002)
+- feat: add fixture-backed landing demo (7c57bb0)
 
 ## [v9.22.1] - 2026-05-21
 

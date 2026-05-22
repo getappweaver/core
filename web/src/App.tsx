@@ -28,7 +28,7 @@ import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
 import { useConnect } from './connect/useConnect';
 import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
-import { isWebDemoMode } from './demo/runtime';
+import { installWebDemoFocusGuard, isWebDemoMode } from './demo/runtime';
 import {
   clampDockWidth,
   DESKTOP_LAYOUT_STORAGE_KEY,
@@ -153,6 +153,8 @@ type HeaderWidget = {
 const LAYOUT_SETTINGS_TIMELINE_ID = 'layout-settings';
 
 function AppInner(): JSX.Element {
+  installWebDemoFocusGuard();
+
   const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
   const PIPER_TTS_AUTO_ATTEMPTED_KEY = 'appweaver.tts.piper-auto-attempted';
 
