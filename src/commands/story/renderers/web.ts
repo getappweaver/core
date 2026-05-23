@@ -3,7 +3,10 @@ import type { StoryStep } from '@src/system/story-definition';
 import type { ClientViewRoot, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 import { row, stack, textBlock, textNode } from '@src/web/widgets';
 
-import { renderStoryListRoot } from './story-list-component';
+import {
+  type StoryListEntry,
+  renderStoryListRoot,
+} from './story-list-component';
 
 function badge(label: string): WebNode {
   return {
@@ -48,6 +51,16 @@ export function renderStoryListWeb(stories: RegisteredStory[]): WebNodeRoot {
       description: entry.story.description ?? null,
     })),
   );
+}
+
+function storyListEntry(entry: RegisteredStory): StoryListEntry {
+  return {
+    id: entry.id,
+    pluginAlias: entry.pluginAlias,
+    iconUrl: entry.iconUrl ?? null,
+    title: entry.story.title,
+    description: entry.story.description ?? null,
+  };
 }
 
 function renderStep(step: StoryStep<unknown>, index: number): WebNode {
@@ -169,7 +182,11 @@ function renderStep(step: StoryStep<unknown>, index: number): WebNode {
 
 export function renderStoryStartWeb(
   entry: RegisteredStory,
-  options?: { walkthrough?: boolean; initialStepIndex?: number },
+  options?: {
+    walkthrough?: boolean;
+    initialStepIndex?: number;
+    relatedStories?: RegisteredStory[];
+  },
 ): ClientViewRoot {
   return {
     kind: 'client_view',
@@ -181,6 +198,7 @@ export function renderStoryStartWeb(
       autoStart: true,
       walkthrough: options?.walkthrough,
       initialStepIndex: options?.initialStepIndex,
+      relatedStories: (options?.relatedStories ?? []).map(storyListEntry),
     },
   };
 }

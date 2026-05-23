@@ -73,20 +73,47 @@ async function fetchDemoJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-function storyStartRoot(entry: DemoStoryEntry): ClientViewRoot {
+function storyListEntry(entry: DemoStoryEntry) {
+  return {
+    id: entry.story.id,
+    pluginAlias: entry.pluginAlias,
+    iconUrl: entry.iconUrl ?? null,
+    title: entry.story.title,
+    description: entry.story.description ?? null,
+  };
+}
+
+function relatedStoryEntries(params: {
+  stories: DemoStoryEntry[];
+  entry: DemoStoryEntry;
+}) {
+  return params.stories
+    .filter(
+      (story) =>
+        story.pluginAlias === params.entry.pluginAlias &&
+        story.story.id !== params.entry.story.id,
+    )
+    .map(storyListEntry);
+}
+
+function storyStartRoot(params: {
+  stories: DemoStoryEntry[];
+  entry: DemoStoryEntry;
+}): ClientViewRoot {
   return {
     kind: 'client_view',
     version: 1,
     view: 'story-runtime',
     meta: { command: 'story', subcommand: 'start' },
     payload: {
-      id: entry.story.id,
-      pluginAlias: entry.pluginAlias,
-      pluginName: entry.pluginName,
-      iconUrl: entry.iconUrl,
-      story: entry.story,
+      id: params.entry.story.id,
+      pluginAlias: params.entry.pluginAlias,
+      pluginName: params.entry.pluginName,
+      iconUrl: params.entry.iconUrl,
+      story: params.entry.story,
       autoStart: true,
       walkthrough: false,
+      relatedStories: relatedStoryEntries(params),
     },
   };
 }
@@ -404,7 +431,7 @@ export function useSocket(adapters: SocketAppAdapters) {
       emitDemoMessage({
         type: 'command_result',
         requestId,
-        output: storyStartRoot(story),
+        output: storyStartRoot({ stories, entry: story }),
       });
 
       emitDemoDone(requestId);

@@ -28,7 +28,7 @@ import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
 import { useConnect } from './connect/useConnect';
 import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
-import { installWebDemoFocusGuard, isWebDemoMode } from './demo/runtime';
+import { isWebDemoMode } from './demo/runtime';
 import {
   clampDockWidth,
   DESKTOP_LAYOUT_STORAGE_KEY,
@@ -150,11 +150,54 @@ type HeaderWidget = {
   order?: number;
 };
 
+type DemoWidgetQuery = {
+  commandToken: string;
+  subcommandToken: string | null;
+};
+
 const LAYOUT_SETTINGS_TIMELINE_ID = 'layout-settings';
 
-function AppInner(): JSX.Element {
-  installWebDemoFocusGuard();
+function cleanQueryToken(value: string | null): string | null {
+  const trimmed = value?.trim();
 
+  return trimmed ? trimmed : null;
+}
+
+function parseDemoWidgetQuery(search: string): DemoWidgetQuery | null {
+  const params = new URLSearchParams(search);
+
+  const commandToken = cleanQueryToken(
+    params.get('command') ?? params.get('cmd') ?? params.get('plugin'),
+  );
+
+  const subcommandToken = cleanQueryToken(
+    params.get('subcommand') ??
+      params.get('sub') ??
+      (commandToken ? params.get('widget') : null),
+  );
+
+  if (commandToken) {
+    return { commandToken, subcommandToken };
+  }
+
+  const widgetToken = cleanQueryToken(
+    params.get('widget') ?? params.get('openWidget'),
+  );
+
+  if (!widgetToken) {
+    return null;
+  }
+
+  const [widgetCommand, ...widgetRest] = widgetToken.split(/[/:\s]+/);
+  const widgetSubcommand = widgetRest.join(' ');
+
+  return {
+    commandToken: widgetCommand!,
+    subcommandToken: cleanQueryToken(widgetSubcommand),
+  };
+}
+
+function AppInner(): JSX.Element {
   const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
   const PIPER_TTS_AUTO_ATTEMPTED_KEY = 'appweaver.tts.piper-auto-attempted';
 
@@ -172,6 +215,10 @@ function AppInner(): JSX.Element {
   })();
 
   const auth = useNostrAuth();
+
+  const demoWidgetQuery = isWebDemoMode()
+    ? parseDemoWidgetQuery(window.location.search)
+    : null;
 
   const [composerAiState, setComposerAiState] =
     createSignal<ComposerAiState | null>(null);
@@ -233,6 +280,8 @@ function AppInner(): JSX.Element {
     string | null
   >(null);
 
+  const PASSIVE_CURSOR_ACTION_DELAY_MS = 620;
+
   let passiveActionQueue = Promise.resolve();
   let passiveHoveredElement: HTMLElement | null = null;
 
@@ -246,6 +295,11 @@ function AppInner(): JSX.Element {
     createSignal<LayoutPrefs>(readLayoutPrefs());
 
   const [desktopLayoutEnabled, setDesktopLayoutEnabled] = createSignal(false);
+  const [desktopLayoutReady, setDesktopLayoutReady] = createSignal(false);
+
+  const [demoQueryWidgetOpenedKey, setDemoQueryWidgetOpenedKey] = createSignal<
+    string | null
+  >(null);
 
   const [expandedDockWidgetKeys, setExpandedDockWidgetKeys] = createSignal<
     string[]
@@ -401,6 +455,63 @@ function AppInner(): JSX.Element {
     return out.sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
   });
 
+  function tokenMatches(value: string | undefined, token: string): boolean {
+    return value?.toLowerCase() === token.toLowerCase();
+  }
+
+  function resolveDemoQueryWidget(query: DemoWidgetQuery): HeaderWidget | null {
+    const command = commands().find(
+      (entry) =>
+        tokenMatches(entry.name, query.commandToken) ||
+        tokenMatches(entry.pluginAlias, query.commandToken) ||
+        entry.aliases.some((alias) => tokenMatches(alias, query.commandToken)),
+    );
+
+    if (!command) {
+      return null;
+    }
+
+    const subcommand = command.subcommands.find((entry) => {
+      if (!entry.webWidget || entry.webWidget.placement !== 'header') {
+        return false;
+      }
+
+      if (!query.subcommandToken) {
+        return true;
+      }
+
+      return (
+        tokenMatches(entry.name, query.subcommandToken) ||
+        entry.aliases.some((alias) =>
+          tokenMatches(alias, query.subcommandToken ?? ''),
+        )
+      );
+    });
+
+    const widget = subcommand?.webWidget;
+
+    if (
+      !subcommand ||
+      !widget ||
+      widget.placement !== 'header' ||
+      !widget.label
+    ) {
+      return null;
+    }
+
+    return {
+      command: command.name,
+      subcommand: subcommand.name,
+      source: command.source ?? 'builtin',
+      pluginAlias: command.pluginAlias,
+      surface: widget.surface,
+      label: widget.label,
+      modalTitle: widget.modalTitle,
+      icon: widget.icon,
+      order: widget.order,
+    };
+  }
+
   const dockedWidgetCards = createMemo<DockedWidgetCard[]>(() => {
     const itemsById = new Map(
       timeline()
@@ -522,12 +633,30 @@ function AppInner(): JSX.Element {
       return;
     }
 
-    setPassiveCursor((prev) => ({
-      ...prev,
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-      visible: true,
-    }));
+    const nextX = rect.left + rect.width / 2;
+    const nextY = rect.top + rect.height / 2;
+
+    setPassiveCursor((prev) => {
+      if (prev.visible) {
+        return { ...prev, x: nextX, y: nextY, visible: true };
+      }
+
+      return {
+        ...prev,
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        visible: true,
+      };
+    });
+
+    requestAnimationFrame(() => {
+      setPassiveCursor((prev) => ({
+        ...prev,
+        x: nextX,
+        y: nextY,
+        visible: true,
+      }));
+    });
   }
 
   function storyTargetDebugLabel(
@@ -679,7 +808,9 @@ function AppInner(): JSX.Element {
     }
 
     if (playback.catchingUp !== true) {
-      await new Promise((resolve) => window.setTimeout(resolve, 420));
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, PASSIVE_CURSOR_ACTION_DELAY_MS),
+      );
     }
 
     if (action.type === 'open_widget') {
@@ -1405,6 +1536,29 @@ function AppInner(): JSX.Element {
     });
   }
 
+  async function openHeaderWidget(widget: HeaderWidget): Promise<void> {
+    if (
+      widget.surface === 'timeline_singleton' ||
+      (dockVisible() && isDockRoutedWidget(widget))
+    ) {
+      await openTaskbarWidgetForStory(widget);
+
+      return;
+    }
+
+    openChromeWidget({
+      command: widget.command,
+      subcommand: widget.subcommand,
+      title: widget.modalTitle,
+    });
+
+    emitStoryWidgetOpened({
+      type: 'widget_opened',
+      command: widget.command,
+      subcommand: widget.subcommand,
+    });
+  }
+
   async function refreshComposerAiState(): Promise<void> {
     if (auth.authState().status !== 'connected' || !wsConnected()) {
       setComposerAiState(null);
@@ -1612,6 +1766,32 @@ function AppInner(): JSX.Element {
     }
   });
 
+  createEffect(() => {
+    if (
+      !demoWidgetQuery ||
+      !wsConnected() ||
+      loadingCommands() ||
+      !desktopLayoutReady()
+    ) {
+      return;
+    }
+
+    const widget = resolveDemoQueryWidget(demoWidgetQuery);
+
+    if (!widget) {
+      return;
+    }
+
+    const key = taskbarDockKey(widget.command, widget.subcommand);
+
+    if (demoQueryWidgetOpenedKey() === key) {
+      return;
+    }
+
+    setDemoQueryWidgetOpenedKey(key);
+    void openHeaderWidget(widget);
+  });
+
   onMount(() => {
     const desktopLayoutQuery = window.matchMedia('(min-width: 900px)');
 
@@ -1620,6 +1800,7 @@ function AppInner(): JSX.Element {
     };
 
     updateDesktopLayoutEnabled();
+    setDesktopLayoutReady(true);
     desktopLayoutQuery.addEventListener('change', updateDesktopLayoutEnabled);
 
     timelineEl?.addEventListener('scroll', updateTimelineBottomFade, {
@@ -1931,17 +2112,7 @@ function AppInner(): JSX.Element {
                 return;
               }
 
-              openChromeWidget({
-                command: w.command,
-                subcommand: w.subcommand,
-                title: w.modalTitle,
-              });
-
-              emitStoryWidgetOpened({
-                type: 'widget_opened',
-                command: w.command,
-                subcommand: w.subcommand,
-              });
+              void openHeaderWidget(w);
             }}
             onConnect={handleConnectMenuClick}
             onLogout={() => auth.logout()}

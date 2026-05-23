@@ -256,8 +256,10 @@ a {
 }
 
 .page-sections {
+  width: 100vw;
   min-height: 0;
   flex: 1;
+  margin-inline: calc(50% - 50vw);
   overflow: hidden;
 }
 
@@ -460,7 +462,10 @@ a {
 }
 
 .one-page-section {
+  max-width: 80rem;
   min-height: 100%;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
   scroll-margin-top: 1rem;
   padding-block: 2rem 5rem;
 }
@@ -479,7 +484,7 @@ a {
 .one-page-demo-frame {
   display: block;
   width: 100%;
-  height: min(720px, calc(100dvh - 9rem));
+  height: calc(100dvh - 5rem);
   min-height: 480px;
   border: 0;
   background: #111;
@@ -487,6 +492,179 @@ a {
 
 .one-page-section--install {
   min-height: auto;
+}
+
+.one-page-section--apps {
+  display: grid;
+  gap: 3rem;
+  min-height: auto;
+  padding-block: 3rem 2rem;
+}
+
+.official-apps {
+  display: grid;
+  gap: 2rem;
+}
+
+.official-app-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.official-app-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 9%);
+  background: rgb(255 255 255 / 3%);
+}
+
+.official-app-label {
+  color: rgb(250 204 21);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.official-app-name {
+  margin: 0;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.official-app-description {
+  margin: 0;
+  color: rgb(180 180 190);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.official-app-link {
+  width: fit-content;
+  color: rgb(165 243 252);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.official-app-link:hover,
+.site-footer-links a:hover {
+  color: white;
+}
+
+.site-footer {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+  color: rgb(161 161 170);
+}
+
+.site-footer-brand {
+  color: rgb(250 204 21);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.site-footer-links a {
+  color: rgb(212 212 216);
+}
+
+.plugin-page-stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 80rem;
+  height: 100%;
+  min-height: 0;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.plugin-page-copy {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 54rem;
+  padding-top: 1.5rem;
+}
+
+.plugin-page-eyebrow {
+  width: fit-content;
+  padding: 0.2rem 0.45rem;
+  background: rgb(250 204 21);
+  color: #0a0d14;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.plugin-page-title {
+  max-width: 50rem;
+  margin: 0;
+  color: white;
+  font-size: clamp(2.1rem, 5vw, 4.75rem);
+  font-weight: 650;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.plugin-page-description {
+  max-width: 48rem;
+  margin: 0;
+  color: rgb(212 212 216);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.plugin-page-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugin-page-list li {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  background: rgb(255 255 255 / 5%);
+  color: rgb(228 228 231);
+  font-size: 0.78rem;
+}
+
+.plugin-page-demo {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(0 0 0 / 22%);
+}
+
+.plugin-page-demo-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: #111;
 }
 
 .stage-viewport {
@@ -1182,6 +1360,7 @@ a {
 
   .one-page-section {
     min-height: auto;
+    padding-inline: 1rem;
     padding-block: 1.5rem 3.5rem;
   }
 
@@ -1194,9 +1373,30 @@ a {
     padding-block: 0 3rem;
   }
 
+  .one-page-section--apps {
+    padding-block: 2rem;
+  }
+
   .one-page-demo-frame {
-    height: min(72dvh, 620px);
     min-height: 360px;
+  }
+
+  .plugin-page-stage {
+    padding-inline: 1rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .plugin-page-stage::-webkit-scrollbar {
+    display: none;
+  }
+
+  .plugin-page-copy {
+    padding-top: 1rem;
+  }
+
+  .plugin-page-demo {
+    min-height: 38rem;
   }
 }
 
@@ -1328,10 +1528,39 @@ a {
   .hero-actions {
     flex-direction: row;
   }
+
+  .one-page-section {
+    padding-inline: 2rem;
+  }
+
+  .plugin-page-stage {
+    padding-inline: 2rem;
+  }
+
+  .official-app-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-footer {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .site-footer-links {
+    justify-content: flex-end;
+  }
 }
 
 @media (width >= 64rem) {
   .stage-shell {
+    padding-inline: 3rem;
+  }
+
+  .one-page-section {
+    padding-inline: 3rem;
+  }
+
+  .plugin-page-stage {
     padding-inline: 3rem;
   }
 
@@ -1364,6 +1593,10 @@ a {
   }
 
   .plugin-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .official-app-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }

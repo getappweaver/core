@@ -107,6 +107,10 @@ AppWeaver apps add focused tools, commands, data models, widgets, and AI skills.
 
 Install and update apps from the web UI. The app installer shows available apps, compatibility, author metadata, install progress, and restart status.
 
+[Interactive Todo app demo](https://getappweaver.com/todo-app)
+
+![Todo app screenshot](https://getappweaver.com/screenshots/todo.png)
+
 ### Official Apps
 
 | App | Description |

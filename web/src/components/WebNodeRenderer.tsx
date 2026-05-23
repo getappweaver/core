@@ -21,6 +21,7 @@ import type {
   WebRenderMeta,
 } from '@src/web/ui-schema';
 
+import { isWebDemoMode } from '../demo/runtime';
 import { registerStoryDomTarget } from '../story/dom-targets';
 import {
   emitStoryTargetClicked,
@@ -82,7 +83,7 @@ function setupWebElementRef({ element, el }: WebElementRefProps): void {
     queueMicrotask(() => el.focus());
   }
 
-  if (element.props?.scrollIntoViewOnMount === true) {
+  if (element.props?.scrollIntoViewOnMount === true && !isWebDemoMode()) {
     requestAnimationFrame(() => {
       el.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });

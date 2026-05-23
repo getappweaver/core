@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js';
 
-import type { ClientViewRoot } from '@src/web/ui-schema';
+import type { ClientViewRoot, WebAction } from '@src/web/ui-schema';
 
 import { StoryRuntimeView } from '../story/StoryRuntimeView';
 import type { StoryRuntimePayload } from '../story/types';
@@ -15,6 +15,7 @@ type ClientViewHostProps = {
     subcommand: string;
     payload: unknown;
   }) => Promise<string>;
+  onRunWebAction: (action: WebAction) => void;
 };
 
 export function ClientViewHost(props: ClientViewHostProps): JSX.Element {
@@ -42,7 +43,10 @@ export function ClientViewHost(props: ClientViewHostProps): JSX.Element {
 
   if (props.view.view === 'story-runtime') {
     return (
-      <StoryRuntimeView payload={props.view.payload as StoryRuntimePayload} />
+      <StoryRuntimeView
+        payload={props.view.payload as StoryRuntimePayload}
+        onRunWebAction={props.onRunWebAction}
+      />
     );
   }
 

@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { isDemoMode } from '@src/demo-mode';
 import type { RegisteredStory } from '@src/stories/registry';
-import { getStory, listStories } from '@src/stories/registry';
+import { listStories } from '@src/stories/registry';
 import type { StoryDefinition } from '@src/system/story-definition';
 
 import { handleError, type BuiltinHandler } from '../dispatch';
@@ -44,18 +44,13 @@ function listAvailableStories(
     : listStories(ctx.prefix);
 }
 
-function getAvailableStory(
-  ctx: Parameters<BuiltinHandler>[0],
-  storyId: string,
-): RegisteredStory | null {
-  if (isDemoMode()) {
-    return (
-      loadDemoStories(ctx.dmBotRoot).find((story) => story.id === storyId) ??
-      null
-    );
-  }
-
-  return getStory(ctx.prefix, storyId);
+function relatedStories(
+  stories: RegisteredStory[],
+  story: RegisteredStory,
+): RegisteredStory[] {
+  return stories.filter(
+    (entry) => entry.pluginAlias === story.pluginAlias && entry.id !== story.id,
+  );
 }
 
 export const handleStoryRoot: BuiltinHandler = (ctx) => {
@@ -86,7 +81,8 @@ export const handleStoryRoot: BuiltinHandler = (ctx) => {
         return `Usage: ${ctx.prefix}story start <story-id>`;
       }
 
-      const story = getAvailableStory(ctx, storyId);
+      const stories = listAvailableStories(ctx);
+      const story = stories.find((entry) => entry.id === storyId) ?? null;
 
       if (!story) {
         return `Unknown story: ${storyId}`;
@@ -94,6 +90,7 @@ export const handleStoryRoot: BuiltinHandler = (ctx) => {
 
       return renderStoryStartWeb(story, {
         walkthrough: isDemoMode() ? false : undefined,
+        relatedStories: relatedStories(stories, story),
       });
     }, 'Failed to start story');
   }

@@ -1,0 +1,60 @@
+[
+  {
+    "pluginAlias": "todo",
+    "pluginName": "appweaver-todo-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-todo-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "todo-add",
+      "todo-add-ai-prompt",
+      "todo-duel-prioritize"
+    ]
+  },
+  {
+    "pluginAlias": "job",
+    "pluginName": "appweaver-job-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-job-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "job-schedule-ai"
+    ]
+  },
+  {
+    "pluginAlias": "bm",
+    "pluginName": "appweaver-bm-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-bm-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "bm-save-ai"
+    ]
+  },
+  {
+    "pluginAlias": "file",
+    "pluginName": "appweaver-file-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-file-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "file-tree-read-markdown",
+      "file-tree-git-diff"
+    ]
+  },
+  {
+    "pluginAlias": "journal",
+    "pluginName": "appweaver-journal-plugin",
+    "sourceType": "command",
+    "sourceName": "stories",
+    "summary": "appweaver-journal-plugin walkthroughs",
+    "examples": [],
+    "storyIds": [
+      "journal-capture-publish"
+    ]
+  }
+]

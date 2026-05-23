@@ -16,7 +16,14 @@ type LandingRouteRequestProps = {
 
 function landingRoutesPlugin(): Plugin {
   const redirects = new Map([['/demo/app', '/demo/app/']]);
-  const appRoutes = new Set(['/one-page']);
+  const appRoutes = new Set([
+    '/one-page',
+    '/todo-app',
+    '/bookmark-manager',
+    '/job-scheduler',
+    '/file-manager',
+    '/captains-log',
+  ]);
 
   function handleRequest({ req, res, next }: LandingRouteRequestProps): void {
     const url = req.url ? req.url.split('?')[0] : null;

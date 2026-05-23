@@ -660,6 +660,7 @@ export function TimelineCommandResultCard(
           fallback={
             <ClientViewHost
               view={props.item.clientView!}
+              onRunWebAction={props.onRunWebAction}
               onRunJsonCommand={props.onRunJsonCommand}
             />
           }

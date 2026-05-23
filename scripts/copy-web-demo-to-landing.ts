@@ -50,6 +50,10 @@ function mirrorStaticDemoAssets(targetRoot: string): void {
 
 mirrorStaticDemoAssets(LANDING_PUBLIC);
 
+if (existsSync(WEB_DIST)) {
+  replaceDir(WEB_DIST, join(LANDING_PUBLIC, 'demo', 'app'));
+}
+
 if (existsSync(LANDING_DIST)) {
   mirrorStaticDemoAssets(LANDING_DIST);
   replaceDir(WEB_DIST, join(LANDING_DIST, 'demo', 'app'));

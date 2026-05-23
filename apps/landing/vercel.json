@@ -47,6 +47,26 @@
     {
       "source": "/one-page",
       "destination": "/index.html"
+    },
+    {
+      "source": "/todo-app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/bookmark-manager",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/job-scheduler",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/file-manager",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/captains-log",
+      "destination": "/index.html"
     }
   ],
   "redirects": [

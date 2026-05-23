@@ -8,10 +8,20 @@ export type StoryRuntimePayload = {
   id: string;
   pluginAlias: string;
   pluginName: string;
+  iconUrl?: string | null;
   story: StoryDefinition<unknown>;
   autoStart?: boolean;
   walkthrough?: boolean;
   initialStepIndex?: number;
+  relatedStories?: StoryRuntimeRelatedStory[];
+};
+
+export type StoryRuntimeRelatedStory = {
+  id: string;
+  pluginAlias: string;
+  iconUrl: string | null;
+  title: string;
+  description: string | null;
 };
 
 export type StoryWalkthroughTarget = StoryTarget;

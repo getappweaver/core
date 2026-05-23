@@ -1,6 +1,8 @@
 import { For, createSignal, onCleanup, onMount } from 'solid-js';
 import { render } from 'solid-js/web';
 
+import { PluginRoute, isPluginRoute } from './plugin-pages';
+
 import './styles.css';
 
 const logoUrl = '/appweaver-logo.svg';
@@ -11,10 +13,23 @@ type NavItem = {
   href: string;
 };
 
-type OnePageSectionId = 'intro' | 'features' | 'demo' | 'install';
+type OnePageSectionId = 'intro' | 'features' | 'demo' | 'install' | 'apps';
+
+type OfficialApp = {
+  name: string;
+  label: string;
+  description: string;
+  href: string;
+};
+
+type SocialLink = {
+  label: string;
+  href: string;
+};
 
 type HeaderProps = {
-  onePageActiveSection: OnePageSectionId;
+  onePageActiveSection: OnePageSectionId | null;
+  navHrefPrefix: '' | '/';
   onOnePageNavSelect: (sectionId: OnePageSectionId) => void;
 };
 
@@ -28,6 +43,48 @@ const onePageNavItems: NavItem[] = [
   { sectionId: 'features', label: 'Features', href: '#features' },
   { sectionId: 'demo', label: 'Interactive Demo', href: '#demo' },
   { sectionId: 'install', label: 'Install', href: '#install' },
+  { sectionId: 'apps', label: 'Apps', href: '#apps' },
+];
+
+const officialApps: OfficialApp[] = [
+  {
+    name: 'Todo app',
+    label: '/todo',
+    description: 'Create, organize, and draft task updates with AI help.',
+    href: '/todo-app',
+  },
+  {
+    name: 'Bookmark manager',
+    label: '/bm',
+    description: 'Save, search, categorize, and publish bookmark collections.',
+    href: '/bookmark-manager',
+  },
+  {
+    name: "Captain's Log",
+    label: '/journal',
+    description: 'Capture private notes, search entries, and publish deliberately.',
+    href: '/captains-log',
+  },
+  {
+    name: 'Job scheduler',
+    label: '/jobs',
+    description: 'Schedule recurring or one-off jobs for AppWeaver to run later.',
+    href: '/job-scheduler',
+  },
+  {
+    name: 'File manager',
+    label: '/file',
+    description: 'Browse workspace trees and inspect project files from AppWeaver.',
+    href: '/file-manager',
+  },
+];
+
+const socialLinks: SocialLink[] = [
+  { label: 'GitHub', href: 'https://github.com/getappweaver' },
+  { label: 'Nostr Git', href: 'https://gitworkshop.dev/getappweaver.com' },
+  { label: 'Nostr', href: 'https://nosta.me/getappweaver.com' },
+  { label: 'X', href: 'https://x.com/getappweaver' },
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/getappweaver' },
 ];
 
 const features = [
@@ -112,7 +169,9 @@ function Header(props: HeaderProps) {
         <For each={onePageNavItems}>
           {(item) => (
             <a
-              href={item.href}
+              href={
+                props.navHrefPrefix === '/' ? `/${item.href}` : item.href
+              }
               class="stage-nav-simple-item"
               classList={{ 'is-active': props.onePageActiveSection === item.sectionId }}
               aria-current={
@@ -252,6 +311,55 @@ function InstallContent() {
   );
 }
 
+function OfficialAppsSection() {
+  return (
+    <div class="official-apps">
+      <div class="section-heading-row">
+        <div>
+          <div class="section-eyebrow">Official Apps</div>
+          <h2 class="section-title">Start with focused tools you can run locally.</h2>
+        </div>
+        <p class="section-summary">
+          Each app adds commands, widgets, AI skills, and local data models to your
+          AppWeaver workspace.
+        </p>
+      </div>
+
+      <div class="official-app-grid">
+        <For each={officialApps}>
+          {(app) => (
+            <article class="official-app-card">
+              <div class="official-app-label">{app.label}</div>
+              <h3 class="official-app-name">{app.name}</h3>
+              <p class="official-app-description">{app.description}</p>
+              <a class="official-app-link" href={app.href}>
+                Interactive Demo
+              </a>
+            </article>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer class="site-footer">
+      <div class="site-footer-brand">AppWeaver</div>
+      <nav class="site-footer-links" aria-label="AppWeaver social links">
+        <For each={socialLinks}>
+          {(link) => (
+            <a href={link.href} rel="noreferrer" target="_blank">
+              {link.label}
+            </a>
+          )}
+        </For>
+      </nav>
+    </footer>
+  );
+}
+
 function OnePage(props: {
   onActiveSectionChange: (sectionId: OnePageSectionId) => void;
 }) {
@@ -264,7 +372,13 @@ function OnePage(props: {
       return;
     }
 
-    const sectionIds: OnePageSectionId[] = ['intro', 'features', 'demo', 'install'];
+    const sectionIds: OnePageSectionId[] = [
+      'intro',
+      'features',
+      'demo',
+      'install',
+      'apps',
+    ];
     let frameId: number | null = null;
 
     const updateActiveSection = () => {
@@ -322,16 +436,25 @@ function OnePage(props: {
         />
       </section>
       <section id="demo" class="one-page-section one-page-section--demo">
-        <iframe title="AppWeaver interactive demo" src="/demo/app/" class="one-page-demo-frame" />
+        <iframe
+          title="AppWeaver interactive demo"
+          src="/demo/app/index.html"
+          class="one-page-demo-frame"
+        />
       </section>
       <section id="install" class="one-page-section one-page-section--install">
         <InstallContent />
+      </section>
+      <section id="apps" class="one-page-section one-page-section--apps">
+        <OfficialAppsSection />
+        <SiteFooter />
       </section>
     </div>
   );
 }
 
 function App() {
+  const pluginRoute = isPluginRoute(window.location.pathname);
   const [onePageActiveSection, setOnePageActiveSection] =
     createSignal<OnePageSectionId>('intro');
 
@@ -340,12 +463,17 @@ function App() {
       <div class="stage-background" />
       <div class="stage-shell">
         <Header
-          onePageActiveSection={onePageActiveSection()}
+          onePageActiveSection={pluginRoute ? 'demo' : onePageActiveSection()}
+          navHrefPrefix={pluginRoute ? '/' : ''}
           onOnePageNavSelect={setOnePageActiveSection}
         />
 
         <main class="page-sections">
-          <OnePage onActiveSectionChange={setOnePageActiveSection} />
+          {pluginRoute ? (
+            <PluginRoute pathname={window.location.pathname} />
+          ) : (
+            <OnePage onActiveSectionChange={setOnePageActiveSection} />
+          )}
         </main>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 
 import type { StoryStep } from '@src/system/story-definition';
+import type { WebAction } from '@src/web/ui-schema';
 
 import {
   emitStoryClearPromptsRequested,
@@ -27,6 +28,7 @@ import {
 
 type StoryRuntimeViewProps = {
   payload: StoryRuntimePayload;
+  onRunWebAction: (action: WebAction) => void;
 };
 
 const DEFAULT_PASSIVE_STEP_DELAY_MS = 1800;
@@ -71,6 +73,21 @@ function stepLabel(step: StoryStep<unknown>): string {
   }
 
   return step.type.replace(/_/g, ' ');
+}
+
+function storyCommandAction(params: {
+  subcommand: string;
+  args: Record<string, unknown>;
+}): WebAction {
+  return {
+    type: 'command',
+    command: 'story',
+    subcommand: params.subcommand,
+    arguments: params.args,
+    options: {},
+    recordInTimeline: true,
+    surface: 'timeline',
+  };
 }
 
 export function StoryRuntimeView(props: StoryRuntimeViewProps) {
@@ -118,6 +135,69 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   );
 
   const isPassivePlayback = () => props.payload.walkthrough === false;
+
+  const relatedStories = () => props.payload.relatedStories ?? [];
+
+  const openStory = (storyId: string): void => {
+    props.onRunWebAction(
+      storyCommandAction({ subcommand: 'start', args: { id: storyId } }),
+    );
+  };
+
+  const openAllStories = (): void => {
+    props.onRunWebAction(storyCommandAction({ subcommand: 'list', args: {} }));
+  };
+
+  const completionActions = () => {
+    if (!complete()) {
+      return null;
+    }
+
+    return (
+      <div class="story-runtime-complete-actions">
+        {relatedStories().length > 0 ? (
+          <section class="story-runtime-related" aria-label="Related stories">
+            <div class="story-runtime-related__eyebrow">Related stories</div>
+            <div class="story-runtime-related__list">
+              {relatedStories().map((story) => (
+                <button
+                  type="button"
+                  class="story-runtime-related-card"
+                  onClick={() => openStory(story.id)}
+                >
+                  <span class="story-runtime-related-card__icon">
+                    {story.iconUrl ? (
+                      <img src={story.iconUrl} alt="" />
+                    ) : (
+                      story.pluginAlias.slice(0, 2).toUpperCase()
+                    )}
+                  </span>
+                  <span class="story-runtime-related-card__main">
+                    <span class="story-runtime-related-card__title-row">
+                      <span class="story-runtime-related-card__title">
+                        {story.title}
+                      </span>
+                      <span class="story-runtime-related-card__badge">
+                        {story.pluginAlias}
+                      </span>
+                    </span>
+                    <span class="story-runtime-related-card__description">
+                      {story.description ?? story.id}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        <div class="story-runtime-card__actions story-runtime-card__actions--all-stories">
+          <button type="button" class="web-button" onClick={openAllStories}>
+            All Stories
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   function stepPassiveDelayMs(step: StoryStep<unknown>): number {
     const delayMs =
@@ -730,6 +810,7 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
         <div class="story-runtime-card__body">
           {passiveDisplayDescription()}
         </div>
+        {completionActions()}
         {passiveDiagnostics().length > 0 ? (
           <div class="story-runtime-card__debug" aria-live="polite">
             <div class="story-runtime-card__debug-title">
@@ -765,6 +846,7 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
           ? 'Complete'
           : `Step ${Math.min(stepIndex() + 1, steps().length)} of ${steps().length}: ${stepLabel(steps()[Math.min(stepIndex(), steps().length - 1)]!)}`}
       </div>
+      {completionActions()}
       <div class="story-runtime-card__actions">
         <button type="button" class="web-button" onClick={quit}>
           Quit story
