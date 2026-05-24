@@ -1,36 +1,30 @@
 import { For, createSignal, onCleanup, onMount } from 'solid-js';
 import { render } from 'solid-js/web';
 
-import { PluginRoute, isPluginRoute } from './plugin-pages';
+import {
+  PluginRoute,
+  isPluginRoute,
+  pluginNavItemsForPath,
+} from './plugin-pages';
+import { officialApps, socialLinks } from './landing-data';
+import { OfficialAppGrid } from './official-app-grid';
 
 import './styles.css';
 
 const logoUrl = '/appweaver-logo.svg';
 
 type NavItem = {
-  sectionId: OnePageSectionId;
+  sectionId: string | null;
   label: string;
   href: string;
 };
 
 type OnePageSectionId = 'intro' | 'features' | 'demo' | 'install' | 'apps';
 
-type OfficialApp = {
-  name: string;
-  label: string;
-  description: string;
-  href: string;
-};
-
-type SocialLink = {
-  label: string;
-  href: string;
-};
-
 type HeaderProps = {
-  onePageActiveSection: OnePageSectionId | null;
-  navHrefPrefix: '' | '/';
-  onOnePageNavSelect: (sectionId: OnePageSectionId) => void;
+  activeSection: string | null;
+  navItems: NavItem[];
+  onNavSelect: (sectionId: string) => void;
 };
 
 type HomePageProps = {
@@ -44,47 +38,6 @@ const onePageNavItems: NavItem[] = [
   { sectionId: 'demo', label: 'Interactive Demo', href: '#demo' },
   { sectionId: 'install', label: 'Install', href: '#install' },
   { sectionId: 'apps', label: 'Apps', href: '#apps' },
-];
-
-const officialApps: OfficialApp[] = [
-  {
-    name: 'Todo app',
-    label: '/todo',
-    description: 'Create, organize, and draft task updates with AI help.',
-    href: '/todo-app',
-  },
-  {
-    name: 'Bookmark manager',
-    label: '/bm',
-    description: 'Save, search, categorize, and publish bookmark collections.',
-    href: '/bookmark-manager',
-  },
-  {
-    name: "Captain's Log",
-    label: '/journal',
-    description: 'Capture private notes, search entries, and publish deliberately.',
-    href: '/captains-log',
-  },
-  {
-    name: 'Job scheduler',
-    label: '/jobs',
-    description: 'Schedule recurring or one-off jobs for AppWeaver to run later.',
-    href: '/job-scheduler',
-  },
-  {
-    name: 'File manager',
-    label: '/file',
-    description: 'Browse workspace trees and inspect project files from AppWeaver.',
-    href: '/file-manager',
-  },
-];
-
-const socialLinks: SocialLink[] = [
-  { label: 'GitHub', href: 'https://github.com/getappweaver' },
-  { label: 'Nostr Git', href: 'https://gitworkshop.dev/getappweaver.com' },
-  { label: 'Nostr', href: 'https://nosta.me/getappweaver.com' },
-  { label: 'X', href: 'https://x.com/getappweaver' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/getappweaver' },
 ];
 
 const features = [
@@ -166,19 +119,19 @@ function Header(props: HeaderProps) {
         </span>
       </a>
       <nav class="stage-nav-simple" aria-label="Landing pages">
-        <For each={onePageNavItems}>
+        <For each={props.navItems}>
           {(item) => (
             <a
-              href={
-                props.navHrefPrefix === '/' ? `/${item.href}` : item.href
-              }
+              href={item.href}
               class="stage-nav-simple-item"
-              classList={{ 'is-active': props.onePageActiveSection === item.sectionId }}
+              classList={{ 'is-active': props.activeSection === item.sectionId }}
               aria-current={
-                props.onePageActiveSection === item.sectionId ? 'location' : undefined
+                props.activeSection === item.sectionId ? 'location' : undefined
               }
               onClick={() => {
-                props.onOnePageNavSelect(item.sectionId);
+                if (item.sectionId) {
+                  props.onNavSelect(item.sectionId);
+                }
               }}
             >
               {item.label}
@@ -325,20 +278,7 @@ function OfficialAppsSection() {
         </p>
       </div>
 
-      <div class="official-app-grid">
-        <For each={officialApps}>
-          {(app) => (
-            <article class="official-app-card">
-              <div class="official-app-label">{app.label}</div>
-              <h3 class="official-app-name">{app.name}</h3>
-              <p class="official-app-description">{app.description}</p>
-              <a class="official-app-link" href={app.href}>
-                Interactive Demo
-              </a>
-            </article>
-          )}
-        </For>
-      </div>
+      <OfficialAppGrid apps={officialApps} />
     </div>
   );
 }
@@ -457,20 +397,38 @@ function App() {
   const pluginRoute = isPluginRoute(window.location.pathname);
   const [onePageActiveSection, setOnePageActiveSection] =
     createSignal<OnePageSectionId>('intro');
+  const [pluginPageActiveSection, setPluginPageActiveSection] =
+    createSignal<string>('features');
 
   return (
     <div class="stage-page">
       <div class="stage-background" />
       <div class="stage-shell">
         <Header
-          onePageActiveSection={pluginRoute ? 'demo' : onePageActiveSection()}
-          navHrefPrefix={pluginRoute ? '/' : ''}
-          onOnePageNavSelect={setOnePageActiveSection}
+          activeSection={
+            pluginRoute ? pluginPageActiveSection() : onePageActiveSection()
+          }
+          navItems={
+            pluginRoute
+              ? pluginNavItemsForPath(window.location.pathname)
+              : onePageNavItems
+          }
+          onNavSelect={(sectionId) => {
+            if (pluginRoute) {
+              setPluginPageActiveSection(sectionId);
+              return;
+            }
+
+            setOnePageActiveSection(sectionId as OnePageSectionId);
+          }}
         />
 
         <main class="page-sections">
           {pluginRoute ? (
-            <PluginRoute pathname={window.location.pathname} />
+            <PluginRoute
+              pathname={window.location.pathname}
+              onActiveSectionChange={setPluginPageActiveSection}
+            />
           ) : (
             <OnePage onActiveSectionChange={setOnePageActiveSection} />
           )}

@@ -73,6 +73,9 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_APPWEAVER_DEMO': JSON.stringify(demoMode),
+    'import.meta.env.VITE_APPWEAVER_DEMO_EMBEDDED': JSON.stringify(
+      embeddedDemoBuild,
+    ),
   },
   root: import.meta.dirname,
   server: {

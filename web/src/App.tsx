@@ -28,7 +28,7 @@ import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
 import { useConnect } from './connect/useConnect';
 import { NostrAuthProvider, useNostrAuth } from './contexts/NostrAuthContext';
-import { isWebDemoMode } from './demo/runtime';
+import { isEmbeddedWebDemoMode, isWebDemoMode } from './demo/runtime';
 import {
   clampDockWidth,
   DESKTOP_LAYOUT_STORAGE_KEY,
@@ -1742,7 +1742,7 @@ function AppInner(): JSX.Element {
   createEffect(() => {
     const key = expandedDockWidgetKeys().at(-1) ?? null;
 
-    if (!key || !dockVisible()) {
+    if (!key || !dockVisible() || isEmbeddedWebDemoMode()) {
       return;
     }
 

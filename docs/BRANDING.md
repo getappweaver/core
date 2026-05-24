@@ -36,12 +36,12 @@ AppWeaver is an open-source app hub for running AI-powered tools from a project 
 
 Use short, predictable names under the `getappweaver` org:
 
-- `getappweaver/todo-plugin`
-- `getappweaver/bookmarks-plugin`
-- `getappweaver/jobs-plugin`
-- `getappweaver/file-plugin`
-- `getappweaver/browser-plugin`
-- `getappweaver/journal-plugin`
+- `getappweaver/todo-app`
+- `getappweaver/bookmark-manager`
+- `getappweaver/job-scheduler`
+- `getappweaver/file-manager`
+- `getappweaver/browser-actions`
+- `getappweaver/captains-log`
 
 Recommended official plugin repo descriptions:
 
@@ -53,6 +53,42 @@ Recommended official plugin repo descriptions:
 | `bm` | Bookmark manager | Official AppWeaver Bookmark manager. Adds focused AI-powered bookmark tools, commands, and data models to an AppWeaver workspace. |
 | `browser` | Browser actions | Official AppWeaver Browser actions app. Adds focused AI-powered browser automation tools, commands, and data models to an AppWeaver workspace. |
 | `journal` | Captain's Log | Official AppWeaver Captain's Log journal app. Adds private journaling, searchable notes, drafts, and optional publishing to Nostr. |
+
+### Official plugin landing features
+
+Use these bullets on the public plugin landing pages. Keep them short enough to scan beside the interactive demo.
+
+#### Todo app
+
+- Create structured tasks from chat, web UI actions, or AI prompts.
+- Focus on one part of the todo tree when you want to work in detail.
+- Copy part of the tree structurally and paste it into any model you want to work with.
+- AI agents cannot edit your todos directly; they create drafts that you can accept, revise, or decline.
+- Your local todo app, accessible from anywhere you use AppWeaver.
+
+#### Bookmark manager
+
+- Your local bookmarks, accessible from anywhere you use AppWeaver.
+- Ask AI to inspect a link or search for something, then draft a bookmark with a useful description, tags, and category.
+- Publish selected bookmark sets only when you deliberately choose to share.
+
+#### Job scheduler
+
+- Schedule one-off or recurring prompts from the same app hub.
+- Use natural language like “Run X each Monday at 8am” and AppWeaver creates the job in your timezone.
+- Automate checks, reminders, publishing, and maintenance without leaving your workspace.
+
+#### File manager
+
+- Browse workspace trees without leaving the AppWeaver UI.
+- Ask for folder summaries and bottom-up context before editing code.
+- Review git diffs in the UI so you can check what changed before moving on.
+
+#### Captain's Log
+
+- Capture private workspace notes as a local Captain's Log.
+- Stroll through entries like a real notepad instead of treating every note as a search result.
+- Publish selected logs only after reviewing the exact draft.
 
 ## Nostr repository announcement metadata
 
