@@ -243,6 +243,8 @@ function Header(props: HeaderProps) {
         href="/"
         class="stage-brand"
         classList={{ 'stage-brand--intro-active': props.introActive }}
+        aria-hidden={props.introActive ? 'true' : undefined}
+        tabIndex={props.introActive ? -1 : undefined}
       >
         <img src={logoUrl} alt="AppWeaver" class="stage-brand-logo" />
         <span class="stage-brand-text" aria-hidden="true">

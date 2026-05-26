@@ -115,6 +115,7 @@ a {
 }
 
 .stage-header {
+  position: relative;
   display: flex;
   flex-flow: row nowrap;
   align-items: center;
@@ -140,6 +141,7 @@ a {
 }
 
 .stage-brand--intro-active {
+  position: absolute;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-0.35rem) scale(0.96);
@@ -1010,6 +1012,8 @@ a {
 }
 
 .hero-copy {
+  display: grid;
+  justify-items: center;
   position: relative;
   z-index: 1;
   min-width: 0;
@@ -1019,7 +1023,6 @@ a {
 .hero-brand {
   display: grid;
   gap: 0.85rem;
-  margin-bottom: 1.6rem;
   color: rgb(244 244 245);
   justify-items: center;
 }
@@ -1053,8 +1056,9 @@ a {
 }
 
 .hero-title {
+  text-align: center;
   max-width: 56rem;
-  margin-top: 1.5rem;
+  margin-top: 0.5rem;
   color: white;
   font-size: 3rem;
   font-weight: 600;
