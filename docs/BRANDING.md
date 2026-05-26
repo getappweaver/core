@@ -112,6 +112,12 @@ Supporting copy:
 
 > Your data stays local-first, you choose which apps belong in your hub. Use them through web/mobile interfaces and prompts, local terminal input, or your favourite Nostr chat app.
 
+Local-first app hub feature bullets:
+
+- Install AppWeaver to and run for any project or workspace folder you control.
+- Use apps that can work with your local filesystem and databases, create files, inspect project state, and show visual git diffs.
+- You can setup a local AI model, Text to Speach (TTS) engine, and push notifications. Be private as you want to be.
+
 ## Possible tags and topics
 
 Use these for GitHub topics, Nostr repository announcement tags, Nostr profile hashtags, launch posts, bookmark metadata, and app-directory listings. Pick the smallest relevant set for the surface; do not use every tag everywhere.

@@ -105,14 +105,8 @@ function officialAppForSlug(slug: string) {
   );
 }
 
-function displayNameForPath(pathname: string): string {
-  const slug = routeSlugForPath(pathname);
-
-  return officialAppForSlug(slug)?.displayName ?? titleCaseSlug(slug);
-}
-
-export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
-  const displayName = displayNameForPath(pathname);
+export function pluginNavItemsForPath(_pathname: string): PluginNavItem[] {
+  void _pathname;
 
   return [
     { sectionId: null, label: 'Back', href: '/' },

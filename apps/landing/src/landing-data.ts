@@ -53,7 +53,7 @@ export const officialApps: OfficialApp[] = [
   },
   {
     name: 'Job scheduler',
-    label: '/jobs',
+    label: '/job',
     description: 'Schedule recurring or one-off jobs for AppWeaver to run later.',
     href: '/job-scheduler',
     packageName: 'appweaver-job-plugin',

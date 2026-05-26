@@ -12,7 +12,7 @@ import { OfficialAppGrid } from './official-app-grid';
 
 import './styles.css';
 
-const logoUrl = '/appweaver-logo.svg';
+const logoUrl = '/appweaver-logo-accent.svg';
 
 type NavItem = {
   sectionId: string | null;
@@ -25,6 +25,7 @@ type OnePageSectionId = 'intro' | 'features' | 'demo' | 'apps';
 type HeaderProps = {
   activeSection: string | null;
   navItems: NavItem[];
+  introActive: boolean;
   onNavSelect: (sectionId: string) => void;
 };
 
@@ -60,9 +61,9 @@ const features: Feature[] = [
   {
     title: 'Local-First App Hub',
     points: [
-      'Run AppWeaver from a project or workspace folder you control.',
-      'Use apps that can work with your local filesystem, create files, inspect project state, and show visual git diffs.',
-      'Install many AppWeaver instances; each instance has its own workspace, local data, and Nostr bot identity.',
+      'Install AppWeaver to and run for any project or workspace folder you control.',
+      'Use apps that can work with your local filesystem and databases, create files, inspect project state, and show visual git diffs.',
+      'You can setup a local AI model, Text to Speach (TTS) engine, and push notifications. Be private as you want to be.',
     ],
   },
   {
@@ -238,7 +239,11 @@ function CopyableCommandBlock(props: CopyableCommandBlockProps) {
 function Header(props: HeaderProps) {
   return (
     <header class="stage-header">
-      <a href="/" class="stage-brand">
+      <a
+        href="/"
+        class="stage-brand"
+        classList={{ 'stage-brand--intro-active': props.introActive }}
+      >
         <img src={logoUrl} alt="AppWeaver" class="stage-brand-logo" />
         <span class="stage-brand-text" aria-hidden="true">
           AppWeaver
@@ -273,6 +278,10 @@ function HomePage(props: HomePageProps) {
   return (
     <section class="hero-stage">
       <div class="hero-copy">
+        <div class="hero-brand" aria-hidden="true">
+          <div class="hero-brand-text">AppWeaver</div>
+          <img src={logoUrl} alt="" class="hero-brand-logo" />
+        </div>
         <h1 class="hero-title">
           An <span class="hero-title-ai">AI</span>-powered <span class="hero-title-app-hub">App Hub</span> on a computer{' '}
           <span class="hero-title-mark hero-title-mark--computer">you control</span>.
@@ -372,8 +381,7 @@ function OfficialAppsSection() {
       <h2 class="section-title short-viewport-section-title">Official Apps</h2>
       <div class="section-heading-row">
         <p class="section-summary">
-          Each app adds commands, widgets, AI skills, and local data models to your
-          AppWeaver workspace.
+          Each app adds commands, widgets, AI skills, and local data models to your AppWeaver workspace.
         </p>
       </div>
 
@@ -401,6 +409,7 @@ function SiteFooter() {
 
 function OnePage(props: {
   onActiveSectionChange: (sectionId: OnePageSectionId) => void;
+  onHeroTitleReachedChange: (reached: boolean) => void;
 }) {
   const [openFeatureIndex, setOpenFeatureIndex] = createSignal(0);
 
@@ -423,6 +432,7 @@ function OnePage(props: {
       frameId = null;
       const rootRect = root.getBoundingClientRect();
       const activationY = rootRect.top + rootRect.height * 0.3;
+      const heroTitle = root.querySelector('.hero-title');
       let activeSection: OnePageSectionId = 'intro';
 
       for (const sectionId of sectionIds) {
@@ -438,6 +448,11 @@ function OnePage(props: {
       }
 
       props.onActiveSectionChange(activeSection);
+
+      props.onHeroTitleReachedChange(
+        heroTitle instanceof HTMLElement &&
+          heroTitle.getBoundingClientRect().top <= rootRect.top + 8,
+      );
     };
 
     const scheduleUpdate = () => {
@@ -500,6 +515,7 @@ function App() {
   const pluginRoute = isPluginRoute(window.location.pathname);
   const [onePageActiveSection, setOnePageActiveSection] =
     createSignal<OnePageSectionId>('intro');
+  const [heroTitleReached, setHeroTitleReached] = createSignal(false);
   const [pluginPageActiveSection, setPluginPageActiveSection] =
     createSignal<string>('features');
 
@@ -510,6 +526,11 @@ function App() {
         <Header
           activeSection={
             pluginRoute ? pluginPageActiveSection() : onePageActiveSection()
+          }
+          introActive={
+            !pluginRoute &&
+            onePageActiveSection() === 'intro' &&
+            !heroTitleReached()
           }
           navItems={
             pluginRoute
@@ -533,7 +554,10 @@ function App() {
               onActiveSectionChange={setPluginPageActiveSection}
             />
           ) : (
-            <OnePage onActiveSectionChange={setOnePageActiveSection} />
+            <OnePage
+              onActiveSectionChange={setOnePageActiveSection}
+              onHeroTitleReachedChange={setHeroTitleReached}
+            />
           )}
         </main>
       </div>

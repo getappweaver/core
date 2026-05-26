@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: dark;
+  --color-accent: #61bebe;
   --color-warning: rgb(250 204 21);
   font-family:
     Inter,
@@ -133,13 +134,21 @@ a {
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+  transition:
+    opacity 240ms ease,
+    transform 320ms ease;
+}
+
+.stage-brand--intro-active {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.35rem) scale(0.96);
 }
 
 .stage-brand-logo {
-  height: 1.75rem;
-  width: 1.75rem;
+  height: 3rem;
+  width: 3rem;
   border-radius: 0.125rem;
-  filter: invert(1);
 }
 
 .stage-brand-text {
@@ -702,7 +711,7 @@ a {
 }
 
 .site-footer-brand {
-  color: rgb(250 204 21);
+  color: var(--color-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
   font-weight: 800;
@@ -716,6 +725,7 @@ a {
   gap: 0.65rem 1rem;
   font-size: 0.85rem;
   font-weight: 650;
+  justify-content: flex-end;
 }
 
 .site-footer-links a {
@@ -967,7 +977,7 @@ a {
   height: 100%;
   min-width: 0;
   align-content: center;
-  padding-block: 3rem;
+  padding-block: 1rem;
 }
 
 .hero-next,.features-next {
@@ -1004,6 +1014,27 @@ a {
   z-index: 1;
   min-width: 0;
   max-width: 64rem;
+}
+
+.hero-brand {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.6rem;
+  color: rgb(244 244 245);
+  justify-items: center;
+}
+
+.hero-brand-text {
+  color: var(--color-accent);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.hero-brand-logo {
+  width: clamp(4.75rem, 9vw, 7.5rem);
+  height: auto;
 }
 
 .hero-eyebrow {
@@ -1129,8 +1160,8 @@ a {
 .hero-apps-icon {
   position: relative;
   display: inline-grid;
-  width: 1.35em;
-  height: 1.35em;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
   overflow: hidden;
 }
@@ -1270,7 +1301,6 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  animation: hero-next-bounce 1.45s ease-in-out infinite;
   color: rgb(125 211 252);
   cursor: pointer;
   font-size: 1.2rem;
@@ -1303,17 +1333,6 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .bouncing-section-link {
     animation: none;
-  }
-}
-
-@keyframes hero-next-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  45% {
-    transform: translateY(0.55rem);
   }
 }
 
@@ -1473,11 +1492,6 @@ a {
 
   .stage-brand-text {
     display: none;
-  }
-
-  .stage-brand-logo {
-    height: 1.375rem;
-    width: 1.375rem;
   }
 
   .stage-nav {
@@ -1718,10 +1732,6 @@ a {
   .site-footer {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-  }
-
-  .site-footer-links {
-    justify-content: flex-end;
   }
 }
 
