@@ -379,6 +379,12 @@ function AppInner(): JSX.Element {
     onChatResult: requestComposerAiState,
   });
 
+  const demoHiddenHeaderWidgets = new Set([
+    'bot:status',
+    'plugins:install',
+    'roadmap:list',
+  ]);
+
   const headerChromeWidgets = createMemo<HeaderWidget[]>(() => {
     const out: HeaderWidget[] = [];
 
@@ -386,7 +392,12 @@ function AppInner(): JSX.Element {
       for (const sub of cmd.subcommands) {
         const w = sub.webWidget;
 
-        if (w?.placement === 'header' && w.label) {
+        if (
+          w?.placement === 'header' &&
+          w.label &&
+          (!isWebDemoMode() ||
+            !demoHiddenHeaderWidgets.has(`${cmd.name}:${sub.name}`))
+        ) {
           out.push({
             command: cmd.name,
             subcommand: sub.name,
@@ -436,6 +447,8 @@ function AppInner(): JSX.Element {
             subcommand: sub.name,
             surface: w.surface,
           }) &&
+          (!isWebDemoMode() ||
+            !demoHiddenHeaderWidgets.has(`${cmd.name}:${sub.name}`)) &&
           w.label
         ) {
           out.push({

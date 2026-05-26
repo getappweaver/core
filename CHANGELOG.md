@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.27.2] - 2026-05-27
+
+- fix: restore account menu and hide demo widgets (6bac165)
+
 ## [v9.27.1] - 2026-05-27
 
-- feat: refresh landing brand presentation (bc8616a)
+- feat: refresh landing brand presentation (31f1a16)
 
 ## [v9.27.0] - 2026-05-27
 

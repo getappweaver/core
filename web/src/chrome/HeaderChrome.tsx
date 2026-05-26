@@ -342,121 +342,121 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
         >
           <IconGlyph fallback="account" />
         </WebButton>
-        <Show when={accountMenuOpen()}>
-          <div
-            class="topbar-menu-panel topbar-account-panel panel"
-            ref={(el) => {
-              accountMenuPanelEl = el;
+      </div>
+      <Show when={accountMenuOpen()}>
+        <div
+          class="topbar-menu-panel topbar-account-panel panel"
+          ref={(el) => {
+            accountMenuPanelEl = el;
+          }}
+        >
+          <WebButton
+            type="button"
+            class="connect-btn"
+            onClick={() => {
+              closeAllMenus();
+              props.onConnect();
             }}
+            title={props.manageTitle()}
           >
+            {props.connectLabel()}
+          </WebButton>
+          <Show when={!props.isDisconnected()}>
             <WebButton
               type="button"
               class="connect-btn"
               onClick={() => {
                 closeAllMenus();
-                props.onConnect();
+                props.onLogout();
               }}
-              title={props.manageTitle()}
+              title="Clear all Nostr signer data stored in this browser"
             >
-              {props.connectLabel()}
+              Log out
             </WebButton>
-            <Show when={!props.isDisconnected()}>
+          </Show>
+          <WebButton
+            type="button"
+            class="connect-btn topbar-submenu-toggle"
+            aria-expanded={accountNostrOpen()}
+            onClick={() => {
+              setAccountSettingsOpen(false);
+              setAccountNostrOpen((open) => !open);
+            }}
+          >
+            Nostr
+            <span class="topbar-submenu-chevron" aria-hidden="true">
+              {accountNostrOpen() ? '▾' : '▸'}
+            </span>
+          </WebButton>
+          <Show when={accountNostrOpen()}>
+            <div class="topbar-submenu-section topbar-submenu-section--nested">
               <WebButton
                 type="button"
                 class="connect-btn"
+                disabled={!props.isConnected()}
                 onClick={() => {
                   closeAllMenus();
-                  props.onLogout();
+                  props.onOpenNostrSearchRelays();
                 }}
-                title="Clear all Nostr signer data stored in this browser"
               >
-                Log out
+                Search relays
               </WebButton>
-            </Show>
-            <WebButton
-              type="button"
-              class="connect-btn topbar-submenu-toggle"
-              aria-expanded={accountNostrOpen()}
-              onClick={() => {
-                setAccountSettingsOpen(false);
-                setAccountNostrOpen((open) => !open);
-              }}
-            >
-              Nostr
-              <span class="topbar-submenu-chevron" aria-hidden="true">
-                {accountNostrOpen() ? '▾' : '▸'}
-              </span>
-            </WebButton>
-            <Show when={accountNostrOpen()}>
-              <div class="topbar-submenu-section topbar-submenu-section--nested">
+            </div>
+          </Show>
+          <WebButton
+            type="button"
+            class="connect-btn topbar-submenu-toggle"
+            aria-expanded={accountSettingsOpen()}
+            onClick={() => {
+              setAccountNostrOpen(false);
+              setAccountSettingsOpen((open) => !open);
+            }}
+          >
+            Settings
+            <span class="topbar-submenu-chevron" aria-hidden="true">
+              {accountSettingsOpen() ? '▾' : '▸'}
+            </span>
+          </WebButton>
+          <Show when={accountSettingsOpen()}>
+            <div class="topbar-submenu-section topbar-submenu-section--nested">
+              <Show when={props.onEnablePiperTts != null}>
                 <WebButton
                   type="button"
                   class="connect-btn"
-                  disabled={!props.isConnected()}
+                  disabled={props.piperTtsBusy?.() ?? false}
                   onClick={() => {
                     closeAllMenus();
-                    props.onOpenNostrSearchRelays();
+                    props.onEnablePiperTts?.();
                   }}
+                  title="Enable Piper TTS for local speech playback"
                 >
-                  Search relays
+                  {props.piperTtsBusy?.()
+                    ? 'Piper TTS …'
+                    : props.piperTtsEnabled?.()
+                      ? 'Piper TTS ✓'
+                      : 'Piper TTS'}
                 </WebButton>
-              </div>
-            </Show>
-            <WebButton
-              type="button"
-              class="connect-btn topbar-submenu-toggle"
-              aria-expanded={accountSettingsOpen()}
-              onClick={() => {
-                setAccountNostrOpen(false);
-                setAccountSettingsOpen((open) => !open);
-              }}
-            >
-              Settings
-              <span class="topbar-submenu-chevron" aria-hidden="true">
-                {accountSettingsOpen() ? '▾' : '▸'}
-              </span>
-            </WebButton>
-            <Show when={accountSettingsOpen()}>
-              <div class="topbar-submenu-section topbar-submenu-section--nested">
-                <Show when={props.onEnablePiperTts != null}>
-                  <WebButton
-                    type="button"
-                    class="connect-btn"
-                    disabled={props.piperTtsBusy?.() ?? false}
-                    onClick={() => {
-                      closeAllMenus();
-                      props.onEnablePiperTts?.();
-                    }}
-                    title="Enable Piper TTS for local speech playback"
-                  >
-                    {props.piperTtsBusy?.()
-                      ? 'Piper TTS …'
-                      : props.piperTtsEnabled?.()
-                        ? 'Piper TTS ✓'
-                        : 'Piper TTS'}
-                  </WebButton>
-                </Show>
-                <WebButton
-                  type="button"
-                  class="connect-btn"
-                  disabled={
-                    !props.isConnected() ||
-                    !props.wsConnected() ||
-                    props.pushBusy()
-                  }
-                  onClick={() => {
-                    closeAllMenus();
-                    props.onEnablePush();
-                  }}
-                  title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
-                >
-                  {props.pushBusy() ? '…' : 'Push'}
-                </WebButton>
-              </div>
-            </Show>
-          </div>
-        </Show>
-      </div>
+              </Show>
+              <WebButton
+                type="button"
+                class="connect-btn"
+                disabled={
+                  !props.isConnected() ||
+                  !props.wsConnected() ||
+                  props.pushBusy()
+                }
+                onClick={() => {
+                  closeAllMenus();
+                  props.onEnablePush();
+                }}
+                title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
+              >
+                {props.pushBusy() ? '…' : 'Push'}
+              </WebButton>
+            </div>
+          </Show>
+        </div>
+      </Show>
     </header>
   );
 }
