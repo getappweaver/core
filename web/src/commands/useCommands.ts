@@ -129,32 +129,41 @@ function appendClassName(
 function highlightWebNodeTargets(
   node: WebNode,
   targetIds: Set<string>,
+  scrollTargetId: string | null,
 ): WebNode {
   if (node.type !== 'element') {
     return node;
   }
 
+  const nodeTargetId = node.props?.id ?? node.props?.storyTargetId;
+
   const shouldHighlight =
-    (node.props?.id !== undefined && targetIds.has(node.props.id)) ||
-    (node.props?.storyTargetId !== undefined &&
-      targetIds.has(node.props.storyTargetId));
+    nodeTargetId !== undefined && targetIds.has(nodeTargetId);
+
+  const shouldScroll = shouldHighlight && nodeTargetId === scrollTargetId;
 
   return {
     ...node,
-    props: shouldHighlight
-      ? {
-          ...node.props,
-          className: appendClassName(
-            node.props?.className,
-            'web-highlight-flash',
-          ),
-        }
-      : node.props,
+    props:
+      shouldHighlight || shouldScroll
+        ? {
+            ...node.props,
+            ...(shouldHighlight
+              ? {
+                  className: appendClassName(
+                    node.props?.className,
+                    'web-highlight-flash',
+                  ),
+                }
+              : {}),
+            ...(shouldScroll ? { scrollIntoViewOnMount: true } : {}),
+          }
+        : node.props,
     summary: node.summary
-      ? highlightWebNodeTargets(node.summary, targetIds)
+      ? highlightWebNodeTargets(node.summary, targetIds, scrollTargetId)
       : undefined,
     children: node.children?.map((child) =>
-      highlightWebNodeTargets(child, targetIds),
+      highlightWebNodeTargets(child, targetIds, scrollTargetId),
     ),
   };
 }
@@ -169,7 +178,7 @@ function highlightWebRootTargets(
 
   return {
     ...root,
-    tree: highlightWebNodeTargets(root.tree, new Set(targetIds)),
+    tree: highlightWebNodeTargets(root.tree, new Set(targetIds), targetIds[0]),
   };
 }
 

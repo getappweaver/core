@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.25.1] - 2026-05-26
+
+- fix: scroll highlighted refresh targets (22fa5c4)
+
 ## [v9.25.0] - 2026-05-24
 
-- feat: polish plugin landing pages (14545ee)
+- feat: polish plugin landing pages (8d9e758)
 
 ## [v9.24.0] - 2026-05-23
 
