@@ -683,15 +683,16 @@ pre {
 }
 
 .topbar.compact {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-dropdown);
   position: relative;
-  padding: 0.7rem 1rem 0.2rem;
-  margin-bottom: 8px;
+  z-index: var(--z-dropdown);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.7rem 1rem 0.2rem;
+  margin-bottom: 8px;
+  overflow: hidden;
   background:
     linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)),
     var(--color-bg);
@@ -713,6 +714,10 @@ pre {
   min-width: 0;
   display: flex;
   align-items: center;
+}
+
+.topbar.compact h1 {
+  flex: 0 0 auto;
 }
 
 .topbar-logo {
@@ -739,6 +744,22 @@ pre {
   gap: 0.45rem;
   flex-shrink: 0;
   position: relative;
+}
+
+.topbar.compact .topbar-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 0.35rem 0.45rem 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 8px;
+}
+
+.topbar.compact .topbar-actions .topbar-menu-btn {
+  flex: 0 0 auto;
 }
 
 .topbar-menu-btn {
@@ -1842,6 +1863,7 @@ a.diff-line__number:focus-visible {
 .card-head--timeline-sticky .card-head__control {
   position: relative;
   z-index: 1;
+  text-wrap-mode: nowrap;
 }
 
 .card-head-right-cluster {

@@ -53,13 +53,17 @@ class ScrollDebugger {
       return;
     }
 
-    const self = this;
+    const isEnabled = () => this.enabled;
+
+    const record = (props: Parameters<ScrollDebugger['record']>[0]) =>
+      this.record(props);
+
     window[methodName] = function wrappedWindowScrollMethod(...args: never[]) {
-      if (!self.enabled) {
+      if (!isEnabled()) {
         return original.apply(this, args);
       }
 
-      self.record({ methodName, target: 'window', args, element: window });
+      record({ methodName, target: 'window', args, element: window });
 
       return original.apply(this, args);
     } as typeof original;
@@ -72,14 +76,18 @@ class ScrollDebugger {
       return;
     }
 
-    const self = this;
+    const isEnabled = () => this.enabled;
+
+    const record = (props: Parameters<ScrollDebugger['record']>[0]) =>
+      this.record(props);
+
     Object.defineProperty(Element.prototype, methodName, {
       value(this: Element, ...args: unknown[]) {
-        if (!self.enabled) {
+        if (!isEnabled()) {
           return original.apply(this, args as never[]);
         }
 
-        self.record({ methodName, target: 'element', args, element: this });
+        record({ methodName, target: 'element', args, element: this });
 
         return original.apply(this, args as never[]);
       },
@@ -95,14 +103,23 @@ class ScrollDebugger {
       return;
     }
 
-    const self = this;
+    const isEnabled = () => this.enabled;
+
+    const record = (props: Parameters<ScrollDebugger['record']>[0]) =>
+      this.record(props);
+
     Object.defineProperty(HTMLElement.prototype, 'focus', {
       value(this: HTMLElement, ...args: unknown[]) {
-        if (!self.enabled) {
+        if (!isEnabled()) {
           return original.apply(this, args as never[]);
         }
 
-        self.record({ methodName: 'focus', target: 'element', args, element: this });
+        record({
+          methodName: 'focus',
+          target: 'element',
+          args,
+          element: this,
+        });
 
         return original.apply(this, args as never[]);
       },
@@ -111,21 +128,27 @@ class ScrollDebugger {
     });
   }
 
-  private wrapScrollPositionProperty(propertyName: 'scrollLeft' | 'scrollTop'): void {
+  private wrapScrollPositionProperty(
+    propertyName: 'scrollLeft' | 'scrollTop',
+  ): void {
     const descriptor = findPropertyDescriptor(Element.prototype, propertyName);
 
     if (!descriptor?.get || !descriptor.set) {
       return;
     }
 
-    const self = this;
+    const isEnabled = () => this.enabled;
+
+    const record = (props: Parameters<ScrollDebugger['record']>[0]) =>
+      this.record(props);
+
     Object.defineProperty(Element.prototype, propertyName, {
       get(this: Element) {
         return descriptor.get!.call(this) as number;
       },
       set(this: Element, value: number) {
-        if (self.enabled) {
-          self.record({
+        if (isEnabled()) {
+          record({
             methodName: `${propertyName} setter`,
             target: 'element',
             args: [value],
@@ -147,6 +170,7 @@ class ScrollDebugger {
   }): void {
     const stack = new Error().stack;
     const caller = extractCaller(stack);
+
     const entry = {
       method: props.methodName,
       target: props.target,
@@ -213,6 +237,7 @@ export function installDemoScrollDebugger(): void {
   }
 
   global.appweaverScrollDebugger = new ScrollDebugger();
+
   console.info(
     '[AppWeaver demo scroll] debugger installed. Use window.appweaverScrollDebugger.getReport().',
   );

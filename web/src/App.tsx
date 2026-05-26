@@ -281,6 +281,7 @@ function AppInner(): JSX.Element {
   >(null);
 
   const PASSIVE_CURSOR_ACTION_DELAY_MS = 620;
+  const PASSIVE_TARGET_SCROLL_WAIT_MS = 2000;
 
   let passiveActionQueue = Promise.resolve();
   let passiveHoveredElement: HTMLElement | null = null;
@@ -724,6 +725,96 @@ function AppInner(): JSX.Element {
     return getStoryDomTarget(targetId);
   }
 
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function overflowClips(style: CSSStyleDeclaration): boolean {
+    return [style.overflow, style.overflowX, style.overflowY].some(
+      (value) => value !== 'visible',
+    );
+  }
+
+  function firstClippingAncestor(target: HTMLElement): HTMLElement | null {
+    for (let el = target.parentElement; el; el = el.parentElement) {
+      if (overflowClips(getComputedStyle(el))) {
+        return el;
+      }
+    }
+
+    return null;
+  }
+
+  function storyTargetIsFullyInView(target: HTMLElement): boolean {
+    const rect = target.getBoundingClientRect();
+    const tolerance = 1;
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+
+    if (
+      rect.left < -tolerance ||
+      rect.top < -tolerance ||
+      rect.right > window.innerWidth + tolerance ||
+      rect.bottom > window.innerHeight + tolerance
+    ) {
+      return false;
+    }
+
+    for (let el = target.parentElement; el; el = el.parentElement) {
+      if (!overflowClips(getComputedStyle(el))) {
+        continue;
+      }
+
+      const ancestorRect = el.getBoundingClientRect();
+
+      if (
+        rect.left < ancestorRect.left - tolerance ||
+        rect.top < ancestorRect.top - tolerance ||
+        rect.right > ancestorRect.right + tolerance ||
+        rect.bottom > ancestorRect.bottom + tolerance
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async function ensurePassiveTargetVisible(
+    target: HTMLElement,
+    playback: StoryPassivePlaybackState,
+  ): Promise<void> {
+    if (storyTargetIsFullyInView(target)) {
+      return;
+    }
+
+    const scrollContext = firstClippingAncestor(target);
+    const contextRect = scrollContext?.getBoundingClientRect();
+
+    if (contextRect && playback.catchingUp !== true) {
+      setPassiveCursor((prev) => ({
+        ...prev,
+        x: contextRect.left + contextRect.width / 2,
+        y: contextRect.top + contextRect.height / 2,
+        visible: true,
+      }));
+    }
+
+    target.scrollIntoView({
+      block: 'nearest',
+      inline: 'center',
+      behavior: playback.catchingUp === true ? 'auto' : 'smooth',
+    });
+
+    if (playback.catchingUp !== true) {
+      await sleep(PASSIVE_TARGET_SCROLL_WAIT_MS);
+    }
+
+    movePassiveCursorToTarget();
+  }
+
   async function typeIntoField(
     field: HTMLInputElement | HTMLTextAreaElement,
     value: string,
@@ -826,6 +917,12 @@ function AppInner(): JSX.Element {
         return;
       }
 
+      const target = storyPassivePlaybackTargetElement();
+
+      if (target) {
+        await ensurePassiveTargetVisible(target, playback);
+      }
+
       if (playback.catchingUp !== true) {
         await pressPassiveCursor();
       }
@@ -866,6 +963,10 @@ function AppInner(): JSX.Element {
             })
           : null;
 
+      if (field) {
+        await ensurePassiveTargetVisible(field, playback);
+      }
+
       const didType = await typePassiveFormValues(action.values, field);
 
       if (!didType) {
@@ -890,6 +991,8 @@ function AppInner(): JSX.Element {
 
       return;
     }
+
+    await ensurePassiveTargetVisible(target, playback);
 
     const rect = target.getBoundingClientRect();
 
