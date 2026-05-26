@@ -1931,14 +1931,17 @@ function AppInner(): JSX.Element {
         return;
       }
 
-      const target = event.target;
+      const targetPath = event.composedPath();
 
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
+      const targetIsEditable = targetPath.some(
+        (target) =>
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          (target instanceof HTMLElement && target.isContentEditable),
+      );
+
+      if (targetIsEditable) {
         return;
       }
 

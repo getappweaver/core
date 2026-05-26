@@ -349,7 +349,7 @@ function storedPreferredProvider(providers: OpenCodeAuthProvider[]): string {
 }
 
 function providerIsConfigured(
-  status: { providers: OpenCodeAuthProvider[] } | undefined,
+  status: { providers: OpenCodeAuthProvider[] } | null | undefined,
   providerID: string,
 ): boolean {
   return Boolean(
@@ -1720,6 +1720,7 @@ function SetupChrome(props: { children: JSX.Element }): JSX.Element {
         onLogout={auth.logout}
         onEnablePush={() => undefined}
         onEnablePiperTts={() => undefined}
+        onOpenNostrSearchRelays={() => undefined}
         onAnyMenuOpenChange={() => undefined}
       />
       {props.children}
