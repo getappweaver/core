@@ -269,7 +269,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
     const requiredWidth =
       buttonCount * iconButtonWidth + Math.max(0, buttonCount - 1) * gapWidth;
 
-    setCompactToolbar(availableWidth < requiredWidth);
+    setCompactToolbar(false); // (availableWidth < requiredWidth);
   }
 
   onMount(() => {

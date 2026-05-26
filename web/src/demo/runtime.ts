@@ -8,3 +8,11 @@ export function isEmbeddedWebDemoMode(): boolean {
     import.meta.env.VITE_APPWEAVER_DEMO_EMBEDDED === true
   );
 }
+
+export function isDemoScrollDebugEnabled(): boolean {
+  return (
+    isWebDemoMode() &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('debugScroll')
+  );
+}

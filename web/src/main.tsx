@@ -4,9 +4,15 @@ import { registerSW } from 'virtual:pwa-register';
 import 'highlight.js/styles/github-dark.css';
 
 import { App } from './App';
+import { isDemoScrollDebugEnabled } from './demo/runtime';
+import { installDemoScrollDebugger } from './demo/scroll-debugger';
 import './styles.css';
 
 registerSW({ immediate: true });
+
+if (isDemoScrollDebugEnabled()) {
+  installDemoScrollDebugger();
+}
 
 function syncAppViewportHeight(): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') {

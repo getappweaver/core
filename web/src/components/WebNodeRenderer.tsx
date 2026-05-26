@@ -21,7 +21,7 @@ import type {
   WebRenderMeta,
 } from '@src/web/ui-schema';
 
-import { isWebDemoMode } from '../demo/runtime';
+import { isEmbeddedWebDemoMode, isWebDemoMode } from '../demo/runtime';
 import { registerStoryDomTarget } from '../story/dom-targets';
 import {
   emitStoryTargetClicked,
@@ -1979,6 +1979,10 @@ function WebFormElement(props: WebFormElementProps): JSX.Element {
   let formEl: HTMLFormElement | undefined;
 
   createEffect(() => {
+    if (isEmbeddedWebDemoMode()) {
+      return;
+    }
+
     if (props.element.props?.hiddenUntilRevealed !== true || !formEl) {
       return;
     }
@@ -2176,6 +2180,10 @@ function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
   });
 
   createEffect(() => {
+    if (isEmbeddedWebDemoMode()) {
+      return;
+    }
+
     if (props.element.props?.autoFocus !== true || inputEl == null) {
       return;
     }

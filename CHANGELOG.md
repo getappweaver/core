@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.26.0] - 2026-05-26
+
+- feat: polish landing demo flow (5236b8e)
+
 ## [v9.25.1] - 2026-05-26
 
-- fix: scroll highlighted refresh targets (22fa5c4)
+- fix: scroll highlighted refresh targets (efb1279)
 
 ## [v9.25.0] - 2026-05-24
 

@@ -115,11 +115,11 @@ export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
   const displayName = displayNameForPath(pathname);
 
   return [
-    { sectionId: null, label: 'Back to main page', href: '/' },
+    { sectionId: null, label: 'Back', href: '/' },
     { sectionId: 'features', label: 'Features', href: '#features' },
     {
       sectionId: 'demo',
-      label: `Interactive ${displayName} Demo`,
+      label: `Demo`,
       href: '#demo',
     },
     { sectionId: 'install', label: 'Install', href: '#install' },
