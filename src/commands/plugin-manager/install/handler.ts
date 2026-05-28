@@ -47,6 +47,7 @@ export type PluginCatalogEntry = {
   installedVersion: string | null;
   compatibleRef: RefEntry | null;
   latestRef: RefEntry | null;
+  updateAvailable: boolean;
 };
 
 export type PluginAuthorIdentity = {
@@ -110,6 +111,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     installedVersion: null,
     compatibleRef: null,
     latestRef: refs.at(-1) ?? null,
+    updateAvailable: false,
   };
 }
 
@@ -450,6 +452,46 @@ function latestCompatibleRef(
   );
 }
 
+function normalizeRefTag(tag: string): string {
+  const normalized = tag.trim().toLowerCase();
+
+  return normalized.startsWith('v') ? normalized.slice(1) : normalized;
+}
+
+function comparePluginVersions(left: string, right: string): number | null {
+  const leftParts = parseVersionParts(left);
+  const rightParts = parseVersionParts(right);
+
+  if (!leftParts || !rightParts) {
+    return null;
+  }
+
+  return compareVersionParts(leftParts, rightParts);
+}
+
+function isUpdateAvailable(
+  installedVersion: string | null,
+  compatibleRef: RefEntry | null,
+): boolean {
+  if (!compatibleRef) {
+    return false;
+  }
+
+  if (!installedVersion) {
+    return true;
+  }
+
+  if (
+    normalizeRefTag(installedVersion) === normalizeRefTag(compatibleRef.tag)
+  ) {
+    return false;
+  }
+
+  const compared = comparePluginVersions(installedVersion, compatibleRef.tag);
+
+  return compared === null ? true : compared < 0;
+}
+
 export function readLocalPluginPackageVersion({
   dmBotRoot,
   alias,
@@ -508,6 +550,111 @@ type InstallCatalogEntryResult = {
   message: string;
 };
 
+type UpdateInstalledCatalogEntryProps = {
+  ctx: RouteCommandContext;
+  entry: PluginCatalogEntry;
+};
+
+function updateInstalledCatalogEntry({
+  ctx,
+  entry,
+}: UpdateInstalledCatalogEntryProps): InstallCatalogEntryResult {
+  if (!entry.installedAlias) {
+    return {
+      success: false,
+      message: `Plugin is not installed: ${entry.title || entry.name}.`,
+    };
+  }
+
+  if (!entry.compatibleRef) {
+    const latest = entry.latestRef
+      ? `${entry.latestRef.tag} for core ${entry.latestRef.coreApiVersion}`
+      : 'no release refs';
+
+    return {
+      success: false,
+      message: `No compatible release for bot core ${readCoreVersion(ctx.dmBotRoot)}. Latest catalog ref: ${latest}.`,
+    };
+  }
+
+  if (!entry.updateAvailable) {
+    const installedVersion = entry.installedVersion ?? 'unknown';
+
+    return {
+      success: false,
+      message: `Plugin ${entry.installedAlias} is already up to date (${installedVersion}).`,
+    };
+  }
+
+  const pluginDir = join(ctx.dmBotRoot, 'plugins', entry.installedAlias);
+
+  if (!existsSync(pluginDir)) {
+    return {
+      success: false,
+      message: `Plugin directory does not exist: ${pluginDir}`,
+    };
+  }
+
+  const fetchResult = Bun.spawnSync(['git', 'fetch', '--tags'], {
+    cwd: pluginDir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  if (fetchResult.exitCode !== 0) {
+    throw new Error(
+      `git fetch failed:\n${fetchResult.stdout.toString()}${fetchResult.stderr.toString()}`,
+    );
+  }
+
+  const checkoutResult = Bun.spawnSync(
+    ['git', 'checkout', entry.compatibleRef.tag],
+    {
+      cwd: pluginDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
+
+  if (checkoutResult.exitCode !== 0) {
+    throw new Error(
+      `git checkout failed:\n${checkoutResult.stdout.toString()}${checkoutResult.stderr.toString()}`,
+    );
+  }
+
+  const pluginsData = readPluginsJson(ctx.dmBotRoot);
+
+  const index = pluginsData.plugins.findIndex(
+    (plugin) => plugin.alias === entry.installedAlias,
+  );
+
+  if (index === -1) {
+    return {
+      success: false,
+      message: `Plugin ${entry.installedAlias} is not listed in plugins.json.`,
+    };
+  }
+
+  const current = pluginsData.plugins[index];
+
+  pluginsData.plugins[index] = {
+    alias: current.alias,
+    ...(current.name ? { name: current.name } : {}),
+    repo: entry.repo,
+  };
+
+  writePluginsJson(ctx.dmBotRoot, pluginsData);
+  runGenerator(ctx.dmBotRoot);
+  writeRestartRequestedFile();
+
+  const fromVersion = entry.installedVersion ?? 'unknown';
+
+  return {
+    success: true,
+    message: `Updated ${entry.installedAlias}: ${fromVersion} → ${entry.compatibleRef.tag}.`,
+  };
+}
+
 async function installCatalogEntry({
   ctx,
   target,
@@ -537,14 +684,7 @@ async function installCatalogEntry({
   }
 
   if (entry.installedAlias) {
-    const installedVersion = entry.installedVersion
-      ? ` @ ${entry.installedVersion}`
-      : '';
-
-    return {
-      success: false,
-      message: `Plugin already installed as ${entry.installedAlias}${installedVersion}.`,
-    };
+    return updateInstalledCatalogEntry({ ctx, entry });
   }
 
   if (!entry.compatibleRef) {
@@ -634,14 +774,21 @@ function attachInstalledState({
         plugin.alias === entry.name,
     );
 
+    const compatibleRef = latestCompatibleRef(entry.refs, coreVersion);
+
+    const installedVersion = installed
+      ? readLocalPluginPackageVersion({ dmBotRoot, alias: installed.alias })
+      : null;
+
     return {
       ...entry,
       installedAlias: installed?.alias ?? null,
-      installedVersion: installed
-        ? readLocalPluginPackageVersion({ dmBotRoot, alias: installed.alias })
-        : null,
-      compatibleRef: latestCompatibleRef(entry.refs, coreVersion),
+      installedVersion,
+      compatibleRef,
       latestRef: entry.refs.at(-1) ?? null,
+      updateAvailable: installed
+        ? isUpdateAvailable(installedVersion, compatibleRef)
+        : false,
     };
   });
 }

@@ -15,7 +15,9 @@ export function renderPluginsInstallText(
 
   for (const entry of representation.entries) {
     const status = entry.installedAlias
-      ? `installed as ${entry.installedAlias}${entry.installedVersion ? ` @ ${entry.installedVersion}` : ''}`
+      ? entry.updateAvailable && entry.compatibleRef
+        ? `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; update available: ${entry.compatibleRef.tag}`
+        : `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; up to date`
       : entry.compatibleRef
         ? `compatible: ${entry.compatibleRef.tag}`
         : `not compatible with core ${representation.coreVersion}`;
@@ -36,7 +38,7 @@ export function renderPluginsInstallText(
 
   lines.push(
     '',
-    `Use ${options.prefix}plugins install <plugin-id-or-name> to install a compatible release.`,
+    `Use ${options.prefix}plugins install <plugin-id-or-name> to install or update a compatible release.`,
   );
 
   return lines.join('\n');

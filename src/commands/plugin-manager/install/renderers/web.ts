@@ -66,8 +66,15 @@ function versionStatus(
   let tone: 'muted' | 'success' | 'warning';
 
   if (entry.installedAlias) {
-    label = `Installed: ${entry.installedAlias}${entry.installedVersion ? ` @ ${entry.installedVersion}` : ''}`;
-    tone = 'success';
+    const installedVersion = entry.installedVersion ?? 'unknown';
+
+    if (entry.updateAvailable && entry.compatibleRef) {
+      label = `Installed: ${entry.installedAlias} @ ${installedVersion} · update available: ${entry.compatibleRef.tag}`;
+      tone = 'warning';
+    } else {
+      label = `Installed: ${entry.installedAlias} @ ${installedVersion} · up to date`;
+      tone = 'success';
+    }
   } else if (entry.compatibleRef) {
     label = `Compatible: ${entry.compatibleRef.tag}`;
     tone = 'success';
@@ -89,15 +96,25 @@ function versionStatus(
 }
 
 function installButton(entry: PluginCatalogEntry): WebNode | null {
-  if (entry.installedAlias || !entry.compatibleRef) {
+  if (!entry.compatibleRef) {
     return null;
   }
+
+  const isUpdate = entry.installedAlias !== null;
+
+  if (isUpdate && !entry.updateAvailable) {
+    return null;
+  }
+
+  const label = isUpdate ? 'Update' : 'Install';
+  const pending = isUpdate ? 'Updating' : 'Installing';
+  const success = isUpdate ? 'Successfully updated' : 'Successfully installed';
 
   return {
     type: 'element',
     tag: 'button',
     props: {
-      label: 'Install',
+      label,
       className: 'web-button',
       action: {
         type: 'command',
@@ -107,9 +124,9 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
         options: {},
         recordInTimeline: false,
         clientStatus: {
-          pending: `Installing ${entry.title || entry.name} plugin...`,
+          pending: `${pending} ${entry.title || entry.name} plugin...`,
           restarting: 'Restarting AppWeaver...',
-          success: `Successfully installed ${entry.title || entry.name} plugin.`,
+          success: `${success} ${entry.title || entry.name} plugin.`,
         },
       },
     },
