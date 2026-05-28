@@ -52,13 +52,13 @@ export function getStoryDomTarget(targetId: string): HTMLElement | null {
 
   pruneDisconnected(targetId, elements);
 
-  const visibleTarget = [...elements].find(isVisibleTarget);
+  const visibleTarget = [...elements].reverse().find(isVisibleTarget);
 
   if (visibleTarget) {
     return visibleTarget;
   }
 
-  const connectedTarget = [...elements].find((el) => el.isConnected);
+  const connectedTarget = [...elements].reverse().find((el) => el.isConnected);
 
   return connectedTarget ?? null;
 }

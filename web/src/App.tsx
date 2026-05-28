@@ -60,6 +60,7 @@ import {
   onStoryClearPromptsRequested,
   onStoryWalkthroughChange,
 } from './story/events';
+import { setStoryOpenWidgets } from './story/open-widgets';
 import { canStorySandboxHandleCommand } from './story/sandbox';
 import type {
   StoryPassivePlaybackState,
@@ -1165,6 +1166,18 @@ function AppInner(): JSX.Element {
     return dockVisible() ? entry !== undefined : entry?.visible === true;
   }
 
+  function isStoryWidgetCurrentlyOpen(widget: {
+    command: string;
+    subcommand: string;
+  }): boolean {
+    const key = taskbarDockKey(widget.command, widget.subcommand);
+    const entry = taskbarSingletonByKey()[key];
+
+    return dockVisible()
+      ? entry !== undefined && expandedDockWidgetKeys().includes(key)
+      : entry?.visible === true;
+  }
+
   function isTimelineCommandResultHidden(
     item: Extract<TimelineItem, { type: 'command_result' }>,
   ): boolean {
@@ -2150,6 +2163,26 @@ function AppInner(): JSX.Element {
 
     window.sessionStorage.setItem(PIPER_TTS_AUTO_ATTEMPTED_KEY, '1');
     void onEnablePiperTts(true);
+  });
+
+  createEffect(() => {
+    const widgets: Array<{ command: string; subcommand: string }> = [];
+    const modal = chrome.chromeModal();
+
+    if (modal) {
+      widgets.push({ command: modal.command, subcommand: modal.subcommand });
+    }
+
+    for (const widget of taskbarWidgets()) {
+      if (isStoryWidgetCurrentlyOpen(widget)) {
+        widgets.push({
+          command: widget.command,
+          subcommand: widget.subcommand,
+        });
+      }
+    }
+
+    setStoryOpenWidgets(widgets);
   });
 
   return (

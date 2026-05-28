@@ -18,6 +18,7 @@ import {
   onStoryTargetHovered,
   onStoryWidgetOpened,
 } from './events';
+import { isStoryWidgetOpen } from './open-widgets';
 import { activateStorySandbox, deactivateStorySandbox } from './sandbox';
 import {
   STORY_FILL_FORM_TARGET_ID,
@@ -624,6 +625,18 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
           : null,
         fillFormValues: step.values,
       });
+
+      return;
+    }
+
+    if (step.type === 'wait_for_action') {
+      if (
+        step.match.type === 'widget_opened' &&
+        isStoryWidgetOpen(step.match)
+      ) {
+        clearWalkthrough();
+        advance();
+      }
 
       return;
     }

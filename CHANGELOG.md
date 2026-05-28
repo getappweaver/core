@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.27.7] - 2026-05-28
+
+- fix: improve demo widget playback tracking (85507fa)
+
 ## [v9.27.6] - 2026-05-28
 
-- fix: configure local web server startup (12dbeb6)
+- fix: configure local web server startup (e13d49b)
 
 ## [v9.27.5] - 2026-05-28
 
