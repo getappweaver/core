@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.27.6] - 2026-05-28
+
+- fix: configure local web server startup (12dbeb6)
+
 ## [v9.27.5] - 2026-05-28
 
-- feat: add plugin release publishing commands (5b668ea)
+- feat: add plugin release publishing commands (9330e42)
 
 ## [v9.27.4] - 2026-05-27
 

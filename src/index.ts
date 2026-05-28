@@ -91,7 +91,7 @@ import { openWalletDb } from './wallet/db';
 import { getNativePiperStatus } from './web/native-tts';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
-import { startLocalWebServer } from './web/server';
+import { DEFAULT_HOST, DEFAULT_PORT, startLocalWebServer } from './web/server';
 import { createSetupSecret } from './web/setup/secret';
 import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
 
@@ -173,6 +173,10 @@ async function startSetupOnlyMode(props: {
     setupSecret: props.setupSecret,
     setupMode: true,
     setupBillboard: props.setupBillboard,
+    host: process.env.BOT_WEB_APP_HOST || DEFAULT_HOST,
+    port: process.env.BOT_WEB_APP_PORT
+      ? Number(process.env.BOT_WEB_APP_PORT)
+      : DEFAULT_PORT,
   });
 
   return waitForever();
@@ -308,6 +312,10 @@ async function main() {
     setupSecret,
     setupMode: false,
     setupBillboard,
+    host: process.env.BOT_WEB_APP_HOST || DEFAULT_HOST,
+    port: process.env.BOT_WEB_APP_PORT
+      ? Number(process.env.BOT_WEB_APP_PORT)
+      : DEFAULT_PORT,
   });
 
   const pwdOutput = process.cwd();

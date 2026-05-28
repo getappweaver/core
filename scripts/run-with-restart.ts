@@ -116,7 +116,7 @@ function botEnv(): NodeJS.ProcessEnv {
     ...process.env,
     ...setupEnv,
     BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
-    BOT_WEB_STATIC: '0',
+    BOT_WEB_STATIC: '1',
   };
 }
 

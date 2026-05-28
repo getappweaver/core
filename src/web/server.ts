@@ -15,8 +15,8 @@ import { createWebFetchHandler, type WebRouteContext } from './routes';
 import { createWebSocketHandler } from './ws';
 import { WebSocketPromptSession } from './ws-prompt-session';
 
-const DEFAULT_HOST = '127.0.0.1';
-const DEFAULT_PORT = 5551;
+export const DEFAULT_HOST = '127.0.0.1';
+export const DEFAULT_PORT = 5551;
 const BILLBOARD_WIDTH = 80;
 const BILLBOARD_INNER_WIDTH = BILLBOARD_WIDTH - 4;
 
@@ -36,8 +36,8 @@ export type StartLocalWebServerOptions = {
   setupSecret: string;
   setupMode: boolean;
   setupBillboard: boolean;
-  host?: string;
-  port?: number;
+  host: string;
+  port: number;
 };
 
 function resolvePort(explicit?: number): number {
