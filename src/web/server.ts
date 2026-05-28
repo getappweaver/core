@@ -40,7 +40,7 @@ export type StartLocalWebServerOptions = {
   port: number;
 };
 
-function resolvePort(explicit?: number): number {
+export function resolvePort(explicit?: number): number {
   const fromEnv = process.env.BOT_WEB_PORT;
 
   if (fromEnv !== undefined && fromEnv !== '') {
@@ -54,7 +54,7 @@ function resolvePort(explicit?: number): number {
   return explicit ?? DEFAULT_PORT;
 }
 
-function resolveHost(explicit?: string): string {
+export function resolveHost(explicit?: string): string {
   const fromEnv = process.env.BOT_WEB_HOST?.trim();
 
   if (fromEnv) {

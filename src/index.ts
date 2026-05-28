@@ -17,7 +17,8 @@
  *   BOT_OPENCODE_SERVE_URL  - Attach to a running opencode server (e.g. http://localhost:4096)
  *   CASHU_DEFAULT_MINT_URL  - Default Cashu mint URL to use for auto-flow
  *   BOT_WEB_ENABLED         - Set to 0 to skip the local discovery server (default 1)
- *   BOT_WEB_PORT            - Port for local web (default 5551); binds to 127.0.0.1 only
+ *   BOT_WEB_HOST            - Host for local web (default 127.0.0.1)
+ *   BOT_WEB_PORT            - Port for local web (default 5551)
  *   BOT_WEB_PUSH_PUBLIC_KEY - VAPID public key for Web Push (optional; all three push vars required to enable)
  *   BOT_WEB_PUSH_PRIVATE_KEY- VAPID private key (optional)
  *   BOT_WEB_PUSH_SUBJECT    - VAPID contact, e.g. mailto:you@example.com (optional)
@@ -91,7 +92,7 @@ import { openWalletDb } from './wallet/db';
 import { getNativePiperStatus } from './web/native-tts';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
-import { DEFAULT_HOST, DEFAULT_PORT, startLocalWebServer } from './web/server';
+import { resolveHost, resolvePort, startLocalWebServer } from './web/server';
 import { createSetupSecret } from './web/setup/secret';
 import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
 
@@ -173,10 +174,8 @@ async function startSetupOnlyMode(props: {
     setupSecret: props.setupSecret,
     setupMode: true,
     setupBillboard: props.setupBillboard,
-    host: process.env.BOT_WEB_APP_HOST || DEFAULT_HOST,
-    port: process.env.BOT_WEB_APP_PORT
-      ? Number(process.env.BOT_WEB_APP_PORT)
-      : DEFAULT_PORT,
+    host: resolveHost(),
+    port: resolvePort(),
   });
 
   return waitForever();
@@ -312,10 +311,8 @@ async function main() {
     setupSecret,
     setupMode: false,
     setupBillboard,
-    host: process.env.BOT_WEB_APP_HOST || DEFAULT_HOST,
-    port: process.env.BOT_WEB_APP_PORT
-      ? Number(process.env.BOT_WEB_APP_PORT)
-      : DEFAULT_PORT,
+    host: resolveHost(),
+    port: resolvePort(),
   });
 
   const pwdOutput = process.cwd();
