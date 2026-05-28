@@ -156,6 +156,11 @@ type DemoWidgetQuery = {
   subcommandToken: string | null;
 };
 
+type CommandResultTimelineItem = Extract<
+  TimelineItem,
+  { type: 'command_result' }
+>;
+
 const LAYOUT_SETTINGS_TIMELINE_ID = 'layout-settings';
 
 function cleanQueryToken(value: string | null): string | null {
@@ -291,6 +296,10 @@ function AppInner(): JSX.Element {
 
   const [taskbarSingletonByKey, setTaskbarSingletonByKey] = createSignal<
     Record<string, SingletonWidgetEntry>
+  >({});
+
+  const [dockWidgetItemsByKey, setDockWidgetItemsByKey] = createSignal<
+    Record<string, CommandResultTimelineItem>
   >({});
 
   const [layoutPrefs, setLayoutPrefs] =
@@ -528,21 +537,14 @@ function AppInner(): JSX.Element {
   }
 
   const dockedWidgetCards = createMemo<DockedWidgetCard[]>(() => {
-    const itemsById = new Map(
-      timeline()
-        .filter(
-          (item): item is Extract<TimelineItem, { type: 'command_result' }> =>
-            item.type === 'command_result',
-        )
-        .map((item) => [item.id, item]),
-    );
+    const dockItems = dockWidgetItemsByKey();
 
     return taskbarWidgets().reduce<DockedWidgetCard[]>((out, widget) => {
       const key = taskbarDockKey(widget.command, widget.subcommand);
       const entry = taskbarSingletonByKey()[key];
-      const item = entry ? itemsById.get(entry.itemId) : undefined;
+      const item = dockItems[key];
 
-      if (entry && item) {
+      if (entry && item && item.id === entry.itemId) {
         out.push({ key, widget, entry, item });
       }
 
@@ -1053,6 +1055,8 @@ function AppInner(): JSX.Element {
         return rest;
       });
 
+      removeDockWidgetItem(key);
+
       setTimeline((prev) =>
         prev.filter(
           (item) =>
@@ -1088,10 +1092,7 @@ function AppInner(): JSX.Element {
     const existing = taskbarSingletonByKey()[key];
 
     const hasTimelineItem =
-      existing !== undefined &&
-      timeline().some(
-        (item) => item.type === 'command_result' && item.id === existing.itemId,
-      );
+      existing !== undefined && hasTaskbarItem(key, existing);
 
     if (existing && hasTimelineItem) {
       if (dockVisible()) {
@@ -1149,6 +1150,86 @@ function AppInner(): JSX.Element {
       (widget.surface === 'timeline_singleton' || dockVisible())
     );
   }
+
+  function hasTaskbarItem(key: string, entry: SingletonWidgetEntry): boolean {
+    if (dockVisible()) {
+      return dockWidgetItemsByKey()[key]?.id === entry.itemId;
+    }
+
+    return timeline().some(
+      (item) => item.type === 'command_result' && item.id === entry.itemId,
+    );
+  }
+
+  function removeDockWidgetItem(key: string): void {
+    setDockWidgetItemsByKey((prev) => {
+      if (!(key in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[key];
+
+      return next;
+    });
+  }
+
+  createEffect(
+    on(dockVisible, (visible, previousVisible) => {
+      if (previousVisible === undefined || visible === previousVisible) {
+        return;
+      }
+
+      if (visible) {
+        const entries = taskbarSingletonByKey();
+
+        const dockItems = timeline().filter(
+          (item): item is CommandResultTimelineItem =>
+            item.type === 'command_result' &&
+            item.timelineSingletonKey !== undefined &&
+            entries[item.timelineSingletonKey]?.itemId === item.id,
+        );
+
+        if (dockItems.length === 0) {
+          return;
+        }
+
+        setDockWidgetItemsByKey((prev) => {
+          const next = { ...prev };
+
+          for (const item of dockItems) {
+            const key = item.timelineSingletonKey;
+
+            if (key !== undefined) {
+              next[key] = item;
+            }
+          }
+
+          return next;
+        });
+
+        const dockItemIds = new Set(dockItems.map((item) => item.id));
+
+        setTimeline((prev) => prev.filter((item) => !dockItemIds.has(item.id)));
+
+        return;
+      }
+
+      const entries = taskbarSingletonByKey();
+
+      const dockItems = Object.entries(dockWidgetItemsByKey())
+        .filter(([key, item]) => entries[key]?.itemId === item.id)
+        .map(([, item]) => item);
+
+      if (dockItems.length === 0) {
+        return;
+      }
+
+      setTimeline((prev) => [...prev, ...dockItems]);
+      setDockWidgetItemsByKey({});
+      scrollTimelineToBottomSoon();
+    }),
+  );
 
   function isHeaderWidgetActive(widget: {
     command: string;
@@ -1350,13 +1431,51 @@ function AppInner(): JSX.Element {
     const key = taskbarDockKey(params.command, params.subcommand);
     const existing = taskbarSingletonByKey()[key];
 
+    if (dockVisible()) {
+      const itemId = existing?.itemId ?? createId();
+
+      setDockWidgetItemsByKey((prev) => ({
+        ...prev,
+        [key]: {
+          id: itemId,
+          type: 'command_result',
+          command: params.command,
+          subcommand: params.subcommand,
+          subcommandTag: params.subcommand,
+          values: params.values,
+          text: params.output.text,
+          web: params.output.web,
+          clientView: params.output.clientView,
+          timelineSingletonKey: key,
+        },
+      }));
+
+      if (
+        timeline().some(
+          (item) =>
+            item.type === 'command_result' && item.timelineSingletonKey === key,
+        )
+      ) {
+        setTimeline((prev) =>
+          prev.filter(
+            (item) =>
+              item.type !== 'command_result' ||
+              item.timelineSingletonKey !== key,
+          ),
+        );
+      }
+
+      activateSingleTaskbarKey(key, itemId, params.visible);
+
+      return;
+    }
+
+    removeDockWidgetItem(key);
+
     if (existing) {
       setTimeline((prev) => {
         const rest: TimelineItem[] = [];
-        let singleton: Extract<
-          TimelineItem,
-          { type: 'command_result' }
-        > | null = null;
+        let singleton: CommandResultTimelineItem | null = null;
         for (const item of prev) {
           if (item.type === 'command_result' && item.id === existing.itemId) {
             singleton = {
@@ -1423,6 +1542,8 @@ function AppInner(): JSX.Element {
     });
 
     collapseDockWidget(key);
+
+    removeDockWidgetItem(key);
 
     if (!existing) {
       return;
@@ -1538,6 +1659,8 @@ function AppInner(): JSX.Element {
         return rest;
       });
 
+      removeDockWidgetItem(key);
+
       setTimeline((prev) =>
         prev.filter(
           (item) =>
@@ -1573,10 +1696,7 @@ function AppInner(): JSX.Element {
     const existing = taskbarSingletonByKey()[key];
 
     const hasTimelineItem =
-      existing !== undefined &&
-      timeline().some(
-        (item) => item.type === 'command_result' && item.id === existing.itemId,
-      );
+      existing !== undefined && hasTaskbarItem(key, existing);
 
     if (existing && !hasTimelineItem) {
       setTaskbarSingletonByKey((prev) => {
@@ -1585,6 +1705,8 @@ function AppInner(): JSX.Element {
 
         return rest;
       });
+
+      removeDockWidgetItem(key);
     }
 
     if (existing && hasTimelineItem) {
@@ -1755,7 +1877,7 @@ function AppInner(): JSX.Element {
   const {
     deleteTimelineItem,
     repeatTimelineSubcommand,
-    replaceCommandResultWeb,
+    replaceCommandResultWeb: replaceTimelineCommandResultWeb,
     saveTimelineForm,
     submitForm,
     updateFormValue,
@@ -1771,6 +1893,34 @@ function AppInner(): JSX.Element {
     defaultPayload,
     resolveCommandDetail,
   });
+
+  function replaceCommandResultWeb(
+    itemId: string,
+    web: import('@src/web/ui-schema').WebNodeRoot,
+  ): void {
+    let replacedDockItem = false;
+
+    setDockWidgetItemsByKey((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      for (const [key, item] of Object.entries(next)) {
+        if (item.id !== itemId) {
+          continue;
+        }
+
+        next[key] = { ...item, web, text: null };
+        changed = true;
+        replacedDockItem = true;
+      }
+
+      return changed ? next : prev;
+    });
+
+    if (!replacedDockItem) {
+      replaceTimelineCommandResultWeb(itemId, web);
+    }
+  }
 
   const palette = usePalette({
     commands,
@@ -2067,9 +2217,10 @@ function AppInner(): JSX.Element {
   createEffect(() => {
     setTaskbarSingletonByKey((prev) => {
       const liveIds = new Set(
-        timeline()
-          .filter((item) => item.type === 'command_result')
-          .map((item) => item.id),
+        [
+          ...timeline().filter((item) => item.type === 'command_result'),
+          ...Object.values(dockWidgetItemsByKey()),
+        ].map((item) => item.id),
       );
 
       let changed = false;
