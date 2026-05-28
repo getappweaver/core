@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.27.5] - 2026-05-28
+
+- feat: add plugin release publishing commands (5b668ea)
+
 ## [v9.27.4] - 2026-05-27
 
-- fix: improve setup and palette input handling (bafc0ae)
+- fix: improve setup and palette input handling (ffa4fa7)
 
 ## [v9.27.3] - 2026-05-27
 

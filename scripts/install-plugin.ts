@@ -32,8 +32,9 @@ const PLUGIN_QUERY_RELAYS = [
 
 const PluginEntrySchema = z.object({
   alias: z.string().min(1),
+  name: z.string().min(1).optional(),
   repo: z.string().min(1),
-  version: z.string().min(1),
+  version: z.string().min(1).optional(),
 });
 
 const PluginsJsonSchema = z.object({
@@ -117,6 +118,30 @@ function readPluginsJson(): PluginsJson {
 
 function writePluginsJson(data: PluginsJson): void {
   writeFileSync(PLUGINS_JSON, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
+function readInstalledPackageVersion(alias: string): string | null {
+  const pkgPath = join(ROOT, 'plugins', alias, 'package.json');
+
+  if (!existsSync(pkgPath)) {
+    return null;
+  }
+
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+      version?: unknown;
+    };
+
+    return typeof pkg.version === 'string' && pkg.version.trim().length > 0
+      ? pkg.version.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function installedVersion(entry: PluginEntry): string {
+  return entry.version ?? readInstalledPackageVersion(entry.alias) ?? 'unknown';
 }
 
 function tagValue(tags: string[][], name: string): string {
@@ -382,14 +407,16 @@ function buildPluginDiscoveryVersionLines({
   const lines: string[] = [];
 
   if (installed) {
-    if (installed.version === PLUGIN_VERSION_HEAD) {
+    const currentVersion = installedVersion(installed);
+
+    if (currentVersion === PLUGIN_VERSION_HEAD) {
       lines.push(
         `version: HEAD (experimental) ✓ installed — default branch, not a catalog tag`,
       );
     } else {
       const installedRef = findRefForInstalledVersion(
         plugin.refs,
-        installed.version,
+        currentVersion,
       );
 
       if (installedRef) {
@@ -398,15 +425,13 @@ function buildPluginDiscoveryVersionLines({
         );
       } else {
         lines.push(
-          `version: ${installed.version} ✓ installed (no matching ref tag on catalog)`,
+          `version: ${currentVersion} ✓ installed (no matching ref tag on catalog)`,
         );
       }
     }
 
     if (compatible) {
-      if (
-        normalizeRefTag(compatible.tag) !== normalizeRefTag(installed.version)
-      ) {
+      if (normalizeRefTag(compatible.tag) !== normalizeRefTag(currentVersion)) {
         lines.push(
           `version: ${compatible.tag} for core ${compatible.coreApiVersion} (upgrade available)`,
         );
@@ -414,7 +439,7 @@ function buildPluginDiscoveryVersionLines({
 
       if (
         headAheadOfRelease === true &&
-        installed.version !== PLUGIN_VERSION_HEAD
+        currentVersion !== PLUGIN_VERSION_HEAD
       ) {
         lines.push(
           `version: HEAD (experimental — newer than ${compatible.tag})`,
@@ -631,21 +656,20 @@ async function selectPluginVersion({
   const compatible = findCompatibleRef(plugin.refs, coreVersion);
 
   if (installedEntry) {
+    const currentVersion = installedVersion(installedEntry);
+
     console.log(
-      `Current installation: ${installedEntry.alias} @ ${installedEntry.version}`,
+      `Current installation: ${installedEntry.alias} @ ${currentVersion}`,
     );
 
     if (compatible) {
-      if (
-        normalizeRefTag(compatible.tag) ===
-        normalizeRefTag(installedEntry.version)
-      ) {
+      if (normalizeRefTag(compatible.tag) === normalizeRefTag(currentVersion)) {
         console.log(
           `Latest compatible ref matches installed (${compatible.tag}, core ${compatible.coreApiVersion}).`,
         );
-      } else if (installedEntry.version !== PLUGIN_VERSION_HEAD) {
+      } else if (currentVersion !== PLUGIN_VERSION_HEAD) {
         console.log(
-          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreApiVersion}) — upgrade from ${installedEntry.version}`,
+          `Latest compatible ref: ${compatible.tag} (core ${compatible.coreApiVersion}) — upgrade from ${currentVersion}`,
         );
       } else {
         console.log(
@@ -679,7 +703,7 @@ async function selectPluginVersion({
   if (!headAhead) {
     if (
       !installedEntry ||
-      normalizeRefTag(installedEntry.version) !==
+      normalizeRefTag(installedVersion(installedEntry)) !==
         normalizeRefTag(compatible.tag)
     ) {
       console.log(
@@ -803,8 +827,10 @@ async function updatePlugin(
   coreVersion: string,
   pluginsData: PluginsJson,
 ): Promise<void> {
+  const currentVersion = installedVersion(entry);
+
   console.log(`\nChecking for updates to "${entry.alias}"...`);
-  console.log(`  Current version: ${entry.version}`);
+  console.log(`  Current version: ${currentVersion}`);
 
   const events = await queryPluginEvents(pool);
 
@@ -836,11 +862,11 @@ async function updatePlugin(
   const pluginDir = join(ROOT, 'plugins', entry.alias);
 
   if (selected.kind === 'catalog') {
-    if (normalizeRefTag(selected.ref.tag) === normalizeRefTag(entry.version)) {
-      console.log(`✓ Already up to date (${entry.version}).`);
+    if (normalizeRefTag(selected.ref.tag) === normalizeRefTag(currentVersion)) {
+      console.log(`✓ Already up to date (${currentVersion}).`);
       process.exit(0);
     }
-  } else if (entry.version === PLUGIN_VERSION_HEAD) {
+  } else if (currentVersion === PLUGIN_VERSION_HEAD) {
     const pullResult = Bun.spawnSync(['git', 'pull', '--ff-only'], {
       cwd: pluginDir,
       stdio: ['inherit', 'inherit', 'inherit'],
@@ -862,7 +888,7 @@ async function updatePlugin(
 
   const label = selectedVersionLabel(selected);
 
-  console.log(`\nUpdating ${entry.alias}: ${entry.version} → ${label}`);
+  console.log(`\nUpdating ${entry.alias}: ${currentVersion} → ${label}`);
 
   if (selected.kind === 'catalog') {
     const fetchResult = Bun.spawnSync(['git', 'fetch', '--tags'], {
@@ -909,7 +935,13 @@ async function updatePlugin(
   }
 
   const idx = pluginsData.plugins.findIndex((p) => p.alias === entry.alias);
-  pluginsData.plugins[idx] = { ...entry, version: label };
+
+  pluginsData.plugins[idx] = {
+    alias: entry.alias,
+    ...(entry.name ? { name: entry.name } : {}),
+    repo: entry.repo,
+  };
+
   writePluginsJson(pluginsData);
   console.log('✓ plugins.json updated.');
 
@@ -1030,8 +1062,6 @@ async function installPlugin(
     process.exit(1);
   }
 
-  const installLabel = selectedVersionLabel(selected);
-
   console.log('\nThe alias is used for:');
   console.log('  • Plugin folder:   plugins/<alias>/');
   console.log('  • Bot commands:    !<alias> list, !<alias> add, etc.');
@@ -1097,9 +1127,7 @@ async function installPlugin(
       process.exit(1);
     }
   } else {
-    console.log(
-      `\nCloning ${plugin.repo} (default branch, shallow) — recorded as "${PLUGIN_VERSION_HEAD}" in plugins.json...`,
-    );
+    console.log(`\nCloning ${plugin.repo} (default branch, shallow)...`);
 
     const cloneResult = Bun.spawnSync(
       ['git', 'clone', '--depth', '1', plugin.repo, destDir],
@@ -1116,8 +1144,8 @@ async function installPlugin(
 
   pluginsData.plugins.push({
     alias,
+    name: plugin.name,
     repo: plugin.repo,
-    version: installLabel,
   });
 
   writePluginsJson(pluginsData);

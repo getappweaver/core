@@ -12,7 +12,7 @@ import { renderPluginsInstallWeb } from './renderers/web';
 
 const PLUGIN_KIND = 32107;
 
-const PLUGIN_QUERY_RELAYS = [
+export const PLUGIN_QUERY_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://nos.lol',
@@ -55,10 +55,11 @@ export type PluginAuthorIdentity = {
   verified: boolean;
 };
 
-type InstalledPluginEntry = {
+export type InstalledPluginEntry = {
   alias: string;
+  name?: string;
   repo: string;
-  version: string;
+  version?: string;
 };
 
 type PluginsJson = {
@@ -318,7 +319,9 @@ function readCoreVersion(dmBotRoot: string): string {
   return pkg.version;
 }
 
-function readInstalledPlugins(dmBotRoot: string): InstalledPluginEntry[] {
+export function readInstalledPlugins(
+  dmBotRoot: string,
+): InstalledPluginEntry[] {
   const pluginsJsonPath = join(dmBotRoot, 'plugins.json');
 
   if (!existsSync(pluginsJsonPath)) {
@@ -338,8 +341,10 @@ function readInstalledPlugins(dmBotRoot: string): InstalledPluginEntry[] {
       entry !== null &&
       typeof entry === 'object' &&
       typeof entry.alias === 'string' &&
+      (typeof entry.name === 'undefined' || typeof entry.name === 'string') &&
       typeof entry.repo === 'string' &&
-      typeof entry.version === 'string'
+      (typeof entry.version === 'undefined' ||
+        typeof entry.version === 'string')
     );
   });
 }
@@ -365,8 +370,10 @@ function readPluginsJson(dmBotRoot: string): PluginsJson {
         entry !== null &&
         typeof entry === 'object' &&
         typeof entry.alias === 'string' &&
+        (typeof entry.name === 'undefined' || typeof entry.name === 'string') &&
         typeof entry.repo === 'string' &&
-        typeof entry.version === 'string'
+        (typeof entry.version === 'undefined' ||
+          typeof entry.version === 'string')
       );
     }),
   };
@@ -443,7 +450,33 @@ function latestCompatibleRef(
   );
 }
 
-function suggestedAlias(pluginName: string): string {
+export function readLocalPluginPackageVersion({
+  dmBotRoot,
+  alias,
+}: {
+  dmBotRoot: string;
+  alias: string;
+}): string | null {
+  const pkgPath = join(dmBotRoot, 'plugins', alias, 'package.json');
+
+  if (!existsSync(pkgPath)) {
+    return null;
+  }
+
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+      version?: unknown;
+    };
+
+    return typeof pkg.version === 'string' && pkg.version.trim().length > 0
+      ? pkg.version.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function suggestedAlias(pluginName: string): string {
   return pluginName
     .replace(/^(?:appweaver|dm-bot)-/, '')
     .replace(/-plugin$/, '');
@@ -485,6 +518,7 @@ async function installCatalogEntry({
     entries: await queryPluginCatalog(ctx),
     installedPlugins,
     coreVersion,
+    dmBotRoot: ctx.dmBotRoot,
   });
 
   const normalizedTarget = target.trim().toLowerCase();
@@ -503,9 +537,13 @@ async function installCatalogEntry({
   }
 
   if (entry.installedAlias) {
+    const installedVersion = entry.installedVersion
+      ? ` @ ${entry.installedVersion}`
+      : '';
+
     return {
       success: false,
-      message: `Plugin already installed as ${entry.installedAlias} @ ${entry.installedVersion}.`,
+      message: `Plugin already installed as ${entry.installedAlias}${installedVersion}.`,
     };
   }
 
@@ -561,8 +599,8 @@ async function installCatalogEntry({
 
   pluginsData.plugins.push({
     alias,
+    name: entry.name,
     repo: entry.repo,
-    version: entry.compatibleRef.tag,
   });
 
   writePluginsJson(ctx.dmBotRoot, pluginsData);
@@ -579,29 +617,36 @@ type AttachInstalledStateProps = {
   entries: PluginCatalogEntry[];
   installedPlugins: InstalledPluginEntry[];
   coreVersion: string;
+  dmBotRoot: string;
 };
 
 function attachInstalledState({
   entries,
   installedPlugins,
   coreVersion,
+  dmBotRoot,
 }: AttachInstalledStateProps): PluginCatalogEntry[] {
   return entries.map((entry) => {
     const installed = installedPlugins.find(
-      (plugin) => plugin.repo === entry.repo || plugin.alias === entry.name,
+      (plugin) =>
+        plugin.repo === entry.repo ||
+        plugin.name === entry.name ||
+        plugin.alias === entry.name,
     );
 
     return {
       ...entry,
       installedAlias: installed?.alias ?? null,
-      installedVersion: installed?.version ?? null,
+      installedVersion: installed
+        ? readLocalPluginPackageVersion({ dmBotRoot, alias: installed.alias })
+        : null,
       compatibleRef: latestCompatibleRef(entry.refs, coreVersion),
       latestRef: entry.refs.at(-1) ?? null,
     };
   });
 }
 
-async function queryPluginCatalog(
+export async function queryPluginCatalog(
   ctx: RouteCommandContext,
 ): Promise<PluginCatalogEntry[]> {
   const eventsById = new Map<string, NostrEvent>();
@@ -684,6 +729,7 @@ export async function handlePluginsInstall(
       entries: await queryPluginCatalog(ctx),
       installedPlugins: readInstalledPlugins(ctx.dmBotRoot),
       coreVersion,
+      dmBotRoot: ctx.dmBotRoot,
     });
 
     return renderPluginsInstallWeb({
@@ -697,6 +743,7 @@ export async function handlePluginsInstall(
     entries: await queryPluginCatalog(ctx),
     installedPlugins,
     coreVersion,
+    dmBotRoot: ctx.dmBotRoot,
   });
 
   const representation: PluginsInstallRepresentation = {

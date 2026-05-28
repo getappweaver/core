@@ -24,7 +24,6 @@ type PluginEntry = {
   alias: string;
   name: string;
   repo: string;
-  version: string;
 };
 
 type PluginsJson = {
@@ -80,6 +79,14 @@ const ALLOWED_ICON_EXTS = new Set(['.svg', '.png', '.webp']);
 
 function readPluginsJson(): PluginsJson {
   return JSON.parse(readFileSync(PLUGINS_JSON, 'utf8')) as PluginsJson;
+}
+
+function readPluginVersion(alias: string): string {
+  const pkg = JSON.parse(
+    readFileSync(join(ROOT, 'plugins', alias, 'package.json'), 'utf8'),
+  ) as { version?: unknown };
+
+  return typeof pkg.version === 'string' ? pkg.version : 'unknown';
 }
 
 function resolveBotPlugin(mod: Record<string, unknown>): BotPlugin {
@@ -487,7 +494,7 @@ async function main(): Promise<void> {
       alias: entry.alias,
       name: plugin.identity.name,
       repo: entry.repo,
-      version: entry.version,
+      version: readPluginVersion(entry.alias),
       commandStoryCount: pluginStoryData.stories.length,
       aiStoryCount: aiData.stories.length,
     });

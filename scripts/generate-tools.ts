@@ -32,7 +32,6 @@ type PluginEntry = {
   alias: string;
   name: string;
   repo: string;
-  version: string;
 };
 
 type PluginsJson = {

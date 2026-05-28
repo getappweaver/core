@@ -85,8 +85,8 @@ const PackageJsonSchema = z.object({
 
 const PluginEntrySchema = z.object({
   alias: z.string().min(1),
+  name: z.string().min(1).optional(),
   repo: z.string().min(1),
-  version: z.string().min(1),
 });
 
 const PluginsJsonSchema = z.object({

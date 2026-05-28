@@ -15,7 +15,7 @@ export function renderPluginsInstallText(
 
   for (const entry of representation.entries) {
     const status = entry.installedAlias
-      ? `installed as ${entry.installedAlias} @ ${entry.installedVersion}`
+      ? `installed as ${entry.installedAlias}${entry.installedVersion ? ` @ ${entry.installedVersion}` : ''}`
       : entry.compatibleRef
         ? `compatible: ${entry.compatibleRef.tag}`
         : `not compatible with core ${representation.coreVersion}`;

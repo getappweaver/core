@@ -2,6 +2,8 @@ import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 
 import { handlePluginsInstall } from './install/handler';
+import { handlePluginsPublish } from './publish/handler';
+import { handlePluginsReleases } from './releases/handler';
 
 export const handlePluginsRoot: BuiltinHandler = (ctx) => {
   const sub = ctx.args[0]?.toLowerCase() ?? 'install';
@@ -23,7 +25,21 @@ export const handlePluginsRoot: BuiltinHandler = (ctx) => {
     );
   }
 
+  if (sub === 'releases' || sub === 'release' || sub === 'publish-status') {
+    return handleError(
+      async () => handlePluginsReleases(ctx),
+      'Failed to list plugin releases',
+    );
+  }
+
+  if (sub === 'publish') {
+    return handleError(
+      async () => handlePluginsPublish(ctx),
+      'Failed to publish plugin',
+    );
+  }
+
   return Promise.resolve(
-    `Unknown plugins command: ${sub}. Try ${ctx.prefix}plugins install`,
+    `Unknown plugins command: ${sub}. Try ${ctx.prefix}plugins install, ${ctx.prefix}plugins releases, or ${ctx.prefix}plugins publish <alias>`,
   );
 };

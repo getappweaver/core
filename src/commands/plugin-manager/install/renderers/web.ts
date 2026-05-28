@@ -66,7 +66,7 @@ function versionStatus(
   let tone: 'muted' | 'success' | 'warning';
 
   if (entry.installedAlias) {
-    label = `Installed: ${entry.installedAlias} @ ${entry.installedVersion}`;
+    label = `Installed: ${entry.installedAlias}${entry.installedVersion ? ` @ ${entry.installedVersion}` : ''}`;
     tone = 'success';
   } else if (entry.compatibleRef) {
     label = `Compatible: ${entry.compatibleRef.tag}`;
