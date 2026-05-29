@@ -45,6 +45,7 @@ type HeaderChromeProps = {
   onEnablePiperTts?: () => void;
   onOpenNostrSearchRelays: () => void;
   onOpenLayoutSettings?: () => void;
+  onRestartBot: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
 
@@ -455,6 +456,18 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               </WebButton>
             </div>
           </Show>
+          <WebButton
+            type="button"
+            class="connect-btn"
+            disabled={!props.wsConnected()}
+            onClick={() => {
+              closeAllMenus();
+              props.onRestartBot();
+            }}
+            title="Run /bot restart"
+          >
+            Restart
+          </WebButton>
         </div>
       </Show>
     </header>

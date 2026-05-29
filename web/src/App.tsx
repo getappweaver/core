@@ -1960,6 +1960,25 @@ function AppInner(): JSX.Element {
       ensureCommandDetail,
     });
 
+  async function restartBotFromAccountMenu(): Promise<void> {
+    try {
+      const detail = await ensureCommandDetail('bot');
+
+      const subcommand = detail.subcommands.find(
+        (entry) =>
+          entry.name === 'restart' || entry.aliases.includes('restart'),
+      );
+
+      if (!subcommand) {
+        throw new Error('Unknown subcommand: restart');
+      }
+
+      await runCommand('bot', subcommand, defaultPayload(subcommand));
+    } catch (err) {
+      appendSystemMessage(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   const { submitComposer, useComposerFocus } = useComposer({
     composerText,
     pendingPromptRequestId,
@@ -2429,6 +2448,9 @@ function AppInner(): JSX.Element {
             onOpenLayoutSettings={
               desktopLayoutEnabled() ? openLayoutSettings : undefined
             }
+            onRestartBot={() => {
+              void restartBotFromAccountMenu();
+            }}
             onAnyMenuOpenChange={setHeaderMenusOpen}
           />
           <main class="chat-shell">
