@@ -47,6 +47,7 @@ export type PluginCatalogEntry = {
   installedVersion: string | null;
   compatibleRef: RefEntry | null;
   latestRef: RefEntry | null;
+  changelogRefs: RefEntry[];
   updateAvailable: boolean;
 };
 
@@ -111,6 +112,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     installedVersion: null,
     compatibleRef: null,
     latestRef: refs.at(-1) ?? null,
+    changelogRefs: [],
     updateAvailable: false,
   };
 }
@@ -492,6 +494,40 @@ function isUpdateAvailable(
   return compared === null ? true : compared < 0;
 }
 
+type ChangelogRefsForTargetProps = {
+  refs: RefEntry[];
+  installedVersion: string | null;
+  compatibleRef: RefEntry | null;
+};
+
+function changelogRefsForTarget({
+  refs,
+  installedVersion,
+  compatibleRef,
+}: ChangelogRefsForTargetProps): RefEntry[] {
+  if (!compatibleRef) {
+    return [];
+  }
+
+  const targetVersion = compatibleRef.tag;
+
+  return refs.filter((ref) => {
+    const refToTarget = comparePluginVersions(ref.tag, targetVersion);
+
+    if (refToTarget === null || refToTarget > 0) {
+      return false;
+    }
+
+    if (!installedVersion) {
+      return normalizeRefTag(ref.tag) === normalizeRefTag(targetVersion);
+    }
+
+    const refToInstalled = comparePluginVersions(ref.tag, installedVersion);
+
+    return refToInstalled === null ? false : refToInstalled > 0;
+  });
+}
+
 export function readLocalPluginPackageVersion({
   dmBotRoot,
   alias,
@@ -786,6 +822,11 @@ function attachInstalledState({
       installedVersion,
       compatibleRef,
       latestRef: entry.refs.at(-1) ?? null,
+      changelogRefs: changelogRefsForTarget({
+        refs: entry.refs,
+        installedVersion,
+        compatibleRef,
+      }),
       updateAvailable: installed
         ? isUpdateAvailable(installedVersion, compatibleRef)
         : false,

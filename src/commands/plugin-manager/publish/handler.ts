@@ -33,6 +33,8 @@ const PLUGIN_PUBLISH_RELAYS = [
   'wss://nostr.mom',
 ];
 
+const CHANGELOG_COMMIT_LIMIT = 20;
+
 type RefEntry = {
   tag: string;
   coreApiVersion: string;
@@ -240,6 +242,126 @@ function verifyRemoteRefs({
   }
 }
 
+function fetchLocalTags(pluginDir: string): void {
+  Bun.spawnSync(['git', 'fetch', '--tags'], {
+    cwd: pluginDir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+}
+
+type GitCommitSubjectsProps = {
+  pluginDir: string;
+  fromTag: string | null;
+  toTag: string;
+};
+
+function gitCommitSubjects({
+  pluginDir,
+  fromTag,
+  toTag,
+}: GitCommitSubjectsProps): string[] {
+  const range = fromTag ? `${fromTag}..${toTag}` : toTag;
+
+  const result = Bun.spawnSync(
+    [
+      'git',
+      'log',
+      `--max-count=${CHANGELOG_COMMIT_LIMIT}`,
+      '--format=%s',
+      range,
+    ],
+    {
+      cwd: pluginDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  );
+
+  if (result.exitCode !== 0) {
+    return [];
+  }
+
+  return result.stdout
+    .toString()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+type ChangelogFromCommitMessagesProps = {
+  pluginDir: string;
+  previousTag: string | null;
+  versionTag: string;
+};
+
+function changelogFromCommitMessages({
+  pluginDir,
+  previousTag,
+  versionTag,
+}: ChangelogFromCommitMessagesProps): string {
+  const subjects = gitCommitSubjects({
+    pluginDir,
+    fromTag: previousTag,
+    toTag: versionTag,
+  });
+
+  return subjects.length > 0
+    ? subjects.map((subject) => `• ${subject}`).join('\n')
+    : `Release ${versionTag}`;
+}
+
+function isGeneratedFallbackChangelog(ref: RefEntry): boolean {
+  const changelog = ref.changelog.trim();
+
+  return (
+    changelog.length === 0 ||
+    changelog === `Release ${ref.tag}` ||
+    /^Release v?\d+(?:\.\d+){0,2}/i.test(changelog)
+  );
+}
+
+type RefsWithCommitChangelogsProps = {
+  pluginDir: string;
+  refs: RefEntry[];
+};
+
+function refsWithCommitChangelogs({
+  pluginDir,
+  refs,
+}: RefsWithCommitChangelogsProps): RefEntry[] {
+  return refs.map((ref, index) => {
+    if (!isGeneratedFallbackChangelog(ref)) {
+      return ref;
+    }
+
+    return {
+      ...ref,
+      changelog: changelogFromCommitMessages({
+        pluginDir,
+        previousTag: refs[index - 1]?.tag ?? null,
+        versionTag: ref.tag,
+      }),
+    };
+  });
+}
+
+function refsEqual(left: RefEntry[], right: RefEntry[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((ref, index) => {
+      const rightRef = right[index];
+
+      return (
+        rightRef !== undefined &&
+        ref.tag === rightRef.tag &&
+        ref.coreApiVersion === rightRef.coreApiVersion &&
+        ref.changelog === rightRef.changelog
+      );
+    })
+  );
+}
+
 async function fetchPluginPublishRelays({
   ctx,
   authorPubkey,
@@ -352,7 +474,29 @@ export async function handlePluginsPublish(
 
   const versionTag = `v${pkg.version}`;
 
-  if (published.refs.some((ref) => ref.tag === versionTag)) {
+  const repo = readGitRemote({
+    dmBotRoot: ctx.dmBotRoot,
+    alias,
+    fallbackRepo: installed.repo,
+  });
+
+  const pluginDir = join(ctx.dmBotRoot, 'plugins', alias);
+
+  fetchLocalTags(pluginDir);
+
+  const refsWithBackfilledChangelogs = refsWithCommitChangelogs({
+    pluginDir,
+    refs: published.refs,
+  });
+
+  const versionAlreadyPublished = refsWithBackfilledChangelogs.some(
+    (ref) => ref.tag === versionTag,
+  );
+
+  if (
+    versionAlreadyPublished &&
+    refsEqual(published.refs, refsWithBackfilledChangelogs)
+  ) {
     const representation: PluginsPublishRepresentation = {
       alias,
       pluginName: pkg.name,
@@ -370,20 +514,24 @@ export async function handlePluginsPublish(
 
   const connection = findAuthorConnection({ ctx, published });
 
-  const repo = readGitRemote({
-    dmBotRoot: ctx.dmBotRoot,
-    alias,
-    fallbackRepo: installed.repo,
+  const previousRef = refsWithBackfilledChangelogs.at(-1) ?? null;
+
+  const changelog = changelogFromCommitMessages({
+    pluginDir,
+    previousTag: previousRef?.tag ?? null,
+    versionTag,
   });
 
-  const refs = [
-    ...published.refs,
-    {
-      tag: versionTag,
-      coreApiVersion: pkg.coreApiVersion,
-      changelog: `Release ${versionTag}`,
-    },
-  ];
+  const refs = versionAlreadyPublished
+    ? refsWithBackfilledChangelogs
+    : [
+        ...refsWithBackfilledChangelogs,
+        {
+          tag: versionTag,
+          coreApiVersion: pkg.coreApiVersion,
+          changelog,
+        },
+      ];
 
   verifyRemoteRefs({ repo, refs });
 

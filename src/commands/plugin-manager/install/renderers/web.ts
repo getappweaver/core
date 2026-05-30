@@ -28,6 +28,15 @@ const pluginsInstallStylesheet = {
       gap: 0.5rem;
     }
 
+    .web-box.plugins-install-changelog-panel {
+      border-left: 2px solid var(--color-warning, currentColor);
+      background: color-mix(in srgb, var(--color-warning, currentColor) 9%, transparent);
+    }
+
+    .web-stack.plugins-install-changelog-list {
+      gap: 0.35rem;
+    }
+
     .web-stack.plugins-install-card-main {
       min-width: 0;
       flex: 1 1 auto;
@@ -133,6 +142,68 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
   };
 }
 
+function changelogRevealId(entry: PluginCatalogEntry): string {
+  return `plugin-changelog-${entry.id}`.replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
+function changelogButton(entry: PluginCatalogEntry): WebNode | null {
+  if (entry.changelogRefs.length === 0) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'button',
+    props: {
+      label: 'Changelog',
+      className: 'web-button',
+      action: {
+        type: 'toggleReveal',
+        targetId: changelogRevealId(entry),
+      },
+    },
+  };
+}
+
+function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
+  if (entry.changelogRefs.length === 0) {
+    return null;
+  }
+
+  const label = entry.installedAlias
+    ? `Changes from ${entry.installedVersion ?? 'current'} to ${entry.compatibleRef?.tag ?? 'latest'}`
+    : `Release notes for ${entry.compatibleRef?.tag ?? 'latest'}`;
+
+  return {
+    type: 'element',
+    tag: 'box',
+    props: {
+      padding: 'sm',
+      className: 'plugins-install-changelog-panel',
+      revealId: changelogRevealId(entry),
+      hiddenUntilRevealed: true,
+    },
+    children: [
+      {
+        type: 'element',
+        tag: 'stack',
+        props: { gap: 'sm', className: 'plugins-install-changelog-list' },
+        children: [
+          {
+            type: 'element',
+            tag: 'text',
+            props: { weight: 'semibold', size: 'sm', tone: 'warning' },
+            children: [textNode(label)],
+          },
+          ...entry.changelogRefs.map((ref) =>
+            textBlock(`${ref.tag}\n${ref.changelog}`, 'default'),
+          ),
+        ],
+      },
+    ],
+  };
+}
+
 function pluginIcon(entry: PluginCatalogEntry): WebNode | null {
   if (
     !entry.icon.startsWith('data:image/svg+xml;base64,') &&
@@ -227,6 +298,8 @@ function sourceCodeLink(entry: PluginCatalogEntry): WebNode | null {
 
 function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   const action = installButton(entry);
+  const changelog = changelogButton(entry);
+  const changelogDetails = changelogPanel(entry);
   const icon = pluginIcon(entry);
   const source = sourceCodeLink(entry);
 
@@ -262,7 +335,7 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
             props: { gap: 'sm', className: 'plugins-install-card-actions' },
             children: [versionStatus(entry, coreVersion)],
           },
-          ...(action
+          ...(action || changelog
             ? [
                 {
                   type: 'element' as const,
@@ -271,10 +344,13 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
                     gap: 'sm' as const,
                     className: 'plugins-install-card-actions',
                   },
-                  children: [action],
+                  children: [action, changelog].filter(
+                    (node): node is WebNode => node !== null,
+                  ),
                 },
               ]
             : []),
+          ...(changelogDetails ? [changelogDetails] : []),
         ],
       },
     ],

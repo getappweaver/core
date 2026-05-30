@@ -1,5 +1,13 @@
 import type { PluginsInstallRepresentation } from '../handler';
 
+function changelogLabel(installedAlias: string | null): string {
+  return installedAlias ? 'changes' : 'release notes';
+}
+
+function indentedChangelog(changelog: string): string[] {
+  return changelog.split('\n').map((line) => `      ${line}`);
+}
+
 export function renderPluginsInstallText(
   representation: PluginsInstallRepresentation,
   options: { prefix: string },
@@ -31,6 +39,15 @@ export function renderPluginsInstallText(
 
     if (entry.description) {
       lines.push(`  ${entry.description}`);
+    }
+
+    if (entry.changelogRefs.length > 0) {
+      lines.push(`  ${changelogLabel(entry.installedAlias)}:`);
+
+      for (const ref of entry.changelogRefs) {
+        lines.push(`    ${ref.tag}:`);
+        lines.push(...indentedChangelog(ref.changelog));
+      }
     }
 
     lines.push(`  repo: ${entry.repo}`);
