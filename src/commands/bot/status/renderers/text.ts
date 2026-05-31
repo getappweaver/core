@@ -40,10 +40,20 @@ export function renderBotStatusText(
       ? `${STATUS_EMOJI.provider('routstr')} ${C.magenta}routstr${C.reset} (budget: ${formatMsats(msats(d.routstrBudgetMsatsRaw ?? 0))})`
       : `${STATUS_EMOJI.provider('local')} local`;
 
+  const updateDisplay = d.coreUpdate
+    ? d.coreUpdate.state === 'available'
+      ? ` ${C.green}(update available: ${d.coreUpdate.remoteRef ?? 'remote'})${C.reset}`
+      : d.coreUpdate.state === 'checking'
+        ? ` ${C.gray}(checking for updates…)${C.reset}`
+        : d.coreUpdate.state === 'unavailable'
+          ? ` ${C.gray}(update check unavailable)${C.reset}`
+          : ` ${C.gray}(up to date)${C.reset}`
+    : '';
+
   const lines = [
     `${lbl('Backend')} ${STATUS_EMOJI.backend(d.backend)} ${C.magenta}${d.backend}${C.reset}`,
     `${lbl('Provider')} ${providerDisplay}`,
-    `${lbl('Version')} ${d.version}`,
+    `${lbl('Version')} ${d.version}${updateDisplay}`,
     `${lbl('Mode')} ${STATUS_EMOJI.mode(d.mode)} ${d.mode}`,
     `${lbl('Linting')} ${STATUS_EMOJI.linting(d.linting)} ${d.linting}`,
     `${lbl('Model')} ${modelDisplay}`,

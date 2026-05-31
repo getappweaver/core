@@ -4,6 +4,7 @@
 
 import type { SimplePool } from 'nostr-tools/pool';
 
+import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
@@ -27,6 +28,7 @@ export type StartLocalWebServerOptions = {
   parentOfBotRoot: string;
   dmBotRoot: string;
   attachUrl: string | null;
+  coreUpdateChecker: CoreUpdateChecker | null;
   botPubkey: string | null;
   seenDb: CoreDb;
   pool: SimplePool;
@@ -213,6 +215,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     parentOfBotRoot: options.parentOfBotRoot,
     dmBotRoot: options.dmBotRoot,
     attachUrl: options.attachUrl,
+    coreUpdateChecker: options.coreUpdateChecker,
     botPubkey: options.botPubkey,
     seenDb: options.seenDb,
     pool: options.pool,

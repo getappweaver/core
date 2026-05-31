@@ -13,6 +13,7 @@ import { getBotPushSubcommandDefinition } from './push/definition';
 import { getBotReadySubcommandDefinition } from './ready/definition';
 import { getBotRestartSubcommandDefinition } from './restart/definition';
 import { getBotStatusSubcommandDefinition } from './status/definition';
+import { getBotUpdateCheckSubcommandDefinition } from './update-check/definition';
 import { getBotVersionSubcommandDefinition } from './version/definition';
 import { getBotWorkspaceSubcommandDefinition } from './workspace/definition';
 
@@ -37,6 +38,7 @@ export function getBotCommandDefinition({
         exampleTopics: ['workspace', 'lint', 'restart'],
       }),
       getBotStatusSubcommandDefinition(p),
+      getBotUpdateCheckSubcommandDefinition(p),
       getBotVersionSubcommandDefinition(p),
       getBotPingSubcommandDefinition(p),
       getBotIdentitySubcommandDefinition(p),

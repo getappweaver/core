@@ -69,6 +69,40 @@ function opencodeModelFormChoices(
   ];
 }
 
+function updateStatusValue(d: BotStatusData): string {
+  const update = d.coreUpdate;
+
+  if (!update) {
+    return d.version;
+  }
+
+  if (update.state === 'available') {
+    return `${d.version} · update available`;
+  }
+
+  if (update.state === 'checking') {
+    return `${d.version} · checking…`;
+  }
+
+  if (update.state === 'unavailable') {
+    return `${d.version} · check unavailable`;
+  }
+
+  return `${d.version} · up to date`;
+}
+
+function updateStatusTone(d: BotStatusData): WebTone | null {
+  if (d.coreUpdate?.state === 'available') {
+    return 'success';
+  }
+
+  if (d.coreUpdate?.state === 'unavailable') {
+    return 'muted';
+  }
+
+  return null;
+}
+
 function overflowMenu(
   label: string,
   items: NonNullable<KvRowProps['menuItems']>,
@@ -277,6 +311,16 @@ export function renderBotStatusWeb(
     },
   ];
 
+  const versionMenuItems = [
+    {
+      label: 'Check for updates',
+      action: commandAction({
+        command: 'bot',
+        subcommand: 'update-check',
+      }),
+    },
+  ];
+
   const rootModelMenuItems = [
     {
       label: d.opencodeRootModel ? 'Change root model' : 'Set root model',
@@ -406,11 +450,22 @@ export function renderBotStatusWeb(
     }),
     kvRow({
       label: 'Version',
-      value: d.version,
-      valueTone: null,
+      value: updateStatusValue(d),
+      valueTone: updateStatusTone(d),
       nowrapValue: true,
+      menuItems: versionMenuItems,
     }),
   );
+
+  if (d.coreUpdate?.message) {
+    rows.push(
+      kvRow({
+        label: 'Update',
+        value: d.coreUpdate.message,
+        valueTone: d.coreUpdate.state === 'available' ? 'success' : 'muted',
+      }),
+    );
+  }
 
   if (d.opencodeServeUrl) {
     rows.push(

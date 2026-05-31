@@ -903,6 +903,11 @@ pre {
   color: #000;
 }
 
+.connect-btn.topbar-widget-update-available {
+  background: var(--color-success);
+  color: #000;
+}
+
 .app-shell[data-demo-mode='true']
   .topbar-menu-btn[data-story-target='header-widget:story:list'],
 .app-shell[data-demo-mode='true']
@@ -914,6 +919,11 @@ pre {
 .connect-btn.topbar-widget-active:hover,
 .connect-btn.topbar-widget-active:focus-visible {
   background: var(--color-warning);
+}
+
+.connect-btn.topbar-widget-update-available:hover,
+.connect-btn.topbar-widget-update-available:focus-visible {
+  background: var(--color-success);
 }
 
 .story-walkthrough {

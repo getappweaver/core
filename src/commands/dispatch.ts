@@ -6,6 +6,7 @@ import type { VerifiedEvent } from 'nostr-tools';
 import type { SimplePool } from 'nostr-tools/pool';
 
 import type { PromptFn, RunAgentFn, SendReplyFn } from '@src/core/plugin';
+import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { MessageSource } from '@src/messaging';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
@@ -70,6 +71,7 @@ export type RouteCommandProps = {
   prefix: string;
   botRelayUrls: string[];
   version: string;
+  coreUpdateChecker: CoreUpdateChecker | null;
   parentOfBotRoot: string;
   dmBotRoot: string;
   attachUrl: string | null;

@@ -76,6 +76,7 @@ import type { CommandPayload, CommandDetail, TimelineItem } from './types';
 import {
   createId,
   defaultPayload,
+  fetchJson,
   getSubcommandQueryFromPalette,
   hasMissingRequiredInputs,
   matchesCommandToken,
@@ -149,6 +150,13 @@ type HeaderWidget = {
   modalTitle: string;
   icon?: string;
   order?: number;
+};
+
+type CoreUpdateResponse = {
+  ok: boolean;
+  update: {
+    state: 'checking' | 'available' | 'up_to_date' | 'unavailable';
+  } | null;
 };
 
 type DemoWidgetQuery = {
@@ -264,6 +272,7 @@ function AppInner(): JSX.Element {
 
   const [pushBusy, setPushBusy] = createSignal(false);
   const [piperTtsBusy, setPiperTtsBusy] = createSignal(false);
+  const [coreUpdateAvailable, setCoreUpdateAvailable] = createSignal(false);
 
   const [piperTtsEnabled, setPiperTtsEnabled] =
     createSignal(isPiperTtsEnabled());
@@ -1820,6 +1829,21 @@ function AppInner(): JSX.Element {
     requestComposerAiState();
   }
 
+  async function refreshCoreUpdateState(): Promise<void> {
+    if (auth.authState().status !== 'connected') {
+      setCoreUpdateAvailable(false);
+
+      return;
+    }
+
+    try {
+      const result = await fetchJson<CoreUpdateResponse>('/api/core-update');
+      setCoreUpdateAvailable(result.update?.state === 'available');
+    } catch {
+      setCoreUpdateAvailable(false);
+    }
+  }
+
   function saveTimelineFormBridge(
     item: Extract<TimelineItem, { type: 'command_form' }>,
   ): void {
@@ -2227,10 +2251,13 @@ function AppInner(): JSX.Element {
     const status = auth.authState().status;
 
     if (status !== 'connected' || !wsConnected()) {
+      setCoreUpdateAvailable(false);
+
       return;
     }
 
     void refreshComposerAiState();
+    void refreshCoreUpdateState();
   });
 
   createEffect(() => {
@@ -2415,6 +2442,7 @@ function AppInner(): JSX.Element {
             pushBusy={pushBusy}
             piperTtsBusy={piperTtsBusy}
             piperTtsEnabled={piperTtsEnabled}
+            hasCoreUpdate={coreUpdateAvailable}
             onWidgetElement={(widget, el) => {
               const key = storyTargetHeaderWidgetKey(
                 widget.command,

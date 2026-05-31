@@ -14,6 +14,7 @@ export function statusPropsFromContext(ctx: RouteCommandContext) {
     botRelayUrls: ctx.botRelayUrls,
     seenDb: ctx.seenDb,
     version: ctx.version,
+    coreUpdate: ctx.coreUpdateChecker?.getSnapshot() ?? null,
     dmBotRoot: ctx.dmBotRoot,
     parentOfBotRoot: ctx.parentOfBotRoot,
     attachUrl: ctx.attachUrl,

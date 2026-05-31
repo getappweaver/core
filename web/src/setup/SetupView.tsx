@@ -1715,6 +1715,7 @@ function SetupChrome(props: { children: JSX.Element }): JSX.Element {
         pushBusy={() => false}
         piperTtsBusy={() => false}
         piperTtsEnabled={() => false}
+        hasCoreUpdate={() => false}
         onOpenWidget={() => undefined}
         onConnect={connect.handleConnectMenuClick}
         onLogout={auth.logout}

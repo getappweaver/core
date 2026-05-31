@@ -34,6 +34,7 @@ type HeaderChromeProps = {
   pushBusy: Accessor<boolean>;
   piperTtsBusy?: Accessor<boolean>;
   piperTtsEnabled?: Accessor<boolean>;
+  hasCoreUpdate: Accessor<boolean>;
   onOpenWidget: (widget: HeaderChromeWidget) => void;
   onWidgetElement?: (
     widget: HeaderChromeWidget,
@@ -289,6 +290,10 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               ref={(el) => props.onWidgetElement?.(widget, el)}
               classList={{
                 'topbar-widget-active': props.isWidgetActive(widget),
+                'topbar-widget-update-available':
+                  widget.command === 'bot' &&
+                  widget.subcommand === 'status' &&
+                  props.hasCoreUpdate(),
               }}
               disabled={!props.wsConnected()}
               onClick={() => openWidget(widget)}

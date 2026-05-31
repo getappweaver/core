@@ -16,6 +16,7 @@ import {
   getOpencodeSetupAuthStatus,
 } from '@src/backends/opencode-sdk';
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
+import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
@@ -69,6 +70,7 @@ export type WebRouteContext = {
   parentOfBotRoot: string;
   dmBotRoot: string;
   attachUrl: string | null;
+  coreUpdateChecker: CoreUpdateChecker | null;
   botPubkey: string | null;
   seenDb: CoreDb;
   pool: SimplePool;
@@ -630,6 +632,23 @@ export function createWebFetchHandler(
       return jsonResponse({
         commands: listAllCommandsDetailForWeb(ctx.prefix),
       });
+    }
+
+    if (req.method === 'GET' && path === '/api/core-update') {
+      return jsonResponse({
+        ok: true,
+        update: ctx.coreUpdateChecker?.getSnapshot() ?? null,
+      });
+    }
+
+    if (req.method === 'POST' && path === '/api/core-update/check') {
+      if (!ctx.coreUpdateChecker) {
+        return jsonResponse({ ok: true, update: null });
+      }
+
+      return ctx.coreUpdateChecker
+        .checkNow()
+        .then((update) => jsonResponse({ ok: true, update }));
     }
 
     if (req.method === 'GET' && path === '/api/bunker/connections') {

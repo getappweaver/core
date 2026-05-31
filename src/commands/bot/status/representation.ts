@@ -7,6 +7,7 @@ import {
   listOpencodeModelCatalog,
   readOpencodeConfig,
 } from '@src/backends/opencode-config';
+import type { CoreUpdateSnapshot } from '@src/core/update-check';
 import {
   AgentBackendNameSchema,
   AgentModeSchema,
@@ -32,6 +33,7 @@ export type StatusProps = {
   botRelayUrls: string[];
   seenDb: CoreDb;
   version: string;
+  coreUpdate: CoreUpdateSnapshot | null;
   dmBotRoot: string;
   parentOfBotRoot: string;
   attachUrl: string | null;
@@ -41,6 +43,18 @@ export const BotStatusDataSchema = z.object({
   backend: AgentBackendNameSchema,
   provider: ProviderNameSchema,
   version: z.string().min(1),
+  coreUpdate: z
+    .object({
+      state: z.enum(['checking', 'available', 'up_to_date', 'unavailable']),
+      localRef: z.string().nullable(),
+      remoteRef: z.string().nullable(),
+      upstream: z.string().nullable(),
+      behind: z.number().int().nonnegative().nullable(),
+      ahead: z.number().int().nonnegative().nullable(),
+      checkedAtMs: z.number().int().nonnegative().nullable(),
+      message: z.string().nullable(),
+    })
+    .nullable(),
   mode: AgentModeSchema,
   executionProfileKind: z.enum(['mode', 'agent']),
   executionProfileDisplayName: z.string().min(1),
@@ -81,6 +95,7 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
     botRelayUrls,
     seenDb,
     version,
+    coreUpdate,
     dmBotRoot,
     parentOfBotRoot,
     attachUrl,
@@ -142,6 +157,7 @@ export function buildBotStatusData(props: StatusProps): BotStatusData {
     backend: backendName,
     provider: providerName,
     version,
+    coreUpdate,
     mode,
     executionProfileKind:
       executionProfile.kind === 'cursor' ? 'mode' : ('agent' as const),

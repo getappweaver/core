@@ -50,6 +50,7 @@ import {
   type PluginContext,
   type PromptPayload,
 } from './core/plugin';
+import { createCoreUpdateChecker } from './core/update-check';
 import {
   openCoreDb,
   initSkKeyEncryption,
@@ -119,6 +120,7 @@ function shouldShowSetupBillboard(missingEnv: string[]): boolean {
 async function startSetupOnlyMode(props: {
   setupSecret: string;
   version: string;
+  coreUpdateChecker: ReturnType<typeof createCoreUpdateChecker>;
   missingEnv: string[];
   setupBillboard: boolean;
 }): Promise<never> {
@@ -148,6 +150,7 @@ async function startSetupOnlyMode(props: {
     parentOfBotRoot,
     dmBotRoot,
     attachUrl: null,
+    coreUpdateChecker: props.coreUpdateChecker,
     botPubkey: null,
     seenDb,
     pool,
@@ -193,6 +196,7 @@ async function main() {
 
   const setupSecret = createSetupSecret();
   const VERSION = readPackageVersion();
+  const coreUpdateChecker = createCoreUpdateChecker(dmBotRoot);
   const missingEnv = getMissingRequiredBotEnv();
   const setupBillboard = shouldShowSetupBillboard(missingEnv);
 
@@ -200,6 +204,7 @@ async function main() {
     return startSetupOnlyMode({
       setupSecret,
       version: VERSION,
+      coreUpdateChecker,
       missingEnv,
       setupBillboard,
     });
@@ -280,6 +285,7 @@ async function main() {
     botRelayUrls,
     seenDb,
     version: VERSION,
+    coreUpdate: coreUpdateChecker.getSnapshot(),
     dmBotRoot,
     parentOfBotRoot,
     attachUrl: opencodeServeUrl,
@@ -302,6 +308,7 @@ async function main() {
     parentOfBotRoot,
     dmBotRoot,
     attachUrl: opencodeServeUrl,
+    coreUpdateChecker,
     botPubkey,
     seenDb,
     pool,
@@ -544,6 +551,7 @@ async function main() {
         parentOfBotRoot,
         dmBotRoot,
         attachUrl: opencodeServeUrl,
+        coreUpdateChecker,
         backend,
         botPubkey,
         walletDb,

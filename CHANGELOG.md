@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.31.0] - 2026-05-31
+
+- feat: add core update check indicator (8ab79eb)
+
 ## [v9.30.3] - 2026-05-31
 
-- fix: tame opencode sdk server CPU usage (55495b1)
+- fix: tame opencode sdk server CPU usage (410ed64)
 
 ## [v9.30.2] - 2026-05-31
 
