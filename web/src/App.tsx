@@ -2006,6 +2006,7 @@ function AppInner(): JSX.Element {
   const { submitComposer, useComposerFocus } = useComposer({
     composerText,
     pendingPromptRequestId,
+    hasPendingRequest: (requestId) => pendingRequests.has(requestId),
     setComposerText,
     setPendingPromptRequestId,
     appendSystemMessage,

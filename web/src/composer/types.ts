@@ -17,6 +17,7 @@ export type ComposerChromePromptSession = {
 export type ComposerAdapters = {
   composerText: Accessor<string>;
   pendingPromptRequestId: Accessor<string | null>;
+  hasPendingRequest: (requestId: string) => boolean;
   setComposerText: Setter<string>;
   setPendingPromptRequestId: Setter<string | null>;
   appendSystemMessage: (text: string) => void;

@@ -288,6 +288,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
   }
 
   function closeChromeModal(): void {
+    const chromePrompt = adapters.chromePromptSession();
+
+    if (
+      chromePrompt &&
+      adapters.pendingPromptRequestId() === chromePrompt.requestId
+    ) {
+      adapters.setPendingPromptRequestId(null);
+    }
+
     adapters.setChromeModal(null);
     adapters.setChromeLoading(false);
     adapters.setChromeError(null);

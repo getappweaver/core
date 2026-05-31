@@ -10,7 +10,12 @@ export function useComposer(adapters: ComposerAdapters): ComposerHook {
       return;
     }
 
-    const promptRequestId = adapters.pendingPromptRequestId();
+    let promptRequestId = adapters.pendingPromptRequestId();
+
+    if (promptRequestId && !adapters.hasPendingRequest(promptRequestId)) {
+      adapters.setPendingPromptRequestId(null);
+      promptRequestId = null;
+    }
 
     if (promptRequestId) {
       const chrome = adapters.chrome.chromePromptSession();

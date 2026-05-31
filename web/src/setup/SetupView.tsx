@@ -1722,6 +1722,7 @@ function SetupChrome(props: { children: JSX.Element }): JSX.Element {
         onEnablePush={() => undefined}
         onEnablePiperTts={() => undefined}
         onOpenNostrSearchRelays={() => undefined}
+        onRestartBot={() => undefined}
         onAnyMenuOpenChange={() => undefined}
       />
       {props.children}
