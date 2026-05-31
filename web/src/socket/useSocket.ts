@@ -10,6 +10,7 @@ import {
   consumePluginInstallSuccessMessage,
   hasActivePluginInstallRestartStatus,
 } from '../restartStatus';
+import { logStoryDebug } from '../story/debug';
 import { handleStorySandboxSocketMessage } from '../story/sandbox';
 import type { CommandDetail, CommandOutput, TimelineItem } from '../types';
 import { createId as createRequestId } from '../utils';
@@ -41,6 +42,11 @@ type DemoStoryEntry = {
     sandbox?: Record<string, unknown>;
   };
 };
+
+type CommandResultTimelineItem = Extract<
+  TimelineItem,
+  { type: 'command_result' }
+>;
 
 type ClientMessageRecord = Record<string, unknown> & {
   requestId?: string;
@@ -116,6 +122,46 @@ function storyStartRoot(params: {
       relatedStories: relatedStoryEntries(params),
     },
   };
+}
+
+function restoredTimelineItem(item: TimelineItem): TimelineItem {
+  if (item.type !== 'command_result') {
+    return item;
+  }
+
+  if (item.clientView?.view !== 'story-runtime') {
+    return item;
+  }
+
+  const payload = item.clientView.payload;
+
+  const payloadRecord =
+    typeof payload === 'object' && payload !== null
+      ? (payload as Record<string, unknown>)
+      : null;
+
+  if (payloadRecord?.autoStart !== true) {
+    return item;
+  }
+
+  return {
+    ...item,
+    clientView: {
+      ...item.clientView,
+      payload: {
+        ...payloadRecord,
+        autoStart: false,
+      },
+    },
+  };
+}
+
+function isStoryRuntimeTimelineItem(
+  item: TimelineItem,
+): item is CommandResultTimelineItem {
+  return (
+    item.type === 'command_result' && item.clientView?.view === 'story-runtime'
+  );
 }
 
 function firstFixtureOutput(stories: DemoStoryEntry[], key: string): unknown {
@@ -484,8 +530,51 @@ export function useSocket(adapters: SocketAppAdapters) {
           return;
         }
 
-        if (message.items.length > 0) {
-          adapters.setTimeline(message.items as TimelineItem[]);
+        const rawItems = message.items as TimelineItem[];
+        const restoredItems = rawItems.map(restoredTimelineItem);
+
+        const storyRuntimeItems = restoredItems.flatMap((item, index) =>
+          isStoryRuntimeTimelineItem(item)
+            ? [
+                {
+                  item,
+                  rawItem: rawItems[index] ?? item,
+                },
+              ]
+            : [],
+        );
+
+        if (storyRuntimeItems.length > 0) {
+          logStoryDebug('timeline.restore-story-runtimes', {
+            timelineId: message.timelineId,
+            count: storyRuntimeItems.length,
+            items: storyRuntimeItems.map(({ item, rawItem }) => {
+              const payload = item.clientView?.payload;
+
+              const rawPayload = isStoryRuntimeTimelineItem(rawItem)
+                ? rawItem.clientView?.payload
+                : null;
+
+              const payloadRecord =
+                typeof payload === 'object' && payload !== null
+                  ? (payload as Record<string, unknown>)
+                  : null;
+
+              return {
+                id: item.id,
+                command: item.command,
+                subcommand: item.subcommand,
+                storyId: payloadRecord?.id ?? null,
+                autoStart: payloadRecord?.autoStart ?? null,
+                restoredAutoStartDisabled: payload !== rawPayload,
+                walkthrough: payloadRecord?.walkthrough ?? null,
+              };
+            }),
+          });
+        }
+
+        if (restoredItems.length > 0) {
+          adapters.setTimeline(restoredItems);
         }
       },
     });

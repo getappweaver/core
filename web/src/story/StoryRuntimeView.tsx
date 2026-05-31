@@ -3,6 +3,7 @@ import { createEffect, createSignal, onCleanup } from 'solid-js';
 import type { StoryStep } from '@src/system/story-definition';
 import type { WebAction } from '@src/web/ui-schema';
 
+import { logStoryDebug } from './debug';
 import {
   emitStoryClearPromptsRequested,
   emitStoryPassivePlaybackChange,
@@ -134,6 +135,17 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   const [passivePaused, setPassivePaused] = createSignal(
     props.payload.walkthrough === false,
   );
+
+  logStoryDebug('runtime.mount', {
+    storyId: props.payload.id,
+    pluginAlias: props.payload.pluginAlias,
+    autoStart: props.payload.autoStart ?? null,
+    autoStartOnMount,
+    walkthrough: props.payload.walkthrough ?? null,
+    initialStepIndex,
+    stepCount: props.payload.story.steps.length,
+    pathname: window.location.pathname,
+  });
 
   const isPassivePlayback = () => props.payload.walkthrough === false;
 
@@ -338,10 +350,23 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   }
 
   if (started()) {
+    logStoryDebug('runtime.activate-on-render', {
+      storyId: props.payload.id,
+      stepIndex: stepIndex(),
+      complete: complete(),
+      autoStartOnMount,
+    });
+
     activateStorySandbox(props.payload);
   }
 
   function start(): void {
+    logStoryDebug('runtime.start', {
+      storyId: props.payload.id,
+      previousStepIndex: stepIndex(),
+      complete: complete(),
+    });
+
     activateStorySandbox(props.payload);
 
     setInstruction(
@@ -461,6 +486,13 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   }
 
   function quit(): void {
+    logStoryDebug('runtime.quit', {
+      storyId: props.payload.id,
+      stepIndex: stepIndex(),
+      started: started(),
+      complete: complete(),
+    });
+
     for (const step of steps()) {
       if (step.type !== 'complete') {
         continue;
@@ -477,6 +509,13 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     deactivateStorySandbox(props.payload);
     setComplete(true);
     setInstruction('Story quit.');
+
+    logStoryDebug('runtime.quit-complete', {
+      storyId: props.payload.id,
+      stepIndex: stepIndex(),
+      started: started(),
+      complete: true,
+    });
   }
 
   createEffect(() => {
@@ -485,6 +524,15 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     }
 
     const step = steps()[stepIndex()];
+
+    logStoryDebug('runtime.step-effect', {
+      storyId: props.payload.id,
+      stepIndex: stepIndex(),
+      stepType: step?.type ?? null,
+      started: started(),
+      complete: complete(),
+      passivePlayback: isPassivePlayback(),
+    });
 
     if (!step) {
       setComplete(true);
