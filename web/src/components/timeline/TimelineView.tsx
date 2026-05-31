@@ -45,19 +45,19 @@ export function TimelineView(props: TimelineViewProps) {
             </Match>
 
             <Match when={isChatItem(item)}>
-              <TimelineChatCard
-                id={(item as Extract<TimelineItem, { type: 'chat' }>).id}
-                role={(item as Extract<TimelineItem, { type: 'chat' }>).role}
-                text={(item as Extract<TimelineItem, { type: 'chat' }>).text}
+              <TimelineChatEntry
+                item={item as Extract<TimelineItem, { type: 'chat' }>}
                 onDeleteTimelineItem={props.onDeleteTimelineItem}
               />
             </Match>
 
             <Match when={isReasoningItem(item)}>
               <TimelineReasoningCard
+                id={(item as Extract<TimelineItem, { type: 'reasoning' }>).id}
                 text={
                   (item as Extract<TimelineItem, { type: 'reasoning' }>).text
                 }
+                onDeleteTimelineItem={props.onDeleteTimelineItem}
               />
             </Match>
 
@@ -294,14 +294,127 @@ export function TimelineSystemCard(props: TimelineSystemCardProps) {
 }
 
 type TimelineReasoningCardProps = {
+  id: string;
   text: string;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
 };
 
 function TimelineReasoningCard(props: TimelineReasoningCardProps) {
+  let cardEl: HTMLDivElement | undefined;
+
+  const [copied, setCopied] = createSignal(false);
+
+  const [speechState, setSpeechState] = createSignal<SpeechSentenceState>({
+    active: false,
+    sentenceIndex: null,
+    sentences: [],
+  });
+
+  const [seekSentenceIndex, setSeekSentenceIndex] = createSignal<number | null>(
+    null,
+  );
+
+  const speechHighlightActive = () => speechState().active;
+
+  const scrollCardToTop = () => {
+    cardEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
+  const copyThinking = async () => {
+    const text = props.text.trim();
+
+    if (!text) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  };
+
   return (
-    <div class="card agent-muted-card reasoning-card">
-      <i>Thinking:</i> {props.text}
-    </div>
+    <TimelineCollapsibleCard
+      class="card chat-card thinking-card"
+      ref={(el) => {
+        cardEl = el;
+      }}
+      expandedHeadClass="card-head--timeline-sticky"
+      expandedTrailingButtonClass="card-head__control"
+      expandedHead={
+        <>
+          <button
+            type="button"
+            class="card-head__scroll-ledge"
+            tabIndex={-1}
+            title="Scroll to top of this thinking"
+            aria-label="Scroll to top of this thinking"
+            onClick={scrollCardToTop}
+          />
+          <div class="card-head-leading">
+            <span class="tag mode-tag card-head__control">thinking</span>
+          </div>
+        </>
+      }
+      expandedHeadToolbar={
+        <div
+          class="card-head-tree-toolbar"
+          role="toolbar"
+          aria-label="Thinking"
+        >
+          <button
+            type="button"
+            class={`tag tag-button card-head__control card-head-tree-toolbar-btn card-head-chrome-btn chat-copy-btn${copied() ? ' chat-copy-btn--show-text' : ''}`}
+            title={copied() ? 'Copied thinking' : 'Copy thinking'}
+            aria-label={copied() ? 'Copied thinking' : 'Copy thinking'}
+            onClick={copyThinking}
+          >
+            <svg
+              class="chat-copy-btn__icon"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 12V2H4V0h12v12h-2zM0 4h12v12H0V4zm2 2v8h8V6H2z"
+                fill-rule="evenodd"
+              />
+            </svg>
+            {copied() && <span>copied</span>}
+          </button>
+          <TimelineSpeechButton
+            text={props.text.trim()}
+            class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
+            label="thinking"
+            seekSentenceIndex={seekSentenceIndex()}
+            onSeekHandled={() => setSeekSentenceIndex(null)}
+            onSentenceState={setSpeechState}
+          />
+        </div>
+      }
+      collapsedHeadSummary={
+        <span class="tag mode-tag card-head__control">thinking</span>
+      }
+      onDismiss={() => props.onDeleteTimelineItem(props.id)}
+    >
+      <div class="thinking-card-body">
+        <ChatMarkdown
+          text={props.text}
+          role="assistant"
+          speechSentences={
+            speechHighlightActive() ? speechState().sentences : undefined
+          }
+          activeSpeechSentenceIndex={
+            speechHighlightActive() ? speechState().sentenceIndex : null
+          }
+          onSpeechSentenceClick={
+            speechHighlightActive()
+              ? (index) => setSeekSentenceIndex(index)
+              : null
+          }
+        />
+      </div>
+    </TimelineCollapsibleCard>
   );
 }
 
@@ -330,23 +443,67 @@ function splitThinkingBlock(text: string): {
   thinking: string | null;
   output: string;
 } {
-  const prefix = '**Thinking:**\n';
+  const markdownPrefix = '**Thinking:**\n';
 
-  if (!text.startsWith(prefix)) {
-    return { thinking: null, output: text };
+  if (text.startsWith(markdownPrefix)) {
+    const rest = text.slice(markdownPrefix.length);
+    const separator = rest.indexOf('\n\n');
+
+    if (separator < 0) {
+      return { thinking: rest, output: '' };
+    }
+
+    return {
+      thinking: rest.slice(0, separator),
+      output: rest.slice(separator + 2),
+    };
   }
 
-  const rest = text.slice(prefix.length);
-  const separator = rest.indexOf('\n\n');
+  const xmlMatch = /^<thinking>\n?([\s\S]*?)\n?<\/thinking>\n*/.exec(text);
 
-  if (separator < 0) {
-    return { thinking: rest, output: '' };
+  if (xmlMatch) {
+    return {
+      thinking: xmlMatch[1],
+      output: text.slice(xmlMatch[0].length),
+    };
   }
 
-  return {
-    thinking: rest.slice(0, separator),
-    output: rest.slice(separator + 2),
-  };
+  return { thinking: null, output: text };
+}
+
+type TimelineChatEntryProps = {
+  item: Extract<TimelineItem, { type: 'chat' }>;
+  onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+};
+
+function TimelineChatEntry(props: TimelineChatEntryProps) {
+  const parts = () =>
+    props.item.role === 'assistant'
+      ? splitThinkingBlock(props.item.text)
+      : { thinking: null, output: props.item.text };
+
+  const shouldShowChatCard = () =>
+    parts().thinking === null || parts().output.trim().length > 0;
+
+  return (
+    <>
+      <Show when={parts().thinking !== null}>
+        <TimelineReasoningCard
+          id={`${props.item.id}-thinking`}
+          text={parts().thinking ?? ''}
+          onDeleteTimelineItem={() => props.onDeleteTimelineItem(props.item.id)}
+        />
+      </Show>
+      <Show when={shouldShowChatCard()}>
+        <TimelineChatCard
+          id={props.item.id}
+          role={props.item.role}
+          text={parts().output}
+          onDeleteTimelineItem={props.onDeleteTimelineItem}
+        />
+      </Show>
+    </>
+  );
 }
 
 export function TimelineChatCard(props: TimelineChatCardProps) {
@@ -364,15 +521,10 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
     null,
   );
 
-  const parts = () => splitThinkingBlock(props.text);
-
   const speechText = () =>
-    props.role === 'assistant' ? parts().output.trim() : '';
+    props.role === 'assistant' ? props.text.trim() : '';
 
-  const copyText = () =>
-    props.role === 'assistant' && parts().thinking !== null
-      ? parts().output.trim()
-      : props.text.trim();
+  const copyText = () => props.text.trim();
 
   const speechHighlightActive = () =>
     props.role === 'assistant' && speechState().active;
@@ -395,29 +547,7 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
 
   const body = () => (
     <div classList={{ 'chat-card-body': props.role === 'assistant' }}>
-      {props.role === 'assistant' && parts().thinking !== null ? (
-        <>
-          <div class="chat-thinking">
-            <strong>Thinking:</strong>
-            <ChatMarkdown text={parts().thinking ?? ''} role={props.role} />
-          </div>
-          <ChatMarkdown
-            text={parts().output}
-            role={props.role}
-            speechSentences={
-              speechHighlightActive() ? speechState().sentences : undefined
-            }
-            activeSpeechSentenceIndex={
-              speechHighlightActive() ? speechState().sentenceIndex : null
-            }
-            onSpeechSentenceClick={
-              speechHighlightActive()
-                ? (index) => setSeekSentenceIndex(index)
-                : null
-            }
-          />
-        </>
-      ) : props.role === 'assistant' ? (
+      {props.role === 'assistant' ? (
         <ChatMarkdown
           text={props.text}
           role={props.role}
