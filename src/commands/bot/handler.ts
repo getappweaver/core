@@ -13,6 +13,7 @@ import { handleBotPush } from './push/handler';
 import { handleBotReady } from './ready/handler';
 import { handleBotRestart } from './restart/handler';
 import { handleBotStatus } from './status/handler';
+import { handleBotUpdate } from './update/handler';
 import { handleBotUpdateCheck } from './update-check/handler';
 import { handleBotVersion } from './version/handler';
 import { handleBotWorkspaceCommand } from './workspace/handler';
@@ -36,7 +37,7 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
 
   if (!sub) {
     return Promise.resolve(
-      `Usage: ${p}bot status | update-check | version | ping | identity | workspace | lint | log | ready | push | restart — or ${p}bot help`,
+      `Usage: ${p}bot status | update-check | update | version | ping | identity | workspace | lint | log | ready | push | restart — or ${p}bot help`,
     );
   }
 
@@ -46,6 +47,10 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
 
   if (sub === 'update-check' || sub === 'updates') {
     return handleBotUpdateCheck(ctx);
+  }
+
+  if (sub === 'update') {
+    return handleBotUpdate(ctx);
   }
 
   if (sub === 'version') {

@@ -13,6 +13,7 @@ import { getBotPushSubcommandDefinition } from './push/definition';
 import { getBotReadySubcommandDefinition } from './ready/definition';
 import { getBotRestartSubcommandDefinition } from './restart/definition';
 import { getBotStatusSubcommandDefinition } from './status/definition';
+import { getBotUpdateSubcommandDefinition } from './update/definition';
 import { getBotUpdateCheckSubcommandDefinition } from './update-check/definition';
 import { getBotVersionSubcommandDefinition } from './version/definition';
 import { getBotWorkspaceSubcommandDefinition } from './workspace/definition';
@@ -39,6 +40,7 @@ export function getBotCommandDefinition({
       }),
       getBotStatusSubcommandDefinition(p),
       getBotUpdateCheckSubcommandDefinition(p),
+      getBotUpdateSubcommandDefinition(p),
       getBotVersionSubcommandDefinition(p),
       getBotPingSubcommandDefinition(p),
       getBotIdentitySubcommandDefinition(p),

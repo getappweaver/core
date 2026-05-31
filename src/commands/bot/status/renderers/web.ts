@@ -319,6 +319,13 @@ export function renderBotStatusWeb(
         subcommand: 'update-check',
       }),
     },
+    {
+      label: 'Update AppWeaver',
+      action: commandAction({
+        command: 'bot',
+        subcommand: 'update',
+      }),
+    },
   ];
 
   const rootModelMenuItems = [

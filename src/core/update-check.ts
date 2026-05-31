@@ -20,6 +20,16 @@ export type CoreUpdateSnapshot = {
 export type CoreUpdateChecker = {
   getSnapshot: () => CoreUpdateSnapshot;
   checkNow: () => Promise<CoreUpdateSnapshot>;
+  updateNow: () => Promise<CoreUpdateApplyResult>;
+};
+
+export type CoreUpdateApplyResult = {
+  beforeRef: string | null;
+  afterRef: string | null;
+  upstream: string | null;
+  pulled: boolean;
+  pullOutput: string;
+  snapshot: CoreUpdateSnapshot;
 };
 
 type RunGitProps = {
@@ -163,10 +173,37 @@ export function createCoreUpdateChecker(root: string): CoreUpdateChecker {
     return inFlight;
   };
 
+  const updateNow = async (): Promise<CoreUpdateApplyResult> => {
+    const before = await checkNow();
+
+    const pullOutput = await runGit({
+      root,
+      args: ['pull', '--ff-only'],
+      timeoutMs: 60_000,
+    });
+
+    const after = await checkNow();
+
+    const pulled =
+      before.localRef !== null &&
+      after.localRef !== null &&
+      before.localRef !== after.localRef;
+
+    return {
+      beforeRef: before.localRef,
+      afterRef: after.localRef,
+      upstream: after.upstream ?? before.upstream,
+      pulled,
+      pullOutput,
+      snapshot: after,
+    };
+  };
+
   void checkNow();
 
   return {
     getSnapshot: () => snapshot,
     checkNow,
+    updateNow,
   };
 }
