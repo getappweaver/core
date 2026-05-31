@@ -319,14 +319,17 @@ export function renderBotStatusWeb(
         subcommand: 'update-check',
       }),
     },
-    {
+  ];
+
+  if (d.coreUpdate?.state === 'available') {
+    versionMenuItems.push({
       label: 'Update AppWeaver',
       action: commandAction({
         command: 'bot',
         subcommand: 'update',
       }),
-    },
-  ];
+    });
+  }
 
   const rootModelMenuItems = [
     {

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.32.1] - 2026-06-01
+
+- fix: don't give update option if already up-to-date (814ac2e)
+
 ## [v9.32.0] - 2026-06-01
 
-- feat: bot update via git (139988c)
+- feat: bot update via git (3d5c5ef)
 
 ## [v9.31.3] - 2026-06-01
 
