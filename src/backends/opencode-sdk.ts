@@ -1,12 +1,12 @@
-import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (in-process server)
 // ---------------------------------------------------------------------------
-import { createOpencode } from '@opencode-ai/sdk/v2';
+import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 
 import { debug, log } from '../logger';
 import type { ProviderName } from '../providers/types';
@@ -44,13 +44,51 @@ import type {
   RunMessageProps,
 } from './types';
 
-type SdkInstance = Awaited<ReturnType<typeof createOpencode>>;
+type SdkInstance = {
+  client: ReturnType<typeof createOpencodeClient>;
+  server: {
+    close(): void;
+  };
+};
 
 let sdk: SdkInstance | null = null;
 let sdkInitPromise: Promise<SdkInstance> | null = null;
 
 const DEFAULT_PORT_START = 4099;
 const DEFAULT_PORT_COUNT = 12;
+
+function stopOpencodeServerProcess(proc: ChildProcess): void {
+  if (proc.exitCode !== null || proc.signalCode !== null) {
+    return;
+  }
+
+  if (proc.pid) {
+    const result = spawnSync('kill', ['-TERM', `-${proc.pid}`], {
+      stdio: 'ignore',
+    });
+
+    if (result.status === 0 && !result.error) {
+      return;
+    }
+
+    debug(
+      `opencode-sdk: failed to stop server process group: ${result.error?.message ?? `kill exited ${result.status ?? 'unknown'}`}`,
+    );
+  }
+
+  proc.kill('SIGTERM');
+}
+
+function getOpencodeServerCwd(): string {
+  const configured = process.env.OPENCODE_SDK_SERVER_CWD?.trim();
+
+  const directory =
+    configured || join(process.cwd(), '.logs', 'opencode-sdk-server');
+
+  mkdirSync(directory, { recursive: true });
+
+  return directory;
+}
 
 function buildPortRange(start: number, count: number): number[] {
   const ports: number[] = [];
@@ -144,13 +182,115 @@ function getPortsToTry(): number[] {
   return DEFAULT_PORTS;
 }
 
+async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
+  const cwd = getOpencodeServerCwd();
+
+  const proc = spawn(
+    'opencode',
+    ['serve', '--hostname=127.0.0.1', `--port=${port}`],
+    {
+      cwd,
+      detached: true,
+      env: {
+        ...process.env,
+        OPENCODE_CONFIG_CONTENT: JSON.stringify({}),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+
+  const url = await new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      stopOpencodeServerProcess(proc);
+      reject(new Error(`Timeout waiting for server to start after 5000ms`));
+    }, 5000);
+
+    let output = '';
+    let resolved = false;
+
+    function cleanup(): void {
+      clearTimeout(timeout);
+      proc.stdout.off('data', onStdout);
+      proc.stderr.off('data', onStderr);
+      proc.off('exit', onExit);
+      proc.off('error', onError);
+    }
+
+    function onStdout(chunk: Buffer): void {
+      if (resolved) {
+        return;
+      }
+
+      output += chunk.toString('utf8');
+
+      for (const line of output.split('\n')) {
+        if (!line.startsWith('opencode server listening')) {
+          continue;
+        }
+
+        const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
+
+        if (!match) {
+          cleanup();
+          stopOpencodeServerProcess(proc);
+          reject(new Error(`Failed to parse server url from output: ${line}`));
+
+          return;
+        }
+
+        resolved = true;
+        cleanup();
+        resolve(match[1]);
+
+        return;
+      }
+    }
+
+    function onStderr(chunk: Buffer): void {
+      output += chunk.toString('utf8');
+    }
+
+    function onExit(code: number | null): void {
+      cleanup();
+
+      reject(
+        new Error(
+          `Server exited with code ${code ?? 'unknown'}${
+            output.trim() ? `\nServer output: ${output}` : ''
+          }`,
+        ),
+      );
+    }
+
+    function onError(error: Error): void {
+      cleanup();
+      reject(error);
+    }
+
+    proc.stdout.on('data', onStdout);
+    proc.stderr.on('data', onStderr);
+    proc.on('exit', onExit);
+    proc.on('error', onError);
+  });
+
+  return {
+    client: createOpencodeClient({ baseUrl: url }),
+    server: {
+      close() {
+        stopOpencodeServerProcess(proc);
+      },
+    },
+  };
+}
+
 async function initSdk(): Promise<SdkInstance> {
   const ports = getPortsToTry();
   let lastError: Error | null = null;
 
   for (const port of ports) {
     try {
-      sdk = await createOpencode({ port, hostname: '127.0.0.1' });
+      sdk = await createLocalOpencodeSdk(port);
       debug(`opencode-sdk: server started on port ${port}`);
 
       return sdk;
@@ -193,6 +333,12 @@ async function getOrInitSdk(): Promise<SdkInstance> {
   } finally {
     sdkInitPromise = null;
   }
+}
+
+export async function getOpencodeSdkClient(): Promise<SdkInstance['client']> {
+  const instance = await getOrInitSdk();
+
+  return instance.client;
 }
 
 function coerceAuthMethods(value: unknown): OpencodeSetupAuthMethod[] {

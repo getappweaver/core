@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.30.3] - 2026-05-31
+
+- fix: tame opencode sdk server CPU usage (55495b1)
+
 ## [v9.30.2] - 2026-05-31
 
-- fix: split timeline thinking card from assistant card (c2141fb)
+- fix: split timeline thinking card from assistant card (5818a34)
 
 ## [v9.30.1] - 2026-05-31
 

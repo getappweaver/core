@@ -1,5 +1,4 @@
-import { createOpencode } from '@opencode-ai/sdk/v2';
-
+import { getOpencodeSdkClient } from '@src/backends/opencode-sdk';
 import type { AgentBackendName, CoreDb } from '@src/db';
 import { setState, STATE_CURRENT_SESSION } from '@src/db';
 
@@ -38,10 +37,10 @@ export async function handleSessionAdopt({
     };
   }
 
-  const opencode = await createOpencode({});
+  const opencode = await getOpencodeSdkClient();
 
   try {
-    const result = await opencode.client.session.get({
+    const result = await opencode.session.get({
       sessionID: sessionId,
       directory: cwd,
     });
@@ -85,7 +84,5 @@ export async function handleSessionAdopt({
     }
 
     throw err;
-  } finally {
-    opencode.server.close();
   }
 }

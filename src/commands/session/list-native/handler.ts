@@ -1,6 +1,6 @@
 import type { Session } from '@opencode-ai/sdk/v2';
-import { createOpencode } from '@opencode-ai/sdk/v2';
 
+import { getOpencodeSdkClient } from '@src/backends/opencode-sdk';
 import type { CoreDb } from '@src/db';
 import { getState, STATE_CURRENT_SESSION } from '@src/db';
 
@@ -61,57 +61,53 @@ export async function handleSessionListNative({
     };
   }
 
-  const opencode = await createOpencode({});
+  const opencode = await getOpencodeSdkClient();
 
-  try {
-    const result = await opencode.client.session.list({
-      directory: cwd,
-      roots: true,
-      limit: 25,
-    });
+  const result = await opencode.session.list({
+    directory: cwd,
+    roots: true,
+    limit: 25,
+  });
 
-    const sessions = result.data ?? [];
+  const sessions = result.data ?? [];
 
-    if (sessions.length === 0) {
-      return {
-        kind: 'session.list-native',
-        version: 1,
-        meta: { command: 'session', subcommand: 'list-native' },
-        data: { view: 'empty', directory: cwd },
-      };
-    }
-
-    const trackedRows = db
-      .prepare('SELECT id FROM sessions WHERE backend = ?')
-      .all('opencode') as TrackedSessionRow[];
-
-    const trackedIds = new Set(trackedRows.map((row) => row.id));
-    const currentSessionId = getState(db, STATE_CURRENT_SESSION);
-
+  if (sessions.length === 0) {
     return {
       kind: 'session.list-native',
       version: 1,
       meta: { command: 'session', subcommand: 'list-native' },
-      data: {
-        view: 'rows',
-        directory: cwd,
-        rows: sessions.map((session) => ({
-          id: session.id,
-          title: session.title,
-          directory: session.directory,
-          agent: (session as Session & RuntimeSessionExtras).agent ?? null,
-          model: formatModel(session),
-          createdAtIso: new Date(session.time.created).toISOString(),
-          updatedAtIso: new Date(session.time.updated).toISOString(),
-          filesChanged: session.summary?.files ?? null,
-          additions: session.summary?.additions ?? null,
-          deletions: session.summary?.deletions ?? null,
-          isTracked: trackedIds.has(session.id),
-          isCurrent: session.id === currentSessionId,
-        })),
-      },
+      data: { view: 'empty', directory: cwd },
     };
-  } finally {
-    opencode.server.close();
   }
+
+  const trackedRows = db
+    .prepare('SELECT id FROM sessions WHERE backend = ?')
+    .all('opencode') as TrackedSessionRow[];
+
+  const trackedIds = new Set(trackedRows.map((row) => row.id));
+  const currentSessionId = getState(db, STATE_CURRENT_SESSION);
+
+  return {
+    kind: 'session.list-native',
+    version: 1,
+    meta: { command: 'session', subcommand: 'list-native' },
+    data: {
+      view: 'rows',
+      directory: cwd,
+      rows: sessions.map((session) => ({
+        id: session.id,
+        title: session.title,
+        directory: session.directory,
+        agent: (session as Session & RuntimeSessionExtras).agent ?? null,
+        model: formatModel(session),
+        createdAtIso: new Date(session.time.created).toISOString(),
+        updatedAtIso: new Date(session.time.updated).toISOString(),
+        filesChanged: session.summary?.files ?? null,
+        additions: session.summary?.additions ?? null,
+        deletions: session.summary?.deletions ?? null,
+        isTracked: trackedIds.has(session.id),
+        isCurrent: session.id === currentSessionId,
+      })),
+    },
+  };
 }
