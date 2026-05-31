@@ -79,6 +79,125 @@ function previewPayload(value: unknown, maxLen: number): string {
   }
 }
 
+function shortErrorText(value: string): string {
+  return value.length <= 500 ? value : `${value.slice(0, 499)}…`;
+}
+
+function looksLikeProviderRateLimit(value: string): boolean {
+  return (
+    /rate\s*limit/i.test(value) ||
+    /too many requests/i.test(value) ||
+    /resource[_\s-]*exhausted/i.test(value) ||
+    /quota\s+exceeded/i.test(value) ||
+    /\b429\b/.test(value)
+  );
+}
+
+function eventMayBelongToSession(
+  rec: Record<string, unknown>,
+  sessionId: string,
+): boolean {
+  const properties = rec.properties;
+
+  if (properties && typeof properties === 'object') {
+    return isMatchingSession(properties as Record<string, unknown>, sessionId);
+  }
+
+  const syncEvent = rec.syncEvent;
+
+  if (syncEvent && typeof syncEvent === 'object') {
+    const aggregateID = (syncEvent as { aggregateID?: unknown }).aggregateID;
+
+    return typeof aggregateID !== 'string' || aggregateID === sessionId;
+  }
+
+  return true;
+}
+
+function extractLikelyMessage(value: Record<string, unknown>): string | null {
+  const direct = value.message ?? value.error ?? value.reason ?? value.body;
+
+  if (typeof direct === 'string' && direct.length > 0) {
+    return direct;
+  }
+
+  const data = value.data;
+
+  if (data && typeof data === 'object') {
+    const message = (data as { message?: unknown }).message;
+
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+
+  return null;
+}
+
+type ExtractProviderRateLimitMessageInnerProps = {
+  value: unknown;
+  seen: WeakSet<object>;
+  depth: number;
+};
+
+function extractProviderRateLimitMessageInner({
+  value,
+  seen,
+  depth,
+}: ExtractProviderRateLimitMessageInnerProps): string | null {
+  if (depth > 8) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return looksLikeProviderRateLimit(value) ? shortErrorText(value) : null;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  if (seen.has(value)) {
+    return null;
+  }
+
+  seen.add(value);
+
+  const rec = value as Record<string, unknown>;
+  const status = rec.status ?? rec.statusCode ?? rec.status_code ?? rec.code;
+  const message = extractLikelyMessage(rec);
+
+  if (status === 429 || status === '429') {
+    return shortErrorText(message ?? 'AI provider rate limit: 429');
+  }
+
+  if (message && looksLikeProviderRateLimit(message)) {
+    return shortErrorText(message);
+  }
+
+  for (const child of Object.values(rec)) {
+    const found = extractProviderRateLimitMessageInner({
+      value: child,
+      seen,
+      depth: depth + 1,
+    });
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function extractProviderRateLimitMessage(value: unknown): string | null {
+  return extractProviderRateLimitMessageInner({
+    value,
+    seen: new WeakSet(),
+    depth: 0,
+  });
+}
+
 function logUnknownOnce(
   logState: OpencodeStreamLogState,
   eventType: string,
@@ -284,6 +403,14 @@ export function mapOpencodeSsePayloadToChunk(
     logUnknownOnce(logState, '(missing-type)', raw);
 
     return [];
+  }
+
+  const rateLimitMessage = eventMayBelongToSession(rec, sessionId)
+    ? extractProviderRateLimitMessage(rec)
+    : null;
+
+  if (rateLimitMessage) {
+    return [{ kind: 'error', message: rateLimitMessage }];
   }
 
   if (SILENT_STREAM_EVENT_TYPES.has(eventType)) {
