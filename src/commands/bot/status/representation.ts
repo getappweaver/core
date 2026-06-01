@@ -46,6 +46,16 @@ export const BotStatusDataSchema = z.object({
   coreUpdate: z
     .object({
       state: z.enum(['checking', 'available', 'up_to_date', 'unavailable']),
+      localVersion: z.string().nullable(),
+      remoteVersion: z.string().nullable(),
+      updateLevel: z.enum(['major', 'minor', 'patch', 'same', 'unknown']),
+      changelog: z.array(
+        z.object({
+          ref: z.string(),
+          subject: z.string(),
+        }),
+      ),
+      changelogTruncated: z.boolean(),
       localRef: z.string().nullable(),
       remoteRef: z.string().nullable(),
       upstream: z.string().nullable(),

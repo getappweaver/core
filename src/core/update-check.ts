@@ -6,8 +6,20 @@ export type CoreUpdateState =
   | 'up_to_date'
   | 'unavailable';
 
+export type CoreUpdateLevel = 'major' | 'minor' | 'patch' | 'same' | 'unknown';
+
+export type CoreUpdateChangelogEntry = {
+  ref: string;
+  subject: string;
+};
+
 export type CoreUpdateSnapshot = {
   state: CoreUpdateState;
+  localVersion: string | null;
+  remoteVersion: string | null;
+  updateLevel: CoreUpdateLevel;
+  changelog: CoreUpdateChangelogEntry[];
+  changelogTruncated: boolean;
   localRef: string | null;
   remoteRef: string | null;
   upstream: string | null;
@@ -75,6 +87,11 @@ async function runGit({ root, args, timeoutMs }: RunGitProps): Promise<string> {
 function unavailableSnapshot(message: string): CoreUpdateSnapshot {
   return {
     state: 'unavailable',
+    localVersion: null,
+    remoteVersion: null,
+    updateLevel: 'unknown',
+    changelog: [],
+    changelogTruncated: false,
     localRef: null,
     remoteRef: null,
     upstream: null,
@@ -85,9 +102,85 @@ function unavailableSnapshot(message: string): CoreUpdateSnapshot {
   };
 }
 
+function parseChangelog(raw: string): CoreUpdateChangelogEntry[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [ref, ...subjectParts] = line.split('\t');
+      const subject = subjectParts.join('\t').trim();
+
+      return {
+        ref: ref.trim(),
+        subject: subject || ref.trim(),
+      };
+    });
+}
+
+function versionFromPackageJson(content: string): string | null {
+  try {
+    const parsed = JSON.parse(content) as { version?: unknown };
+
+    return typeof parsed.version === 'string' && parsed.version.trim()
+      ? parsed.version.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function versionParts(value: string | null): [number, number, number] | null {
+  const match = value?.trim().match(/^v?(\d+)\.(\d+)\.(\d+)/);
+
+  if (!match) {
+    return null;
+  }
+
+  return [
+    Number.parseInt(match[1], 10),
+    Number.parseInt(match[2], 10),
+    Number.parseInt(match[3], 10),
+  ];
+}
+
+function updateLevelForVersions({
+  localVersion,
+  remoteVersion,
+}: {
+  localVersion: string | null;
+  remoteVersion: string | null;
+}): CoreUpdateLevel {
+  const local = versionParts(localVersion);
+  const remote = versionParts(remoteVersion);
+
+  if (!local || !remote) {
+    return 'unknown';
+  }
+
+  if (remote[0] !== local[0]) {
+    return 'major';
+  }
+
+  if (remote[1] !== local[1]) {
+    return 'minor';
+  }
+
+  if (remote[2] !== local[2]) {
+    return 'patch';
+  }
+
+  return 'same';
+}
+
 export function createCoreUpdateChecker(root: string): CoreUpdateChecker {
   let snapshot: CoreUpdateSnapshot = {
     state: 'checking',
+    localVersion: null,
+    remoteVersion: null,
+    updateLevel: 'unknown',
+    changelog: [],
+    changelogTruncated: false,
     localRef: null,
     remoteRef: null,
     upstream: null,
@@ -124,31 +217,67 @@ export function createCoreUpdateChecker(root: string): CoreUpdateChecker {
           timeoutMs: 30_000,
         });
 
-        const [localRef, remoteRef, counts] = await Promise.all([
-          runGit({
-            root,
-            args: ['rev-parse', '--short', 'HEAD'],
-            timeoutMs: 5_000,
-          }),
-          runGit({
-            root,
-            args: ['rev-parse', '--short', '@{u}'],
-            timeoutMs: 5_000,
-          }),
-          runGit({
-            root,
-            args: ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],
-            timeoutMs: 5_000,
-          }),
-        ]);
+        const [localRef, remoteRef, counts, localPkg, remotePkg, changelogRaw] =
+          await Promise.all([
+            runGit({
+              root,
+              args: ['rev-parse', '--short', 'HEAD'],
+              timeoutMs: 5_000,
+            }),
+            runGit({
+              root,
+              args: ['rev-parse', '--short', '@{u}'],
+              timeoutMs: 5_000,
+            }),
+            runGit({
+              root,
+              args: ['rev-list', '--left-right', '--count', 'HEAD...@{u}'],
+              timeoutMs: 5_000,
+            }),
+            runGit({
+              root,
+              args: ['show', 'HEAD:package.json'],
+              timeoutMs: 5_000,
+            }),
+            runGit({
+              root,
+              args: ['show', '@{u}:package.json'],
+              timeoutMs: 5_000,
+            }),
+            runGit({
+              root,
+              args: [
+                'log',
+                '--max-count=21',
+                '--pretty=format:%h%x09%s',
+                'HEAD..@{u}',
+              ],
+              timeoutMs: 5_000,
+            }),
+          ]);
 
         const [aheadRaw, behindRaw] = counts.split(/\s+/);
         const ahead = Number.parseInt(aheadRaw ?? '0', 10);
         const behind = Number.parseInt(behindRaw ?? '0', 10);
         const hasUpdate = behind > 0;
+        const localVersion = versionFromPackageJson(localPkg);
+        const remoteVersion = versionFromPackageJson(remotePkg);
+
+        const updateLevel = updateLevelForVersions({
+          localVersion,
+          remoteVersion,
+        });
+
+        const changelogEntries = parseChangelog(changelogRaw);
+        const changelogTruncated = changelogEntries.length > 20;
 
         snapshot = {
           state: hasUpdate ? 'available' : 'up_to_date',
+          localVersion,
+          remoteVersion,
+          updateLevel,
+          changelog: changelogEntries.slice(0, 20),
+          changelogTruncated,
           localRef,
           remoteRef,
           upstream,

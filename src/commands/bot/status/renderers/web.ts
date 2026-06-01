@@ -77,7 +77,14 @@ function updateStatusValue(d: BotStatusData): string {
   }
 
   if (update.state === 'available') {
-    return `${d.version} · update available`;
+    const targetVersion = update.remoteVersion ?? update.remoteRef ?? 'remote';
+
+    const level =
+      update.updateLevel === 'unknown' || update.updateLevel === 'same'
+        ? 'update'
+        : `${update.updateLevel} update`;
+
+    return `${update.localVersion ?? d.version} → ${targetVersion} · ${level} available`;
   }
 
   if (update.state === 'checking') {
@@ -88,7 +95,7 @@ function updateStatusValue(d: BotStatusData): string {
     return `${d.version} · check unavailable`;
   }
 
-  return `${d.version} · up to date`;
+  return `${update.localVersion ?? d.version} · up to date`;
 }
 
 function updateStatusTone(d: BotStatusData): WebTone | null {

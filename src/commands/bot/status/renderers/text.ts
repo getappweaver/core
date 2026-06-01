@@ -42,7 +42,7 @@ export function renderBotStatusText(
 
   const updateDisplay = d.coreUpdate
     ? d.coreUpdate.state === 'available'
-      ? ` ${C.green}(update available: ${d.coreUpdate.remoteRef ?? 'remote'})${C.reset}`
+      ? ` ${C.green}(${d.coreUpdate.updateLevel} update available: ${d.coreUpdate.remoteVersion ?? d.coreUpdate.remoteRef ?? 'remote'})${C.reset}`
       : d.coreUpdate.state === 'checking'
         ? ` ${C.gray}(checking for updates…)${C.reset}`
         : d.coreUpdate.state === 'unavailable'
