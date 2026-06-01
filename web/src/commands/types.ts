@@ -80,6 +80,7 @@ export type CommandsAdapters = {
   nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   createId: () => string;
   requestComposerAiState: () => void;
+  refreshCoreUpdateState: () => Promise<void>;
   beginWebUiBusy: (sourceId: string) => void;
   endWebUiBusy: (sourceId: string) => void;
   pendingRequests: Map<string, PendingRequest>;

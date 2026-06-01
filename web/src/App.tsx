@@ -1882,6 +1882,7 @@ function AppInner(): JSX.Element {
     nip44DecryptSelf: auth.nip44DecryptSelf,
     createId,
     requestComposerAiState,
+    refreshCoreUpdateState,
     beginWebUiBusy,
     endWebUiBusy,
     pendingRequests,

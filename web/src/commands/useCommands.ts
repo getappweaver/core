@@ -46,6 +46,13 @@ function shouldRefreshComposerAiState(
   );
 }
 
+function shouldRefreshCoreUpdateState(
+  command: string,
+  subcommand: string,
+): boolean {
+  return command === 'bot' && ['update-check', 'update'].includes(subcommand);
+}
+
 function withInitialRevealedIds(
   root: WebNodeRoot,
   revealIds: string[] | undefined,
@@ -907,6 +914,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           void refreshComposerAiState();
         }
 
+        if (
+          shouldRefreshCoreUpdateState(
+            commandAction.command,
+            commandAction.subcommand,
+          )
+        ) {
+          void adapters.refreshCoreUpdateState();
+        }
+
         dispatchRefreshOnce('final');
 
         if (!refreshChildInFlight) {
@@ -1052,6 +1068,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       onDone: () => {
         if (shouldRefreshComposerAiState(command, subcommand.name)) {
           void refreshComposerAiState();
+        }
+
+        if (shouldRefreshCoreUpdateState(command, subcommand.name)) {
+          void adapters.refreshCoreUpdateState();
         }
 
         if (adapters.pendingPromptRequestId() === requestId) {

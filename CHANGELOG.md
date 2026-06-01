@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.32.3] - 2026-06-01
+
+- fix: update-check would paint bot status button to green (1204011)
+
 ## [v9.32.2] - 2026-06-01
 
-- fix: show changelog button (40d0879)
+- fix: show changelog button (779e4a4)
 
 ## [v9.32.1] - 2026-06-01
 
