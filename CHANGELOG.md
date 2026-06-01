@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.33.2] - 2026-06-01
+
+- ref: added more debug logs to web app with localstorage support (5269b88)
+
 ## [v9.33.1] - 2026-06-01
 
-- ref: added more debug logs for prompt issues (777373a)
+- ref: added more debug logs for prompt issues (3bf6646)
 
 ## [v9.33.0] - 2026-06-01
 

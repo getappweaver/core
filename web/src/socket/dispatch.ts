@@ -1,5 +1,6 @@
 import type { WebNodeRoot } from '@src/web/ui-schema';
 
+import { logChatDebug } from '../chat/debug';
 import type { CommandOutput } from '../types';
 
 import type {
@@ -133,6 +134,11 @@ export function handleServerMessage(params: {
     case 'chat_stream_chunk': {
       const chunk = message.chunk;
 
+      logChatDebug('socket.chat_stream_chunk', {
+        requestId: message.requestId,
+        kind: chunk.kind,
+      });
+
       if (chunk.kind === 'status') {
         adapters.setAgentWorking(chunk.phase === 'started');
 
@@ -183,10 +189,21 @@ export function handleServerMessage(params: {
     }
 
     case 'chat_result':
+      logChatDebug('socket.chat_result', {
+        requestId: message.requestId,
+        hasPending: pending !== undefined,
+        outputLength: message.output.length,
+      });
+
       pending?.onChatResult?.(message);
 
       return;
     case 'done':
+      logChatDebug('socket.done', {
+        requestId: message.requestId,
+        hasPending: pending !== undefined,
+      });
+
       adapters.setAgentWorking(false);
       pending?.onDone?.(message);
       pendingRequests.delete(message.requestId);
@@ -194,6 +211,12 @@ export function handleServerMessage(params: {
 
       return;
     case 'error':
+      logChatDebug('socket.error', {
+        requestId: message.requestId,
+        hasPending: pending !== undefined,
+        message: message.message,
+      });
+
       adapters.setAgentWorking(false);
       pending?.onError?.(message);
       pendingRequests.delete(message.requestId);

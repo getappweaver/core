@@ -2,10 +2,12 @@ import type { TimelineFileDiff, TimelineToolCall } from '@src/timeline/types';
 
 import type { TimelineItem } from '../types';
 
+import { logChatDebug } from './debug';
 import type { ChatAdapters, ChatHook } from './types';
 
 export function useChat(adapters: ChatAdapters): ChatHook {
   const STREAM_TEXT_FLUSH_MS = 80;
+  const CHAT_PROMPT_PREVIEW_LENGTH = 200;
 
   const chatStreamAssistantByRequestId = new Map<string, string>();
   const streamedAssistantRequestIds = new Set<string>();
@@ -28,8 +30,12 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     pendingStreamTextByRequestId.delete(requestId);
 
     if (!deltaText) {
+      logChatDebug('stream.flush.empty', { requestId });
+
       return;
     }
+
+    logChatDebug('stream.flush', { requestId, length: deltaText.length });
 
     adapters.setTimeline((prev) => {
       let assistantId = chatStreamAssistantByRequestId.get(requestId);
@@ -61,6 +67,11 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function appendUserMessage(text: string): void {
+    logChatDebug('timeline.user.append', {
+      length: text.length,
+      preview: text.slice(0, CHAT_PROMPT_PREVIEW_LENGTH),
+    });
+
     adapters.setTimeline((prev) => [
       ...prev,
       { id: adapters.createId(), type: 'chat', role: 'user', text },
@@ -68,6 +79,14 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleStreamTextDelta(requestId: string, deltaText: string): void {
+    logChatDebug('stream.text_delta', {
+      requestId,
+      length: deltaText.length,
+      pendingLength:
+        (pendingStreamTextByRequestId.get(requestId)?.length ?? 0) +
+        deltaText.length,
+    });
+
     pendingStreamTextByRequestId.set(
       requestId,
       (pendingStreamTextByRequestId.get(requestId) ?? '') + deltaText,
@@ -94,12 +113,18 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     }
 
     chatStreamAssistantByRequestId.delete(requestId);
+    logChatDebug('stream.text_segment.close', { requestId });
   }
 
   function handleStreamReasoningDelta(
     requestId: string,
     deltaText: string,
   ): void {
+    logChatDebug('stream.reasoning_delta', {
+      requestId,
+      length: deltaText.length,
+    });
+
     closeTextSegmentBeforeStructuralChunk(requestId);
 
     const itemId = `${requestId}-reasoning`;
@@ -142,6 +167,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     id: string,
     text: string,
   ): void {
+    logChatDebug('stream.summary', { requestId, id, length: text.length });
+
     closeTextSegmentBeforeStructuralChunk(requestId);
 
     adapters.setTimeline((prev) => {
@@ -166,6 +193,11 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     requestId: string,
     files: TimelineFileDiff[],
   ): void {
+    logChatDebug('stream.diff', {
+      requestId,
+      ...summarizeDiffFiles(files),
+    });
+
     closeTextSegmentBeforeStructuralChunk(requestId);
 
     adapters.setTimeline((prev) => [
@@ -179,6 +211,14 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleStreamTool(requestId: string, tool: TimelineToolCall): void {
+    logChatDebug('stream.tool', {
+      requestId,
+      callId: tool.callId,
+      tool: tool.tool,
+      title: tool.title,
+      status: tool.status,
+    });
+
     closeTextSegmentBeforeStructuralChunk(requestId);
 
     const itemId = `${requestId}-tool-${tool.callId}`;
@@ -212,6 +252,12 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleChatResult(requestId: string, output: string): void {
+    logChatDebug('chat.result', {
+      requestId,
+      length: output.length,
+      streamed: streamedAssistantRequestIds.has(requestId),
+    });
+
     const timer = streamFlushTimerByRequestId.get(requestId);
 
     if (timer !== undefined) {
@@ -226,6 +272,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
+    logChatDebug('chat.result.cleanup', { requestId, hasStreamedAssistant });
 
     adapters.setTimeline((prev) => {
       if (hasStreamedAssistant) {
@@ -269,16 +316,29 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
+    logChatDebug('request.clear', { requestId });
   }
 
   function sendPromptAnswer(requestId: string, answer: string): void {
+    logChatDebug('prompt_answer.send.attempt', {
+      requestId,
+      length: answer.length,
+    });
+
     try {
       adapters.sendSocketMessage({
         type: 'prompt_answer',
         requestId,
         answer,
       });
+
+      logChatDebug('prompt_answer.send.success', { requestId });
     } catch (err) {
+      logChatDebug('prompt_answer.send.error', {
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),
       );
@@ -286,20 +346,42 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function sendChat(text: string): void {
+    const requestId = adapters.createId();
+
+    logChatDebug('chat.send.start', {
+      requestId,
+      timelineId: adapters.timelineId(),
+      length: text.length,
+      preview: text.slice(0, CHAT_PROMPT_PREVIEW_LENGTH),
+    });
+
     appendUserMessage(text);
     adapters.setAgentWorking(true);
 
-    const requestId = adapters.createId();
-
     adapters.pendingRequests.set(requestId, {
       onChatResult: (message) => {
+        logChatDebug('chat.pending.on_result', {
+          requestId,
+          outputLength: message.output.length,
+        });
+
         adapters.setAgentWorking(false);
         handleChatResult(requestId, message.output);
         adapters.onChatResult();
       },
-      onError: () => {
+      onError: (message) => {
+        logChatDebug('chat.pending.on_error', {
+          requestId,
+          message: message.message,
+        });
+
         adapters.setAgentWorking(false);
       },
+    });
+
+    logChatDebug('chat.pending.registered', {
+      requestId,
+      pendingCount: adapters.pendingRequests.size,
     });
 
     try {
@@ -309,7 +391,14 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         timelineId: adapters.timelineId(),
         content: text,
       });
+
+      logChatDebug('chat.socket.send.success', { requestId });
     } catch (err) {
+      logChatDebug('chat.socket.send.error', {
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
       adapters.pendingRequests.delete(requestId);
       clearRequest(requestId);
       adapters.setAgentWorking(false);
@@ -321,6 +410,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function cancelChat(): void {
+    logChatDebug('chat.cancel.start');
+
     adapters.setAgentWorking(false);
 
     try {
@@ -328,7 +419,13 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         type: 'cancel_chat',
         requestId: adapters.createId(),
       });
+
+      logChatDebug('chat.cancel.sent');
     } catch (err) {
+      logChatDebug('chat.cancel.error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),
       );
