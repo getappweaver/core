@@ -151,6 +151,10 @@ function changelogButton(entry: PluginCatalogEntry): WebNode | null {
     return null;
   }
 
+  if (entry.installedAlias && entry.updateAvailable) {
+    return null;
+  }
+
   return {
     type: 'element',
     tag: 'button',
@@ -170,6 +174,8 @@ function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
     return null;
   }
 
+  const showInline = entry.installedAlias !== null && entry.updateAvailable;
+
   const label = entry.installedAlias
     ? `Changes from ${entry.installedVersion ?? 'current'} to ${entry.compatibleRef?.tag ?? 'latest'}`
     : `Release notes for ${entry.compatibleRef?.tag ?? 'latest'}`;
@@ -180,8 +186,12 @@ function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
     props: {
       padding: 'sm',
       className: 'plugins-install-changelog-panel',
-      revealId: changelogRevealId(entry),
-      hiddenUntilRevealed: true,
+      ...(showInline
+        ? {}
+        : {
+            revealId: changelogRevealId(entry),
+            hiddenUntilRevealed: true,
+          }),
     },
     children: [
       {
