@@ -79,6 +79,42 @@ function stopOpencodeServerProcess(proc: ChildProcess): void {
   proc.kill('SIGTERM');
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isTimeoutLikeError(err: unknown): boolean {
+  return /\b(timeout|timed out|deadline|abort)\b/i.test(errorMessage(err));
+}
+
+function logSdkCallError({
+  operation,
+  sessionId,
+  err,
+}: {
+  operation: string;
+  sessionId: string;
+  err: unknown;
+}): void {
+  const message = errorMessage(err);
+
+  const prefix = isTimeoutLikeError(err)
+    ? 'OpenCode SDK timeout/error'
+    : 'OpenCode SDK error';
+
+  log.warn(
+    `${prefix} during ${operation} for session ${sessionId}: ${message}`,
+  );
+}
+
+function sdkResultError(result: unknown): unknown | null {
+  if (result === null || typeof result !== 'object' || !('error' in result)) {
+    return null;
+  }
+
+  return (result as { error?: unknown }).error ?? null;
+}
+
 function getOpencodeServerCwd(): string {
   const configured = process.env.OPENCODE_SDK_SERVER_CWD?.trim();
 
@@ -1155,7 +1191,19 @@ export function createOpencodeSDKBackend({
         onAgentStreamChunk !== null && streamAbortSignal !== null;
 
       if (!useEventStream) {
-        const result = await client.session.prompt(promptParams);
+        let result: Awaited<ReturnType<typeof client.session.prompt>>;
+
+        try {
+          result = await client.session.prompt(promptParams);
+        } catch (err) {
+          logSdkCallError({
+            operation: 'session.prompt',
+            sessionId,
+            err,
+          });
+
+          throw err;
+        }
 
         debug(
           'opencode-sdk session.prompt result',
@@ -1363,13 +1411,32 @@ export function createOpencodeSDKBackend({
       > | null = null;
 
       try {
-        const promptAsyncResult =
-          await client.session.promptAsync(promptParams);
+        let promptAsyncResult: Awaited<
+          ReturnType<typeof client.session.promptAsync>
+        >;
 
-        if (promptAsyncResult.error) {
+        try {
+          promptAsyncResult = await client.session.promptAsync(promptParams);
+        } catch (err) {
+          logSdkCallError({
+            operation: 'session.promptAsync',
+            sessionId,
+            err,
+          });
+
+          throw err;
+        }
+
+        const promptAsyncError = sdkResultError(promptAsyncResult);
+
+        if (promptAsyncError) {
+          log.warn(
+            `OpenCode SDK promptAsync returned error for session ${sessionId}: ${String(promptAsyncError)}`,
+          );
+
           return {
             type: 'error',
-            output: String(promptAsyncResult.error),
+            output: String(promptAsyncError),
             sessionId,
           } satisfies AgentErrorResult;
         }
@@ -1384,19 +1451,39 @@ export function createOpencodeSDKBackend({
           } satisfies AgentErrorResult;
         }
 
-        const messagesResult = await client.session.messages({
-          sessionID: sessionId,
-          directory: cwd,
-          limit: 10,
-        });
+        let messagesResult: Awaited<ReturnType<typeof client.session.messages>>;
 
-        const latest = messagesResult.error
+        try {
+          messagesResult = await client.session.messages({
+            sessionID: sessionId,
+            directory: cwd,
+            limit: 10,
+          });
+        } catch (err) {
+          logSdkCallError({
+            operation: 'session.messages',
+            sessionId,
+            err,
+          });
+
+          throw err;
+        }
+
+        const messagesError = sdkResultError(messagesResult);
+
+        if (messagesError) {
+          log.warn(
+            `OpenCode SDK messages returned error for session ${sessionId}: ${String(messagesError)}`,
+          );
+        }
+
+        const latest = messagesError
           ? null
           : latestAssistantMessage(messagesResult.data);
 
         promptResult = {
           data: latest ?? undefined,
-          error: messagesResult.error,
+          error: messagesError ?? undefined,
           response: messagesResult.response,
         } as Awaited<ReturnType<typeof client.session.prompt>>;
       } finally {
