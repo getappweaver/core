@@ -50,6 +50,11 @@ export const RequestComposerAiStateClientMessageSchema = z.object({
   requestId: RequestIdSchema,
 });
 
+export const CompactSessionClientMessageSchema = z.object({
+  type: z.literal('compact_session'),
+  requestId: RequestIdSchema,
+});
+
 export const LoadTimelineClientMessageSchema = z.object({
   type: z.literal('load_timeline'),
   requestId: RequestIdSchema,
@@ -183,6 +188,7 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   AuthenticateClientMessageSchema,
   RequestCommandsClientMessageSchema,
   RequestComposerAiStateClientMessageSchema,
+  CompactSessionClientMessageSchema,
   LoadTimelineClientMessageSchema,
   LoadTimelineBeforeClientMessageSchema,
   RunCommandClientMessageSchema,

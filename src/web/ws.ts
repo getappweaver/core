@@ -1,8 +1,15 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { getAgentBackend } from '@src/db';
+import { summarizeOpencodeSdkSession } from '@src/backends/opencode-sdk';
+import {
+  getAgentBackend,
+  getState,
+  getWorkspaceTarget,
+  STATE_CURRENT_SESSION,
+} from '@src/db';
 import { isDemoMode } from '@src/demo-mode';
+import { log } from '@src/logger';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
@@ -299,6 +306,17 @@ async function handleDemoWebSocketMessage(params: {
 
       return;
 
+    case 'compact_session':
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: 'Compaction is not available in demo mode.',
+        }),
+      );
+
+      return;
+
     case 'load_timeline':
     case 'load_timeline_before':
       sendMessage(
@@ -382,6 +400,64 @@ async function handleDemoWebSocketMessage(params: {
         }),
       );
   }
+}
+
+async function handleCompactSession(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  ctx: WebRouteContext;
+  requestId: string;
+}): Promise<void> {
+  const { ws, ctx, requestId } = params;
+  const backendName = getAgentBackend(ctx.seenDb);
+
+  if (backendName !== 'opencode') {
+    sendMessage(
+      ws,
+      createErrorMessage({
+        requestId,
+        message: 'Compaction is available only for the OpenCode backend.',
+      }),
+    );
+
+    return;
+  }
+
+  const sessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
+
+  if (!sessionId) {
+    sendMessage(
+      ws,
+      createErrorMessage({
+        requestId,
+        message: 'No active session to compact.',
+      }),
+    );
+
+    return;
+  }
+
+  const state = await getComposerAiState(ctx);
+
+  const cwd =
+    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
+      ? ctx.dmBotRoot
+      : ctx.parentOfBotRoot;
+
+  await summarizeOpencodeSdkSession({
+    sessionId,
+    cwd,
+    effectiveModel: state.effectiveModel,
+  });
+
+  sendMessage(
+    ws,
+    createCommandResultMessage({
+      requestId,
+      output: 'Compacted current OpenCode session.',
+    }),
+  );
+
+  sendMessage(ws, createDoneMessage(requestId));
 }
 
 function summarizeInvocation(
@@ -775,6 +851,8 @@ async function handleChat(params: {
   let streamedReasoning = '';
 
   try {
+    log.info(`[websocket] chat run start ${message.requestId}`);
+
     result = await runWebChat({
       ctx,
       content: message.content,
@@ -874,7 +952,13 @@ async function handleChat(params: {
         : null,
       streamAbortSignal: useStream ? chatAbort.signal : null,
     });
+
+    log.info(`[websocket] chat run complete ${message.requestId}`);
   } catch (err) {
+    log.warn(
+      `[websocket] chat run failed ${message.requestId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+
     ws.data.currentChatAbort = null;
     throw err;
   } finally {
@@ -884,6 +968,10 @@ async function handleChat(params: {
   }
 
   const output = result.output;
+
+  log.info(
+    `[websocket] inserting assistant chat ${message.requestId} (${output.length} chars)`,
+  );
 
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
@@ -910,7 +998,10 @@ async function handleChat(params: {
     }),
   );
 
+  log.info(`[websocket] sent chat_result ${message.requestId}`);
+
   sendMessage(ws, createDoneMessage(message.requestId));
+  log.info(`[websocket] sent done ${message.requestId}`);
 }
 
 export function createWebSocketHandler(ctx: WebRouteContext) {
@@ -1062,6 +1153,16 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
               );
 
               sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
+            case 'compact_session': {
+              await handleCompactSession({
+                ws,
+                ctx,
+                requestId: message.requestId,
+              });
 
               return;
             }

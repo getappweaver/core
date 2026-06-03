@@ -79,125 +79,6 @@ function previewPayload(value: unknown, maxLen: number): string {
   }
 }
 
-function shortErrorText(value: string): string {
-  return value.length <= 500 ? value : `${value.slice(0, 499)}…`;
-}
-
-function looksLikeProviderRateLimit(value: string): boolean {
-  return (
-    /rate\s*limit/i.test(value) ||
-    /too many requests/i.test(value) ||
-    /resource[_\s-]*exhausted/i.test(value) ||
-    /quota\s+exceeded/i.test(value) ||
-    /\b429\b/.test(value)
-  );
-}
-
-function eventMayBelongToSession(
-  rec: Record<string, unknown>,
-  sessionId: string,
-): boolean {
-  const properties = rec.properties;
-
-  if (properties && typeof properties === 'object') {
-    return isMatchingSession(properties as Record<string, unknown>, sessionId);
-  }
-
-  const syncEvent = rec.syncEvent;
-
-  if (syncEvent && typeof syncEvent === 'object') {
-    const aggregateID = (syncEvent as { aggregateID?: unknown }).aggregateID;
-
-    return typeof aggregateID !== 'string' || aggregateID === sessionId;
-  }
-
-  return true;
-}
-
-function extractLikelyMessage(value: Record<string, unknown>): string | null {
-  const direct = value.message ?? value.error ?? value.reason ?? value.body;
-
-  if (typeof direct === 'string' && direct.length > 0) {
-    return direct;
-  }
-
-  const data = value.data;
-
-  if (data && typeof data === 'object') {
-    const message = (data as { message?: unknown }).message;
-
-    if (typeof message === 'string' && message.length > 0) {
-      return message;
-    }
-  }
-
-  return null;
-}
-
-type ExtractProviderRateLimitMessageInnerProps = {
-  value: unknown;
-  seen: WeakSet<object>;
-  depth: number;
-};
-
-function extractProviderRateLimitMessageInner({
-  value,
-  seen,
-  depth,
-}: ExtractProviderRateLimitMessageInnerProps): string | null {
-  if (depth > 8) {
-    return null;
-  }
-
-  if (typeof value === 'string') {
-    return looksLikeProviderRateLimit(value) ? shortErrorText(value) : null;
-  }
-
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-
-  if (seen.has(value)) {
-    return null;
-  }
-
-  seen.add(value);
-
-  const rec = value as Record<string, unknown>;
-  const status = rec.status ?? rec.statusCode ?? rec.status_code ?? rec.code;
-  const message = extractLikelyMessage(rec);
-
-  if (status === 429 || status === '429') {
-    return shortErrorText(message ?? 'AI provider rate limit: 429');
-  }
-
-  if (message && looksLikeProviderRateLimit(message)) {
-    return shortErrorText(message);
-  }
-
-  for (const child of Object.values(rec)) {
-    const found = extractProviderRateLimitMessageInner({
-      value: child,
-      seen,
-      depth: depth + 1,
-    });
-
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
-}
-
-function extractProviderRateLimitMessage(value: unknown): string | null {
-  return extractProviderRateLimitMessageInner({
-    value,
-    seen: new WeakSet(),
-    depth: 0,
-  });
-}
-
 function logUnknownOnce(
   logState: OpencodeStreamLogState,
   eventType: string,
@@ -237,15 +118,56 @@ function logIgnoredOnce(
 }
 
 function extractSessionErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'data' in error) {
-    const data = (error as { data?: { message?: string } }).data;
+  if (!error || typeof error !== 'object') {
+    return 'Session error';
+  }
 
-    if (data && typeof data.message === 'string' && data.message.length > 0) {
-      return data.message;
-    }
+  const rec = error as Record<string, unknown>;
+  const direct = rec.message ?? rec.reason ?? rec.body;
+
+  if (typeof direct === 'string' && direct.length > 0) {
+    return direct;
+  }
+
+  const status = rec.status ?? rec.statusCode ?? rec.status_code ?? rec.code;
+
+  if (status === 429 || status === '429') {
+    return 'AI provider rate limit: 429';
+  }
+
+  const data = rec.data;
+
+  if (data && typeof data === 'object') {
+    const message = (data as { message?: unknown }).message;
+
+    return typeof message === 'string' && message.length > 0
+      ? message
+      : 'Session error';
   }
 
   return 'Session error';
+}
+
+function sessionRetrySummary(
+  status: Record<string, unknown>,
+): { id: string; text: string } | null {
+  if (status.type !== 'retry') {
+    return null;
+  }
+
+  const attempt = typeof status.attempt === 'number' ? status.attempt : null;
+
+  const message =
+    typeof status.message === 'string' && status.message.length > 0
+      ? status.message
+      : 'AI provider request failed; retrying';
+
+  const attemptText = attempt === null ? '' : ` attempt ${attempt}`;
+
+  return {
+    id: `status-retry-${attempt ?? 'unknown'}`,
+    text: `↻ Retry${attemptText}: ${message}`,
+  };
 }
 
 export function coerceFileDiff(value: unknown): AgentFileDiff | null {
@@ -405,14 +327,6 @@ export function mapOpencodeSsePayloadToChunk(
     return [];
   }
 
-  const rateLimitMessage = eventMayBelongToSession(rec, sessionId)
-    ? extractProviderRateLimitMessage(rec)
-    : null;
-
-  if (rateLimitMessage) {
-    return [{ kind: 'error', message: rateLimitMessage }];
-  }
-
   if (SILENT_STREAM_EVENT_TYPES.has(eventType)) {
     logIgnoredOnce(logState, eventType, 'silent transport event', raw);
 
@@ -499,6 +413,22 @@ export function mapOpencodeSsePayloadToChunk(
       ];
     }
 
+    if (status && typeof status === 'object') {
+      const retrySummary = sessionRetrySummary(
+        status as Record<string, unknown>,
+      );
+
+      if (retrySummary) {
+        return [
+          {
+            kind: 'summary',
+            id: `${sessionId}-${retrySummary.id}`,
+            text: retrySummary.text,
+          },
+        ];
+      }
+    }
+
     logIgnoredOnce(logState, eventType, 'non-busy session status', raw);
 
     return [];
@@ -575,6 +505,11 @@ export function mapOpencodeSsePayloadToChunk(
     }
 
     const message = extractSessionErrorMessage(p.error);
+
+    debug(
+      'opencode-sdk stream: session.error payload',
+      previewPayload(raw, 10_000),
+    );
 
     return [{ kind: 'error', message }];
   }

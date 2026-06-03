@@ -2749,6 +2749,29 @@ button.composer-chip.composer-chip--success {
   margin-left: auto;
 }
 
+button.composer-meta-text--context {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+button.composer-meta-text--context:disabled {
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.composer-meta-dropdown--context {
+  margin-left: auto;
+}
+
+.composer-meta-dropdown--context .composer-meta-text--context {
+  margin-left: 0;
+}
+
 .composer-meta-dropdown {
   position: relative;
   display: inline-flex;

@@ -87,6 +87,16 @@ function isTimeoutLikeError(err: unknown): boolean {
   return /\b(timeout|timed out|deadline|abort)\b/i.test(errorMessage(err));
 }
 
+function shortLogText(value: string, maxLength: number = 500): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+}
+
+function isFatalStreamErrorMessage(message: string): boolean {
+  return /\b(error|exception|failed|failure|timeout|timed out|deadline|abort|rate limit|429|unauthorized|forbidden)\b/i.test(
+    message,
+  );
+}
+
 function logSdkCallError({
   operation,
   sessionId,
@@ -740,6 +750,35 @@ type GetOpencodeSdkContextStatsProps = {
   effectiveModel: string;
 };
 
+type SummarizeOpencodeSdkSessionProps = {
+  sessionId: string;
+  cwd: string;
+  effectiveModel: string;
+};
+
+export async function summarizeOpencodeSdkSession({
+  sessionId,
+  cwd,
+  effectiveModel,
+}: SummarizeOpencodeSdkSessionProps): Promise<void> {
+  const { client } = await getOrInitSdk();
+  const model = modelToProviderAndId(effectiveModel);
+
+  const result = await client.session.summarize({
+    sessionID: sessionId,
+    directory: cwd,
+    providerID: model.providerID,
+    modelID: model.modelID,
+    auto: true,
+  });
+
+  const err = sdkResultError(result);
+
+  if (err) {
+    throw new Error(errorMessage(err));
+  }
+}
+
 export async function getOpencodeSdkContextStats({
   sessionId,
   cwd,
@@ -766,10 +805,18 @@ export async function getOpencodeSdkContextStats({
         (info as { role?: unknown }).role === 'assistant' &&
         'tokens' in info,
     )
-    .sort((a, b) => getMessageCreatedAt(b) - getMessageCreatedAt(a));
+    .map((info) => ({
+      createdAt: getMessageCreatedAt(info),
+      tokenTotal: coerceTokenTotal(info.tokens),
+    }))
+    .filter(
+      (info): info is { createdAt: number; tokenTotal: number } =>
+        info.tokenTotal !== null && info.tokenTotal > 0,
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   const latestTokens = assistantMessages.length
-    ? coerceTokenTotal(assistantMessages[0].tokens)
+    ? assistantMessages[0].tokenTotal
     : null;
 
   if (latestTokens === null) {
@@ -1255,8 +1302,16 @@ export function createOpencodeSDKBackend({
         }
 
         if (chunk.kind === 'error') {
-          streamErrorMessage = chunk.message;
-          resolveStreamComplete();
+          if (isFatalStreamErrorMessage(chunk.message)) {
+            streamErrorMessage = chunk.message;
+            resolveStreamComplete();
+          } else {
+            log.warn(
+              `OpenCode SDK non-fatal stream error event ignored for session ${sessionId}: ${shortLogText(chunk.message)}`,
+            );
+
+            return;
+          }
         }
 
         recordStreamDebugChunk(
@@ -1441,9 +1496,15 @@ export function createOpencodeSDKBackend({
           } satisfies AgentErrorResult;
         }
 
+        log.info(`OpenCode SDK stream waiting for completion: ${sessionId}`);
         await streamComplete;
+        log.info(`OpenCode SDK stream completed: ${sessionId}`);
 
         if (streamErrorMessage) {
+          log.warn(
+            `OpenCode SDK stream error for session ${sessionId}: ${streamErrorMessage}`,
+          );
+
           return {
             type: 'error',
             output: streamErrorMessage,
@@ -1454,11 +1515,15 @@ export function createOpencodeSDKBackend({
         let messagesResult: Awaited<ReturnType<typeof client.session.messages>>;
 
         try {
+          log.info(`OpenCode SDK fetching final messages: ${sessionId}`);
+
           messagesResult = await client.session.messages({
             sessionID: sessionId,
             directory: cwd,
             limit: 10,
           });
+
+          log.info(`OpenCode SDK final messages returned: ${sessionId}`);
         } catch (err) {
           logSdkCallError({
             operation: 'session.messages',
@@ -1480,6 +1545,10 @@ export function createOpencodeSDKBackend({
         const latest = messagesError
           ? null
           : latestAssistantMessage(messagesResult.data);
+
+        log.info(
+          `OpenCode SDK latest assistant message ${latest ? 'found' : 'missing'}: ${sessionId}`,
+        );
 
         promptResult = {
           data: latest ?? undefined,
@@ -1532,11 +1601,17 @@ export function createOpencodeSDKBackend({
         JSON.stringify(promptResult, null, 2),
       );
 
-      return parsePromptSdkResult({
+      log.info(`OpenCode SDK parsing final prompt result: ${sessionId}`);
+
+      const parsedResult = parsePromptSdkResult({
         result: promptResult,
         sessionId,
         effectiveModel,
       });
+
+      log.info(`OpenCode SDK parsed final prompt result: ${sessionId}`);
+
+      return parsedResult;
     },
 
     async availableModels(): Promise<string[]> {

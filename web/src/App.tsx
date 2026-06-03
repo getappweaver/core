@@ -21,6 +21,7 @@ import type { ComposerAiState } from './commands/types';
 import { useCommandForms } from './commands/useCommandForms';
 import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
+import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
 import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
@@ -297,6 +298,10 @@ function AppInner(): JSX.Element {
 
   const PASSIVE_CURSOR_ACTION_DELAY_MS = 620;
   const PASSIVE_TARGET_SCROLL_WAIT_MS = 2000;
+
+  const [compactSessionRequestId, setCompactSessionRequestId] = createSignal<
+    string | null
+  >(null);
 
   let passiveActionQueue = Promise.resolve();
   let passiveHoveredElement: HTMLElement | null = null;
@@ -1844,6 +1849,61 @@ function AppInner(): JSX.Element {
     }
   }
 
+  function compactCurrentSession(): void {
+    if (!wsConnected()) {
+      appendSystemMessage('Connect WebSocket first.');
+
+      return;
+    }
+
+    if (compactSessionRequestId() !== null) {
+      appendSystemMessage('Session compaction is already running.');
+
+      return;
+    }
+
+    const requestId = createId();
+
+    setCompactSessionRequestId(requestId);
+    appendSystemMessage('------ Compacting -------');
+
+    pendingRequests.set(requestId, {
+      onCommandResult: (message) => {
+        if (typeof message.output === 'string') {
+          appendSystemMessage(message.output);
+        }
+      },
+      onDone: () => {
+        setCompactSessionRequestId(null);
+        requestComposerAiState();
+      },
+      onError: () => {
+        setCompactSessionRequestId(null);
+      },
+    });
+
+    sendSocketMessage({
+      type: 'compact_session',
+      requestId,
+    });
+  }
+
+  async function createNewSessionFromComposerMenu(): Promise<void> {
+    const commandDetail = await ensureCommandDetail('session');
+
+    const subcommand = commandDetail?.subcommands.find(
+      (entry) => entry.name === 'new',
+    );
+
+    if (!subcommand) {
+      appendSystemMessage('Unable to create a new session.');
+
+      return;
+    }
+
+    await runCommand('session', subcommand, defaultPayload(subcommand));
+  }
+
   function saveTimelineFormBridge(
     item: Extract<TimelineItem, { type: 'command_form' }>,
   ): void {
@@ -1910,6 +1970,8 @@ function AppInner(): JSX.Element {
     timeline,
     timelineId,
     setTimeline,
+    pendingPromptRequestId,
+    setPendingPromptRequestId,
     setActiveFormId,
     createId,
     pendingRequests,
@@ -2557,16 +2619,19 @@ function AppInner(): JSX.Element {
                     <span class="composer-meta-text composer-meta-text--muted">
                       {composerAiState()!.provider}
                     </span>
-                    <Show when={formatComposerContextStats(composerAiState())}>
-                      {(contextLabel) => (
-                        <span
-                          class="composer-meta-text composer-meta-text--muted composer-meta-text--context"
-                          title="Latest OpenCode SDK assistant-message token total and model context usage"
-                        >
-                          {contextLabel()}
-                        </span>
-                      )}
-                    </Show>
+                    <ComposerContextMenuButton
+                      backend={composerAiState()!.backend}
+                      label={
+                        formatComposerContextStats(composerAiState()) ??
+                        'session'
+                      }
+                      wsConnected={wsConnected()}
+                      compacting={compactSessionRequestId() !== null}
+                      onCompact={compactCurrentSession}
+                      onCreateNewSession={() => {
+                        void createNewSessionFromComposerMenu();
+                      }}
+                    />
                   </Show>
                   <Show when={agentWorking()}>
                     <span class="composer-working" aria-live="polite">
