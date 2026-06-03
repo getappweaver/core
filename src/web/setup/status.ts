@@ -148,6 +148,16 @@ function setupDependencies(): SetupDependencyStatus[] {
       installCommand: null,
     }),
     dependencyStatus({
+      name: 'nak',
+      command: 'nak',
+      required: true,
+      installHint:
+        'Install nak, the Nostr Army Knife, for Nostr event tooling.',
+      installUrl: 'https://github.com/fiatjaf/nak#nak-the-nostr-army-knife',
+      installCommand:
+        'curl -sSL https://raw.githubusercontent.com/fiatjaf/nak/master/install.sh | sh',
+    }),
+    dependencyStatus({
       name: 'Piper',
       command: 'piper',
       required: false,

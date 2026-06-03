@@ -397,6 +397,10 @@ pre {
   border-left: 4px solid var(--color-accent);
 }
 
+.setup-card--nostr-tools {
+  border-left: 4px solid var(--color-warning);
+}
+
 .setup-card-head {
   display: flex;
   align-items: flex-start;
@@ -454,6 +458,56 @@ pre {
 .setup-runtime-grid dd {
   margin: 0.25rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.setup-detection-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.8rem 0 0;
+}
+
+.setup-detection-grid div {
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  background: var(--color-panel);
+}
+
+.setup-detection-grid dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.setup-detection-grid dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.setup-tool-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-tool-list li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.45rem 0.55rem;
+  background: var(--color-panel);
+}
+
+.setup-tool-list span {
+  color: var(--color-text-muted);
+}
+
+.setup-tool-list a {
+  color: var(--color-warning);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .setup-status-list {
@@ -669,6 +723,11 @@ pre {
   }
 
   .setup-runtime-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-detection-grid,
+  .setup-tool-list li {
     grid-template-columns: 1fr;
   }
 

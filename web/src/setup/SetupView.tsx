@@ -46,6 +46,248 @@ type StatusRowProps = {
   detail: string;
 };
 
+type DetectedBrowser =
+  | 'Brave'
+  | 'Chrome'
+  | 'Edge'
+  | 'Firefox'
+  | 'Safari'
+  | 'Samsung Internet'
+  | 'Unknown';
+
+type DetectedDevice = 'phone' | 'tablet' | 'desktop';
+
+type DetectedOS = 'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux' | 'Unknown';
+
+type BrowserEnvironment = {
+  browser: DetectedBrowser;
+  device: DetectedDevice;
+  os: DetectedOS;
+  nip07Available: boolean;
+};
+
+type NostrToolRecommendation = {
+  name: string;
+  detail: string;
+  href: string | null;
+};
+
+const CHROMIUM_DESKTOP_BROWSERS: DetectedBrowser[] = [
+  'Brave',
+  'Chrome',
+  'Edge',
+];
+
+const hasNavigatorUAData = (
+  navigatorValue: Navigator,
+): navigatorValue is Navigator & {
+  userAgentData: { brands: { brand: string }[] };
+} => {
+  const userAgentData = ((navigatorValue as unknown) as Record<string, unknown>)
+    .userAgentData;
+
+  return (
+    typeof userAgentData === 'object' &&
+    userAgentData !== null &&
+    Array.isArray((userAgentData as { brands: unknown }).brands)
+  );
+};
+
+function hasNavigatorBrave(navigatorValue: Navigator): boolean {
+  return 'brave' in navigatorValue;
+}
+
+function detectBrowser(userAgent: string): DetectedBrowser {
+  if (/Edg\//.test(userAgent)) {
+    return 'Edge';
+  }
+
+  if (/SamsungBrowser\//.test(userAgent)) {
+    return 'Samsung Internet';
+  }
+
+  if (/Firefox\//.test(userAgent) || /FxiOS\//.test(userAgent)) {
+    return 'Firefox';
+  }
+
+  if (/CriOS\//.test(userAgent) || /Chrome\//.test(userAgent)) {
+    return 'Chrome';
+  }
+
+  if (/Safari\//.test(userAgent)) {
+    return 'Safari';
+  }
+
+  return 'Unknown';
+}
+
+function detectOS(userAgent: string, maxTouchPoints: number): DetectedOS {
+  if (/Android/i.test(userAgent)) {
+    return 'Android';
+  }
+
+  if (
+    /iPhone|iPad|iPod/i.test(userAgent) ||
+    (/Macintosh/i.test(userAgent) && maxTouchPoints > 1)
+  ) {
+    return 'iOS';
+  }
+
+  if (/Mac OS X|Macintosh/i.test(userAgent)) {
+    return 'macOS';
+  }
+
+  if (/Windows/i.test(userAgent)) {
+    return 'Windows';
+  }
+
+  if (/Linux/i.test(userAgent)) {
+    return 'Linux';
+  }
+
+  return 'Unknown';
+}
+
+function detectDevice(
+  userAgent: string,
+  maxTouchPoints: number,
+): DetectedDevice {
+  if (
+    /iPad|Tablet/i.test(userAgent) ||
+    (/Macintosh/i.test(userAgent) && maxTouchPoints > 1)
+  ) {
+    return 'tablet';
+  }
+
+  if (/Android/i.test(userAgent) && !/Mobile/i.test(userAgent)) {
+    return 'tablet';
+  }
+
+  if (/Mobi|iPhone|iPod/i.test(userAgent)) {
+    return 'phone';
+  }
+
+  return 'desktop';
+}
+
+function detectBrowserEnvironment(): BrowserEnvironment {
+  const userAgent = window.navigator.userAgent;
+  const maxTouchPoints = window.navigator.maxTouchPoints;
+
+  const brands = hasNavigatorUAData(window.navigator)
+    ? window.navigator.userAgentData.brands
+    : [];
+
+  const browserFromUA = detectBrowser(userAgent);
+
+  const browser =
+    hasNavigatorBrave(window.navigator) ||
+    brands.some((brand) => /Brave/i.test(brand.brand))
+      ? 'Brave'
+      : browserFromUA;
+
+  return {
+    browser,
+    device: detectDevice(userAgent, maxTouchPoints),
+    os: detectOS(userAgent, maxTouchPoints),
+    nip07Available: Boolean(window.nostr),
+  };
+}
+
+function nostrToolRecommendations(
+  environment: BrowserEnvironment,
+): NostrToolRecommendation[] {
+  if (environment.nip07Available) {
+    return [
+      {
+        name: 'Use detected NIP-07 signer',
+        detail:
+          'This browser already exposes window.nostr, so the extension connect path should work.',
+        href: null,
+      },
+    ];
+  }
+
+  if (environment.os === 'Android') {
+    return [
+      {
+        name: 'Amber',
+        detail:
+          'Recommended Android signer. Use the Amber tab in Connect Nostr.',
+        href: 'https://github.com/greenart7c3/Amber',
+      },
+      {
+        name: 'Nostr Connect',
+        detail:
+          'Use a mobile signer that handles nostrconnect:// links if you prefer relay-based approval.',
+        href: null,
+      },
+    ];
+  }
+
+  if (environment.os === 'iOS') {
+    return [
+      {
+        name: 'NostrKey Safari extension',
+        detail:
+          'Possible iPhone/iPad NIP-07 option. This path may need manual testing on iOS.',
+        href: 'https://apps.apple.com/ca/app/nostrkey-web-extension/id6759624317',
+      },
+      {
+        name: 'nak bunker',
+        detail:
+          'Advanced fallback: run a local nak bunker yourself and paste the bunker URL. This keeps the user private key outside AppWeaver.',
+        href: null,
+      },
+    ];
+  }
+
+  if (
+    environment.device === 'desktop' &&
+    CHROMIUM_DESKTOP_BROWSERS.includes(environment.browser)
+  ) {
+    return [
+      {
+        name: 'nos2x extension',
+        detail:
+          'Recommended desktop NIP-07 signer for Chrome, Brave, and Edge style browsers.',
+        href: 'https://chromewebstore.google.com/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp',
+      },
+    ];
+  }
+
+  if (environment.device === 'desktop' && environment.browser === 'Firefox') {
+    return [
+      {
+        name: 'nos2x-fox extension',
+        detail: 'Recommended desktop NIP-07 signer for Firefox.',
+        href: 'https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/',
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'Nostr Connect',
+      detail:
+        'Recommended for this browser if a NIP-07 extension is unavailable or unsupported.',
+      href: null,
+    },
+    {
+      name: 'nak bunker',
+      detail:
+        'Advanced local option: run nak bunker yourself, then connect AppWeaver with the bunker URL.',
+      href: null,
+    },
+    {
+      name: 'Bunker URL',
+      detail:
+        'Use an existing NIP-46 bunker connection when you already have one.',
+      href: null,
+    },
+  ];
+}
+
 function StatusRow(props: StatusRowProps): JSX.Element {
   return (
     <li class="setup-status-row">
@@ -145,6 +387,86 @@ function SetupStatusCard(props: { status: SetupStatus }): JSX.Element {
 
       <ul class="setup-status-list">
         <For each={setupRows(status())}>{(row) => <StatusRow {...row} />}</For>
+      </ul>
+    </section>
+  );
+}
+
+function NostrToolingCard(): JSX.Element {
+  const [environment, setEnvironment] = createSignal(
+    detectBrowserEnvironment(),
+  );
+
+  const recommendations = createMemo(() =>
+    nostrToolRecommendations(environment()),
+  );
+
+  const refreshEnvironment = () => setEnvironment(detectBrowserEnvironment());
+  const refreshTimer = window.setTimeout(refreshEnvironment, 900);
+
+  window.addEventListener('focus', refreshEnvironment);
+  document.addEventListener('visibilitychange', refreshEnvironment);
+
+  onCleanup(() => {
+    window.clearTimeout(refreshTimer);
+    window.removeEventListener('focus', refreshEnvironment);
+    document.removeEventListener('visibilitychange', refreshEnvironment);
+  });
+
+  return (
+    <section
+      class="card setup-card setup-card--nostr-tools"
+      aria-labelledby="nostr-tooling-title"
+    >
+      <div class="setup-card-head">
+        <div>
+          <h1 id="nostr-tooling-title">Nostr tooling</h1>
+        </div>
+        <span
+          class="setup-badge"
+          classList={{ 'is-ok': environment().nip07Available }}
+        >
+          {environment().nip07Available ? 'signer found' : 'recommendation'}
+        </span>
+      </div>
+      <p class="setup-copy">
+        AppWeaver detected this browser environment and picked the best connect
+        options for setup.
+      </p>
+      <dl class="setup-detection-grid">
+        <div>
+          <dt>Browser</dt>
+          <dd>{environment().browser}</dd>
+        </div>
+        <div>
+          <dt>Device</dt>
+          <dd>{environment().device}</dd>
+        </div>
+        <div>
+          <dt>OS</dt>
+          <dd>{environment().os}</dd>
+        </div>
+        <div>
+          <dt>NIP-07</dt>
+          <dd>{environment().nip07Available ? 'available' : 'not detected'}</dd>
+        </div>
+      </dl>
+      <ul class="setup-tool-list">
+        <For each={recommendations()}>
+          {(recommendation) => (
+            <li>
+              <strong>{recommendation.name}</strong>
+              <span>{recommendation.detail}</span>
+              <Show when={recommendation.href}>
+                {(href) => (
+                  <a href={href()} target="_blank" rel="noreferrer">
+                    Open
+                  </a>
+                )}
+              </Show>
+            </li>
+          )}
+        </For>
       </ul>
     </section>
   );
@@ -1793,6 +2115,7 @@ export function SetupView(): JSX.Element {
             {(loaded) => (
               <>
                 <SystemCheckCard status={loaded()} />
+                <NostrToolingCard />
                 <SetupTimeline
                   token={setupToken()!}
                   status={loaded()}

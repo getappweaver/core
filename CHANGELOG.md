@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.35.0] - 2026-06-03
+
+- feat: add nostr tooling setup recommendations (b54b7c8)
+
 ## [v9.34.0] - 2026-06-03
 
-- feat: add opencode session context actions (36b2fbd)
+- feat: add opencode session context actions (cf75e01)
 
 ## [v9.33.3] - 2026-06-03
 
