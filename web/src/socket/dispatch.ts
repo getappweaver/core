@@ -147,6 +147,7 @@ export function handleServerMessage(params: {
 
       if (chunk.kind === 'error') {
         adapters.setAgentWorking(false);
+        adapters.appendSystemMessage(chunk.message);
 
         return;
       }

@@ -562,6 +562,14 @@ export function TimelineCommandResultCard(
       }
       expandedHeadToolbar={
         <>
+          <Show when={props.item.web}>
+            <TimelineWebTreeToolbar
+              onScrollToTop={scrollCardToTop}
+              toolbar={webTreeToolbar}
+              treeHeaderInView={treeHeaderInView}
+              buttonClass="card-head__control"
+            />
+          </Show>
           <Show when={ttsText()}>
             {(text) => (
               <div
@@ -579,14 +587,6 @@ export function TimelineCommandResultCard(
                 />
               </div>
             )}
-          </Show>
-          <Show when={props.item.web}>
-            <TimelineWebTreeToolbar
-              onScrollToTop={scrollCardToTop}
-              toolbar={webTreeToolbar}
-              treeHeaderInView={treeHeaderInView}
-              buttonClass="card-head__control"
-            />
           </Show>
           <Show when={storyRuntimeId()}>
             {(storyId) => (

@@ -48,6 +48,15 @@ export function useTimeline(adapters: TimelineAdapters): TimelineHook {
   }
 
   function deleteTimelineItem(itemId: string): void {
+    const deleted = adapters.timeline().find((item) => item.id === itemId);
+
+    if (
+      deleted?.type === 'prompt' &&
+      adapters.pendingPromptRequestId() === deleted.requestId
+    ) {
+      adapters.setPendingPromptRequestId(null);
+    }
+
     adapters.setTimeline((prev) => prev.filter((item) => item.id !== itemId));
 
     const requestId = adapters.createId();

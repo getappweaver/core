@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.35.1] - 2026-06-03
+
+- fix: improve prompt cleanup and chat diagnostics (823ed08)
+
 ## [v9.35.0] - 2026-06-03
 
-- feat: add nostr tooling setup recommendations (b54b7c8)
+- feat: add nostr tooling setup recommendations (d4baf91)
 
 ## [v9.34.0] - 2026-06-03
 

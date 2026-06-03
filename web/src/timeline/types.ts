@@ -14,6 +14,8 @@ export type TimelineAdapters = {
   timeline: Accessor<TimelineItem[]>;
   timelineId: Accessor<string>;
   setTimeline: Setter<TimelineItem[]>;
+  pendingPromptRequestId: Accessor<string | null>;
+  setPendingPromptRequestId: Setter<string | null>;
   setActiveFormId: Setter<string | null>;
   createId: () => string;
   pendingRequests: Map<string, PendingRequest>;

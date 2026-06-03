@@ -1,5 +1,7 @@
 import { createEffect, onMount } from 'solid-js';
 
+import { logChatDebug } from '../chat/debug';
+
 import type { ComposerAdapters, ComposerHook } from './types';
 
 export function useComposer(adapters: ComposerAdapters): ComposerHook {
@@ -12,13 +14,30 @@ export function useComposer(adapters: ComposerAdapters): ComposerHook {
 
     let promptRequestId = adapters.pendingPromptRequestId();
 
+    logChatDebug('composer.submit', {
+      length: text.length,
+      startsWithSlash: text.startsWith('/'),
+      pendingPromptRequestId: promptRequestId,
+      hasPendingPromptRequest: promptRequestId
+        ? adapters.hasPendingRequest(promptRequestId)
+        : false,
+      chromePromptRequestId:
+        adapters.chrome.chromePromptSession()?.requestId ?? null,
+    });
+
     if (promptRequestId && !adapters.hasPendingRequest(promptRequestId)) {
+      logChatDebug('composer.prompt.stale_clear', { promptRequestId });
       adapters.setPendingPromptRequestId(null);
       promptRequestId = null;
     }
 
     if (promptRequestId) {
       const chrome = adapters.chrome.chromePromptSession();
+
+      logChatDebug('composer.route.prompt_answer', {
+        promptRequestId,
+        chromePrompt: chrome?.requestId ?? null,
+      });
 
       if (!chrome) {
         adapters.chat.appendUserMessage(text);
@@ -95,6 +114,7 @@ export function useComposer(adapters: ComposerAdapters): ComposerHook {
     }
 
     adapters.setComposerText('');
+    logChatDebug('composer.route.chat', { length: text.length });
     adapters.chat.sendChat(text);
   }
 

@@ -153,6 +153,16 @@ function textOffsetForRange(root: HTMLElement, target: Range): number | null {
 export function ChatMarkdown(props: ChatMarkdownProps) {
   const [codeEl, setCodeEl] = createSignal<HTMLElement | null>(null);
 
+  const speechSentences = createMemo(() => props.speechSentences ?? []);
+
+  const activeSpeechSentenceIndex = createMemo(
+    () => props.activeSpeechSentenceIndex ?? null,
+  );
+
+  const onSpeechSentenceClick = createMemo(
+    () => props.onSpeechSentenceClick ?? null,
+  );
+
   const html = createMemo(() => {
     const src = props.text ?? '';
 
@@ -177,8 +187,8 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
 
   createEffect(() => {
     const el = codeEl();
-    const sentences = props.speechSentences ?? [];
-    const activeIndex = props.activeSpeechSentenceIndex;
+    const sentences = speechSentences();
+    const activeIndex = activeSpeechSentenceIndex();
 
     const highlightApi = CSS as typeof CSS & {
       highlights?: Map<string, unknown>;
@@ -221,13 +231,10 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
 
   const handleClick = (event: MouseEvent): void => {
     const el = codeEl();
-    const sentences = props.speechSentences ?? [];
+    const sentences = speechSentences();
+    const onClick = onSpeechSentenceClick();
 
-    if (
-      el == null ||
-      sentences.length === 0 ||
-      props.onSpeechSentenceClick == null
-    ) {
+    if (el == null || sentences.length === 0 || onClick == null) {
       return;
     }
 
@@ -248,13 +255,13 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
     );
 
     if (sentence != null) {
-      props.onSpeechSentenceClick(sentence.index);
+      onClick(sentence.index);
     }
   };
 
   const setHoverHighlight = (event: MouseEvent | null): void => {
     const el = codeEl();
-    const sentences = props.speechSentences ?? [];
+    const sentences = speechSentences();
 
     const highlightApi = CSS as typeof CSS & {
       highlights?: Map<string, unknown>;
@@ -301,9 +308,7 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
       <code
         class="hljs language-markdown"
         classList={{
-          'chat-md__code--speech-clickable': Boolean(
-            props.onSpeechSentenceClick,
-          ),
+          'chat-md__code--speech-clickable': Boolean(onSpeechSentenceClick()),
         }}
         onClick={handleClick}
         onMouseMove={setHoverHighlight}
