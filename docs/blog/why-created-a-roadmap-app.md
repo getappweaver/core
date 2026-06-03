@@ -1,0 +1,9 @@
+So far so good, then how do I continue to develop AppWeaver and many apps I'm still developing actively. At some point either I'll come across a lucrative job offer or I'll get bored from this. In order to continue this, I needed an incentive. 
+
+It's called money. Money is the best incentive in the world. You can outsource the things you don't want to do or can't do by yourself to others with a premium. And why not use this with the internet magic money P2P payments? We can create a marketplace for issues and feature requests with developers that would like to work on them.
+
+Well, not that easy. I believe this is not a solved problem in nostr or even general distributed networks. It's also a bootstrapping problem or chicken and eggs type of situation. Network is small, users are non existant. There is no developer besides me. How can I create a bidding system that probably no one would use?
+
+I think the better design is, donate/tip and forget. If someone uses the product and there is something wrong, you can just create an issue or a feature request. You can add your tip with a lightning payment called a zap.
+
+This is not a contract nor a business agreement. There is no employer and employee. You just signal that you want this issue/request this (how much?) badly. Maybe you didn't zap anything at all. Still thank you for that because you give your precious time to give a feedback. But if you or someone else has zapped, now there is a different game theory. It's the most real signal you can give because it's skin in the game. It's a race for developers' attention and incentive. People can zap on the same issues someone else created and when we order the items by the amount of zaps it would create a nice crowdfunding prioritization.
