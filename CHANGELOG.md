@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.37.2] - 2026-06-05
+
+- fix: no need for open in timeline button in the toolbar (93d6594)
+
 ## [v9.37.1] - 2026-06-04
 
-- fix: update blog todo (a22dccf)
+- fix: update blog todo (f41dd62)
 
 ## [v9.37.0] - 2026-06-04
 

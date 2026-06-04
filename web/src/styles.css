@@ -2187,10 +2187,6 @@ a.diff-line__number:focus-visible {
   color: #000;
 }
 
-.card-head-tree-toolbar .web-file-open-timeline-button {
-  background: color-mix(in srgb, var(--color-accent) 86%, transparent);
-}
-
 .widget-help-toggle[aria-pressed='true'] {
   background: var(--color-accent);
 }
