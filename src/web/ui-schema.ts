@@ -31,6 +31,8 @@ export const WebRefreshSchema = z.object({
       template: z.string().min(1),
     })
     .optional(),
+  /** Whether the refresh command should create timeline entries. Defaults to the parent action policy. */
+  recordInTimeline: z.boolean().optional(),
   expandTreeItemIds: z.array(z.string().min(1)).optional(),
   expandTreeItemIdFromOption: z
     .object({
@@ -144,8 +146,18 @@ export const WebActionSchema = z.discriminatedUnion('type', [
 
 export const WebToolbarActionSchema = z.object({
   label: z.string().min(1),
-  icon: z.enum(['add', 'checklist', 'copy', 'log']).optional(),
+  icon: z
+    .enum(['add', 'checklist', 'copy', 'edit', 'log', 'openTimeline', 'save'])
+    .optional(),
+  activeLabel: z.string().min(1).optional(),
+  activeIcon: z
+    .enum(['add', 'checklist', 'copy', 'edit', 'log', 'openTimeline', 'save'])
+    .optional(),
+  toggleKey: z.string().min(1).optional(),
+  className: z.string().min(1).optional(),
+  visibleOnSurfaces: z.array(z.enum(['dock', 'modal', 'timeline'])).optional(),
   action: WebActionSchema,
+  activeAction: WebActionSchema.optional(),
 });
 
 export const WebWhiteSpaceSchema = z.enum(['pre-wrap']);
@@ -215,8 +227,22 @@ export const WebPropsSchema = z.object({
   /** Hide this node until `{ type: "reveal", targetId }`; `{ type: "hideReveal", targetId }` collapses again. */
   revealId: z.string().min(1).optional(),
   hiddenUntilRevealed: z.literal(true).optional(),
+  /** Hide this node while a local toolbar/client toggle key is active. */
+  hiddenWhenToggleKey: z.string().min(1).optional(),
+  /** Hide this node unless a local toolbar/client toggle key is active. */
+  visibleWhenToggleKey: z.string().min(1).optional(),
   /** Hide this node unless the connected browser signer pubkey is in this allow-list. */
   visibleForPubkeys: z.array(z.string().min(1)).optional(),
+  /** Native contenteditable mode for simple browser-side editing experiments. */
+  contentEditable: z
+    .union([z.boolean(), z.literal('plaintext-only')])
+    .optional(),
+  /** `editableText`: stable id used by browser-side save/extraction actions. */
+  editableTextId: z.string().min(1).optional(),
+  /** `editableText`: initial text content. */
+  editableTextValue: z.string().optional(),
+  /** `editableText`: render a live line-number gutter. */
+  showLineNumbers: z.literal(true).optional(),
   action: WebActionSchema.optional(),
   stopPropagation: z.boolean().optional(),
   /** `textField`: name submitted with parent `form` (FormData / merge into command `arguments`). */
@@ -241,6 +267,8 @@ export const WebPropsSchema = z.object({
   autoFocus: z.literal(true).optional(),
   /** Scroll this element into view when it is mounted/replaced. */
   scrollIntoViewOnMount: z.literal(true).optional(),
+  /** Optional one-shot key for `scrollIntoViewOnMount`; consumed in browser session storage. */
+  scrollIntoViewOnceKey: z.string().min(1).optional(),
   /** Stable target id used by story walkthrough focus/fill steps. */
   storyTargetId: z.string().min(1).optional(),
   /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
@@ -287,6 +315,8 @@ export const WebElementTagSchema = z.enum([
   'choiceField',
   /** Multi-line text input with auto-growing height; use `formFieldName` with parent `form`. */
   'textArea',
+  /** Browser-side editable text surface with optional live line numbers. */
+  'editableText',
   /**
    * Group fields and submit: `action` is merged with `FormData` on the client.
    * - `command`: FormData keys map into `arguments`
@@ -390,6 +420,8 @@ export const TimelineDiffEventSchema = z.object({
   title: z.string().nullable(),
   subtitle: z.string().nullable(),
   origin: z.enum(['workspace_diff', 'git_commit', 'agent_patch']).nullable(),
+  scopePath: z.string().nullable().optional(),
+  stagedFiles: z.array(z.string()).optional(),
 });
 
 export const TimelineEventOutputSchema = z.object({

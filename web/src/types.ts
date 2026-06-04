@@ -166,6 +166,8 @@ export type TimelineItem =
         title: string | null;
         subtitle: string | null;
         origin: 'workspace_diff' | 'git_commit' | 'agent_patch' | null;
+        scopePath?: string | null;
+        stagedFiles?: string[];
       } | null;
     }
   | {

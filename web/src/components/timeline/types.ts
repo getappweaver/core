@@ -34,6 +34,12 @@ export type TimelineViewProps = {
     subcommand: string;
     payload: unknown;
   }) => Promise<string>;
+  onRunJsonCommandOutput: (props: {
+    command: string;
+    subcommand: string;
+    payload: unknown;
+  }) => Promise<import('../../commands/types').SplitCommandOutput>;
+  onReplaceTimelineItem: (item: TimelineItem) => void;
   onUpdateFormValue: (
     itemId: string,
     source: 'arguments' | 'options',

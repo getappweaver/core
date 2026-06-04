@@ -285,6 +285,69 @@ export function cardHeadCopyIcon(dims?: CardHeadChromeIconDims): JSX.Element {
   );
 }
 
+/** Inlined from edit [#1479] (SVG Repo). */
+export function cardHeadEditIcon(dims?: CardHeadChromeIconDims): JSX.Element {
+  const { width, height } = resolveDims(dims);
+
+  return (
+    <svg
+      class="card-head-chrome-icon"
+      width={width}
+      height={height}
+      viewBox="-3 -3.5 27 27"
+      aria-hidden="true"
+    >
+      <path
+        d="M18.9 18.010643H2.1V2.095788h8.4V.106431H0V20h21v-9.946785h-2.1v7.957428ZM6.3 9.949769 16.63095 0 21 4.114985 10.3341 14.031929H6.3V9.949769Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** Open in timeline / pop out. */
+export function cardHeadOpenTimelineIcon(
+  dims?: CardHeadChromeIconDims,
+): JSX.Element {
+  const { width, height } = resolveDims(dims);
+
+  return (
+    <svg
+      class="card-head-chrome-icon"
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 5h7v2H7v10h10v-5h2v7H5V5zm8 0h6v6h-2V8.41l-7.29 7.3-1.42-1.42 7.3-7.29H13V5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/** Inlined from save icon (SVG Repo). */
+export function cardHeadSaveIcon(dims?: CardHeadChromeIconDims): JSX.Element {
+  const { width, height } = resolveDims(dims);
+
+  return (
+    <svg
+      class="card-head-chrome-icon"
+      width={width}
+      height={height}
+      viewBox="-2 -2 20 20"
+      aria-hidden="true"
+    >
+      <path
+        d="M11 14v-4H5v4H3V8h10v6h-2 3V2H4v4h8V2h-2v2H6V2H2v12h3zM0 0h16v16H0V0z"
+        fill="currentColor"
+        fill-rule="evenodd"
+      />
+    </svg>
+  );
+}
+
 export function cardHeadLogIcon(dims?: CardHeadChromeIconDims): JSX.Element {
   const { width, height } = resolveDims(dims);
 

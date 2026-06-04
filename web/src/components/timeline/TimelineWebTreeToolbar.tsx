@@ -8,7 +8,10 @@ import {
   cardHeadAddIcon,
   cardHeadChecklistIcon,
   cardHeadCopyIcon,
+  cardHeadEditIcon,
   cardHeadLogIcon,
+  cardHeadOpenTimelineIcon,
+  cardHeadSaveIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
   cardHeadTreeFilterIcon,
@@ -27,6 +30,10 @@ type TimelineWebTreeToolbarProps = {
   buttonClass?: string;
 };
 
+type TimelineToolbarAction = NonNullable<
+  WebTreeToolbarRegistration['actions']
+>[number];
+
 export function TimelineWebTreeToolbar(
   props: TimelineWebTreeToolbarProps,
 ): JSX.Element {
@@ -36,8 +43,12 @@ export function TimelineWebTreeToolbar(
     null,
   );
 
+  const [activeToggleKeys, setActiveToggleKeys] = createSignal<Set<string>>(
+    new Set(),
+  );
+
   let filterInputEl: HTMLInputElement | undefined;
-  let copiedTimer: ReturnType<typeof window.setTimeout> | undefined;
+  let copiedTimer: number | undefined;
 
   const btnClass = () =>
     [
@@ -65,6 +76,38 @@ export function TimelineWebTreeToolbar(
       window.clearTimeout(copiedTimer);
     }
   });
+
+  const actionKey = (item: TimelineToolbarAction) =>
+    item.toggleKey ?? item.label;
+
+  const actionIsActive = (item: TimelineToolbarAction) =>
+    activeToggleKeys().has(actionKey(item));
+
+  const actionLabel = (item: TimelineToolbarAction) =>
+    actionIsActive(item) ? (item.activeLabel ?? item.label) : item.label;
+
+  const actionIcon = (item: TimelineToolbarAction) =>
+    actionIsActive(item) ? (item.activeIcon ?? item.icon) : item.icon;
+
+  const renderActionIcon = (
+    icon: TimelineToolbarAction['icon'],
+    label: string,
+  ) =>
+    icon === 'add'
+      ? cardHeadAddIcon()
+      : icon === 'checklist'
+        ? cardHeadChecklistIcon()
+        : icon === 'copy'
+          ? cardHeadCopyIcon()
+          : icon === 'edit'
+            ? cardHeadEditIcon()
+            : icon === 'log'
+              ? cardHeadLogIcon()
+              : icon === 'openTimeline'
+                ? cardHeadOpenTimelineIcon()
+                : icon === 'save'
+                  ? cardHeadSaveIcon()
+                  : label;
 
   /*
    * `when` must be a boolean or data value — never pass `when={() => ...}` here:
@@ -120,16 +163,47 @@ export function TimelineWebTreeToolbar(
             {(item) => (
               <WebButton
                 type="button"
-                class={`${btnClass()}${item.icon === 'copy' ? ' chat-copy-btn' : ''}${copiedActionLabel() === item.label ? ' chat-copy-btn--show-text' : ''}`}
-                data-ui={`toolbar-${item.icon ?? 'action'}`}
+                class={`${btnClass()}${item.className ? ` ${item.className}` : ''}${actionIcon(item) === 'copy' ? ' chat-copy-btn' : ''}${copiedActionLabel() === item.label ? ' chat-copy-btn--show-text' : ''}`}
+                data-ui={`toolbar-${actionIcon(item) ?? 'action'}`}
                 title={
-                  copiedActionLabel() === item.label ? 'Copied' : item.label
+                  copiedActionLabel() === item.label
+                    ? 'Copied'
+                    : actionLabel(item)
                 }
                 aria-label={
-                  copiedActionLabel() === item.label ? 'Copied' : item.label
+                  copiedActionLabel() === item.label
+                    ? 'Copied'
+                    : actionLabel(item)
+                }
+                aria-pressed={
+                  item.activeIcon != null || item.activeLabel != null
+                    ? actionIsActive(item)
+                    : undefined
                 }
                 onClick={() => {
-                  reg.runAction(item.action);
+                  const runActiveAction = actionIsActive(item);
+
+                  if (item.activeIcon != null || item.activeLabel != null) {
+                    const key = actionKey(item);
+
+                    setActiveToggleKeys((prev) => {
+                      const next = new Set(prev);
+
+                      if (next.has(key)) {
+                        next.delete(key);
+                      } else {
+                        next.add(key);
+                      }
+
+                      return next;
+                    });
+                  }
+
+                  reg.runAction(
+                    runActiveAction
+                      ? (item.activeAction ?? item.action)
+                      : item.action,
+                  );
 
                   if (item.icon === 'copy') {
                     setCopiedActionLabel(item.label);
@@ -145,15 +219,7 @@ export function TimelineWebTreeToolbar(
                   }
                 }}
               >
-                {item.icon === 'add'
-                  ? cardHeadAddIcon()
-                  : item.icon === 'checklist'
-                    ? cardHeadChecklistIcon()
-                    : item.icon === 'copy'
-                      ? cardHeadCopyIcon()
-                      : item.icon === 'log'
-                        ? cardHeadLogIcon()
-                        : item.label}
+                {renderActionIcon(actionIcon(item), actionLabel(item))}
                 {copiedActionLabel() === item.label && <span>copied</span>}
               </WebButton>
             )}

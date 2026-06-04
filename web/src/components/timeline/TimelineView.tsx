@@ -74,6 +74,11 @@ export function TimelineView(props: TimelineViewProps) {
               <TimelineDiffCard
                 item={item as Extract<TimelineItem, { type: 'diff' }>}
                 onDeleteTimelineItem={props.onDeleteTimelineItem}
+                onRunJsonCommand={props.onRunJsonCommand}
+                onRunJsonCommandOutput={props.onRunJsonCommandOutput}
+                onReplaceTimelineItem={props.onReplaceTimelineItem}
+                onRunWebAction={props.onRunWebAction}
+                onAppendSystem={props.onAppendSystem}
               />
             </Match>
 
@@ -642,6 +647,11 @@ export function TimelineChatCard(props: TimelineChatCardProps) {
 type TimelineDiffCardProps = {
   item: Extract<TimelineItem, { type: 'diff' }>;
   onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+  onRunJsonCommand: TimelineViewProps['onRunJsonCommand'];
+  onRunJsonCommandOutput: TimelineViewProps['onRunJsonCommandOutput'];
+  onReplaceTimelineItem: TimelineViewProps['onReplaceTimelineItem'];
+  onRunWebAction: TimelineViewProps['onRunWebAction'];
+  onAppendSystem: TimelineViewProps['onAppendSystem'];
 };
 
 type TimelineDiffSummaryRowProps = {
@@ -811,6 +821,7 @@ function copyLineReference(text: string): void {
 
 export function TimelineDiffCard(props: TimelineDiffCardProps) {
   let cardEl: HTMLDivElement | undefined;
+  let messageEl: HTMLTextAreaElement | undefined;
 
   const additions = () =>
     props.item.files.reduce((sum, file) => sum + file.additions, 0);
@@ -819,6 +830,35 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
     props.item.files.reduce((sum, file) => sum + file.deletions, 0);
 
   const [openFiles, setOpenFiles] = createSignal(new Set<number>());
+
+  const fileNames = () => props.item.files.map((file) => file.file);
+
+  const [selectedFiles, setSelectedFiles] = createSignal(
+    new Set(
+      (props.item.meta?.stagedFiles ?? []).filter((file) =>
+        fileNames().includes(file),
+      ),
+    ),
+  );
+
+  const [commitMessage, setCommitMessage] = createSignal('');
+  const [commitBusy, setCommitBusy] = createSignal(false);
+  const [refreshBusy, setRefreshBusy] = createSignal(false);
+
+  const [restoreBusyFile, setRestoreBusyFile] = createSignal<string | null>(
+    null,
+  );
+
+  const [commitStatus, setCommitStatus] = createSignal<string | null>(null);
+
+  const workspaceDiff = () => props.item.meta?.origin === 'workspace_diff';
+  const scopePath = () => props.item.meta?.scopePath ?? props.item.meta?.title;
+  const selectedCount = () => selectedFiles().size;
+
+  const commitDisabled = () =>
+    commitBusy() ||
+    selectedCount() === 0 ||
+    commitMessage().trim().length === 0;
 
   const label = () => {
     switch (props.item.meta?.origin) {
@@ -845,6 +885,144 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
       return next;
     });
+  }
+
+  function toggleSelectedFile(file: string): void {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(file)) {
+        next.delete(file);
+      } else {
+        next.add(file);
+      }
+
+      return next;
+    });
+  }
+
+  function selectAllFiles(): void {
+    setSelectedFiles(new Set(fileNames()));
+  }
+
+  function selectNoFiles(): void {
+    setSelectedFiles(new Set<string>());
+  }
+
+  async function refreshDiffCard(): Promise<void> {
+    const path = scopePath();
+
+    if (!path) {
+      props.onAppendSystem('Cannot refresh diff: missing path.');
+
+      return;
+    }
+
+    setRefreshBusy(true);
+
+    try {
+      const output = await props.onRunJsonCommandOutput({
+        command: 'file',
+        subcommand: 'diff',
+        payload: {
+          arguments: { path },
+          options: { timeline: true },
+        },
+      });
+
+      const event = output.timelineEvent?.event;
+
+      if (event?.type !== 'diff') {
+        if (output.text?.includes('No git diff available')) {
+          props.onDeleteTimelineItem(props.item.id);
+
+          return;
+        }
+
+        props.onAppendSystem(
+          output.text ?? 'Diff refresh did not return a diff.',
+        );
+
+        return;
+      }
+
+      props.onReplaceTimelineItem({
+        ...props.item,
+        files: event.files,
+        meta: {
+          title: event.title,
+          subtitle: event.subtitle,
+          origin: event.origin,
+          scopePath: event.scopePath ?? null,
+          stagedFiles: event.stagedFiles ?? [],
+        },
+      });
+    } catch (err) {
+      props.onAppendSystem(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshBusy(false);
+    }
+  }
+
+  async function restoreFile(file: string): Promise<void> {
+    setRestoreBusyFile(file);
+    setCommitStatus(null);
+
+    try {
+      const output = await props.onRunJsonCommand({
+        command: 'file',
+        subcommand: 'restore',
+        payload: { file },
+      });
+
+      setCommitStatus(output);
+      await refreshDiffCard();
+    } catch (err) {
+      setCommitStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestoreBusyFile(null);
+    }
+  }
+
+  async function commitSelectedFiles(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+
+    if (commitDisabled()) {
+      return;
+    }
+
+    setCommitBusy(true);
+    setCommitStatus(null);
+
+    try {
+      const text = await props.onRunJsonCommand({
+        command: 'file',
+        subcommand: 'commit',
+        payload: {
+          scopePath: scopePath(),
+          message: commitMessage(),
+          selectedFiles: Array.from(selectedFiles()),
+          expectedStagedFiles: props.item.meta?.stagedFiles ?? [],
+        },
+      });
+
+      setCommitStatus(text);
+    } catch (err) {
+      setCommitStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCommitBusy(false);
+    }
+  }
+
+  function resizeMessageTextarea(): void {
+    const el = messageEl;
+
+    if (!el) {
+      return;
+    }
+
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }
 
   const head = () => (
@@ -898,6 +1076,32 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
       collapsedHeadSummary={head()}
       onDismiss={() => props.onDeleteTimelineItem(props.item.id)}
     >
+      <Show when={workspaceDiff()}>
+        <div
+          class="diff-card__actions"
+          role="toolbar"
+          aria-label="Diff actions"
+        >
+          <button
+            type="button"
+            class="diff-card__link"
+            onClick={selectAllFiles}
+          >
+            Select all
+          </button>
+          <button type="button" class="diff-card__link" onClick={selectNoFiles}>
+            Select none
+          </button>
+          <button
+            type="button"
+            class="diff-card__link"
+            disabled={refreshBusy()}
+            onClick={() => void refreshDiffCard()}
+          >
+            {refreshBusy() ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </Show>
       <For each={props.item.files}>
         {(file, index) => (
           <div class="diff-file">
@@ -907,6 +1111,19 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
               onClick={() => toggleFile(index())}
               aria-expanded={openFiles().has(index())}
             >
+              <Show when={workspaceDiff()}>
+                <input
+                  type="checkbox"
+                  class="web-checkbox web-checkbox--retro diff-file__checkbox"
+                  checked={selectedFiles().has(file.file)}
+                  aria-label={`Include ${file.file} in commit`}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => {
+                    event.stopPropagation();
+                    toggleSelectedFile(file.file);
+                  }}
+                />
+              </Show>
               <span class="diff-file__name">{file.file}</span>
               <span class="diff-file__meta">
                 {file.status ?? 'modified'} · +{file.additions} -
@@ -914,6 +1131,20 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
               </span>
             </button>
             <Show when={openFiles().has(index())}>
+              <Show when={workspaceDiff()}>
+                <div class="diff-file__expanded-actions">
+                  <button
+                    type="button"
+                    class="diff-card__link diff-file__restore"
+                    disabled={restoreBusyFile() === file.file}
+                    onClick={() => void restoreFile(file.file)}
+                  >
+                    {restoreBusyFile() === file.file
+                      ? 'Restoring…'
+                      : 'Restore file'}
+                  </button>
+                </div>
+              </Show>
               <pre class="diff-file__patch">
                 <For each={renderDiffPatchLines(file.patch)}>
                   {(line) => (
@@ -948,6 +1179,40 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
           </div>
         )}
       </For>
+      <Show when={workspaceDiff()}>
+        <form class="diff-card__commit-form" onSubmit={commitSelectedFiles}>
+          <div class="diff-card__commit-message-row">
+            <textarea
+              ref={(el) => {
+                messageEl = el;
+                resizeMessageTextarea();
+              }}
+              rows={1}
+              value={commitMessage()}
+              placeholder="Commit message"
+              aria-label="Commit message"
+              onInput={(event) => {
+                setCommitMessage(event.currentTarget.value);
+                resizeMessageTextarea();
+              }}
+            />
+          </div>
+          <div class="diff-card__commit-action-row">
+            <WebButton
+              type="submit"
+              class="web-button diff-card__commit-button"
+              disabled={commitDisabled()}
+            >
+              {commitBusy()
+                ? 'Committing…'
+                : `Commit selected (${selectedCount()})`}
+            </WebButton>
+          </div>
+          <Show when={commitStatus()}>
+            {(status) => <div class="diff-card__commit-status">{status()}</div>}
+          </Show>
+        </form>
+      </Show>
     </TimelineCollapsibleCard>
   );
 }
@@ -1318,6 +1583,18 @@ export function TimelineToolCard(props: TimelineToolCardProps) {
                 },
               }}
               onDeleteTimelineItem={props.onDeleteTimelineItem}
+              onRunJsonCommand={async () =>
+                'Commit unavailable for patch previews.'
+              }
+              onRunJsonCommandOutput={async () => ({
+                text: 'Refresh unavailable for patch previews.',
+                web: null,
+                clientView: null,
+                timelineEvent: null,
+              })}
+              onReplaceTimelineItem={() => {}}
+              onRunWebAction={() => {}}
+              onAppendSystem={() => {}}
             />
           )}
         </For>

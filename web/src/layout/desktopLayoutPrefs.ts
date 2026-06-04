@@ -18,14 +18,27 @@ export const DEFAULT_LAYOUT_PREFS: LayoutPrefs = {
 };
 
 const MIN_DOCK_WIDTH_PX = 260;
-const MAX_DOCK_WIDTH_PX = 520;
+const MAX_DOCK_WIDTH_PX = 860;
+const MIN_MAIN_WIDTH_PX = 360;
+const DOCK_RESIZER_WIDTH_PX = 8;
 
 function isDockPosition(value: unknown): value is DockPosition {
   return value === 'left' || value === 'right' || value === 'hidden';
 }
 
 export function clampDockWidth(value: number): number {
-  return Math.min(MAX_DOCK_WIDTH_PX, Math.max(MIN_DOCK_WIDTH_PX, value));
+  const viewportMax =
+    typeof window === 'undefined'
+      ? MAX_DOCK_WIDTH_PX
+      : Math.max(
+          MIN_DOCK_WIDTH_PX,
+          window.innerWidth - MIN_MAIN_WIDTH_PX - DOCK_RESIZER_WIDTH_PX,
+        );
+
+  return Math.min(
+    Math.min(MAX_DOCK_WIDTH_PX, viewportMax),
+    Math.max(MIN_DOCK_WIDTH_PX, value),
+  );
 }
 
 function normalizeDockExpandedLimit(value: unknown): number {

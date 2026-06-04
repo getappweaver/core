@@ -115,6 +115,11 @@ export type CommandsHook = {
     subcommand: string;
     payload: unknown;
   }) => Promise<string>;
+  runJsonCommandOutput: (props: {
+    command: string;
+    subcommand: string;
+    payload: unknown;
+  }) => Promise<SplitCommandOutput>;
   runWebAction: (action: WebAction, params?: RunWebActionParams) => void;
   splitCommandOutput: (output: CommandOutput | undefined) => SplitCommandOutput;
 };

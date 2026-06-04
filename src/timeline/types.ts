@@ -34,6 +34,8 @@ export type TimelineEventMeta = {
   title: string | null;
   subtitle: string | null;
   origin: TimelineDiffOrigin | null;
+  scopePath?: string | null;
+  stagedFiles?: string[];
 };
 
 export function summarizeTimelineDiffFiles(

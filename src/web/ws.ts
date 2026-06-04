@@ -104,6 +104,8 @@ function insertCommandOutputTimelineEvent(props: {
           title: output.event.title,
           subtitle: output.event.subtitle,
           origin: output.event.origin,
+          scopePath: output.event.scopePath ?? null,
+          stagedFiles: output.event.stagedFiles ?? [],
         },
         prompt: null,
         requestId: null,

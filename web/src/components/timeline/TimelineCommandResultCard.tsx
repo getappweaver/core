@@ -98,6 +98,7 @@ type TimelineCommandResultCardProps = {
   onCollapsedChange?: (collapsed: boolean) => void;
   onHeadClick?: () => void;
   iconUrl?: string | null;
+  renderSurface?: 'dock' | 'timeline';
 };
 
 type SpeechSentenceState = {
@@ -668,7 +669,7 @@ export function TimelineCommandResultCard(
           <div class="web-result">
             <WebNodeShadowRoot
               root={props.item.web!}
-              renderSurface="timeline"
+              renderSurface={props.renderSurface ?? 'timeline'}
               stateScopeId={props.item.id}
               busy={props.isWebUiBusy(props.item.id)}
               currentUserPubkey={props.currentUserPubkey}

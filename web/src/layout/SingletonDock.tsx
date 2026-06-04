@@ -143,6 +143,7 @@ export function SingletonDock(props: SingletonDockProps): JSX.Element {
                       onRunJsonCommand={props.onRunJsonCommand}
                       onAppendSystem={props.onAppendSystem}
                       currentUserPubkey={props.currentUserPubkey()}
+                      renderSurface="dock"
                       collapsed={!isExpanded(dockCard.key)}
                       onHeadClick={() =>
                         props.onToggleExpandedDockWidget(dockCard.key)

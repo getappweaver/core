@@ -173,6 +173,7 @@ export async function routeCommand(
     runAgent,
     sendReply,
     promptFn,
+    jsonPayload: props.jsonPayload,
   });
 
   if (pluginResult !== null) {

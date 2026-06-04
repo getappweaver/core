@@ -1,9 +1,11 @@
 import type {
   TimelineEventOutput,
+  WebAction,
   WebNode,
   WebNodeRoot,
 } from '@src/web/ui-schema';
 
+import { getEditableTextSnapshot } from '../editableTextRegistry';
 import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
 import { loadSearchRelays } from '../nostr/searchRelays';
 import {
@@ -115,6 +117,8 @@ function timelineEventOutputToItem(
           title: output.event.title,
           subtitle: output.event.subtitle,
           origin: output.event.origin,
+          scopePath: output.event.scopePath ?? null,
+          stagedFiles: output.event.stagedFiles ?? [],
         },
       };
     default:
@@ -186,6 +190,85 @@ function highlightWebRootTargets(
   return {
     ...root,
     tree: highlightWebNodeTargets(root.tree, new Set(targetIds), targetIds[0]),
+  };
+}
+
+type EditableTextRunCommandAction = Extract<WebAction, { type: 'command' }>;
+
+function isEditableTextRunCommandAction(
+  value: unknown,
+): value is EditableTextRunCommandAction {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    candidate.type === 'command' &&
+    typeof candidate.command === 'string' &&
+    typeof candidate.subcommand === 'string'
+  );
+}
+
+function commandWithEditableText(props: {
+  action: WebAction;
+  appendSystemMessage: (message: string) => void;
+}): WebAction | null {
+  if (props.action.type !== 'clientAction') {
+    return null;
+  }
+
+  const editableId = props.action.payload?.editableTextId;
+  const contentArgument = props.action.payload?.contentArgument;
+  const activeLineRefreshOption = props.action.payload?.activeLineRefreshOption;
+
+  const activeLineScrollTokenOption =
+    props.action.payload?.activeLineScrollTokenOption;
+
+  const command = props.action.payload?.command;
+
+  if (
+    typeof editableId !== 'string' ||
+    typeof contentArgument !== 'string' ||
+    !isEditableTextRunCommandAction(command)
+  ) {
+    props.appendSystemMessage('Editable text save action is missing payload.');
+
+    return null;
+  }
+
+  const snapshot = getEditableTextSnapshot(editableId);
+
+  if (snapshot == null) {
+    props.appendSystemMessage(`Editable text not found: ${editableId}`);
+
+    return null;
+  }
+
+  return {
+    ...command,
+    arguments: {
+      ...(command.arguments ?? {}),
+      [contentArgument]: snapshot.text,
+    },
+    refresh:
+      command.refresh == null
+        ? undefined
+        : {
+            ...command.refresh,
+            options: {
+              ...(command.refresh.options ?? {}),
+              ...(typeof activeLineRefreshOption === 'string'
+                ? { [activeLineRefreshOption]: snapshot.activeLine }
+                : {}),
+              ...(typeof activeLineScrollTokenOption === 'string'
+                ? {
+                    [activeLineScrollTokenOption]: `${editableId}:${snapshot.activeLine}:${Date.now()}`,
+                  }
+                : {}),
+            },
+          },
   };
 }
 
@@ -385,6 +468,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             setChromeLoading: adapters.setChromeLoading,
           }),
         );
+      } else if (clientActionName === 'editableText.runCommand') {
+        const command = commandWithEditableText({
+          action,
+          appendSystemMessage: adapters.appendSystemMessage,
+        });
+
+        if (command !== null) {
+          runWebAction(command, params);
+        }
       } else if (clientActionName === 'roadmap.createIssue') {
         runClientAction(
           handleRoadmapCreateIssue({
@@ -730,6 +822,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         refresh.subcommand,
       );
 
+      const refreshRecordTl = refresh.recordInTimeline ?? recordTl;
+
       if (!refreshesTaskbar && !params?.onReplaceRoot) {
         return;
       }
@@ -737,7 +831,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       const refreshRequestId = adapters.createId();
 
       adapters.pendingRequests.set(refreshRequestId, {
-        recordInTimeline: recordTl,
+        recordInTimeline: refreshRecordTl,
         onCommandResult: (refreshMessage) => {
           if (refreshStage === 'prompt' && finalRefreshDispatchAttempted) {
             return;
@@ -791,7 +885,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             arguments: refresh.arguments ?? {},
             options: refresh.options ?? {},
           },
-          recordInTimeline: recordTl,
+          recordInTimeline: refreshRecordTl,
         });
 
         refreshChildInFlight = true;
@@ -848,7 +942,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 options: commandAction.options ?? {},
               },
               text: shouldRenderInTimeline ? null : output.text,
-              web: shouldRenderInTimeline ? null : output.web,
+              web: output.web,
               clientView: output.clientView,
             },
           ]);
@@ -1109,6 +1203,16 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     subcommand: string;
     payload: unknown;
   }): Promise<string> {
+    return runJsonCommandOutput(props).then(
+      (output) => output.text ?? 'Saved.',
+    );
+  }
+
+  function runJsonCommandOutput(props: {
+    command: string;
+    subcommand: string;
+    payload: unknown;
+  }): Promise<ReturnType<typeof splitCommandOutput>> {
     const requestId = adapters.createId();
 
     return new Promise((resolve, reject) => {
@@ -1116,7 +1220,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         recordInTimeline: false,
         onCommandResult: (message) => {
           const output = splitCommandOutput(message.output);
-          resolve(output.text ?? 'Saved.');
+          resolve(output);
         },
         onError: (message) => reject(new Error(message.message)),
       });
@@ -1145,6 +1249,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     requestChromeCommand,
     runCommand,
     runJsonCommand,
+    runJsonCommandOutput,
     runWebAction,
     splitCommandOutput,
   };

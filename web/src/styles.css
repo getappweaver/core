@@ -1643,6 +1643,30 @@ pre {
   color: #ff7b72;
 }
 
+.diff-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+}
+
+.diff-card__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-warning);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+}
+
+.diff-card__link:hover,
+.diff-card__link:focus-visible {
+  color: var(--color-button-hover);
+}
+
 .diff-file {
   border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, #fff);
 }
@@ -1668,11 +1692,68 @@ pre {
   color: inherit;
 }
 
+.diff-file__checkbox {
+  flex: 0 0 auto;
+  margin: 0 0.15rem 0 0;
+}
+
 .diff-file__summary:hover {
   background: color-mix(in srgb, #141414 80%, #fff);
 }
 
+.diff-card__commit-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, #fff);
+}
+
+.diff-card__commit-message-row,
+.diff-card__commit-action-row {
+  min-width: 0;
+}
+
+.diff-card__commit-action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.diff-card__commit-form textarea {
+  width: 100%;
+  min-height: 2.1rem;
+  max-height: 7.5rem;
+  resize: none;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.diff-card__commit-button {
+  white-space: nowrap;
+}
+
+.diff-card__commit-status {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  white-space: pre-wrap;
+}
+
+.diff-file__expanded-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.4rem 0.55rem 0;
+  background: #0d1117;
+}
+
+.diff-file__restore:disabled,
+.diff-card__link:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
 .diff-file__name {
+  flex: 1 1 auto;
   overflow-wrap: anywhere;
 }
 
@@ -2104,6 +2185,10 @@ a.diff-line__number:focus-visible {
 .card-head-tree-toolbar .card-head-tree-toolbar-btn:active {
   background: color-mix(in srgb, var(--color-accent) 70%, #000);
   color: #000;
+}
+
+.card-head-tree-toolbar .web-file-open-timeline-button {
+  background: color-mix(in srgb, var(--color-accent) 86%, transparent);
 }
 
 .widget-help-toggle[aria-pressed='true'] {
@@ -2553,6 +2638,7 @@ a.diff-line__number:focus-visible {
 .field-row select,
 .nostr-search-relays-modal__row input[type='text'],
 .composer textarea,
+.diff-card__commit-form textarea,
 .palette-filter {
   width: 100%;
   border: none;
@@ -2590,6 +2676,7 @@ a.diff-line__number:focus-visible {
 .field-row input[type='number']::placeholder,
 .nostr-search-relays-modal__row input[type='text']::placeholder,
 .composer textarea::placeholder,
+.diff-card__commit-form textarea::placeholder,
 .palette-filter::placeholder {
   color: var(--form-input-placeholder-color);
   opacity: 1;
@@ -2602,6 +2689,7 @@ a.diff-line__number:focus-visible {
 .field-row input[type='number']:focus::placeholder,
 .nostr-search-relays-modal__row input[type='text']:focus::placeholder,
 .composer textarea:focus::placeholder,
+.diff-card__commit-form textarea:focus::placeholder,
 .palette-filter:focus::placeholder {
   color: var(--form-input-placeholder-color);
 }
@@ -2615,6 +2703,7 @@ a.diff-line__number:focus-visible {
 .field-row select:focus,
 .nostr-search-relays-modal__row input[type='text']:focus,
 .composer textarea:focus,
+.diff-card__commit-form textarea:focus,
 .palette-filter:focus {
   background: var(--color-warning);
   color: #000;

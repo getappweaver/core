@@ -4,7 +4,13 @@
 
 import hljsGithubDarkCss from 'highlight.js/styles/github-dark.css?raw';
 import type { JSX } from 'solid-js';
-import { createEffect, createSignal, onCleanup, onMount } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
 import { render } from 'solid-js/web';
 
 import type { WebAction, WebNodeRoot, WebStyleSheet } from '@src/web/ui-schema';
@@ -19,6 +25,8 @@ import {
   WebNodeRenderer,
   WebRevealContext,
   WebCurrentUserPubkeyContext,
+  WebToggleContext,
+  runLocalWebAction,
   type WebRevealContextValue,
   WebRenderMetaContext,
   WebRenderSurfaceContext,
@@ -30,7 +38,7 @@ import {
 type WebNodeShadowRootProps = {
   root: WebNodeRoot;
   stateScopeId?: string;
-  renderSurface?: 'modal' | 'timeline';
+  renderSurface?: 'dock' | 'modal' | 'timeline';
   busy?: boolean;
   /** When set, root-level `tree` UI registers handlers so the host can render toolbar in light DOM. */
   onWebTreeToolbarChange?: (
@@ -110,12 +118,23 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   let hostEl: HTMLDivElement | undefined;
   const [ctx, setCtx] = createSignal<ShadowMountContext | null>(null);
   const [currentRoot, setCurrentRoot] = createSignal<WebNodeRoot>(props.root);
+  const speechSentences = createMemo(() => props.speechSentences);
+
+  const activeSpeechSentenceIndex = createMemo(
+    () => props.activeSpeechSentenceIndex,
+  );
+
+  const onSpeechSentenceClick = createMemo(() => props.onSpeechSentenceClick);
 
   const treeItemExpandedById = getTreeItemExpandedStateForScope(
     props.stateScopeId,
   );
 
   const [revealedIds, setRevealedIds] = createSignal<Set<string>>(new Set());
+
+  const [activeToggleKeys, setActiveToggleKeys] = createSignal<Set<string>>(
+    new Set(),
+  );
 
   const revealContext: WebRevealContextValue = {
     isRevealed: (id) => revealedIds().has(id),
@@ -158,6 +177,23 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     },
   };
 
+  const toggleContext = {
+    isActive: (key: string) => activeToggleKeys().has(key),
+    toggle: (key: string) => {
+      setActiveToggleKeys((prev) => {
+        const next = new Set(prev);
+
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+
+        return next;
+      });
+    },
+  };
+
   onMount(() => {
     const host = hostEl;
 
@@ -178,6 +214,65 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
 
   createEffect(() => {
     setCurrentRoot(props.root);
+  });
+
+  createEffect(() => {
+    const tree = currentRoot().tree;
+
+    if (tree.type !== 'element' || tree.tag === 'tree') {
+      return;
+    }
+
+    const renderSurface = props.renderSurface ?? null;
+
+    const actions = tree.props?.toolbarActions?.filter((action) => {
+      if (action.visibleOnSurfaces == null) {
+        return true;
+      }
+
+      return (
+        renderSurface !== null &&
+        action.visibleOnSurfaces.includes(renderSurface)
+      );
+    });
+
+    if (actions == null || actions.length === 0) {
+      return;
+    }
+
+    props.onWebTreeToolbarChange?.({
+      showFilter: false,
+      filterValue: () => '',
+      filterPlaceholder: 'Filter',
+      setFilterValue: () => {},
+      showTreeControls: false,
+      showRefresh: false,
+      actions,
+      runAction: (action) => {
+        if (
+          runLocalWebAction({
+            action,
+            expandedById: treeItemExpandedById,
+            revealContext,
+            toggleContext,
+          })
+        ) {
+          return;
+        }
+
+        props.onRunAction?.(action, {
+          onReplaceRoot: props.onReplaceRoot,
+          promptRequestId: props.promptRequestId,
+        });
+      },
+      collapseAll: () => {},
+      expandAll: () => {},
+      refresh: () => {},
+    });
+
+    onCleanup(() => {
+      props.onWebTreeToolbarChange?.(null);
+    });
   });
 
   createEffect(() => {
@@ -253,18 +348,20 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                       value={() => props.currentUserPubkey ?? null}
                     >
                       <WebRevealContext.Provider value={revealContext}>
-                        <WebNodeRenderer
-                          root={currentRoot()}
-                          onReplaceRoot={props.onReplaceRoot}
-                          onError={props.onError}
-                          promptRequestId={props.promptRequestId}
-                          speechSentences={props.speechSentences}
-                          activeSpeechSentenceIndex={
-                            props.activeSpeechSentenceIndex
-                          }
-                          onSpeechSentenceClick={props.onSpeechSentenceClick}
-                          onRunAction={props.onRunAction}
-                        />
+                        <WebToggleContext.Provider value={toggleContext}>
+                          <WebNodeRenderer
+                            root={currentRoot()}
+                            onReplaceRoot={props.onReplaceRoot}
+                            onError={props.onError}
+                            promptRequestId={props.promptRequestId}
+                            speechSentences={speechSentences}
+                            activeSpeechSentenceIndex={
+                              activeSpeechSentenceIndex
+                            }
+                            onSpeechSentenceClick={onSpeechSentenceClick}
+                            onRunAction={props.onRunAction}
+                          />
+                        </WebToggleContext.Provider>
                       </WebRevealContext.Provider>
                     </WebCurrentUserPubkeyContext.Provider>
                   </WebTreeHeaderElCallbackContext.Provider>
@@ -296,6 +393,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
         class="web-ui-shadow-host"
         classList={{
           'web-ui-shadow-host--timeline': props.renderSurface === 'timeline',
+          'web-ui-shadow-host--dock': props.renderSurface === 'dock',
           'web-ui-shadow-host--modal': props.renderSurface === 'modal',
         }}
         ref={(el) => {

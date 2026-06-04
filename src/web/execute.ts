@@ -188,6 +188,7 @@ export async function executeBuiltinCommand({
     source: 'web',
     sendReply,
     promptFn,
+    jsonPayload: payload,
   });
 
   return {

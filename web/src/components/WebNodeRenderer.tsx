@@ -32,6 +32,7 @@ import { writeClipboardText } from '../utils/clipboard';
 
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import { WebButton } from './WebButton';
+import { WebEditableText } from './WebEditableText';
 
 type WebNodeRendererProps = {
   root?: WebNodeRoot;
@@ -39,9 +40,11 @@ type WebNodeRendererProps = {
   onReplaceRoot?: (root: WebNodeRoot) => void;
   onError?: (message: string) => void;
   promptRequestId?: string;
-  speechSentences?: string[];
-  activeSpeechSentenceIndex?: number | null;
-  onSpeechSentenceClick?: ((index: number) => void) | null;
+  speechSentences?: Accessor<string[] | undefined>;
+  activeSpeechSentenceIndex?: Accessor<number | null | undefined>;
+  onSpeechSentenceClick?: Accessor<
+    ((index: number) => void) | null | undefined
+  >;
   onRunAction?: (
     action: WebAction,
     params?: {
@@ -73,6 +76,27 @@ type SentenceRange = {
 
 const WEB_SPEECH_HIGHLIGHT_NAME = 'web-speech-active';
 const WEB_SPEECH_HOVER_HIGHLIGHT_NAME = 'web-speech-hover';
+const WEB_SCROLL_ONCE_STORAGE_PREFIX = 'appweaver:web-scroll-once:';
+
+function consumeScrollIntoViewOnceKey(key: string): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  const storageKey = `${WEB_SCROLL_ONCE_STORAGE_PREFIX}${key}`;
+
+  try {
+    if (window.sessionStorage.getItem(storageKey) === '1') {
+      return false;
+    }
+
+    window.sessionStorage.setItem(storageKey, '1');
+
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 function setupWebElementRef({ element, el }: WebElementRefProps): void {
   if (element.props?.storyTargetId) {
@@ -84,6 +108,12 @@ function setupWebElementRef({ element, el }: WebElementRefProps): void {
   }
 
   if (element.props?.scrollIntoViewOnMount === true && !isWebDemoMode()) {
+    const onceKey = element.props.scrollIntoViewOnceKey;
+
+    if (typeof onceKey === 'string' && !consumeScrollIntoViewOnceKey(onceKey)) {
+      return;
+    }
+
     requestAnimationFrame(() => {
       el.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
@@ -316,16 +346,20 @@ type SpeechHighlightBoxProps = {
   onReplaceRoot: WebNodeRendererProps['onReplaceRoot'];
   onError: WebNodeRendererProps['onError'];
   promptRequestId: string | undefined;
-  speechSentences: string[] | undefined;
-  activeSpeechSentenceIndex: number | null | undefined;
-  onSpeechSentenceClick: ((index: number) => void) | null | undefined;
+  speechSentences: Accessor<string[] | undefined> | undefined;
+  activeSpeechSentenceIndex: Accessor<number | null | undefined> | undefined;
+  onSpeechSentenceClick:
+    | Accessor<((index: number) => void) | null | undefined>
+    | undefined;
 };
 
 function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
   let el: HTMLDivElement | undefined;
 
   const sentenceAtEvent = (event: MouseEvent): SentenceRange | null => {
-    if (el == null || !props.speechSentences?.length) {
+    const sentences = props.speechSentences?.() ?? [];
+
+    if (el == null || sentences.length === 0) {
       return null;
     }
 
@@ -342,10 +376,7 @@ function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
     }
 
     return (
-      sentenceRangesInText(
-        speechTextForElement(el),
-        props.speechSentences,
-      ).find(
+      sentenceRangesInText(speechTextForElement(el), sentences).find(
         (candidate) => offset >= candidate.start && offset <= candidate.end,
       ) ?? null
     );
@@ -373,8 +404,8 @@ function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
 
   createEffect(() => {
     const highlights = highlightApi();
-    const activeIndex = props.activeSpeechSentenceIndex;
-    const sentences = props.speechSentences ?? [];
+    const activeIndex = props.activeSpeechSentenceIndex?.();
+    const sentences = props.speechSentences?.() ?? [];
 
     highlights?.delete(WEB_SPEECH_HIGHLIGHT_NAME);
 
@@ -401,7 +432,7 @@ function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
       ref={el}
       class={elementClass(props.element)}
       classList={{
-        'web-speech-clickable': Boolean(props.onSpeechSentenceClick),
+        'web-speech-clickable': Boolean(props.onSpeechSentenceClick?.()),
       }}
       data-ui={elementUi(props.element)}
       data-story-target={props.element.props?.storyTargetId}
@@ -414,9 +445,10 @@ function SpeechHighlightBox(props: SpeechHighlightBoxProps): JSX.Element {
       }}
       onClick={(event) => {
         const sentence = sentenceAtEvent(event);
+        const onSentenceClick = props.onSpeechSentenceClick?.();
 
-        if (sentence != null && props.onSpeechSentenceClick != null) {
-          props.onSpeechSentenceClick(sentence.index);
+        if (sentence != null && onSentenceClick != null) {
+          onSentenceClick(sentence.index);
         }
       }}
     >
@@ -546,6 +578,7 @@ type RunLocalWebActionProps = {
   action: WebAction;
   expandedById: Map<string, boolean> | undefined;
   revealContext: WebRevealContextValue | undefined;
+  toggleContext: WebToggleContextValue | undefined;
 };
 
 /** Bulk expand/collapse from the tree header; epoch increments on each user action. */
@@ -567,6 +600,15 @@ export type WebRevealContextValue = {
 
 export const WebRevealContext = createContext<
   WebRevealContextValue | undefined
+>(undefined);
+
+export type WebToggleContextValue = {
+  isActive: (key: string) => boolean;
+  toggle: (key: string) => void;
+};
+
+export const WebToggleContext = createContext<
+  WebToggleContextValue | undefined
 >(undefined);
 
 /** Hoist tree chrome into a light-DOM slot (e.g. timeline sticky card head). */
@@ -625,10 +667,11 @@ function expandTreeItemsForAction(
   }
 }
 
-function runLocalWebAction({
+export function runLocalWebAction({
   action,
   expandedById,
   revealContext,
+  toggleContext,
 }: RunLocalWebActionProps): boolean {
   expandTreeItemsForAction(action, expandedById);
 
@@ -661,6 +704,23 @@ function runLocalWebAction({
       }
 
       return true;
+    }
+
+    if (clientActionName === 'web.toggle') {
+      const key = action.payload?.key;
+
+      if (typeof key === 'string' && key.length > 0) {
+        toggleContext?.toggle(key);
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'editableText.runCommand') {
+      // Let the command runner read the mounted editable node before any
+      // refresh/toggle can unmount it. The refreshed command result will leave
+      // edit mode once save succeeds.
+      return false;
     }
   }
 
@@ -707,7 +767,7 @@ export const WebRenderMetaContext = createContext<
 >(undefined);
 
 export const WebRenderSurfaceContext = createContext<
-  Accessor<'modal' | 'timeline' | null> | undefined
+  Accessor<'dock' | 'modal' | 'timeline' | null> | undefined
 >(undefined);
 
 export const WebCurrentUserPubkeyContext = createContext<
@@ -1552,6 +1612,7 @@ function WebTreeElement(props: WebTreeElementProps) {
   const registerHoistedToolbar = useContext(WebTreeToolbarRegisterContext);
   const reportTreeHeaderEl = useContext(WebTreeHeaderElCallbackContext);
   const revealContext = useContext(WebRevealContext);
+  const toggleContext = useContext(WebToggleContext);
 
   const expandedById =
     useContext(TreeItemExpandedStateContext) ?? new Map<string, boolean>();
@@ -1568,7 +1629,12 @@ function WebTreeElement(props: WebTreeElementProps) {
   let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   const filterEnabled = () => props.element.props?.filterable === true;
   const hasFilterValue = () => normalizedFilterQuery(filterInput()).length > 0;
-  const showInlineHeader = () => renderSurface?.() !== 'timeline';
+
+  const showInlineHeader = () => {
+    const surface = renderSurface?.() ?? null;
+
+    return surface !== 'timeline' && surface !== 'dock';
+  };
 
   const filterIndex = createMemo(() =>
     filterEnabled()
@@ -1657,6 +1723,7 @@ function WebTreeElement(props: WebTreeElementProps) {
         action,
         expandedById,
         revealContext,
+        toggleContext,
       })
     ) {
       return;
@@ -2494,6 +2561,7 @@ function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
 export function WebNodeRenderer(props: WebNodeRendererProps) {
   const getBusy = useContext(WebShadowUiBusyContext);
   const revealContext = useContext(WebRevealContext);
+  const toggleContext = useContext(WebToggleContext);
   const currentUserPubkey = useWebCurrentUserPubkey();
   const expandedById = useContext(TreeItemExpandedStateContext);
   const node = () => props.node ?? props.root?.tree;
@@ -2508,6 +2576,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
         action,
         expandedById,
         revealContext,
+        toggleContext,
       })
     ) {
       return;
@@ -2530,6 +2599,8 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
           const element = node() as WebElementNode;
           const revealId = element.props?.revealId;
           const visibleForPubkeys = element.props?.visibleForPubkeys;
+          const hiddenWhenToggleKey = element.props?.hiddenWhenToggleKey;
+          const visibleWhenToggleKey = element.props?.visibleWhenToggleKey;
 
           if (
             visibleForPubkeys !== undefined &&
@@ -2541,6 +2612,20 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
           if (
             element.props?.hiddenUntilRevealed === true &&
             (!revealId || revealContext?.isRevealed(revealId) !== true)
+          ) {
+            return null;
+          }
+
+          if (
+            hiddenWhenToggleKey !== undefined &&
+            toggleContext?.isActive(hiddenWhenToggleKey) === true
+          ) {
+            return null;
+          }
+
+          if (
+            visibleWhenToggleKey !== undefined &&
+            toggleContext?.isActive(visibleWhenToggleKey) !== true
           ) {
             return null;
           }
@@ -2658,6 +2743,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                   class={elementClass(element)}
                   data-ui={elementUi(element)}
                   style={elementStyle(element)}
+                  contentEditable={element.props?.contentEditable}
                   href={element.props?.href ?? '#'}
                   target={element.props?.external ? '_blank' : undefined}
                   rel={
@@ -2829,6 +2915,10 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                 <WebTextAreaNode element={element} />
               </Match>
 
+              <Match when={element.tag === 'editableText'}>
+                <WebEditableText element={element} />
+              </Match>
+
               <Match when={element.tag === 'badge'}>
                 <span
                   class={elementClass(element)}
@@ -2875,6 +2965,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                       class={elementClass(element)}
                       data-ui={elementUi(element)}
                       style={elementStyle(element)}
+                      contentEditable={element.props?.contentEditable}
                     >
                       <For each={element.children ?? []}>
                         {(child) => (
@@ -2920,6 +3011,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
                         setupWebElementRef({ element, el });
                       }}
                       style={elementStyle(element)}
+                      contentEditable={element.props?.contentEditable}
                       role={element.props?.action ? 'button' : undefined}
                       tabIndex={
                         element.props?.action ||

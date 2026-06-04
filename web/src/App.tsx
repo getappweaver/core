@@ -1915,6 +1915,7 @@ function AppInner(): JSX.Element {
     openChromeWidget,
     runCommand,
     runJsonCommand,
+    runJsonCommandOutput,
     runWebAction,
   } = useCommands({
     authStatus: () => auth.authState().status,
@@ -2007,6 +2008,12 @@ function AppInner(): JSX.Element {
     if (!replacedDockItem) {
       replaceTimelineCommandResultWeb(itemId, web);
     }
+  }
+
+  function replaceTimelineItem(item: TimelineItem): void {
+    setTimeline((prev) =>
+      prev.map((entry) => (entry.id === item.id ? item : entry)),
+    );
   }
 
   const palette = usePalette({
@@ -2567,6 +2574,8 @@ function AppInner(): JSX.Element {
               isWebUiBusy={isWebUiBusyFor}
               onRunWebAction={runWebAction}
               onRunJsonCommand={runJsonCommand}
+              onRunJsonCommandOutput={runJsonCommandOutput}
+              onReplaceTimelineItem={replaceTimelineItem}
               onUpdateFormValue={updateFormValue}
               onSubmitForm={(itemId) => void submitForm(itemId)}
               layoutPrefs={layoutPrefs()}
