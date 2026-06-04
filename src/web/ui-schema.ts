@@ -77,6 +77,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('reveal'),
     targetId: z.string().min(1),
+    /** Expand tree items before revealing a target nested inside collapsed content. */
+    expandTreeItemIds: z.array(z.string().min(1)).optional(),
   }),
   z.object({
     /** Collapse a previously revealed node (removes matching `targetId` from local reveal state). */
@@ -87,6 +89,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     /** Toggle a reveal target open/closed. */
     type: z.literal('toggleReveal'),
     targetId: z.string().min(1),
+    /** Expand tree items before toggling a target nested inside collapsed content. */
+    expandTreeItemIds: z.array(z.string().min(1)).optional(),
   }),
   z.object({
     type: z.literal('command'),

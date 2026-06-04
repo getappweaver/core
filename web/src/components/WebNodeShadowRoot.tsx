@@ -253,6 +253,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
           runLocalWebAction({
             action,
             expandedById: treeItemExpandedById,
+            expandTreeItems: undefined,
             revealContext,
             toggleContext,
           })
