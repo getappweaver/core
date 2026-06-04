@@ -4,6 +4,7 @@ import { join } from 'path';
 import { nip19, type NostrEvent } from 'nostr-tools';
 
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
+import type { CoreUpdateSnapshot } from '@src/core/update-check';
 
 import type { RouteCommandContext } from '../../dispatch';
 
@@ -47,6 +48,8 @@ export type PluginCatalogEntry = {
   installedVersion: string | null;
   compatibleRef: RefEntry | null;
   latestRef: RefEntry | null;
+  blockedUpdateRef: RefEntry | null;
+  coreUpdateCanUnlockBlockedRef: boolean;
   changelogRefs: RefEntry[];
   updateAvailable: boolean;
 };
@@ -70,6 +73,7 @@ type PluginsJson = {
 
 export type PluginsInstallRepresentation = {
   coreVersion: string;
+  coreUpdate: CoreUpdateSnapshot | null;
   relays: string[];
   entries: PluginCatalogEntry[];
 };
@@ -112,6 +116,8 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     installedVersion: null,
     compatibleRef: null,
     latestRef: refs.at(-1) ?? null,
+    blockedUpdateRef: null,
+    coreUpdateCanUnlockBlockedRef: false,
     changelogRefs: [],
     updateAvailable: false,
   };
@@ -494,6 +500,88 @@ function isUpdateAvailable(
   return compared === null ? true : compared < 0;
 }
 
+function isRefNewerThanInstalled({
+  ref,
+  installedVersion,
+}: {
+  ref: RefEntry;
+  installedVersion: string | null;
+}): boolean {
+  if (!installedVersion) {
+    return true;
+  }
+
+  if (normalizeRefTag(installedVersion) === normalizeRefTag(ref.tag)) {
+    return false;
+  }
+
+  const compared = comparePluginVersions(installedVersion, ref.tag);
+
+  return compared === null ? true : compared < 0;
+}
+
+function latestCoreVersionFromSnapshot(
+  snapshot: CoreUpdateSnapshot | null,
+): string | null {
+  if (!snapshot) {
+    return null;
+  }
+
+  return snapshot.remoteVersion ?? snapshot.localVersion;
+}
+
+function canCoreUpdateUnlockRef({
+  ref,
+  coreUpdate,
+}: {
+  ref: RefEntry | null;
+  coreUpdate: CoreUpdateSnapshot | null;
+}): boolean {
+  if (!ref || coreUpdate?.state !== 'available') {
+    return false;
+  }
+
+  const latestCoreVersion = latestCoreVersionFromSnapshot(coreUpdate);
+
+  return latestCoreVersion
+    ? coreVersionSatisfies(latestCoreVersion, ref.coreApiVersion)
+    : false;
+}
+
+function blockedUpdateRefForEntry({
+  refs,
+  coreVersion,
+  installedVersion,
+  compatibleRef,
+}: {
+  refs: RefEntry[];
+  coreVersion: string;
+  installedVersion: string | null;
+  compatibleRef: RefEntry | null;
+}): RefEntry | null {
+  const latestRef = refs.at(-1) ?? null;
+
+  if (
+    !latestRef ||
+    coreVersionSatisfies(coreVersion, latestRef.coreApiVersion)
+  ) {
+    return null;
+  }
+
+  if (!isRefNewerThanInstalled({ ref: latestRef, installedVersion })) {
+    return null;
+  }
+
+  if (
+    compatibleRef &&
+    normalizeRefTag(compatibleRef.tag) === normalizeRefTag(latestRef.tag)
+  ) {
+    return null;
+  }
+
+  return latestRef;
+}
+
 type ChangelogRefsForTargetProps = {
   refs: RefEntry[];
   installedVersion: string | null;
@@ -701,6 +789,7 @@ async function installCatalogEntry({
     entries: await queryPluginCatalog(ctx),
     installedPlugins,
     coreVersion,
+    coreUpdate: null,
     dmBotRoot: ctx.dmBotRoot,
   });
 
@@ -793,6 +882,7 @@ type AttachInstalledStateProps = {
   entries: PluginCatalogEntry[];
   installedPlugins: InstalledPluginEntry[];
   coreVersion: string;
+  coreUpdate: CoreUpdateSnapshot | null;
   dmBotRoot: string;
 };
 
@@ -800,6 +890,7 @@ function attachInstalledState({
   entries,
   installedPlugins,
   coreVersion,
+  coreUpdate,
   dmBotRoot,
 }: AttachInstalledStateProps): PluginCatalogEntry[] {
   return entries.map((entry) => {
@@ -816,12 +907,24 @@ function attachInstalledState({
       ? readLocalPluginPackageVersion({ dmBotRoot, alias: installed.alias })
       : null;
 
+    const blockedUpdateRef = blockedUpdateRefForEntry({
+      refs: entry.refs,
+      coreVersion,
+      installedVersion,
+      compatibleRef,
+    });
+
     return {
       ...entry,
       installedAlias: installed?.alias ?? null,
       installedVersion,
       compatibleRef,
       latestRef: entry.refs.at(-1) ?? null,
+      blockedUpdateRef,
+      coreUpdateCanUnlockBlockedRef: canCoreUpdateUnlockRef({
+        ref: blockedUpdateRef,
+        coreUpdate,
+      }),
       changelogRefs: changelogRefsForTarget({
         refs: entry.refs,
         installedVersion,
@@ -898,6 +1001,7 @@ export async function handlePluginsInstall(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsInstallWeb> | string> {
   const coreVersion = readCoreVersion(ctx.dmBotRoot);
+  const coreUpdate = (await ctx.coreUpdateChecker?.checkNow()) ?? null;
   const installedPlugins = readInstalledPlugins(ctx.dmBotRoot);
   const target = ctx.args[1]?.trim() ?? '';
 
@@ -917,11 +1021,13 @@ export async function handlePluginsInstall(
       entries: await queryPluginCatalog(ctx),
       installedPlugins: readInstalledPlugins(ctx.dmBotRoot),
       coreVersion,
+      coreUpdate,
       dmBotRoot: ctx.dmBotRoot,
     });
 
     return renderPluginsInstallWeb({
       coreVersion,
+      coreUpdate,
       relays: PLUGIN_QUERY_RELAYS,
       entries,
     });
@@ -931,11 +1037,13 @@ export async function handlePluginsInstall(
     entries: await queryPluginCatalog(ctx),
     installedPlugins,
     coreVersion,
+    coreUpdate,
     dmBotRoot: ctx.dmBotRoot,
   });
 
   const representation: PluginsInstallRepresentation = {
     coreVersion,
+    coreUpdate,
     relays: PLUGIN_QUERY_RELAYS,
     entries,
   };

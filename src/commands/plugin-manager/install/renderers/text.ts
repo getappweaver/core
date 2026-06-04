@@ -23,8 +23,8 @@ export function renderPluginsInstallText(
 
   for (const entry of representation.entries) {
     const status = entry.installedAlias
-      ? entry.updateAvailable && entry.compatibleRef
-        ? `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; update available: ${entry.compatibleRef.tag}`
+      ? entry.updateAvailable || entry.blockedUpdateRef
+        ? `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; update(s) available`
         : `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; up to date`
       : entry.compatibleRef
         ? `compatible: ${entry.compatibleRef.tag}`
@@ -39,6 +39,18 @@ export function renderPluginsInstallText(
 
     if (entry.description) {
       lines.push(`  ${entry.description}`);
+    }
+
+    if (entry.updateAvailable && entry.compatibleRef) {
+      lines.push(`  install: ${entry.compatibleRef.tag}`);
+    }
+
+    if (entry.blockedUpdateRef) {
+      lines.push(
+        entry.coreUpdateCanUnlockBlockedRef
+          ? `  update core to unlock: ${entry.blockedUpdateRef.tag}`
+          : `  ${entry.blockedUpdateRef.tag} requires core ${entry.blockedUpdateRef.coreApiVersion}`,
+      );
     }
 
     if (entry.changelogRefs.length > 0) {

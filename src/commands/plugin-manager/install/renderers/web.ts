@@ -1,4 +1,4 @@
-import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
+import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 import { textBlock, textNode } from '@src/web/widgets';
 
 import type {
@@ -24,6 +24,15 @@ const pluginsInstallStylesheet = {
     }
 
     .web-row.plugins-install-card-actions {
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .web-stack.plugins-install-update-actions {
+      gap: 0.35rem;
+    }
+
+    .web-row.plugins-install-update-action {
       align-items: center;
       gap: 0.5rem;
     }
@@ -77,8 +86,8 @@ function versionStatus(
   if (entry.installedAlias) {
     const installedVersion = entry.installedVersion ?? 'unknown';
 
-    if (entry.updateAvailable && entry.compatibleRef) {
-      label = `Installed: ${entry.installedAlias} @ ${installedVersion} · update available: ${entry.compatibleRef.tag}`;
+    if (entry.updateAvailable || entry.blockedUpdateRef) {
+      label = `Installed: ${entry.installedAlias} @ ${installedVersion} · update(s) available:`;
       tone = 'warning';
     } else {
       label = `Installed: ${entry.installedAlias} @ ${installedVersion} · up to date`;
@@ -115,7 +124,7 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
     return null;
   }
 
-  const label = isUpdate ? 'Update' : 'Install';
+  const label = `Install ${entry.compatibleRef.tag}`;
   const pending = isUpdate ? 'Updating' : 'Installing';
   const success = isUpdate ? 'Successfully updated' : 'Successfully installed';
 
@@ -139,6 +148,81 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
         },
       },
     },
+  };
+}
+
+function coreUpdateAction(): WebAction {
+  return {
+    type: 'command',
+    command: 'bot',
+    subcommand: 'update',
+    arguments: {},
+    options: {},
+    clientStatus: {
+      pending: 'Updating AppWeaver...',
+      restarting: 'Restarting AppWeaver...',
+      success: 'Updated AppWeaver.',
+    },
+  };
+}
+
+function coreUpdateButton(entry: PluginCatalogEntry): WebNode | null {
+  if (!entry.blockedUpdateRef || !entry.coreUpdateCanUnlockBlockedRef) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'button',
+    props: {
+      label: `Update core · unlock ${entry.blockedUpdateRef.tag}`,
+      tone: 'warning',
+      className: 'web-button',
+      action: coreUpdateAction(),
+    },
+  };
+}
+
+function blockedUpdateNote(entry: PluginCatalogEntry): WebNode | null {
+  if (!entry.blockedUpdateRef || entry.coreUpdateCanUnlockBlockedRef) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'text',
+    props: { tone: 'muted', size: 'sm' },
+    children: [
+      textNode(
+        `${entry.blockedUpdateRef.tag} requires core ${entry.blockedUpdateRef.coreApiVersion}`,
+      ),
+    ],
+  };
+}
+
+function updateActions(entry: PluginCatalogEntry): WebNode | null {
+  const action = installButton(entry);
+  const coreAction = coreUpdateButton(entry);
+  const blockedNote = blockedUpdateNote(entry);
+
+  const children = [action, coreAction, blockedNote].filter(
+    (node): node is WebNode => node !== null,
+  );
+
+  if (children.length === 0) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'stack',
+    props: { gap: 'xs', className: 'plugins-install-update-actions' },
+    children: children.map((node) => ({
+      type: 'element' as const,
+      tag: 'row' as const,
+      props: { gap: 'sm' as const, className: 'plugins-install-update-action' },
+      children: [node],
+    })),
   };
 }
 
@@ -307,7 +391,7 @@ function sourceCodeLink(entry: PluginCatalogEntry): WebNode | null {
 }
 
 function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
-  const action = installButton(entry);
+  const actions = updateActions(entry);
   const changelog = changelogButton(entry);
   const changelogDetails = changelogPanel(entry);
   const icon = pluginIcon(entry);
@@ -345,7 +429,7 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
             props: { gap: 'sm', className: 'plugins-install-card-actions' },
             children: [versionStatus(entry, coreVersion)],
           },
-          ...(action || changelog
+          ...(actions || changelog
             ? [
                 {
                   type: 'element' as const,
@@ -354,7 +438,7 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
                     gap: 'sm' as const,
                     className: 'plugins-install-card-actions',
                   },
-                  children: [action, changelog].filter(
+                  children: [actions, changelog].filter(
                     (node): node is WebNode => node !== null,
                   ),
                 },

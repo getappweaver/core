@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.37.0] - 2026-06-04
+
+- feat: show plugin updates blocked by core version (dca7dfd)
+
 ## [v9.36.1] - 2026-06-04
 
-- fix: expand tree items before reveal actions (5fb3959)
+- fix: expand tree items before reveal actions (7c4a77f)
 
 ## [v9.36.0] - 2026-06-04
 
