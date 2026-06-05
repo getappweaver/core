@@ -9,6 +9,7 @@ import {
   Show,
 } from 'solid-js';
 
+import type { ChatRunStatus } from './chat/types';
 import { useChat } from './chat/useChat';
 import { ChromeOverlay } from './chrome/ChromeOverlay';
 import { HeaderChrome } from './chrome/HeaderChrome';
@@ -215,6 +216,7 @@ function parseDemoWidgetQuery(search: string): DemoWidgetQuery | null {
 
 function AppInner(): JSX.Element {
   const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
+  const CHAT_RUN_STATUS_STORAGE_PREFIX = 'appweaver.chat-run-status';
   const PIPER_TTS_AUTO_ATTEMPTED_KEY = 'appweaver.tts.piper-auto-attempted';
 
   const initialTimelineId = (() => {
@@ -229,6 +231,16 @@ function AppInner(): JSX.Element {
 
     return created;
   })();
+
+  function chatRunStatusStorageKey(scope: string): string {
+    return `${CHAT_RUN_STATUS_STORAGE_PREFIX}:${scope}`;
+  }
+
+  function readChatRunStatus(scope: string): ChatRunStatus {
+    const stored = window.localStorage.getItem(chatRunStatusStorageKey(scope));
+
+    return stored === 'interrupted' ? 'interrupted' : 'idle';
+  }
 
   const auth = useNostrAuth();
 
@@ -255,6 +267,10 @@ function AppInner(): JSX.Element {
   const [composerText, setComposerText] = createSignal('');
   const [loadingCommands, setLoadingCommands] = createSignal(true);
   const [agentWorking, setAgentWorking] = createSignal(false);
+
+  const [chatRunStatus, setChatRunStatus] = createSignal<ChatRunStatus>(
+    readChatRunStatus(`timeline:${initialTimelineId}`),
+  );
 
   const [timelineScrolledAwayFromBottom, setTimelineScrolledAwayFromBottom] =
     createSignal(false);
@@ -344,6 +360,28 @@ function AppInner(): JSX.Element {
     appendSystemMessageToTimeline(setTimeline, createId, text);
   };
 
+  function setPersistedChatRunStatus(status: ChatRunStatus): ChatRunStatus {
+    setChatRunStatus(status);
+
+    const key = chatRunStatusStorageKey(chatRunStatusScope());
+
+    if (status === 'idle') {
+      window.localStorage.removeItem(key);
+    } else {
+      window.localStorage.setItem(key, status);
+    }
+
+    return status;
+  }
+
+  function chatRunStatusScope(): string {
+    const currentSessionId = composerAiState()?.currentSessionId;
+
+    return currentSessionId
+      ? `session:${currentSessionId}`
+      : `timeline:${timelineId()}`;
+  }
+
   const chrome = useChrome();
 
   const connect = useConnect({
@@ -401,6 +439,8 @@ function AppInner(): JSX.Element {
     sendSocketMessage,
     appendSystemMessage,
     setAgentWorking,
+    chatRunStatus,
+    setChatRunStatus: setPersistedChatRunStatus,
     onChatResult: requestComposerAiState,
   });
 
@@ -1891,6 +1931,8 @@ function AppInner(): JSX.Element {
   }
 
   async function createNewSessionFromComposerMenu(): Promise<void> {
+    setPersistedChatRunStatus('idle');
+
     const commandDetail = await ensureCommandDetail('session');
 
     const subcommand = commandDetail?.subcommands.find(
@@ -2100,6 +2142,12 @@ function AppInner(): JSX.Element {
   });
 
   useSocketLifecycle();
+
+  createEffect(
+    on(chatRunStatusScope, (scope) => {
+      setChatRunStatus(readChatRunStatus(scope));
+    }),
+  );
 
   let previousTimelineLength = 0;
 
@@ -2632,6 +2680,7 @@ function AppInner(): JSX.Element {
                     </span>
                     <ComposerWorkingButton
                       working={agentWorking()}
+                      runStatus={chatRunStatus()}
                       onStop={() => chat.cancelChat()}
                     />
                     <ComposerContextMenuButton

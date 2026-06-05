@@ -55,6 +55,7 @@ type ClientMessageRecord = Record<string, unknown> & {
 
 const demoComposerAiState: ComposerAiState = {
   backend: 'demo',
+  currentSessionId: null,
   executionProfileLabel: 'Mode',
   executionProfileName: 'Demo',
   executionProfileColor: '#facc15',

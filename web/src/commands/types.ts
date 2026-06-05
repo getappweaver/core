@@ -18,6 +18,7 @@ import type {
 
 export type ComposerAiState = {
   backend: string;
+  currentSessionId: string | null;
   executionProfileLabel: 'Agent' | 'Mode';
   executionProfileName: string;
   executionProfileColor: string | null;

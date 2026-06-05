@@ -2950,7 +2950,8 @@ button.composer-chip.composer-chip--model-override {
   pointer-events: none;
 }
 
- .composer-working-btn-wrap.is-working {
+ .composer-working-btn-wrap.is-working,
+ .composer-working-btn-wrap.is-interrupted {
   visibility: visible;
   pointer-events: auto;
 }
@@ -2982,6 +2983,13 @@ button.composer-chip.composer-chip--model-override {
   background: var(--color-warning);
   flex-shrink: 0;
   transition: opacity 0.06s linear;
+}
+
+ .composer-working-label {
+  color: var(--color-warning);
+  font-size: 0.78rem;
+  line-height: 1;
+  opacity: 0.82;
 }
 
  .composer-working-btn-wrap .web-overflow-panel {

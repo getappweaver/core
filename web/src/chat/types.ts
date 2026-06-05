@@ -13,8 +13,12 @@ export type ChatAdapters = {
   sendSocketMessage: (message: unknown) => void;
   appendSystemMessage: (text: string) => void;
   setAgentWorking: Setter<boolean>;
+  chatRunStatus: Accessor<ChatRunStatus>;
+  setChatRunStatus: (status: ChatRunStatus) => void;
   onChatResult: () => void;
 };
+
+export type ChatRunStatus = 'idle' | 'interrupted';
 
 export type ChatHook = {
   appendUserMessage: (text: string) => void;

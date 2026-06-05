@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, onMount } from 'solid-js';
 
+import type { ChatRunStatus } from '../chat/types';
+
 const SQUARES = 6;
 // full bounce cycle: 0→5→0 = 10 steps, period in ms
 const PERIOD_MS = 1400;
@@ -22,6 +24,7 @@ function squareOpacity(pos: number, idx: number): number {
 
 type ComposerWorkingButtonProps = {
   working: boolean;
+  runStatus: ChatRunStatus;
   onStop: () => void;
 };
 
@@ -32,6 +35,8 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
   let root: HTMLDivElement | undefined;
   let rafId: number | null = null;
   let startTime: number | null = null;
+
+  const interrupted = () => !props.working && props.runStatus === 'interrupted';
 
   function tick(now: number): void {
     if (startTime === null) {
@@ -96,29 +101,42 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
   return (
     <div
       class="composer-working-btn-wrap"
-      classList={{ 'is-working': props.working }}
+      classList={{
+        'is-working': props.working,
+        'is-interrupted': interrupted(),
+      }}
       ref={root}
     >
       <button
         type="button"
         class="composer-working-bar"
-        aria-label="AI working — click to stop"
+        aria-label={
+          props.working ? 'AI working — click to stop' : 'AI interrupted'
+        }
         aria-expanded={open()}
         aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (props.working) {
+            setOpen((v) => !v);
+          }
+        }}
       >
-        <span class="composer-working-squares" aria-hidden="true">
-          <For each={Array.from({ length: SQUARES }, (_, i) => i)}>
-            {(i) => (
-              <span
-                class="composer-working-sq"
-                style={{ opacity: String(squareOpacity(pos(), i)) }}
-              />
-            )}
-          </For>
-        </span>
+        {props.working ? (
+          <span class="composer-working-squares" aria-hidden="true">
+            <For each={Array.from({ length: SQUARES }, (_, i) => i)}>
+              {(i) => (
+                <span
+                  class="composer-working-sq"
+                  style={{ opacity: String(squareOpacity(pos(), i)) }}
+                />
+              )}
+            </For>
+          </span>
+        ) : (
+          <span class="composer-working-label">Interrupted</span>
+        )}
       </button>
-      {open() && (
+      {props.working && open() && (
         <div class="web-overflow-panel is-flip-up" role="menu">
           <button
             type="button"

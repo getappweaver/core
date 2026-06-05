@@ -22,6 +22,7 @@ import type { WebRouteContext } from './routes';
 
 export type ComposerAiState = {
   backend: string;
+  currentSessionId: string | null;
   executionProfileLabel: 'Agent' | 'Mode';
   executionProfileName: string;
   executionProfileColor: string | null;
@@ -109,6 +110,7 @@ export async function getComposerAiState(
 
   return {
     backend: backendName,
+    currentSessionId,
     executionProfileLabel:
       executionProfile.kind === 'cursor' ? 'Mode' : ('Agent' as const),
     executionProfileName:

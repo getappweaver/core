@@ -145,6 +145,7 @@ function isDemoAuthorization(value: string): boolean {
 function demoComposerAiState(): ComposerAiState {
   return {
     backend: 'demo',
+    currentSessionId: null,
     executionProfileLabel: 'Agent',
     executionProfileName: 'Demo Agent',
     executionProfileColor: 'info',

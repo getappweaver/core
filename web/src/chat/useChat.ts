@@ -387,6 +387,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     });
 
     appendUserMessage(text);
+    adapters.setChatRunStatus('idle');
     adapters.setAgentWorking(true);
 
     adapters.pendingRequests.set(requestId, {
@@ -397,6 +398,11 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         });
 
         adapters.setAgentWorking(false);
+
+        if (adapters.chatRunStatus() !== 'interrupted') {
+          adapters.setChatRunStatus('idle');
+        }
+
         handleChatResult(requestId, message.output);
         adapters.onChatResult();
       },
@@ -407,6 +413,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         });
 
         adapters.setAgentWorking(false);
+
+        if (adapters.chatRunStatus() !== 'interrupted') {
+          adapters.setChatRunStatus('idle');
+        }
       },
     });
 
@@ -433,6 +443,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       adapters.pendingRequests.delete(requestId);
       clearRequest(requestId);
       adapters.setAgentWorking(false);
+      adapters.setChatRunStatus('idle');
 
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),
@@ -444,6 +455,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     logChatDebug('chat.cancel.start');
 
     adapters.setAgentWorking(false);
+    adapters.setChatRunStatus('interrupted');
 
     try {
       adapters.sendSocketMessage({
