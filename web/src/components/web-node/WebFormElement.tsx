@@ -1,0 +1,562 @@
+import type { JSX } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  useContext,
+} from 'solid-js';
+
+import type {
+  WebAction,
+  WebElementNode,
+  WebNode,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
+
+import { isEmbeddedWebDemoMode } from '../../demo/runtime';
+import { registerStoryDomTarget } from '../../story/dom-targets';
+import { onStoryFillForm } from '../../story/events';
+
+import { WebShadowUiBusyContext } from '../web-shadow-ui-busy-context';
+import { WebButton } from '../WebButton';
+
+import {
+  TreeExpandRequestSetterContext,
+  TreeItemExpandedStateContext,
+} from './contexts';
+import { elementClass, elementStyle, elementUi } from './element-helpers';
+import { expandTreeItemsForAction } from './tree-state';
+
+type WebRunAction = (
+  action: WebAction,
+  params?: {
+    onReplaceRoot?: (root: WebNodeRoot) => void;
+    promptRequestId?: string;
+    uiExecutionPolicy?: {
+      recordInTimeline?: boolean;
+      suppressSystemMessage?: boolean;
+    };
+  },
+) => void;
+
+type WebFormElementProps = {
+  element: WebElementNode;
+  onRunAction: WebRunAction | undefined;
+  onReplaceRoot: ((root: WebNodeRoot) => void) | undefined;
+  onError: ((message: string) => void) | undefined;
+  promptRequestId: string | undefined;
+  renderChild: (child: WebNode) => JSX.Element;
+};
+
+export function WebFormElement(props: WebFormElementProps): JSX.Element {
+  const expandedById = useContext(TreeItemExpandedStateContext);
+  const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
+  let formEl: HTMLFormElement | undefined;
+
+  createEffect(() => {
+    if (isEmbeddedWebDemoMode()) {
+      return;
+    }
+
+    if (props.element.props?.hiddenUntilRevealed !== true || !formEl) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      formEl?.scrollIntoView({
+        block: 'center',
+        inline: 'nearest',
+        behavior: 'smooth',
+      });
+    });
+  });
+
+  const onSubmit: JSX.EventHandler<HTMLFormElement, SubmitEvent> = (event) => {
+    event.preventDefault();
+    const action = props.element.props?.action;
+
+    if (action == null) {
+      props.onError?.('Form has no action.');
+
+      return;
+    }
+
+    const formEl = event.currentTarget;
+    const fd = new FormData(formEl);
+
+    if (action.type === 'prompt_answer') {
+      const fieldName = action.valueFromField;
+
+      const fieldValue =
+        typeof fieldName === 'string' ? fd.get(fieldName) : null;
+
+      const suffix = typeof fieldValue === 'string' ? fieldValue.trim() : '';
+
+      props.onRunAction?.(
+        {
+          ...action,
+          type: 'prompt_answer',
+          value:
+            suffix.length > 0
+              ? `${action.value} ${suffix}`.trim()
+              : action.value,
+        },
+        {
+          onReplaceRoot: props.onReplaceRoot,
+          promptRequestId: props.promptRequestId,
+        },
+      );
+
+      return;
+    }
+
+    if (action.type === 'clientAction') {
+      const mergedPayload: Record<string, unknown> = {
+        ...(action.payload ?? {}),
+      };
+
+      for (const [key, value] of fd.entries()) {
+        if (typeof value === 'string') {
+          mergedPayload[key] = value;
+        }
+      }
+
+      props.onRunAction?.(
+        {
+          ...action,
+          payload: mergedPayload,
+        },
+        {
+          onReplaceRoot: props.onReplaceRoot,
+          promptRequestId: props.promptRequestId,
+        },
+      );
+
+      return;
+    }
+
+    if (action.type !== 'command') {
+      props.onError?.(
+        'Form action must be a command, clientAction, or prompt_answer WebAction.',
+      );
+
+      return;
+    }
+
+    const mergedArgs: Record<string, unknown> = Object.fromEntries(
+      Object.entries(action.arguments ?? {}).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? [...value] : value,
+      ]),
+    );
+
+    const mergedOptions: Record<string, unknown> = Object.fromEntries(
+      Object.entries(action.options ?? {}).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? [...value] : value,
+      ]),
+    );
+
+    const optionFieldNames = new Set(
+      props.element.props?.formOptionFieldNames ?? [],
+    );
+
+    for (const [key, value] of fd.entries()) {
+      if (typeof value === 'string') {
+        const target = optionFieldNames.has(key) ? mergedOptions : mergedArgs;
+        const existing = target[key];
+
+        if (existing === undefined) {
+          target[key] = value;
+        } else if (Array.isArray(existing)) {
+          existing.push(value);
+        } else {
+          target[key] = [existing, value];
+        }
+      }
+    }
+
+    const merged: WebAction = {
+      ...action,
+      type: 'command',
+      arguments: mergedArgs,
+      options: mergedOptions,
+    };
+
+    expandTreeItemsForAction(merged, expandedById, requestTreeItemExpansion);
+
+    props.onRunAction?.(merged, {
+      onReplaceRoot: props.onReplaceRoot,
+      promptRequestId: props.promptRequestId,
+    });
+  };
+
+  return (
+    <form
+      ref={(el) => {
+        formEl = el;
+      }}
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+      onSubmit={onSubmit}
+      novalidate
+    >
+      <For each={props.element.children ?? []}>
+        {(child) => props.renderChild(child)}
+      </For>
+    </form>
+  );
+}
+
+type WebTextFieldNodeProps = {
+  element: WebElementNode;
+};
+
+export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
+  const getBusy = useContext(WebShadowUiBusyContext);
+  const name = props.element.props?.formFieldName;
+  let inputEl: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    const targetId = props.element.props?.storyTargetId;
+
+    if (!targetId || !inputEl) {
+      return;
+    }
+
+    registerStoryDomTarget(targetId, inputEl);
+    onCleanup(() => registerStoryDomTarget(targetId, null));
+  });
+
+  createEffect(() => {
+    const stop = onStoryFillForm((values) => {
+      if (!inputEl || !name) {
+        return;
+      }
+
+      const value = values.arguments[name] ?? values.options[name];
+
+      if (typeof value === 'string' || typeof value === 'number') {
+        inputEl.value = String(value);
+        inputEl.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+    });
+
+    onCleanup(stop);
+  });
+
+  createEffect(() => {
+    if (isEmbeddedWebDemoMode()) {
+      return;
+    }
+
+    if (props.element.props?.autoFocus !== true || inputEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      inputEl?.focus({ preventScroll: true });
+    });
+  });
+
+  if (name == null || name.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <input
+        ref={(el) => {
+          inputEl = el;
+        }}
+        class="web-textField__input"
+        type="text"
+        name={name}
+        value={props.element.props?.value ?? ''}
+        placeholder={props.element.props?.inputPlaceholder}
+        disabled={props.element.props?.disabled === true || getBusy() === true}
+        autocomplete="off"
+      />
+    </div>
+  );
+}
+
+function resizeAutoGrowTextArea(
+  el: HTMLTextAreaElement,
+  maxRows: number,
+): void {
+  el.style.height = 'auto';
+
+  const computed = window.getComputedStyle(el);
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 20;
+  const borderTop = Number.parseFloat(computed.borderTopWidth) || 0;
+  const borderBottom = Number.parseFloat(computed.borderBottomWidth) || 0;
+  const paddingTop = Number.parseFloat(computed.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(computed.paddingBottom) || 0;
+
+  const maxHeight =
+    lineHeight * maxRows +
+    borderTop +
+    borderBottom +
+    paddingTop +
+    paddingBottom;
+
+  el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+}
+
+export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
+  const getBusy = useContext(WebShadowUiBusyContext);
+  const name = props.element.props?.formFieldName;
+  const maxRows = () => props.element.props?.maxRows ?? 4;
+  let textareaEl: HTMLTextAreaElement | undefined;
+
+  const resize = () => {
+    if (!textareaEl) {
+      return;
+    }
+
+    resizeAutoGrowTextArea(textareaEl, maxRows());
+  };
+
+  createEffect(() => {
+    const targetId = props.element.props?.storyTargetId;
+
+    if (!targetId || !textareaEl) {
+      return;
+    }
+
+    registerStoryDomTarget(targetId, textareaEl);
+    onCleanup(() => registerStoryDomTarget(targetId, null));
+  });
+
+  createEffect(() => {
+    const stop = onStoryFillForm((values) => {
+      if (!textareaEl || !name) {
+        return;
+      }
+
+      const value = values.arguments[name] ?? values.options[name];
+
+      if (typeof value === 'string' || typeof value === 'number') {
+        textareaEl.value = String(value);
+        textareaEl.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        queueMicrotask(resize);
+      }
+    });
+
+    onCleanup(stop);
+  });
+
+  createEffect(() => {
+    const value = props.element.props?.value ?? '';
+
+    if (!textareaEl || textareaEl.value === value) {
+      return;
+    }
+
+    textareaEl.value = value;
+    queueMicrotask(resize);
+  });
+
+  createEffect(() => {
+    if (props.element.props?.autoFocus !== true || textareaEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      textareaEl?.focus({ preventScroll: true });
+      resize();
+    });
+  });
+
+  if (name == null || name.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <textarea
+        ref={(el) => {
+          textareaEl = el;
+          queueMicrotask(resize);
+        }}
+        class="web-textArea__input"
+        name={name}
+        rows={1}
+        value={props.element.props?.value ?? ''}
+        placeholder={props.element.props?.inputPlaceholder}
+        disabled={props.element.props?.disabled === true || getBusy() === true}
+        autocomplete="off"
+        onInput={resize}
+      />
+    </div>
+  );
+}
+
+export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
+  const getBusy = useContext(WebShadowUiBusyContext);
+  const name = props.element.props?.formFieldName;
+  let selectEl: HTMLSelectElement | undefined;
+
+  createEffect(() => {
+    const targetId = props.element.props?.storyTargetId;
+
+    if (!targetId || !selectEl) {
+      return;
+    }
+
+    registerStoryDomTarget(targetId, selectEl);
+    onCleanup(() => registerStoryDomTarget(targetId, null));
+  });
+
+  createEffect(() => {
+    if (props.element.props?.autoFocus !== true || selectEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      selectEl?.focus({ preventScroll: true });
+    });
+  });
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <select
+        ref={(el) => {
+          selectEl = el;
+        }}
+        class="web-select__input"
+        name={name}
+        disabled={props.element.props?.disabled === true || getBusy() === true}
+        value={
+          props.element.props?.value ?? props.element.props?.choices?.[0] ?? ''
+        }
+      >
+        <For each={props.element.props?.choices ?? []}>
+          {(choice) => (
+            <option value={choice}>
+              {props.element.props?.choiceLabels?.[choice] ?? choice}
+            </option>
+          )}
+        </For>
+      </select>
+    </div>
+  );
+}
+
+export function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
+  const choices = () => props.element.props?.choices ?? [];
+  const customChoice = () => props.element.props?.customChoice ?? 'custom';
+  const multiple = () => props.element.props?.multiple === true;
+
+  const [selected, setSelected] = createSignal(
+    props.element.props?.value ?? choices()[0] ?? '',
+  );
+
+  const [selectedValues, setSelectedValues] = createSignal<Set<string>>(
+    new Set(props.element.props?.values ?? []),
+  );
+
+  const name = props.element.props?.formFieldName;
+  let customInputEl: HTMLInputElement | undefined;
+
+  const selectedValueList = createMemo(() => Array.from(selectedValues()));
+
+  const choiceSelected = (choice: string) =>
+    multiple() ? selectedValues().has(choice) : selected() === choice;
+
+  const toggleChoice = (choice: string) => {
+    if (!multiple()) {
+      setSelected(choice);
+
+      return;
+    }
+
+    setSelectedValues((current) => {
+      const next = new Set(current);
+
+      if (next.has(choice)) {
+        next.delete(choice);
+      } else {
+        next.add(choice);
+      }
+
+      return next.size === 0 ? current : next;
+    });
+  };
+
+  createEffect(() => {
+    if (selected() !== customChoice() || customInputEl == null) {
+      return;
+    }
+
+    queueMicrotask(() => customInputEl?.focus({ preventScroll: true }));
+  });
+
+  return (
+    <div
+      class={elementClass(props.element)}
+      data-ui={elementUi(props.element)}
+      style={elementStyle(props.element)}
+    >
+      <Show
+        when={multiple()}
+        fallback={
+          <Show when={selected() !== customChoice()}>
+            <input type="hidden" name={name} value={selected()} />
+          </Show>
+        }
+      >
+        <For each={selectedValueList()}>
+          {(choice) => <input type="hidden" name={name} value={choice} />}
+        </For>
+      </Show>
+      <div class="web-choiceField__choices">
+        <For each={choices()}>
+          {(choice) => (
+            <WebButton
+              type="button"
+              class="web-choiceField__choice"
+              classList={{ 'is-selected': choiceSelected(choice) }}
+              data-choice={choice}
+              onClick={() => toggleChoice(choice)}
+            >
+              {props.element.props?.choiceLabels?.[choice] ?? choice}
+            </WebButton>
+          )}
+        </For>
+      </div>
+      <Show when={selected() === customChoice()}>
+        <input
+          ref={(el) => {
+            customInputEl = el;
+          }}
+          class="web-choiceField__custom-input"
+          name={name}
+          type="number"
+          min="1"
+          inputMode="numeric"
+          placeholder={props.element.props?.inputPlaceholder ?? 'Amount'}
+          autocomplete="off"
+        />
+      </Show>
+    </div>
+  );
+}
