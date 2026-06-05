@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.37.4] - 2026-06-05
+
+- fix: segment streamed reasoning cards (dccdb4d)
+
 ## [v9.37.3] - 2026-06-05
 
-- fix: improve opencode stream UI handling (2188e64)
+- fix: improve opencode stream UI handling (39e7adb)
 
 ## [v9.37.2] - 2026-06-05
 

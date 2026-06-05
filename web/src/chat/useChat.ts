@@ -11,7 +11,13 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
   const chatStreamAssistantByRequestId = new Map<string, string>();
   const streamedAssistantRequestIds = new Set<string>();
-  const reasoningStreamByRequestId = new Map<string, string>();
+
+  const reasoningStreamByRequestId = new Map<
+    string,
+    { itemId: string; text: string }
+  >();
+
+  const reasoningSegmentIndexByRequestId = new Map<string, number>();
   const pendingStreamTextByRequestId = new Map<string, string>();
   const streamFlushTimerByRequestId = new Map<string, number>();
 
@@ -87,6 +93,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         deltaText.length,
     });
 
+    closeReasoningSegment(requestId);
+
     pendingStreamTextByRequestId.set(
       requestId,
       (pendingStreamTextByRequestId.get(requestId) ?? '') + deltaText,
@@ -116,6 +124,23 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     logChatDebug('stream.text_segment.close', { requestId });
   }
 
+  function closeReasoningSegment(requestId: string): void {
+    if (!reasoningStreamByRequestId.has(requestId)) {
+      return;
+    }
+
+    reasoningStreamByRequestId.delete(requestId);
+    logChatDebug('stream.reasoning_segment.close', { requestId });
+  }
+
+  function nextReasoningItemId(requestId: string): string {
+    const next = (reasoningSegmentIndexByRequestId.get(requestId) ?? 0) + 1;
+
+    reasoningSegmentIndexByRequestId.set(requestId, next);
+
+    return `${requestId}-reasoning-${next}`;
+  }
+
   function handleStreamReasoningDelta(
     requestId: string,
     deltaText: string,
@@ -127,12 +152,13 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
     closeTextSegmentBeforeStructuralChunk(requestId);
 
-    const itemId = `${requestId}-reasoning`;
+    const current = reasoningStreamByRequestId.get(requestId);
+    const itemId = current?.itemId ?? nextReasoningItemId(requestId);
 
-    reasoningStreamByRequestId.set(
-      requestId,
-      (reasoningStreamByRequestId.get(requestId) ?? '') + deltaText,
-    );
+    reasoningStreamByRequestId.set(requestId, {
+      itemId,
+      text: (current?.text ?? '') + deltaText,
+    });
 
     adapters.setTimeline((prev) => {
       let found = false;
@@ -170,6 +196,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     logChatDebug('stream.summary', { requestId, id, length: text.length });
 
     closeTextSegmentBeforeStructuralChunk(requestId);
+    closeReasoningSegment(requestId);
 
     adapters.setTimeline((prev) => {
       const itemId = `${requestId}-summary-${id}`;
@@ -199,6 +226,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     });
 
     closeTextSegmentBeforeStructuralChunk(requestId);
+    closeReasoningSegment(requestId);
 
     adapters.setTimeline((prev) => [
       ...prev,
@@ -220,6 +248,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     });
 
     closeTextSegmentBeforeStructuralChunk(requestId);
+    closeReasoningSegment(requestId);
 
     const itemId = `${requestId}-tool-${tool.callId}`;
 
@@ -271,6 +300,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     chatStreamAssistantByRequestId.delete(requestId);
     streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
+    reasoningSegmentIndexByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
     logChatDebug('chat.result.cleanup', { requestId, hasStreamedAssistant });
 
@@ -315,6 +345,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     chatStreamAssistantByRequestId.delete(requestId);
     streamedAssistantRequestIds.delete(requestId);
     reasoningStreamByRequestId.delete(requestId);
+    reasoningSegmentIndexByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
     logChatDebug('request.clear', { requestId });
   }

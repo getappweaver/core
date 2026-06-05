@@ -988,6 +988,13 @@ async function handleChat(params: {
 
   let result: { output: string; sessionId: string };
   let streamedReasoning = '';
+  let reasoningSegmentIndex = 0;
+  let currentReasoningSegmentId: string | null = null;
+
+  function closeCurrentReasoningSegment(): void {
+    currentReasoningSegmentId = null;
+    streamedReasoning = '';
+  }
 
   try {
     log.info(`[websocket] chat run start ${message.requestId}`);
@@ -1005,7 +1012,13 @@ async function handleChat(params: {
               }),
             );
 
+            if (chunk.kind === 'text_delta') {
+              closeCurrentReasoningSegment();
+            }
+
             if (chunk.kind === 'diff') {
+              closeCurrentReasoningSegment();
+
               insertTimelineEvent(ctx.seenDb, {
                 timelineId: message.timelineId,
                 source: 'web',
@@ -1026,6 +1039,8 @@ async function handleChat(params: {
             }
 
             if (chunk.kind === 'tool') {
+              closeCurrentReasoningSegment();
+
               insertTimelineEvent(ctx.seenDb, {
                 id: `${message.requestId}-tool-${chunk.tool.callId}`,
                 timelineId: message.timelineId,
@@ -1047,10 +1062,15 @@ async function handleChat(params: {
             }
 
             if (chunk.kind === 'reasoning_delta') {
+              if (!currentReasoningSegmentId) {
+                reasoningSegmentIndex += 1;
+                currentReasoningSegmentId = `${message.requestId}-reasoning-${reasoningSegmentIndex}`;
+              }
+
               streamedReasoning += chunk.text;
 
               insertTimelineEvent(ctx.seenDb, {
-                id: `${message.requestId}-reasoning`,
+                id: currentReasoningSegmentId,
                 timelineId: message.timelineId,
                 source: 'web',
                 kind: 'reasoning',
@@ -1069,6 +1089,8 @@ async function handleChat(params: {
             }
 
             if (chunk.kind === 'summary') {
+              closeCurrentReasoningSegment();
+
               insertTimelineEvent(ctx.seenDb, {
                 id: `${message.requestId}-summary-${chunk.id}`,
                 timelineId: message.timelineId,
