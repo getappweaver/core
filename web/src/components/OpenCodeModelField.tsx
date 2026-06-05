@@ -8,8 +8,15 @@ export type OpenCodeModelFieldProps = {
   value: string;
   /** From `opencode.json`; use `[]` when there is no catalog (plain text field). */
   choices: WebArgumentFieldChoice[];
+  enterKeyHint?:
+    | 'done'
+    | 'enter'
+    | 'go'
+    | 'next'
+    | 'previous'
+    | 'search'
+    | 'send';
   onChange: (value: string) => void;
-  onKeyDown?: (event: KeyboardEvent) => void;
 };
 
 /**
@@ -24,9 +31,9 @@ export function OpenCodeModelField(props: OpenCodeModelFieldProps) {
       <input
         type="text"
         {...(props.choices.length > 0 ? { list: listId() } : {})}
+        enterkeyhint={props.enterKeyHint}
         value={props.value}
         onInput={(e) => props.onChange(e.currentTarget.value)}
-        onKeyDown={(e) => props.onKeyDown?.(e)}
       />
       <Show when={props.choices.length > 0}>
         <datalist id={listId()}>

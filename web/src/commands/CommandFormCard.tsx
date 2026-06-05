@@ -17,6 +17,15 @@ type CommandFormCardProps = {
   onSubmitForm: TimelineViewProps['onSubmitForm'];
 };
 
+type FormInputEnterKeyHint =
+  | 'done'
+  | 'enter'
+  | 'go'
+  | 'next'
+  | 'previous'
+  | 'search'
+  | 'send';
+
 function OptionHintLine(props: {
   formItem: Extract<TimelineItem, { type: 'command_form' }>;
   field: CommandField;
@@ -44,6 +53,16 @@ export function CommandFormCard(props: CommandFormCardProps) {
   const optionFlagFields = props.formItem.subcommand.options.filter(
     (o) => o.kind === 'boolean',
   );
+
+  const optionInputFields = optionArgFields.filter(
+    (field) => !(field.kind === 'string' && (field.choices?.length ?? 0) > 0),
+  );
+
+  const inputFieldCount =
+    props.formItem.subcommand.arguments.length + optionInputFields.length;
+
+  const inputEnterKeyHint = (inputIndex: number): FormInputEnterKeyHint =>
+    inputIndex < inputFieldCount - 1 ? 'next' : 'go';
 
   let rootEl: HTMLDivElement | undefined;
 
@@ -96,206 +115,204 @@ export function CommandFormCard(props: CommandFormCardProps) {
       collapsedHeadSummary={formHeadTags()}
       onDismiss={() => props.onDeleteTimelineItem(props.formItem.id)}
     >
-      <div class="form-summary">{props.formItem.subcommand.summary}</div>
-      <code class="usage-line">
-        /{props.formItem.command} {props.formItem.subcommand.usage}
-      </code>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void props.onSubmitForm(props.formItem.id);
+        }}
+      >
+        <div class="form-summary">{props.formItem.subcommand.summary}</div>
+        <code class="usage-line">
+          /{props.formItem.command} {props.formItem.subcommand.usage}
+        </code>
 
-      <div class="field-list">
-        <Show when={props.formItem.subcommand.arguments.length > 0}>
-          <div class="form-field-section">
-            <div class="form-field-section-title">Required</div>
-            <For each={props.formItem.subcommand.arguments}>
-              {(field, argIndex) => (
-                <label
-                  class={`field-block field-block--arg field-block--stripe-${argIndex() % 2 === 0 ? 'a' : 'b'}`}
-                >
-                  <span class="field-label">{field.name}</span>
-                  <Show
-                    when={
-                      field.kind === 'string' &&
-                      (props.formItem.argumentChoices?.[field.name]?.length ??
-                        0) > 0
-                    }
-                    fallback={
-                      <input
-                        type={field.kind === 'integer' ? 'number' : 'text'}
-                        value={String(
-                          props.formItem.values.arguments[field.name] ?? '',
-                        )}
-                        onInput={(event) =>
-                          props.onUpdateFormValue(
-                            props.formItem.id,
-                            'arguments',
-                            field.name,
-                            field.kind === 'integer'
-                              ? Number.parseInt(event.currentTarget.value, 10)
-                              : event.currentTarget.value,
-                          )
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault();
-                            props.onSubmitForm(props.formItem.id);
-                          }
-                        }}
-                      />
-                    }
+        <div class="field-list">
+          <Show when={props.formItem.subcommand.arguments.length > 0}>
+            <div class="form-field-section">
+              <div class="form-field-section-title">Required</div>
+              <For each={props.formItem.subcommand.arguments}>
+                {(field, argIndex) => (
+                  <label
+                    class={`field-block field-block--arg field-block--stripe-${argIndex() % 2 === 0 ? 'a' : 'b'}`}
                   >
-                    <OpenCodeModelField
-                      fieldId={`${props.formItem.id}-${field.name}`}
-                      value={String(
-                        props.formItem.values.arguments[field.name] ?? '',
-                      )}
-                      choices={
-                        props.formItem.argumentChoices?.[field.name] ?? []
-                      }
-                      onChange={(v) =>
-                        props.onUpdateFormValue(
-                          props.formItem.id,
-                          'arguments',
-                          field.name,
-                          v,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault();
-                          props.onSubmitForm(props.formItem.id);
-                        }
-                      }}
-                    />
-                  </Show>
-                  <small class="field-summary">{field.summary}</small>
-                </label>
-              )}
-            </For>
-          </div>
-        </Show>
-
-        <Show when={optionArgFields.length > 0}>
-          <div class="form-field-section">
-            <div class="form-field-section-title">Arguments</div>
-            <For each={optionArgFields}>
-              {(field, optIndex) => (
-                <label
-                  class={`field-block field-block--opt field-block--stripe-${optIndex() % 2 === 0 ? 'a' : 'b'}`}
-                >
-                  <div class="field-block-innards">
-                    <div class="field-flag-line field-flag-line--text-opt">
-                      <span class="field-label">{formatFieldLabel(field)}</span>
-                      <Show when={field.summary.trim().length > 0}>
-                        <span class="field-inline-hint muted">
-                          {field.summary}
-                        </span>
-                      </Show>
-                    </div>
+                    <span class="field-label">{field.name}</span>
                     <Show
                       when={
                         field.kind === 'string' &&
-                        (field.choices?.length ?? 0) > 0
+                        (props.formItem.argumentChoices?.[field.name]?.length ??
+                          0) > 0
                       }
                       fallback={
                         <input
                           type={field.kind === 'integer' ? 'number' : 'text'}
+                          enterkeyhint={inputEnterKeyHint(argIndex())}
                           value={String(
-                            props.formItem.values.options[field.name] ?? '',
+                            props.formItem.values.arguments[field.name] ?? '',
                           )}
                           onInput={(event) =>
                             props.onUpdateFormValue(
                               props.formItem.id,
-                              'options',
+                              'arguments',
                               field.name,
                               field.kind === 'integer'
                                 ? Number.parseInt(event.currentTarget.value, 10)
                                 : event.currentTarget.value,
                             )
                           }
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault();
-                              props.onSubmitForm(props.formItem.id);
-                            }
-                          }}
                         />
                       }
                     >
-                      <select
+                      <OpenCodeModelField
+                        fieldId={`${props.formItem.id}-${field.name}`}
+                        enterKeyHint={inputEnterKeyHint(argIndex())}
                         value={String(
-                          props.formItem.values.options[field.name] ??
-                            field.webDefaultValue ??
-                            '',
+                          props.formItem.values.arguments[field.name] ?? '',
+                        )}
+                        choices={
+                          props.formItem.argumentChoices?.[field.name] ?? []
+                        }
+                        onChange={(v) =>
+                          props.onUpdateFormValue(
+                            props.formItem.id,
+                            'arguments',
+                            field.name,
+                            v,
+                          )
+                        }
+                      />
+                    </Show>
+                    <small class="field-summary">{field.summary}</small>
+                  </label>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <Show when={optionArgFields.length > 0}>
+            <div class="form-field-section">
+              <div class="form-field-section-title">Arguments</div>
+              <For each={optionArgFields}>
+                {(field, optIndex) => (
+                  <label
+                    class={`field-block field-block--opt field-block--stripe-${optIndex() % 2 === 0 ? 'a' : 'b'}`}
+                  >
+                    <div class="field-block-innards">
+                      <div class="field-flag-line field-flag-line--text-opt">
+                        <span class="field-label">
+                          {formatFieldLabel(field)}
+                        </span>
+                        <Show when={field.summary.trim().length > 0}>
+                          <span class="field-inline-hint muted">
+                            {field.summary}
+                          </span>
+                        </Show>
+                      </div>
+                      <Show
+                        when={
+                          field.kind === 'string' &&
+                          (field.choices?.length ?? 0) > 0
+                        }
+                        fallback={
+                          <input
+                            type={field.kind === 'integer' ? 'number' : 'text'}
+                            enterkeyhint={inputEnterKeyHint(
+                              props.formItem.subcommand.arguments.length +
+                                optionInputFields.findIndex(
+                                  (entry) => entry.name === field.name,
+                                ),
+                            )}
+                            value={String(
+                              props.formItem.values.options[field.name] ?? '',
+                            )}
+                            onInput={(event) =>
+                              props.onUpdateFormValue(
+                                props.formItem.id,
+                                'options',
+                                field.name,
+                                field.kind === 'integer'
+                                  ? Number.parseInt(
+                                      event.currentTarget.value,
+                                      10,
+                                    )
+                                  : event.currentTarget.value,
+                              )
+                            }
+                          />
+                        }
+                      >
+                        <select
+                          value={String(
+                            props.formItem.values.options[field.name] ??
+                              field.webDefaultValue ??
+                              '',
+                          )}
+                          onChange={(event) =>
+                            props.onUpdateFormValue(
+                              props.formItem.id,
+                              'options',
+                              field.name,
+                              event.currentTarget.value,
+                            )
+                          }
+                        >
+                          <option value="">
+                            {field.webDefaultValue !== undefined
+                              ? `Use default (${String(field.webDefaultValue)})`
+                              : 'No filter'}
+                          </option>
+                          <For each={field.choices ?? []}>
+                            {(opt) => <option value={opt}>{opt}</option>}
+                          </For>
+                        </select>
+                      </Show>
+                    </div>
+                    <OptionHintLine formItem={props.formItem} field={field} />
+                  </label>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <Show when={optionFlagFields.length > 0}>
+            <div class="form-field-section">
+              <div class="form-field-section-title">Flags</div>
+              <For each={optionFlagFields}>
+                {(field, optIndex) => (
+                  <label
+                    class={`field-block field-block--opt field-block--stripe-${optIndex() % 2 === 0 ? 'a' : 'b'}`}
+                  >
+                    <div class="field-flag-line">
+                      <span class="field-label">{formatFieldLabel(field)}</span>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(
+                          props.formItem.values.options[field.name],
                         )}
                         onChange={(event) =>
                           props.onUpdateFormValue(
                             props.formItem.id,
                             'options',
                             field.name,
-                            event.currentTarget.value,
+                            event.currentTarget.checked,
                           )
                         }
-                      >
-                        <option value="">
-                          {field.webDefaultValue !== undefined
-                            ? `Use default (${String(field.webDefaultValue)})`
-                            : 'No filter'}
-                        </option>
-                        <For each={field.choices ?? []}>
-                          {(opt) => <option value={opt}>{opt}</option>}
-                        </For>
-                      </select>
-                    </Show>
-                  </div>
-                  <OptionHintLine formItem={props.formItem} field={field} />
-                </label>
-              )}
-            </For>
-          </div>
-        </Show>
+                      />
+                    </div>
+                    <OptionHintLine formItem={props.formItem} field={field} />
+                    <small class="field-summary">{field.summary}</small>
+                  </label>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
 
-        <Show when={optionFlagFields.length > 0}>
-          <div class="form-field-section">
-            <div class="form-field-section-title">Flags</div>
-            <For each={optionFlagFields}>
-              {(field, optIndex) => (
-                <label
-                  class={`field-block field-block--opt field-block--stripe-${optIndex() % 2 === 0 ? 'a' : 'b'}`}
-                >
-                  <div class="field-flag-line">
-                    <span class="field-label">{formatFieldLabel(field)}</span>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(
-                        props.formItem.values.options[field.name],
-                      )}
-                      onChange={(event) =>
-                        props.onUpdateFormValue(
-                          props.formItem.id,
-                          'options',
-                          field.name,
-                          event.currentTarget.checked,
-                        )
-                      }
-                    />
-                  </div>
-                  <OptionHintLine formItem={props.formItem} field={field} />
-                  <small class="field-summary">{field.summary}</small>
-                </label>
-              )}
-            </For>
-          </div>
-        </Show>
-      </div>
-
-      <div class="actions-row actions-row--form-run">
-        <WebButton
-          type="button"
-          class="web-button"
-          onClick={() => props.onSubmitForm(props.formItem.id)}
-        >
-          Run
-        </WebButton>
-      </div>
+        <div class="actions-row actions-row--form-run">
+          <WebButton type="submit" class="web-button">
+            Run
+          </WebButton>
+        </div>
+      </form>
     </TimelineCollapsibleCard>
   );
 }

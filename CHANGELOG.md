@@ -4,9 +4,14 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.37.7] - 2026-06-05
+
+- refactor: split WebNodeRenderer into focused modules (4aa4eb0)
+- fix: enter on mobile doesn't submit form (e348d3b)
+
 ## [v9.37.6] - 2026-06-05
 
-- ref: xxx (d6e9d7c)
+- ref: xxx (b5f0e59)
 
 ## [v9.37.5] - 2026-06-05
 

@@ -83,7 +83,7 @@ const hasNavigatorUAData = (
 ): navigatorValue is Navigator & {
   userAgentData: { brands: { brand: string }[] };
 } => {
-  const userAgentData = ((navigatorValue as unknown) as Record<string, unknown>)
+  const userAgentData = (navigatorValue as unknown as Record<string, unknown>)
     .userAgentData;
 
   return (
