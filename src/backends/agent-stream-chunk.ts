@@ -4,10 +4,11 @@
 
 import { debug, log } from '../logger';
 
-import type { parseOpenCodePart } from './opencode-parts';
 import {
   createOpenCodeParseState,
+  parseOpenCodePart,
   parseOpenCodeUpdatedPart,
+  rememberOpenCodePartType,
   rememberOpenCodeAssistantMessage,
   segmentSummary,
   type OpenCodeParseState,
@@ -232,6 +233,149 @@ function partType(properties: Record<string, unknown>): string | null {
   return typeof type === 'string' ? type : null;
 }
 
+function partId(properties: Record<string, unknown>): string | null {
+  const directPartId = properties.partID ?? properties.partId;
+
+  if (typeof directPartId === 'string' && directPartId.length > 0) {
+    return directPartId;
+  }
+
+  const part = properties.part;
+
+  if (!part || typeof part !== 'object') {
+    return null;
+  }
+
+  const id = (part as { id?: unknown }).id;
+
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+function rememberedPartType(
+  logState: OpencodeStreamLogState,
+  properties: Record<string, unknown>,
+): string | null {
+  const inlineType = partType(properties);
+
+  if (inlineType) {
+    return inlineType;
+  }
+
+  const id = partId(properties);
+
+  return id ? (logState.parseState.partTypesById.get(id) ?? null) : null;
+}
+
+function bufferUnknownTextDelta(
+  logState: OpencodeStreamLogState,
+  properties: Record<string, unknown>,
+  delta: string,
+): boolean {
+  const id = partId(properties);
+
+  if (!id) {
+    return false;
+  }
+
+  const previous =
+    logState.parseState.pendingUnknownTextDeltasByPartId.get(id) ?? '';
+
+  logState.parseState.pendingUnknownTextDeltasByPartId.set(
+    id,
+    previous + delta,
+  );
+
+  return true;
+}
+
+function clearPendingUnknownTextDelta(
+  logState: OpencodeStreamLogState,
+  properties: Record<string, unknown>,
+): void {
+  const id = partId(properties);
+
+  if (!id) {
+    return;
+  }
+
+  logState.parseState.pendingUnknownTextDeltasByPartId.delete(id);
+}
+
+function flushPendingUnknownTextDeltas(
+  logState: OpencodeStreamLogState,
+): AgentStreamChunk[] {
+  const chunks = Array.from(
+    logState.parseState.pendingUnknownTextDeltasByPartId.values(),
+  )
+    .filter((text) => text.length > 0)
+    .map((text): AgentStreamChunk => ({ kind: 'text_delta', text }));
+
+  logState.parseState.pendingUnknownTextDeltasByPartId.clear();
+
+  return chunks;
+}
+
+function hasOpenAiEncryptedReasoning(part: Record<string, unknown>): boolean {
+  const metadata = part.metadata;
+
+  if (!metadata || typeof metadata !== 'object') {
+    return false;
+  }
+
+  const openai = (metadata as { openai?: unknown }).openai;
+
+  if (!openai || typeof openai !== 'object') {
+    return false;
+  }
+
+  return (
+    typeof (openai as { reasoningEncryptedContent?: unknown })
+      .reasoningEncryptedContent === 'string'
+  );
+}
+
+function noUpdatedPartChunkReason(
+  part: unknown,
+  state: OpenCodeParseState,
+): string | null {
+  if (!part || typeof part !== 'object') {
+    return null;
+  }
+
+  const partRec = part as Record<string, unknown>;
+  const type = typeof partRec.type === 'string' ? partRec.type : '';
+
+  if (type !== 'text' && type !== 'reasoning') {
+    return null;
+  }
+
+  const parsed = parseOpenCodePart(part);
+
+  if (!parsed || (parsed.kind !== 'text' && parsed.kind !== 'reasoning')) {
+    return `known ${type} part was malformed or missing required fields`;
+  }
+
+  const textLength = parsed.text.length;
+
+  if (textLength === 0) {
+    return type === 'reasoning' && hasOpenAiEncryptedReasoning(partRec)
+      ? 'reasoning update has encrypted provider metadata but no visible text'
+      : `known ${type} update has empty text`;
+  }
+
+  if (!state.assistantMessageIds.has(parsed.messageId)) {
+    return `known ${type} update arrived before assistant message metadata was recorded`;
+  }
+
+  const previousLength = state.partTextLengths.get(parsed.partId) ?? 0;
+
+  if (textLength <= previousLength) {
+    return `known ${type} update has no new text (${textLength} <= ${previousLength})`;
+  }
+
+  return `known ${type} update produced no chunk after dedupe`;
+}
+
 function rememberTextDelta(
   logState: OpencodeStreamLogState,
   properties: Record<string, unknown>,
@@ -328,8 +472,6 @@ export function mapOpencodeSsePayloadToChunk(
   }
 
   if (SILENT_STREAM_EVENT_TYPES.has(eventType)) {
-    logIgnoredOnce(logState, eventType, 'silent transport event', raw);
-
     return [];
   }
 
@@ -354,13 +496,32 @@ export function mapOpencodeSsePayloadToChunk(
 
     const field = typeof p.field === 'string' ? p.field : '';
 
-    if (field === 'text' && partType(p) === 'reasoning') {
+    const knownPartType = rememberedPartType(logState, p);
+
+    if (field === 'text' && knownPartType === 'reasoning') {
       rememberTextDelta(logState, p, p.delta);
 
       return [{ kind: 'reasoning_delta', text: p.delta }];
     }
 
-    if (field === 'text') {
+    if (field === 'text' && knownPartType === 'text') {
+      rememberTextDelta(logState, p, p.delta);
+
+      return [{ kind: 'text_delta', text: p.delta }];
+    }
+
+    if (field === 'text' && knownPartType === null) {
+      if (bufferUnknownTextDelta(logState, p, p.delta)) {
+        logIgnoredOnce(
+          logState,
+          eventType,
+          'buffering text delta until part type is known',
+          raw,
+        );
+
+        return [];
+      }
+
       rememberTextDelta(logState, p, p.delta);
 
       return [{ kind: 'text_delta', text: p.delta }];
@@ -449,7 +610,10 @@ export function mapOpencodeSsePayloadToChunk(
       return [];
     }
 
-    return [{ kind: 'status', phase: 'completed', message: null }];
+    return [
+      ...flushPendingUnknownTextDeltas(logState),
+      { kind: 'status', phase: 'completed', message: null },
+    ];
   }
 
   if (eventType === 'message.part.updated') {
@@ -467,11 +631,23 @@ export function mapOpencodeSsePayloadToChunk(
       return [];
     }
 
+    rememberOpenCodePartType(p.part, logState.parseState);
+
     const segment = parseOpenCodeUpdatedPart(p.part, logState.parseState);
     const chunk = segmentToChunk(segment);
 
     if (chunk) {
+      clearPendingUnknownTextDelta(logState, p);
+
       return [chunk];
+    }
+
+    const noChunkReason = noUpdatedPartChunkReason(p.part, logState.parseState);
+
+    if (noChunkReason) {
+      logIgnoredOnce(logState, eventType, noChunkReason, raw);
+
+      return [];
     }
 
     const part =

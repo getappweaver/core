@@ -81,6 +81,8 @@ export type OpenCodeParsedSegment =
 export type OpenCodeParseState = {
   assistantMessageIds: Set<string>;
   partTextLengths: Map<string, number>;
+  partTypesById: Map<string, string>;
+  pendingUnknownTextDeltasByPartId: Map<string, string>;
   emittedDedupeKeys: Set<string>;
 };
 
@@ -88,6 +90,8 @@ export function createOpenCodeParseState(): OpenCodeParseState {
   return {
     assistantMessageIds: new Set(),
     partTextLengths: new Map(),
+    partTypesById: new Map(),
+    pendingUnknownTextDeltasByPartId: new Map(),
     emittedDedupeKeys: new Set(),
   };
 }
@@ -300,6 +304,23 @@ export function parseOpenCodePart(
     default:
       return null;
   }
+}
+
+export function rememberOpenCodePartType(
+  part: unknown,
+  state: OpenCodeParseState,
+): void {
+  if (!part || typeof part !== 'object') {
+    return;
+  }
+
+  const rec = part as Record<string, unknown>;
+
+  if (typeof rec.id !== 'string' || typeof rec.type !== 'string') {
+    return;
+  }
+
+  state.partTypesById.set(rec.id, rec.type);
 }
 
 export function parseOpenCodeMessage(value: unknown): OpenCodeParsedSegment[] {

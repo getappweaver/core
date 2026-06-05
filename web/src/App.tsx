@@ -23,6 +23,7 @@ import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
 import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
+import { ComposerWorkingButton } from './components/ComposerWorkingButton';
 import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
 import { useComposer } from './composer/useComposer';
@@ -1877,8 +1878,9 @@ function AppInner(): JSX.Element {
         setCompactSessionRequestId(null);
         requestComposerAiState();
       },
-      onError: () => {
+      onError: (message) => {
         setCompactSessionRequestId(null);
+        appendSystemMessage(`Compaction failed: ${message.message}`);
       },
     });
 
@@ -2628,6 +2630,10 @@ function AppInner(): JSX.Element {
                     <span class="composer-meta-text composer-meta-text--muted">
                       {composerAiState()!.provider}
                     </span>
+                    <ComposerWorkingButton
+                      working={agentWorking()}
+                      onStop={() => chat.cancelChat()}
+                    />
                     <ComposerContextMenuButton
                       backend={composerAiState()!.backend}
                       label={
@@ -2641,20 +2647,6 @@ function AppInner(): JSX.Element {
                         void createNewSessionFromComposerMenu();
                       }}
                     />
-                  </Show>
-                  <Show when={agentWorking()}>
-                    <span class="composer-working" aria-live="polite">
-                      AI
-                      <span class="composer-working-dots" aria-hidden="true" />
-                      <button
-                        class="composer-working-cancel"
-                        type="button"
-                        aria-label="Cancel"
-                        onClick={() => chat.cancelChat()}
-                      >
-                        ×
-                      </button>
-                    </span>
                   </Show>
                 </div>
               }

@@ -91,6 +91,10 @@ function shortLogText(value: string, maxLength: number = 500): string {
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function isFatalStreamErrorMessage(message: string): boolean {
   return /\b(error|exception|failed|failure|timeout|timed out|deadline|abort|rate limit|429|unauthorized|forbidden)\b/i.test(
     message,
@@ -754,28 +758,129 @@ type SummarizeOpencodeSdkSessionProps = {
   sessionId: string;
   cwd: string;
   effectiveModel: string;
+  auto: boolean;
+  onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
+  streamAbortSignal: AbortSignal | null;
 };
+
+function isSessionCompactedEvent(raw: unknown, sessionId: string): boolean {
+  const rec = unwrapOpenCodeEventRecord(raw);
+
+  if (!rec || rec.type !== 'session.compacted') {
+    return false;
+  }
+
+  const properties = rec.properties;
+
+  return (
+    !!properties &&
+    typeof properties === 'object' &&
+    (properties as { sessionID?: unknown }).sessionID === sessionId
+  );
+}
 
 export async function summarizeOpencodeSdkSession({
   sessionId,
   cwd,
   effectiveModel,
+  auto,
+  onAgentStreamChunk,
+  streamAbortSignal,
 }: SummarizeOpencodeSdkSessionProps): Promise<void> {
   const { client } = await getOrInitSdk();
   const model = modelToProviderAndId(effectiveModel);
+  const logState = createOpencodeStreamLogState(sessionId);
 
-  const result = await client.session.summarize({
-    sessionID: sessionId,
-    directory: cwd,
-    providerID: model.providerID,
-    modelID: model.modelID,
-    auto: true,
+  const sse = onAgentStreamChunk
+    ? await client.event.subscribe({ directory: cwd })
+    : null;
+
+  const stream = sse?.stream ?? null;
+  let stopConsumer = false;
+  let streamCompleteResolved = false;
+  let resolveStreamComplete: () => void = () => undefined;
+
+  const streamComplete = new Promise<void>((resolve) => {
+    resolveStreamComplete = () => {
+      if (streamCompleteResolved) {
+        return;
+      }
+
+      streamCompleteResolved = true;
+      resolve();
+    };
   });
 
-  const err = sdkResultError(result);
+  const pumpPromise = stream
+    ? (async () => {
+        try {
+          for await (const evt of stream) {
+            if (stopConsumer) {
+              break;
+            }
 
-  if (err) {
-    throw new Error(errorMessage(err));
+            const chunks = mapOpencodeSsePayloadToChunk(
+              evt,
+              sessionId,
+              logState,
+            );
+
+            for (const chunk of chunks) {
+              onAgentStreamChunk?.(chunk);
+            }
+
+            if (
+              isSessionCompactedEvent(evt, sessionId) ||
+              isOpenCodeSessionCompletionEvent(evt, sessionId)
+            ) {
+              resolveStreamComplete();
+            }
+          }
+        } catch (err) {
+          debug(`opencode-sdk summarize stream consumer: ${String(err)}`);
+        }
+      })()
+    : Promise.resolve();
+
+  onAgentStreamChunk?.({ kind: 'status', phase: 'started', message: null });
+
+  try {
+    const result = await client.session.summarize(
+      {
+        sessionID: sessionId,
+        directory: cwd,
+        providerID: model.providerID,
+        modelID: model.modelID,
+        auto,
+      },
+      {
+        signal: streamAbortSignal ?? undefined,
+      },
+    );
+
+    const err = sdkResultError(result);
+
+    if (err) {
+      throw new Error(errorMessage(err));
+    }
+
+    if (stream) {
+      await Promise.race([streamComplete, sleep(750)]);
+    }
+  } finally {
+    onAgentStreamChunk?.({ kind: 'status', phase: 'completed', message: null });
+    stopConsumer = true;
+
+    if (stream) {
+      await stream.return(undefined).catch((err) => {
+        debug(
+          'opencode-sdk summarize stream: stream.return failed',
+          String(err),
+        );
+      });
+    }
+
+    await pumpPromise;
   }
 }
 

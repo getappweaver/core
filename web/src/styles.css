@@ -2908,8 +2908,14 @@ button.composer-meta-text--context:disabled {
   text-decoration: none;
 }
 
+button.composer-meta-text--context.is-compacting {
+  color: var(--color-warning);
+  opacity: 0.9;
+  text-decoration: none;
+}
+
 .composer-meta-dropdown--context {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .composer-meta-dropdown--context .composer-meta-text--context {
@@ -2933,54 +2939,55 @@ button.composer-chip.composer-chip--model-override {
   white-space: nowrap;
 }
 
-.composer-working {
-  color: var(--color-warning);
-  font-size: 0.82rem;
-  white-space: nowrap;
+ /* composer working indicator — fixed-width slot, pushes context flush-right */
+ .composer-working-btn-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.composer-working-dots::after {
-  content: '...';
-  display: inline-block;
-  width: 1.1em;
-  text-align: left;
-  animation: composer-working-dots 1s steps(4, end) infinite;
+ .composer-working-btn-wrap.is-working {
+  visibility: visible;
+  pointer-events: auto;
 }
 
-@keyframes composer-working-dots {
-  0% {
-    content: '';
-  }
-
-  25% {
-    content: '.';
-  }
-
-  50% {
-    content: '..';
-  }
-
-  75%,
-  100% {
-    content: '...';
-  }
-}
-
-.composer-working-cancel {
-  background: none;
-  border: none;
-  padding: 0 0 0 0.25em;
+ .composer-working-bar {
+  appearance: none;
+  border: 0;
+  /* generous vertical padding for hit area without affecting visual size */
+  padding: 0.45rem 0;
   margin: 0;
+  background: transparent;
   cursor: pointer;
-  color: var(--color-accent);
-  font-size: 1em;
-  line-height: 1;
-  opacity: 0.7;
-  margin-left: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.composer-working-cancel:hover {
-  opacity: 1;
+ .composer-working-squares {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18em;
+}
+
+ .composer-working-sq {
+  display: block;
+  width: 0.45em;
+  height: 0.45em;
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning);
+  flex-shrink: 0;
+  transition: opacity 0.06s linear;
+}
+
+ .composer-working-btn-wrap .web-overflow-panel {
+  right: 0;
+  left: auto;
+  min-width: 7rem;
 }
 
 .opencode-agents-modal {

@@ -45,6 +45,9 @@ export function ComposerContextMenuButton(
 
   const showCompact = () => props.backend === 'opencode';
 
+  const buttonLabel = () =>
+    props.compacting ? `Compacting… ${props.label}` : props.label;
+
   return (
     <div
       class="composer-meta-dropdown composer-meta-dropdown--context"
@@ -53,6 +56,7 @@ export function ComposerContextMenuButton(
       <button
         type="button"
         class="composer-meta-text composer-meta-text--muted composer-meta-text--context"
+        classList={{ 'is-compacting': props.compacting }}
         disabled={!props.wsConnected}
         aria-expanded={open()}
         aria-haspopup="menu"
@@ -63,7 +67,7 @@ export function ComposerContextMenuButton(
         }
         onClick={() => setOpen((v) => !v)}
       >
-        {props.label}
+        {buttonLabel()}
       </button>
       <Show when={open()}>
         <div class="web-overflow-panel is-flip-up" role="menu">

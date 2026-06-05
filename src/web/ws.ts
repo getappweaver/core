@@ -156,6 +156,82 @@ function demoComposerAiState(): ComposerAiState {
   };
 }
 
+type ComposerContextStats = NonNullable<ComposerAiState['contextStats']>;
+
+type WaitForUpdatedComposerAiStateProps = {
+  ctx: WebRouteContext;
+  previous: ComposerContextStats | null;
+  attempts: number;
+  delayMs: number;
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatTokenCount(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}m`;
+  }
+
+  if (value >= 10_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
+
+  return String(value);
+}
+
+function formatContextStats(stats: ComposerContextStats | null): string {
+  if (!stats) {
+    return 'unknown';
+  }
+
+  if (stats.contextPercent === null) {
+    return formatTokenCount(stats.tokensTotal);
+  }
+
+  return `${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
+}
+
+function contextStatsChanged(
+  previous: ComposerContextStats | null,
+  next: ComposerContextStats | null,
+): boolean {
+  if (!previous || !next) {
+    return previous !== next;
+  }
+
+  return (
+    previous.tokensTotal !== next.tokensTotal ||
+    previous.contextLimit !== next.contextLimit ||
+    previous.contextPercent !== next.contextPercent
+  );
+}
+
+async function waitForUpdatedComposerAiState({
+  ctx,
+  previous,
+  attempts,
+  delayMs,
+}: WaitForUpdatedComposerAiStateProps): Promise<ComposerAiState> {
+  let latest = await getComposerAiState(ctx);
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (contextStatsChanged(previous, latest.contextStats)) {
+      return latest;
+    }
+
+    await sleep(delayMs);
+    latest = await getComposerAiState(ctx);
+  }
+
+  return latest;
+}
+
 type DemoStoryEntry = {
   pluginAlias: string;
   iconUrl?: string;
@@ -410,56 +486,117 @@ async function handleCompactSession(params: {
   requestId: string;
 }): Promise<void> {
   const { ws, ctx, requestId } = params;
+  ws.data.currentChatAbort?.abort();
+  const compactAbort = new AbortController();
+  ws.data.currentChatAbort = compactAbort;
+  let shouldSendDone = true;
   const backendName = getAgentBackend(ctx.seenDb);
 
-  if (backendName !== 'opencode') {
+  try {
+    if (backendName !== 'opencode') {
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId,
+          message: 'Compaction is available only for the OpenCode backend.',
+        }),
+      );
+
+      return;
+    }
+
+    const sessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
+
+    if (!sessionId) {
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId,
+          message: 'No active session to compact.',
+        }),
+      );
+
+      return;
+    }
+
+    const state = await getComposerAiState(ctx);
+    const beforeStats = state.contextStats;
+
+    const cwd =
+      getWorkspaceTarget(ctx.seenDb) === 'appweaver'
+        ? ctx.dmBotRoot
+        : ctx.parentOfBotRoot;
+
     sendMessage(
       ws,
-      createErrorMessage({
+      createCommandResultMessage({
         requestId,
-        message: 'Compaction is available only for the OpenCode backend.',
+        output: `Compacting current OpenCode session… Previous context: ${formatContextStats(beforeStats)}.`,
       }),
     );
 
-    return;
-  }
+    await summarizeOpencodeSdkSession({
+      sessionId,
+      cwd,
+      effectiveModel: state.effectiveModel,
+      auto: false,
+      onAgentStreamChunk: (chunk) => {
+        sendMessage(
+          ws,
+          createChatStreamChunkMessage({
+            requestId,
+            chunk,
+          }),
+        );
+      },
+      streamAbortSignal: compactAbort.signal,
+    });
 
-  const sessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
+    const afterState = await waitForUpdatedComposerAiState({
+      ctx,
+      previous: beforeStats,
+      attempts: 6,
+      delayMs: 500,
+    });
 
-  if (!sessionId) {
+    const afterStats = afterState.contextStats;
+    const statsChanged = contextStatsChanged(beforeStats, afterStats);
+
+    const output = statsChanged
+      ? `Compacted context: ${formatContextStats(beforeStats)} → ${formatContextStats(afterStats)}.`
+      : `Compaction completed, but OpenCode has not reported updated context stats yet. Current context: ${formatContextStats(afterStats)}.`;
+
     sendMessage(
       ws,
-      createErrorMessage({
+      createCommandResultMessage({
         requestId,
-        message: 'No active session to compact.',
+        output,
       }),
     );
+  } catch (err) {
+    if (compactAbort.signal.aborted) {
+      sendMessage(
+        ws,
+        createCommandResultMessage({
+          requestId,
+          output: 'Compaction interrupted.',
+        }),
+      );
 
-    return;
+      return;
+    }
+
+    shouldSendDone = false;
+    throw err;
+  } finally {
+    if (ws.data.currentChatAbort === compactAbort) {
+      ws.data.currentChatAbort = null;
+    }
+
+    if (shouldSendDone) {
+      sendMessage(ws, createDoneMessage(requestId));
+    }
   }
-
-  const state = await getComposerAiState(ctx);
-
-  const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-      ? ctx.dmBotRoot
-      : ctx.parentOfBotRoot;
-
-  await summarizeOpencodeSdkSession({
-    sessionId,
-    cwd,
-    effectiveModel: state.effectiveModel,
-  });
-
-  sendMessage(
-    ws,
-    createCommandResultMessage({
-      requestId,
-      output: 'Compacted current OpenCode session.',
-    }),
-  );
-
-  sendMessage(ws, createDoneMessage(requestId));
 }
 
 function summarizeInvocation(

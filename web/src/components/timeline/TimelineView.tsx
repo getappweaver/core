@@ -351,12 +351,12 @@ function TimelineReasoningCard(props: TimelineReasoningCardProps) {
             type="button"
             class="card-head__scroll-ledge"
             tabIndex={-1}
-            title="Scroll to top of this thinking"
-            aria-label="Scroll to top of this thinking"
+            title="Scroll to top of this reasoning"
+            aria-label="Scroll to top of this reasoning"
             onClick={scrollCardToTop}
           />
           <div class="card-head-leading">
-            <span class="tag mode-tag card-head__control">thinking</span>
+            <span class="tag mode-tag card-head__control">reasoning</span>
           </div>
         </>
       }
@@ -364,13 +364,13 @@ function TimelineReasoningCard(props: TimelineReasoningCardProps) {
         <div
           class="card-head-tree-toolbar"
           role="toolbar"
-          aria-label="Thinking"
+          aria-label="Reasoning"
         >
           <button
             type="button"
             class={`tag tag-button card-head__control card-head-tree-toolbar-btn card-head-chrome-btn chat-copy-btn${copied() ? ' chat-copy-btn--show-text' : ''}`}
-            title={copied() ? 'Copied thinking' : 'Copy thinking'}
-            aria-label={copied() ? 'Copied thinking' : 'Copy thinking'}
+            title={copied() ? 'Copied reasoning' : 'Copy reasoning'}
+            aria-label={copied() ? 'Copied reasoning' : 'Copy reasoning'}
             onClick={copyThinking}
           >
             <svg
@@ -390,7 +390,7 @@ function TimelineReasoningCard(props: TimelineReasoningCardProps) {
           <TimelineSpeechButton
             text={props.text.trim()}
             class="card-head__control card-head-tree-toolbar-btn card-head-speech-btn--manual"
-            label="thinking"
+            label="reasoning"
             seekSentenceIndex={seekSentenceIndex()}
             onSeekHandled={() => setSeekSentenceIndex(null)}
             onSentenceState={setSpeechState}
@@ -398,7 +398,7 @@ function TimelineReasoningCard(props: TimelineReasoningCardProps) {
         </div>
       }
       collapsedHeadSummary={
-        <span class="tag mode-tag card-head__control">thinking</span>
+        <span class="tag mode-tag card-head__control">reasoning</span>
       }
       onDismiss={() => props.onDeleteTimelineItem(props.id)}
     >
