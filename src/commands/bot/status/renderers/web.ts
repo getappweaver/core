@@ -110,16 +110,20 @@ function updateStatusTone(d: BotStatusData): WebTone | null {
   return null;
 }
 
-function overflowMenu(
-  label: string,
-  items: NonNullable<KvRowProps['menuItems']>,
-): WebNode {
+type OverflowMenuProps = {
+  label: string;
+  items: NonNullable<KvRowProps['menuItems']>;
+  tone: WebTone | null;
+};
+
+function overflowMenu({ label, items, tone }: OverflowMenuProps): WebNode {
   return {
     type: 'element',
     tag: 'overflowMenu',
     props: {
       label,
       className: 'web-button web-button--link status-value-trigger',
+      ...(tone ? { tone } : {}),
     },
     children: items.map((item) => ({
       type: 'element',
@@ -164,7 +168,7 @@ function kvRow({
       },
       row(
         menuItems?.length
-          ? [overflowMenu(value, menuItems)]
+          ? [overflowMenu({ label: value, items: menuItems, tone: valueTone })]
           : [
               {
                 type: 'element',
@@ -538,6 +542,18 @@ export function renderBotStatusWeb(
             cursor: pointer;
             pointer-events: auto;
             text-underline-offset: 2px;
+          }
+
+          .status-value-trigger.tone-success {
+            color: var(--color-success);
+          }
+
+          .status-value-trigger.tone-info {
+            color: var(--color-accent);
+          }
+
+          .status-value-trigger.tone-muted {
+            color: var(--color-text-muted);
           }
 
           .status-value-trigger:hover,

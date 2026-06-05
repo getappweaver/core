@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.37.5] - 2026-06-05
+
+- fix: tone status update trigger (0653c14)
+
 ## [v9.37.4] - 2026-06-05
 
-- fix: segment streamed reasoning cards (dccdb4d)
+- fix: segment streamed reasoning cards (24829b2)
 
 ## [v9.37.3] - 2026-06-05
 
