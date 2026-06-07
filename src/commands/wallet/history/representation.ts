@@ -34,3 +34,5 @@ export const WalletHistoryRepresentationSchema = createRepresentationSchema(
 export type WalletHistoryRepresentation = z.infer<
   typeof WalletHistoryRepresentationSchema
 >;
+
+export type WalletHistoryRow = z.infer<typeof WalletHistoryRowSchema>;

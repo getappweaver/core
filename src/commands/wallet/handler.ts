@@ -15,10 +15,15 @@ import { handleWalletBalance } from './balance/handler';
 import { renderWalletCli } from './cli-representation';
 import { handleWalletDecode } from './decode/handler';
 import { handleWalletHistory } from './history/handler';
+import { renderWalletHistoryWeb } from './history/renderers/web';
+import { handleWalletList } from './list/handler';
+import { renderWalletListWeb } from './list/renderers/web';
 import { handleWalletMint } from './mint/handler';
 import { handleWalletMints } from './mints/handler';
 import { handleWalletReceive } from './receive/handler';
+import { renderWalletReceiveWeb } from './receive/renderers/web';
 import { handleWalletSend } from './send/handler';
+import { renderWalletSendWeb } from './send/renderers/web';
 import { buildWalletUsageRepresentation } from './usage/representation';
 
 export const handleWalletRoot: BuiltinHandler = (ctx) => {
@@ -40,6 +45,18 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
     });
 
     return relays.writeRelays;
+  };
+
+  const optionValue = (flag: string): string | null => {
+    const flagIndex = args.findIndex((arg) => arg === flag);
+
+    if (flagIndex < 0) {
+      return null;
+    }
+
+    const value = args[flagIndex + 1];
+
+    return value && !value.startsWith('--') ? value : null;
   };
 
   const hydrateWalletStateIfAvailable = async () => {
@@ -111,6 +128,21 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
     );
   }
 
+  if (subcmd === 'list') {
+    return handleError(async () => {
+      const rep = handleWalletList({
+        walletDb: input.walletDb,
+        defaultMintUrl: mint,
+      });
+
+      if (input.source === 'web') {
+        return renderWalletListWeb(rep);
+      }
+
+      return `Wallet list is available in the web UI for now. Use ${p}wallet mints for text mint balances.`;
+    }, 'Failed to show wallet list');
+  }
+
   switch (subcmd) {
     case 'balance':
       return handleError(
@@ -141,59 +173,60 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
       return handleError(async () => {
         await hydrateWalletStateIfAvailable();
 
-        return render(
-          await handleWalletReceive({
-            mnemonic,
-            walletDb: input.walletDb,
-            mintUrl: mint,
-            token: args[1],
-            prefix: p,
-            botKeyHex: input.config.botKeyHex,
-            signerPubkey: input.botPubkey,
-            ownerPubkey: input.config.masterPubkey,
-            walletStateWriteRelays: await getWalletStateWriteRelays(),
-            signEncryptedSelfEvent:
-              input.source === 'web'
-                ? null
-                : (input.signEncryptedSelfEvent ?? null),
-          }),
-        );
+        const rep = await handleWalletReceive({
+          mnemonic,
+          walletDb: input.walletDb,
+          token: args[1],
+          prefix: p,
+          botKeyHex: input.config.botKeyHex,
+          signerPubkey: input.botPubkey,
+          ownerPubkey: input.config.masterPubkey,
+          walletStateWriteRelays: await getWalletStateWriteRelays(),
+          signEncryptedSelfEvent:
+            input.source === 'web'
+              ? null
+              : (input.signEncryptedSelfEvent ?? null),
+        });
+
+        return input.source === 'web'
+          ? renderWalletReceiveWeb(rep)
+          : render(rep);
       }, 'Failed to receive token');
 
     case 'send':
       return handleError(async () => {
         await hydrateWalletStateIfAvailable();
 
-        return render(
-          await handleWalletSend({
-            mnemonic,
-            walletDb: input.walletDb,
-            mintUrl: mint,
-            amountArg: args[1],
-            prefix: p,
-            botKeyHex: input.config.botKeyHex,
-            signerPubkey: input.botPubkey,
-            ownerPubkey: input.config.masterPubkey,
-            walletStateWriteRelays: await getWalletStateWriteRelays(),
-            signEncryptedSelfEvent:
-              input.source === 'web'
-                ? null
-                : (input.signEncryptedSelfEvent ?? null),
-          }),
-        );
+        const rep = await handleWalletSend({
+          mnemonic,
+          walletDb: input.walletDb,
+          mintUrl: optionValue('--mint') ?? mint,
+          amountArg: args[1],
+          prefix: p,
+          botKeyHex: input.config.botKeyHex,
+          signerPubkey: input.botPubkey,
+          ownerPubkey: input.config.masterPubkey,
+          walletStateWriteRelays: await getWalletStateWriteRelays(),
+          signEncryptedSelfEvent:
+            input.source === 'web'
+              ? null
+              : (input.signEncryptedSelfEvent ?? null),
+        });
+
+        return input.source === 'web' ? renderWalletSendWeb(rep) : render(rep);
       }, 'Failed to send token');
 
     case 'history':
-      return handleError(
-        async () =>
-          render(
-            handleWalletHistory({
-              walletDb: input.walletDb,
-              showToken: args[1] === '--token',
-            }),
-          ),
-        'Failed to get history',
-      );
+      return handleError(async () => {
+        const rep = handleWalletHistory({
+          walletDb: input.walletDb,
+          showToken: args[1] === '--token',
+        });
+
+        return input.source === 'web'
+          ? renderWalletHistoryWeb(rep)
+          : render(rep);
+      }, 'Failed to get history');
 
     default:
       return Promise.resolve(

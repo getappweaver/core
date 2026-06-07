@@ -18,7 +18,16 @@ export function getWalletSendSubcommandDefinition(
         variadic: false,
       },
     ],
-    options: [],
-    examples: [`${p}wallet send <sats>`],
+    options: [
+      {
+        name: 'mint',
+        summary: 'Mint URL to send from. Defaults to the selected wallet mint.',
+        flag: '--mint',
+        shortFlag: null,
+        kind: 'string',
+        required: false,
+      },
+    ],
+    examples: [`${p}wallet send <sats>`, `${p}wallet send <sats> --mint <url>`],
   };
 }

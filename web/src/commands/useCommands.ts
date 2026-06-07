@@ -362,11 +362,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     command: string;
     subcommand: string;
     title: string;
+    iconUrl?: string | null;
   }): void {
     adapters.setChromeModal({
       command: props.command,
       subcommand: props.subcommand,
       title: props.title,
+      iconUrl: props.iconUrl,
     });
 
     requestChromeCommand({

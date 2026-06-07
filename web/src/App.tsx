@@ -155,6 +155,59 @@ type HeaderWidget = {
   order?: number;
 };
 
+function resolveHeaderWidgetIconUrl(widget: HeaderWidget): string | null {
+  const raw = widget.icon?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const lower = raw.toLowerCase();
+
+  if (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('data:')
+  ) {
+    return raw;
+  }
+
+  const flatten = (value: string): string => value.replace(/[\\/]/g, '__');
+  const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
+
+  if (widget.source === 'plugin') {
+    const alias = widget.pluginAlias?.trim();
+
+    if (!alias) {
+      return null;
+    }
+
+    if (raw.startsWith('/plugins/')) {
+      const rel = raw.slice('/plugins/'.length);
+      const slashIdx = rel.indexOf('/');
+
+      if (slashIdx <= 0) {
+        return asset(`plugin-icons/${alias}/${flatten(rel)}`);
+      }
+
+      const relAlias = rel.slice(0, slashIdx);
+      const relIcon = rel.slice(slashIdx + 1);
+
+      return relAlias
+        ? asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`)
+        : null;
+    }
+
+    const rel = raw.startsWith('/') ? raw.slice(1) : raw;
+
+    return asset(`plugin-icons/${alias}/${flatten(rel)}`);
+  }
+
+  return raw.startsWith('/')
+    ? asset(`builtin-icons/${flatten(raw.slice(1))}`)
+    : null;
+}
+
 type CoreUpdateResponse = {
   ok: boolean;
   update: {
@@ -1011,6 +1064,7 @@ function AppInner(): JSX.Element {
         command: widget.command,
         subcommand: widget.subcommand,
         title: widget.modalTitle,
+        iconUrl: resolveHeaderWidgetIconUrl(widget),
       });
 
       emitStoryWidgetOpened({
@@ -1856,6 +1910,7 @@ function AppInner(): JSX.Element {
       command: widget.command,
       subcommand: widget.subcommand,
       title: widget.modalTitle,
+      iconUrl: resolveHeaderWidgetIconUrl(widget),
     });
 
     emitStoryWidgetOpened({

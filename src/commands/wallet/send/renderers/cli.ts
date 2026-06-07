@@ -10,9 +10,9 @@ export function renderWalletSendCli(
 
   switch (d.view) {
     case 'usage':
-      return `Usage: ${d.prefix}wallet send <sats>`;
+      return `Usage: ${d.prefix}wallet send <sats> [--mint <url>]`;
     case 'invalid-amount':
-      return `Usage: ${d.prefix}wallet send <sats>`;
+      return `Usage: ${d.prefix}wallet send <sats> [--mint <url>]`;
     case 'no-wallet-db':
       return 'Wallet DB not available.';
     case 'no-mnemonic':

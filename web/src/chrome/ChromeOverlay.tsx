@@ -35,6 +35,7 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
     <Show when={props.chrome.chromeModal() !== null}>
       <WebCommandOutputModal
         title={props.chrome.chromeModal()!.title}
+        iconUrl={props.chrome.chromeModal()!.iconUrl}
         ariaLabel={props.chrome.chromeModal()!.title}
         onClose={props.onClose}
         loading={props.chrome.chromeLoading()}

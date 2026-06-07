@@ -385,6 +385,10 @@ pre {
   border-left: 4px solid var(--color-warning);
 }
 
+.setup-card--cashu {
+  border-left: 4px solid var(--color-warning);
+}
+
 .setup-card--web-push {
   border-left: 4px solid var(--color-success);
 }
@@ -1324,6 +1328,19 @@ pre {
 .modal-title {
   font-weight: 700;
   font-size: 0.95rem;
+}
+
+.modal-title--with-icon {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.modal-title-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
 }
 
 .modal-tabs,

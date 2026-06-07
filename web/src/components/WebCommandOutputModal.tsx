@@ -12,6 +12,7 @@ import { WebNodeShadowRoot } from './WebNodeShadowRoot';
 
 type WebCommandOutputModalProps = {
   title: string;
+  iconUrl?: string | null;
   ariaLabel: string;
   onClose: () => void;
   loading: boolean;
@@ -64,7 +65,19 @@ export function WebCommandOutputModal(
     >
       <div class="modal panel status-modal-panel">
         <div class="modal-header">
-          <span class="modal-title">{props.title}</span>
+          <span class="modal-title modal-title--with-icon">
+            <Show when={props.iconUrl}>
+              {(iconUrl) => (
+                <img
+                  src={iconUrl()}
+                  alt=""
+                  aria-hidden="true"
+                  class="modal-title-icon"
+                />
+              )}
+            </Show>
+            <span>{props.title}</span>
+          </span>
           <WebButton
             type="button"
             class="close-btn"

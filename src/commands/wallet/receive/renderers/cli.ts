@@ -15,10 +15,8 @@ export function renderWalletReceiveCli(
       return 'Wallet DB not available.';
     case 'no-mnemonic':
       return 'No mnemonic configured. Set one with: bun run wallet:setup';
-    case 'no-mint':
-      return `No mint configured. Set one with: ${d.prefix}wallet mint <url>`;
     case 'success':
-      return 'Token received successfully.';
+      return `Received ${d.receivedSats} sats from ${d.mintUrl}${d.feeSats > 0 ? ` (${d.feeSats} sats fee)` : ''}.`;
     case 'failure':
       return d.message;
     default: {

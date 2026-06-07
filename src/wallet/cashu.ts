@@ -1,5 +1,10 @@
 import type { OperationCounters } from '@cashu/cashu-ts';
-import { getDecodedToken, getEncodedToken, Wallet } from '@cashu/cashu-ts';
+import {
+  getDecodedToken,
+  getEncodedToken,
+  getTokenMetadata,
+  Wallet,
+} from '@cashu/cashu-ts';
 import * as bip39 from '@scure/bip39';
 
 import { debug, log } from '../logger';
@@ -14,6 +19,7 @@ import {
   loadCounters,
   persistCounter,
 } from './db';
+import { normalizeMintUrl } from './mint-url';
 import { InsufficientFundsError } from './types';
 
 export function decodeToken(encodedToken: string): string {
@@ -24,6 +30,16 @@ export function decodeToken(encodedToken: string): string {
   }
 
   return `Decoded token: ${JSON.stringify(decoded, null, 2)}`;
+}
+
+export function decodeTokenMintUrl(encodedToken: string): string {
+  const metadata = getTokenMetadata(encodedToken);
+
+  if (!metadata.mint) {
+    throw new Error('Invalid token: no mint URL');
+  }
+
+  return metadata.mint;
 }
 
 export type CreateCashuWalletProps = {
@@ -105,27 +121,24 @@ export class CashuWallet {
   async receiveToken(
     encodedToken: string,
   ): Promise<{ actuallyReceived: number; fee: number }> {
-    const decoded = getDecodedToken(encodedToken);
+    const tokenMintUrl = decodeTokenMintUrl(encodedToken);
 
-    if (!decoded) {
-      throw new Error('Invalid token: no token data');
-    }
-
-    if (decoded.mint !== this.mintUrl) {
-      debug('Invalid token: mint URL mismatch', decoded.mint, this.mintUrl);
+    if (normalizeMintUrl(tokenMintUrl) !== normalizeMintUrl(this.mintUrl)) {
+      debug('Invalid token: mint URL mismatch', tokenMintUrl, this.mintUrl);
 
       throw new Error('Invalid token: mint URL mismatch');
     }
 
-    if (decoded.unit !== 'sat') {
+    const wallet = await this.getWallet();
+    const decodedWithFullKeysets = wallet.decodeToken(encodedToken);
+
+    if (decodedWithFullKeysets.unit !== 'sat') {
       throw new Error('Invalid token: unit is not sat');
     }
 
-    if (decoded.proofs.length === 0) {
+    if (decodedWithFullKeysets.proofs.length === 0) {
       throw new Error('Invalid token: no proofs');
     }
-
-    const wallet = await this.getWallet();
 
     wallet.on.countersReserved((op: OperationCounters) => {
       log.info(`countersReserved event fired:`);
@@ -133,10 +146,10 @@ export class CashuWallet {
       persistCounter({ db: this.db, mintUrl: this.mintUrl, op });
     });
 
-    const wouldReceive = totalBalance(decoded.proofs);
+    const wouldReceive = totalBalance(decodedWithFullKeysets.proofs);
 
     const newProofs = await wallet.ops
-      .receive(encodedToken)
+      .receive(decodedWithFullKeysets)
       .asDeterministic()
       .run();
 

@@ -8,6 +8,7 @@ import type { CommandDefinition } from '@src/system/command-definition';
 import { getWalletBalanceSubcommandDefinition } from './balance/definition';
 import { getWalletDecodeSubcommandDefinition } from './decode/definition';
 import { getWalletHistorySubcommandDefinition } from './history/definition';
+import { getWalletListSubcommandDefinition } from './list/definition';
 import { getWalletMintSubcommandDefinition } from './mint/definition';
 import { getWalletMintsSubcommandDefinition } from './mints/definition';
 import { getWalletReceiveSubcommandDefinition } from './receive/definition';
@@ -31,6 +32,7 @@ export function getWalletCommandDefinition({
         topicArgSummary: 'Optional: mint, balance, receive, …',
         exampleTopics: ['mint', 'balance'],
       }),
+      getWalletListSubcommandDefinition(p),
       getWalletMintSubcommandDefinition(p),
       getWalletMintsSubcommandDefinition(p),
       getWalletBalanceSubcommandDefinition(p),

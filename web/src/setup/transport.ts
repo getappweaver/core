@@ -85,6 +85,18 @@ export type SetCursorApiKeyResponse = {
   status: SetupStatus;
 };
 
+export type GenerateCashuMnemonicResponse = {
+  ok: true;
+  mnemonic: string;
+};
+
+export type SetCashuWalletResponse = {
+  ok: true;
+  defaultMintUrl: string;
+  saved: true;
+  status: SetupStatus;
+};
+
 export type SetProviderApiKeyResponse = {
   ok: true;
   envNames: string[];
@@ -318,6 +330,45 @@ export async function setCursorApiKey(
   }
 
   return (await res.json()) as SetCursorApiKeyResponse;
+}
+
+export async function generateCashuMnemonic(
+  token: string,
+): Promise<GenerateCashuMnemonicResponse> {
+  const res = await fetch('/api/setup/cashu/mnemonic', {
+    method: 'POST',
+    headers: setupAuthHeaders(token),
+  });
+
+  if (!res.ok) {
+    throw new Error(`setup_cashu_mnemonic_failed:${res.status}`);
+  }
+
+  return (await res.json()) as GenerateCashuMnemonicResponse;
+}
+
+export async function setCashuWallet(props: {
+  token: string;
+  mnemonic: string;
+  defaultMintUrl: string;
+}): Promise<SetCashuWalletResponse> {
+  const res = await fetch('/api/setup/cashu', {
+    method: 'POST',
+    headers: {
+      ...setupAuthHeaders(props.token),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      mnemonic: props.mnemonic,
+      defaultMintUrl: props.defaultMintUrl,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`setup_cashu_wallet_failed:${res.status}`);
+  }
+
+  return (await res.json()) as SetCashuWalletResponse;
 }
 
 export async function setProviderApiKey(props: {

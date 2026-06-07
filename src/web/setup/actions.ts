@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { nip19 } from 'nostr-tools';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { generateVAPIDKeys } from 'web-push';
@@ -111,10 +113,23 @@ type DownloadPiperModelResult = {
   configPath: string;
 };
 
+type SetCashuWalletProps = {
+  dmBotRoot: string;
+  mnemonic: string;
+  defaultMintUrl: string;
+};
+
+type SetCashuWalletResult = {
+  defaultMintUrl: string;
+  saved: true;
+};
+
 const DEFAULT_PIPER_MODEL_URL =
   'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/en_US-libritts_r-medium.onnx';
 
 const DEFAULT_PIPER_MODEL_CONFIG_URL = `${DEFAULT_PIPER_MODEL_URL}.json`;
+
+const DEFAULT_CASHU_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
 
 export type SetupDefaultsInput = {
   prefix: string;
@@ -357,6 +372,55 @@ export async function downloadSetupPiperModel({
   process.env.BOT_PIPER_MODEL_PATH = modelPath;
 
   return { modelPath, configPath };
+}
+
+export function generateSetupCashuMnemonic(): string {
+  return bip39.generateMnemonic(wordlist, 128);
+}
+
+function normalizeCashuMintUrl(raw: string): string {
+  const value = raw.trim() || DEFAULT_CASHU_MINT_URL;
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      throw new Error('invalid_cashu_mint_url');
+    }
+
+    return url.toString();
+  } catch {
+    throw new Error('invalid_cashu_mint_url');
+  }
+}
+
+export function setSetupCashuWallet({
+  dmBotRoot,
+  mnemonic,
+  defaultMintUrl,
+}: SetCashuWalletProps): SetCashuWalletResult {
+  if (process.env.CASHU_MNEMONIC?.trim()) {
+    throw new Error('cashu_mnemonic_already_configured');
+  }
+
+  const normalizedMnemonic = mnemonic.trim().replace(/\s+/g, ' ');
+
+  if (
+    normalizedMnemonic.split(' ').length !== 12 ||
+    !bip39.validateMnemonic(normalizedMnemonic, wordlist)
+  ) {
+    throw new Error('invalid_cashu_mnemonic');
+  }
+
+  const normalizedMintUrl = normalizeCashuMintUrl(defaultMintUrl);
+  const envPath = join(dmBotRoot, '.env');
+
+  setEnvInFile(envPath, 'CASHU_DEFAULT_MINT_URL', normalizedMintUrl);
+  setEnvInFile(envPath, 'CASHU_MNEMONIC', normalizedMnemonic);
+  process.env.CASHU_DEFAULT_MINT_URL = normalizedMintUrl;
+  process.env.CASHU_MNEMONIC = normalizedMnemonic;
+
+  return { defaultMintUrl: normalizedMintUrl, saved: true };
 }
 
 export function setSetupDefaults({

@@ -1,7 +1,7 @@
 import type { VerifiedEvent } from 'nostr-tools';
 
 import { log } from '@src/logger';
-import { CashuWallet } from '@src/wallet/cashu';
+import { CashuWallet, decodeTokenMintUrl } from '@src/wallet/cashu';
 import type { WalletDb } from '@src/wallet/db';
 import {
   bumpCounters,
@@ -16,7 +16,6 @@ import type { WalletReceiveRepresentation } from './representation';
 type HandleWalletReceiveProps = {
   mnemonic: string | null | undefined;
   walletDb: WalletDb | null;
-  mintUrl: string | null;
   token: string | undefined;
   prefix: string;
   botKeyHex: string;
@@ -49,7 +48,6 @@ export async function handleWalletReceive(
   const {
     mnemonic,
     walletDb,
-    mintUrl,
     token,
     prefix,
     botKeyHex,
@@ -67,12 +65,19 @@ export async function handleWalletReceive(
     return toRepresentation({ view: 'no-mnemonic' });
   }
 
-  if (!mintUrl) {
-    return toRepresentation({ view: 'no-mint', prefix });
-  }
-
   if (!token) {
     return toRepresentation({ view: 'usage', prefix });
+  }
+
+  let mintUrl: string;
+
+  try {
+    mintUrl = decodeTokenMintUrl(token);
+  } catch (err) {
+    return toRepresentation({
+      view: 'failure',
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 
   const wallet = new CashuWallet({ mnemonic, mintUrl });
@@ -113,7 +118,12 @@ export async function handleWalletReceive(
         });
       }
 
-      return toRepresentation({ view: 'success' });
+      return toRepresentation({
+        view: 'success',
+        mintUrl,
+        receivedSats: actuallyReceived,
+        feeSats: fee,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 

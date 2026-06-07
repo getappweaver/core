@@ -8,6 +8,7 @@ export type ChromeModalState = {
   command: string;
   subcommand: string;
   title: string;
+  iconUrl?: string | null;
 };
 
 export type ChromePromptSession = {

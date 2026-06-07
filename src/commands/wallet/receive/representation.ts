@@ -14,11 +14,10 @@ export const WalletReceiveDataSchema = z.discriminatedUnion('view', [
     view: z.literal('no-mnemonic'),
   }),
   z.object({
-    view: z.literal('no-mint'),
-    prefix: z.string().min(1),
-  }),
-  z.object({
     view: z.literal('success'),
+    mintUrl: z.string().min(1),
+    receivedSats: z.number().int().nonnegative(),
+    feeSats: z.number().int().nonnegative(),
   }),
   z.object({
     view: z.literal('failure'),

@@ -49,8 +49,10 @@ import {
   upsertWebPushSubscription,
 } from './push-subscriptions';
 import {
+  generateSetupCashuMnemonic,
   downloadSetupPiperModel,
   generateSetupBotKey,
+  setSetupCashuWallet,
   setSetupCursorApiKey,
   setSetupDefaults,
   setSetupMasterPubkey,
@@ -333,6 +335,65 @@ export function createWebFetchHandler(
           ...result,
           status: createSetupStatus(ctx),
         });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/cashu/mnemonic') {
+        if (process.env.CASHU_MNEMONIC?.trim()) {
+          return jsonResponse(
+            { error: 'cashu_mnemonic_already_configured' },
+            { status: 409 },
+          );
+        }
+
+        return jsonResponse({
+          ok: true,
+          mnemonic: generateSetupCashuMnemonic(),
+        });
+      }
+
+      if (req.method === 'POST' && path === '/api/setup/cashu') {
+        return parseJsonBody(req)
+          .then((payload) => {
+            const input = payload as {
+              mnemonic?: unknown;
+              defaultMintUrl?: unknown;
+            } | null;
+
+            if (
+              !input ||
+              typeof input.mnemonic !== 'string' ||
+              typeof input.defaultMintUrl !== 'string'
+            ) {
+              throw new Error('invalid_cashu_wallet');
+            }
+
+            const result = setSetupCashuWallet({
+              dmBotRoot: ctx.dmBotRoot,
+              mnemonic: input.mnemonic,
+              defaultMintUrl: input.defaultMintUrl,
+            });
+
+            return jsonResponse({
+              ok: true,
+              ...result,
+              status: createSetupStatus(ctx),
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+
+            const status =
+              message === 'invalid_json' ||
+              message === 'invalid_cashu_wallet' ||
+              message === 'invalid_cashu_mnemonic' ||
+              message === 'invalid_cashu_mint_url'
+                ? 400
+                : message === 'cashu_mnemonic_already_configured'
+                  ? 409
+                  : 500;
+
+            return jsonResponse({ error: message }, { status });
+          });
       }
 
       if (req.method === 'POST' && path === '/api/setup/relays') {
