@@ -48,6 +48,7 @@ export function handleWalletHistory(
       return {
         dateDisplay,
         operation: h.operation,
+        kind: h.kind,
         shortMint,
         amount: h.amount,
         fee: h.fee,

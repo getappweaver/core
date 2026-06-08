@@ -8,6 +8,31 @@ export function renderWalletHistoryCli(
 ): string {
   const d = representation.data;
 
+  function historyKindLabel(kind: string | null): string | null {
+    switch (kind) {
+      case 'send':
+        return 'send token';
+      case 'melt':
+        return 'melt invoice';
+      case 'receive':
+        return 'receive token';
+      case 'mint':
+        return 'mint token';
+      default:
+        return kind;
+    }
+  }
+
+  function historyLabel(operation: string, kind: string | null): string {
+    const kindLabel = historyKindLabel(kind);
+
+    if (!kindLabel) {
+      return operation;
+    }
+
+    return `${operation} · ${kindLabel}`;
+  }
+
   switch (d.view) {
     case 'no-wallet-db':
       return 'Wallet DB not available.';
@@ -16,7 +41,7 @@ export function renderWalletHistoryCli(
     case 'rows':
       return d.rows
         .map((h) => {
-          let message = `${h.dateDisplay} | ${h.operation} | ${h.shortMint} | ${h.amount} sats | ${h.fee} sats fee`;
+          let message = `${h.dateDisplay} | ${historyLabel(h.operation, h.kind)} | ${h.shortMint} | ${h.amount} sats | ${h.fee} sats fee`;
 
           if (d.showToken) {
             message += `\n${h.token}`;

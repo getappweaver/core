@@ -18,8 +18,12 @@ import { handleWalletHistory } from './history/handler';
 import { renderWalletHistoryWeb } from './history/renderers/web';
 import { handleWalletList } from './list/handler';
 import { renderWalletListWeb } from './list/renderers/web';
+import { handleWalletMelt } from './melt/handler';
+import { renderWalletMeltWeb } from './melt/renderers/web';
 import { handleWalletMint } from './mint/handler';
 import { handleWalletMints } from './mints/handler';
+import { handleWalletPay } from './pay/handler';
+import { renderWalletPayWeb } from './pay/renderers/web';
 import { handleWalletReceive } from './receive/handler';
 import { renderWalletReceiveWeb } from './receive/renderers/web';
 import { handleWalletSend } from './send/handler';
@@ -58,6 +62,9 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
 
     return value && !value.startsWith('--') ? value : null;
   };
+
+  const booleanOptionValue = (flag: string): boolean =>
+    args.some((arg) => arg === flag);
 
   const hydrateWalletStateIfAvailable = async () => {
     if (input.source === 'web' || !input.walletDb || !mnemonic) {
@@ -115,6 +122,31 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
 
   const mint = getWalletDefaultMintUrl(input.seenDb, defaultMintUrl);
 
+  if (subcmd === 'melt') {
+    return handleError(async () => {
+      await hydrateWalletStateIfAvailable();
+
+      const rep = await handleWalletMelt({
+        mnemonic,
+        walletDb: input.walletDb,
+        mintUrl: optionValue('--mint') ?? mint,
+        amountArg: args[1],
+        invoiceArg: args[2],
+        prefix: p,
+        botKeyHex: input.config.botKeyHex,
+        signerPubkey: input.botPubkey,
+        ownerPubkey: input.config.masterPubkey,
+        walletStateWriteRelays: await getWalletStateWriteRelays(),
+        signEncryptedSelfEvent:
+          input.source === 'web'
+            ? null
+            : (input.signEncryptedSelfEvent ?? null),
+      });
+
+      return input.source === 'web' ? renderWalletMeltWeb(rep) : render(rep);
+    }, 'Failed to melt invoice');
+  }
+
   if (subcmd === 'mints') {
     return handleError(
       async () =>
@@ -141,6 +173,32 @@ export const handleWalletRoot: BuiltinHandler = (ctx) => {
 
       return `Wallet list is available in the web UI for now. Use ${p}wallet mints for text mint balances.`;
     }, 'Failed to show wallet list');
+  }
+
+  if (subcmd === 'pay') {
+    return handleError(async () => {
+      await hydrateWalletStateIfAvailable();
+
+      const rep = await handleWalletPay({
+        mnemonic,
+        walletDb: input.walletDb,
+        mintUrl: optionValue('--mint') ?? mint,
+        amountArg: args[1],
+        quoteArg: optionValue('--quote') ?? undefined,
+        claim: booleanOptionValue('--claim'),
+        prefix: p,
+        botKeyHex: input.config.botKeyHex,
+        signerPubkey: input.botPubkey,
+        ownerPubkey: input.config.masterPubkey,
+        walletStateWriteRelays: await getWalletStateWriteRelays(),
+        signEncryptedSelfEvent:
+          input.source === 'web'
+            ? null
+            : (input.signEncryptedSelfEvent ?? null),
+      });
+
+      return input.source === 'web' ? renderWalletPayWeb(rep) : render(rep);
+    }, 'Failed to mint');
   }
 
   switch (subcmd) {

@@ -77,6 +77,10 @@ function renderElement({
       <Match when={element.tag === 'button'}>
         {(() => {
           const htmlType = element.props?.htmlType ?? 'button';
+          const submitAction = element.props?.submitAction;
+
+          const disabledUntilFormFieldPositiveInteger =
+            element.props?.disabledUntilFormFieldPositiveInteger;
 
           const disabled =
             element.props?.disabled === true || getBusy() === true;
@@ -95,6 +99,17 @@ function renderElement({
                 }
                 style={elementStyle(element)}
                 disabled={disabled}
+                {...(submitAction
+                  ? {
+                      'data-web-submit-action': JSON.stringify(submitAction),
+                    }
+                  : {})}
+                {...(disabledUntilFormFieldPositiveInteger
+                  ? {
+                      'data-web-disable-until-positive-integer':
+                        disabledUntilFormFieldPositiveInteger,
+                    }
+                  : {})}
                 onClick={() => {
                   if (element.props?.storyTargetId) {
                     emitStoryTargetClicked(element.props.storyTargetId);
@@ -124,6 +139,15 @@ function renderElement({
               }
               style={elementStyle(element)}
               disabled={disabled}
+              {...(submitAction
+                ? { 'data-web-submit-action': JSON.stringify(submitAction) }
+                : {})}
+              {...(disabledUntilFormFieldPositiveInteger
+                ? {
+                    'data-web-disable-until-positive-integer':
+                      disabledUntilFormFieldPositiveInteger,
+                  }
+                : {})}
               onClick={(e) => {
                 if (element.props?.stopPropagation) {
                   e.stopPropagation();

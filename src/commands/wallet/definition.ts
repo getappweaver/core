@@ -9,8 +9,10 @@ import { getWalletBalanceSubcommandDefinition } from './balance/definition';
 import { getWalletDecodeSubcommandDefinition } from './decode/definition';
 import { getWalletHistorySubcommandDefinition } from './history/definition';
 import { getWalletListSubcommandDefinition } from './list/definition';
+import { getWalletMeltSubcommandDefinition } from './melt/definition';
 import { getWalletMintSubcommandDefinition } from './mint/definition';
 import { getWalletMintsSubcommandDefinition } from './mints/definition';
+import { getWalletPaySubcommandDefinition } from './pay/definition';
 import { getWalletReceiveSubcommandDefinition } from './receive/definition';
 import { getWalletSendSubcommandDefinition } from './send/definition';
 
@@ -25,7 +27,7 @@ export function getWalletCommandDefinition({
 
   return {
     name: 'wallet',
-    summary: 'Cashu wallet: mint, balance, receive, send, history.',
+    summary: 'Cashu wallet: mint, melt, balance, receive, send, history.',
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'wallet', {
@@ -34,6 +36,8 @@ export function getWalletCommandDefinition({
       }),
       getWalletListSubcommandDefinition(p),
       getWalletMintSubcommandDefinition(p),
+      getWalletMeltSubcommandDefinition(p),
+      getWalletPaySubcommandDefinition(p),
       getWalletMintsSubcommandDefinition(p),
       getWalletBalanceSubcommandDefinition(p),
       getWalletDecodeSubcommandDefinition(p),

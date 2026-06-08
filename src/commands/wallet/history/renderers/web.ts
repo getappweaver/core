@@ -95,6 +95,31 @@ function operationTone(operation: string): WebTone {
   return operation === 'receive' ? 'success' : 'warning';
 }
 
+function historyKindLabel(kind: string | null): string | null {
+  switch (kind) {
+    case 'send':
+      return 'send token';
+    case 'melt':
+      return 'melt invoice';
+    case 'receive':
+      return 'receive token';
+    case 'mint':
+      return 'mint token';
+    default:
+      return kind;
+  }
+}
+
+function historyLabel(operation: string, kind: string | null): string {
+  const kindLabel = historyKindLabel(kind);
+
+  if (!kindLabel) {
+    return operation;
+  }
+
+  return `${operation} · ${kindLabel}`;
+}
+
 function historyRow(item: WalletHistoryRow, showToken: boolean): WebNode {
   const tone = operationTone(item.operation);
 
@@ -109,7 +134,7 @@ function historyRow(item: WalletHistoryRow, showToken: boolean): WebNode {
         [
           row(
             [
-              title(item.operation, tone),
+              title(historyLabel(item.operation, item.kind), tone),
               textBlock(
                 `${sats(item.amount)} | ${sats(item.fee)} fee`,
                 'muted',

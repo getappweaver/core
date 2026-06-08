@@ -92,11 +92,22 @@ export function openWalletDb(mnemonic: string): WalletDb {
       ts        INTEGER NOT NULL, -- unix milliseconds
       mint_url  TEXT NOT NULL,
       operation TEXT NOT NULL CHECK(operation IN ('in', 'out')),
+      kind      TEXT,
       amount    INTEGER NOT NULL,
       fee       INTEGER NOT NULL,
       token     TEXT NOT NULL
     )
   `);
+
+  const walletLogColumns = db
+    .prepare('PRAGMA table_info(wallet_log)')
+    .all() as {
+    name: string;
+  }[];
+
+  if (!walletLogColumns.some((column) => column.name === 'kind')) {
+    db.run('ALTER TABLE wallet_log ADD COLUMN kind TEXT');
+  }
 
   return db as WalletDb;
 }
@@ -328,6 +339,7 @@ export type WalletHistoryRow = {
   ts: number;
   mint_url: string;
   operation: 'in' | 'out';
+  kind: string | null;
   amount: number;
   fee: number;
   token: string;
@@ -341,18 +353,18 @@ export function logWalletOperation(
   db: WalletDb,
   props: LogWalletOperationProps,
 ): void {
-  const { ts, mint_url, operation, amount, fee, token } = props;
+  const { ts, mint_url, operation, kind, amount, fee, token } = props;
 
   db.run(
-    'INSERT INTO wallet_log (ts, mint_url, operation, amount, fee, token) VALUES (?, ?, ?, ?, ?, ?)',
-    [ts ?? Date.now(), mint_url, operation, amount, fee, token],
+    'INSERT INTO wallet_log (ts, mint_url, operation, kind, amount, fee, token) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [ts ?? Date.now(), mint_url, operation, kind ?? null, amount, fee, token],
   );
 }
 
 export function getWalletHistory(db: WalletDb, limit = 20): WalletHistoryRow[] {
   return db
     .prepare(
-      'SELECT ts, mint_url, operation, amount, fee, token FROM wallet_log ORDER BY ts DESC LIMIT ?',
+      'SELECT ts, mint_url, operation, kind, amount, fee, token FROM wallet_log ORDER BY ts DESC LIMIT ?',
     )
     .all(limit) as WalletHistoryRow[];
 }

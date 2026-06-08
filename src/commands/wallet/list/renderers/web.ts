@@ -103,6 +103,23 @@ function commandAction(params: {
   };
 }
 
+function submitCommandAction(params: {
+  subcommand: string;
+  arguments: Record<string, unknown>;
+  options: Record<string, unknown>;
+  presentation?: 'run' | 'form';
+}): WebAction {
+  return {
+    type: 'command',
+    command: 'wallet',
+    subcommand: params.subcommand,
+    arguments: params.arguments,
+    options: params.options,
+    ...(params.presentation ? { presentation: params.presentation } : {}),
+    recordInTimeline: false,
+  };
+}
+
 function mintSendForm(item: { mintUrl: string; totalSats: number }): WebNode {
   return {
     type: 'element',
@@ -144,6 +161,40 @@ function mintSendForm(item: { mintUrl: string; totalSats: number }): WebNode {
               tone: item.totalSats > 0 ? 'warning' : 'muted',
               className: 'web-button',
               htmlType: 'submit',
+              disabledUntilFormFieldPositiveInteger: 'sats',
+            },
+          },
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: 'Mint',
+              tone: item.totalSats > 0 ? 'warning' : 'muted',
+              className: 'web-button',
+              htmlType: 'submit',
+              disabledUntilFormFieldPositiveInteger: 'sats',
+              submitAction: submitCommandAction({
+                subcommand: 'pay',
+                arguments: {},
+                options: { mint: item.mintUrl },
+              }),
+            },
+          },
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: 'Melt',
+              tone: item.totalSats > 0 ? 'warning' : 'muted',
+              className: 'web-button',
+              htmlType: 'submit',
+              disabledUntilFormFieldPositiveInteger: 'sats',
+              submitAction: submitCommandAction({
+                subcommand: 'melt',
+                arguments: {},
+                options: { mint: item.mintUrl },
+                presentation: 'form',
+              }),
             },
           },
         ],

@@ -95,6 +95,7 @@ export async function handleWalletReceive(
         ts: null,
         mint_url: mintUrl,
         operation: 'in',
+        kind: 'receive',
         amount: actuallyReceived,
         fee,
         token,

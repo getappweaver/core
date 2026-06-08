@@ -7,13 +7,14 @@ import { bumpCounters, logWalletOperation } from '@src/wallet/db';
 import { publishCurrentDeterministicWalletState } from '@src/wallet/nostr-state';
 import { publishCurrentDeterministicWalletStateWithSigner } from '@src/wallet/nostr-state';
 
-import type { WalletSendRepresentation } from './representation';
+import type { WalletMeltRepresentation } from './representation';
 
-type HandleWalletSendProps = {
+type HandleWalletMeltProps = {
   mnemonic: string | null | undefined;
   walletDb: WalletDb | null;
   mintUrl: string | null;
   amountArg: string | undefined;
+  invoiceArg: string | undefined;
   prefix: string;
   botKeyHex: string;
   signerPubkey: string | null;
@@ -29,24 +30,25 @@ type HandleWalletSendProps = {
 };
 
 function toRepresentation(
-  data: WalletSendRepresentation['data'],
-): WalletSendRepresentation {
+  data: WalletMeltRepresentation['data'],
+): WalletMeltRepresentation {
   return {
-    kind: 'wallet.send',
+    kind: 'wallet.melt',
     version: 1,
-    meta: { command: 'wallet', subcommand: 'send' },
+    meta: { command: 'wallet', subcommand: 'melt' },
     data,
   };
 }
 
-export async function handleWalletSend(
-  props: HandleWalletSendProps,
-): Promise<WalletSendRepresentation> {
+export async function handleWalletMelt(
+  props: HandleWalletMeltProps,
+): Promise<WalletMeltRepresentation> {
   const {
     mnemonic,
     walletDb,
     mintUrl,
     amountArg,
+    invoiceArg,
     prefix,
     botKeyHex,
     signerPubkey,
@@ -55,9 +57,9 @@ export async function handleWalletSend(
     signEncryptedSelfEvent,
   } = props;
 
-  const amount = parseInt(amountArg ?? '', 10);
+  const amount = Number.parseInt(amountArg ?? '', 10);
 
-  if (isNaN(amount) || amount <= 0) {
+  if (Number.isNaN(amount) || amount <= 0) {
     return toRepresentation({ view: 'invalid-amount', prefix });
   }
 
@@ -73,23 +75,33 @@ export async function handleWalletSend(
     return toRepresentation({ view: 'no-mint', prefix });
   }
 
+  if (!invoiceArg) {
+    return toRepresentation({
+      view: 'invoice-form',
+      mintUrl,
+      amountSats: amount,
+      prefix,
+    });
+  }
+
   const wallet = new CashuWallet({ mnemonic, mintUrl });
   const maxRetries = 3;
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
-      const { token, fee } = await wallet.sendToken(amount);
+      const { paidSats, fee, quote, paymentPreimage } =
+        await wallet.meltInvoiceBolt11(invoiceArg, amount);
 
-      log.info(`Sent ${amount} sats in mint ${mintUrl}.`);
+      log.info(`Melted ${paidSats} sats from mint ${mintUrl}.`);
 
       logWalletOperation(walletDb, {
         ts: null,
         mint_url: mintUrl,
         operation: 'out',
-        kind: 'send',
-        amount,
+        kind: 'melt',
+        amount: paidSats,
         fee,
-        token,
+        token: invoiceArg,
       });
 
       if (signEncryptedSelfEvent) {
@@ -110,7 +122,14 @@ export async function handleWalletSend(
         });
       }
 
-      return toRepresentation({ view: 'token', token });
+      return toRepresentation({
+        view: 'success',
+        mintUrl,
+        paidSats,
+        feeSats: fee,
+        quote,
+        paymentPreimage,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -125,13 +144,13 @@ export async function handleWalletSend(
 
       return toRepresentation({
         view: 'failure',
-        message: `Failed to send: ${msg}`,
+        message: `Failed to melt: ${msg}`,
       });
     }
   }
 
   return toRepresentation({
     view: 'failure',
-    message: `Failed to send after ${maxRetries} retries.`,
+    message: `Failed to melt after ${maxRetries} retries.`,
   });
 }

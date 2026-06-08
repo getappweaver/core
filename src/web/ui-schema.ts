@@ -277,6 +277,10 @@ export const WebPropsSchema = z.object({
   storyTargetId: z.string().min(1).optional(),
   /** `button`: native `type` (`submit` for forms). Default when omitted: `button`. */
   htmlType: z.enum(['button', 'submit']).optional(),
+  /** `button`: override form submit action when this button submits the form. */
+  submitAction: WebActionSchema.optional(),
+  /** `button`: disable submit until this form field is a positive integer. */
+  disabledUntilFormFieldPositiveInteger: z.string().min(1).optional(),
   /** `form`: fields with these names merge into command `options` instead of positional `arguments`. */
   formOptionFieldNames: z.array(z.string().min(1)).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */

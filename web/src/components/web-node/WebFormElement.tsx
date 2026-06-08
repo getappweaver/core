@@ -56,6 +56,32 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
   let formEl: HTMLFormElement | undefined;
 
+  function updatePositiveIntegerSubmitButtons(): void {
+    if (!formEl) {
+      return;
+    }
+
+    const buttons = formEl.querySelectorAll<HTMLButtonElement>(
+      'button[data-web-disable-until-positive-integer]',
+    );
+
+    for (const button of buttons) {
+      const fieldName = button.getAttribute(
+        'data-web-disable-until-positive-integer',
+      );
+
+      const field = fieldName
+        ? formEl.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+            `[name="${CSS.escape(fieldName)}"]`,
+          )
+        : null;
+
+      const value = Number.parseInt(field?.value ?? '', 10);
+
+      button.disabled = Number.isNaN(value) || value <= 0;
+    }
+  }
+
   createEffect(() => {
     if (isEmbeddedWebDemoMode()) {
       return;
@@ -74,9 +100,48 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
     });
   });
 
+  createEffect(() => {
+    if (!formEl) {
+      return;
+    }
+
+    updatePositiveIntegerSubmitButtons();
+
+    const onInput = () => updatePositiveIntegerSubmitButtons();
+
+    formEl.addEventListener('input', onInput);
+    formEl.addEventListener('change', onInput);
+
+    onCleanup(() => {
+      formEl?.removeEventListener('input', onInput);
+      formEl?.removeEventListener('change', onInput);
+    });
+  });
+
   const onSubmit: JSX.EventHandler<HTMLFormElement, SubmitEvent> = (event) => {
     event.preventDefault();
-    const action = props.element.props?.action;
+    const submitter = event.submitter;
+
+    const submitterAction =
+      submitter instanceof HTMLElement
+        ? submitter.getAttribute('data-web-submit-action')
+        : null;
+
+    let action = props.element.props?.action;
+
+    if (submitterAction) {
+      try {
+        const parsed = JSON.parse(submitterAction) as WebAction;
+
+        if (parsed.type === 'command') {
+          action = parsed;
+        }
+      } catch {
+        props.onError?.('Form submit action is invalid.');
+
+        return;
+      }
+    }
 
     if (action == null) {
       props.onError?.('Form has no action.');
@@ -378,7 +443,9 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
     });
   });
 
-  if (name == null || name.length === 0) {
+  const isReadOnlyTextArea = name == null || name.length === 0;
+
+  if (isReadOnlyTextArea && props.element.props?.disabled !== true) {
     return null;
   }
 
@@ -394,11 +461,12 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
           queueMicrotask(resize);
         }}
         class="web-textArea__input"
-        name={name}
+        name={name ?? undefined}
         rows={1}
         value={props.element.props?.value ?? ''}
         placeholder={props.element.props?.inputPlaceholder}
         disabled={props.element.props?.disabled === true || getBusy() === true}
+        readOnly={isReadOnlyTextArea}
         autocomplete="off"
         onInput={resize}
       />

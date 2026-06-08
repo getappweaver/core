@@ -433,30 +433,36 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     if (action.type === 'clientAction') {
       const clientActionName = action.action.trim();
 
-      const runClientAction = (actionPromise: Promise<void>): void => {
-        void actionPromise.then(() => {
-          const refresh = action.refresh;
+      const runClientAction = (actionPromise: Promise<void | false>): void => {
+        void actionPromise
+          .then((result) => {
+            if (result === false) {
+              return;
+            }
 
-          if (!refresh || !params?.onReplaceRoot) {
-            return;
-          }
+            const refresh = action.refresh;
 
-          runWebAction(
-            {
-              type: 'command',
-              command: refresh.command,
-              subcommand: refresh.subcommand,
-              arguments: refresh.arguments ?? {},
-              options: refresh.options ?? {},
-              recordInTimeline: false,
-            },
-            {
-              onReplaceRoot: params.onReplaceRoot,
-              promptRequestId: params.promptRequestId,
-              uiExecutionPolicy: { recordInTimeline: false },
-            },
-          );
-        });
+            if (!refresh || !params?.onReplaceRoot) {
+              return;
+            }
+
+            runWebAction(
+              {
+                type: 'command',
+                command: refresh.command,
+                subcommand: refresh.subcommand,
+                arguments: refresh.arguments ?? {},
+                options: refresh.options ?? {},
+                recordInTimeline: false,
+              },
+              {
+                onReplaceRoot: params.onReplaceRoot,
+                promptRequestId: params.promptRequestId,
+                uiExecutionPolicy: { recordInTimeline: false },
+              },
+            );
+          })
+          .catch(() => {});
       };
 
       if (clientActionName === 'roadmap.lightningZap') {
@@ -570,6 +576,47 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             },
           );
         });
+      } else if (clientActionName === 'wallet.payInvoice') {
+        runClientAction(
+          (async () => {
+            adapters.setChromeError(null);
+            adapters.setChromeLoading(true);
+
+            const invoice = action.payload?.invoice;
+
+            if (typeof invoice !== 'string' || invoice.length === 0) {
+              throw new Error('Missing invoice.');
+            }
+
+            const webln = window.webln;
+
+            if (!webln) {
+              throw new Error('WebLN not available.');
+            }
+
+            const isEnabled =
+              typeof webln.isEnabled === 'function'
+                ? await webln.isEnabled()
+                : Boolean(webln.isEnabled);
+
+            if (!isEnabled) {
+              await webln.enable();
+            }
+
+            await webln.sendPayment(invoice);
+            adapters.setChromeLoading(false);
+
+            return true;
+          })().catch((err) => {
+            adapters.setChromeError(
+              err instanceof Error ? err.message : String(err),
+            );
+
+            adapters.setChromeLoading(false);
+
+            return false;
+          }),
+        );
       } else {
         adapters.appendSystemMessage(
           `Unknown client action: ${JSON.stringify(action.action)}`,

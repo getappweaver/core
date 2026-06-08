@@ -5,6 +5,7 @@ import { createRepresentationSchema } from '@src/system/representation';
 export const WalletHistoryRowSchema = z.object({
   dateDisplay: z.string().min(1),
   operation: z.string().min(1),
+  kind: z.string().min(1).nullable(),
   shortMint: z.string().min(1),
   amount: z.number().int(),
   fee: z.number().int(),
