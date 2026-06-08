@@ -10,9 +10,9 @@ export function renderProviderSyncModelsCli(
 
   switch (d.view) {
     case 'fetched':
-      return 'Fetched new models and cached them.';
+      return `Fetched Routstr model index: ${d.discoveredProviders} providers discovered, ${d.fetchedProviders} fetched, ${d.failedProviders} failed, ${d.uniqueModels} unique models, ${d.modelProviderRows} model/provider rows. Cached ${new Date(d.fetchedAtMs).toLocaleString()}.`;
     case 'cached':
-      return `Found ${d.count} cached Routstr models. Last updated: ${new Date(d.updatedAtMs).toLocaleString()}`;
+      return `Routstr model index is fresh: ${d.providerCount} providers, ${d.uniqueModels} unique models, ${d.modelProviderRows} model/provider rows. Last updated: ${new Date(d.updatedAtMs).toLocaleString()}`;
     default: {
       const _exhaustive: never = d;
 

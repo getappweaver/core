@@ -9,6 +9,7 @@ import type { BuiltinHandler } from './dispatch';
 import { handleHelpRoot } from './help/handlers';
 import { handlePluginsRoot } from './plugin-manager/handler';
 import { handleRoadmapRoot } from './roadmap/handler';
+import { handleRoutstrRoot } from './routstr/handler';
 import { handleSessionRoot } from './session/handler';
 import { handleStoryRoot } from './story/handler';
 import { handleWalletRoot } from './wallet/handler';
@@ -27,6 +28,7 @@ export const builtinCommandHandlers: Record<string, BuiltinHandler> = {
   plugin: handlePluginsRoot,
   roadmap: handleRoadmapRoot,
   ai: handleAiRoot,
+  routstr: handleRoutstrRoot,
   wallet: handleWalletRoot,
   bunker: handleBunkerRoot,
   wot: handleWotRoot,

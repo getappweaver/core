@@ -64,12 +64,12 @@ export function handleProviderSet(
     if (modelOverride && !modelOverride.startsWith('routstr/')) {
       log.warn(
         `Current model override "${modelOverride}" is not a routstr model — it will likely fail.
-        \nRun "ai provider models" to list available models for the provider and then
+        \nRun "routstr models" to list available models for the provider and then
         \nRun "ai model set routstr/<id>" to set the model.`,
       );
     } else if (!routstrModel && !modelOverride?.startsWith('routstr/')) {
       log.warn(
-        `No routstr model configured. Run "ai provider models" to list available models for the provider 
+        `No routstr model configured. Run "routstr models" to list available models for the provider 
         and then
         \nRun "ai model set routstr/<id>" to set the model.`,
       );

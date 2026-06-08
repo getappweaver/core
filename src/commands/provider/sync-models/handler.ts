@@ -1,6 +1,14 @@
-import type { CoreDb } from '@src/db';
-import { getCachedRoutstrModels, setCachedRoutstrModels } from '@src/db';
-import { fetchRoutstrModels } from '@src/providers/routstr-models';
+import type { RouteCommandContext } from '@src/commands/dispatch';
+import {
+  countRoutstrModelProviderRows,
+  countRoutstrProviders,
+  countRoutstrUniqueModels,
+  getNewestRoutstrModelFetchMs,
+} from '@src/db';
+import {
+  ROUTSTR_MODEL_INDEX_TTL_MS,
+  syncRoutstrModelIndex,
+} from '@src/providers/routstr-models';
 
 import type { ProviderSyncModelsRepresentation } from './representation';
 
@@ -16,23 +24,24 @@ function toRepresentation(
 }
 
 export async function runProviderSyncModels(
-  db: CoreDb,
+  ctx: RouteCommandContext,
 ): Promise<ProviderSyncModelsRepresentation> {
-  const result = getCachedRoutstrModels(db);
+  const updatedAtMs = getNewestRoutstrModelFetchMs(ctx.seenDb);
 
-  if (!result) {
-    const models = await fetchRoutstrModels();
-
-    setCachedRoutstrModels(db, models);
-
-    return toRepresentation({ view: 'fetched' });
+  if (updatedAtMs && Date.now() - updatedAtMs <= ROUTSTR_MODEL_INDEX_TTL_MS) {
+    return toRepresentation({
+      view: 'cached',
+      providerCount: countRoutstrProviders(ctx.seenDb),
+      modelProviderRows: countRoutstrModelProviderRows(ctx.seenDb),
+      uniqueModels: countRoutstrUniqueModels(ctx.seenDb),
+      updatedAtMs,
+    });
   }
 
-  const { models, ts } = result;
-
-  return toRepresentation({
-    view: 'cached',
-    count: models.length,
-    updatedAtMs: ts,
+  const result = await syncRoutstrModelIndex({
+    db: ctx.seenDb,
+    pool: ctx.pool,
   });
+
+  return toRepresentation({ view: 'fetched', ...result });
 }

@@ -11,7 +11,7 @@ export function renderProviderBudgetCli(
 
   switch (d.view) {
     case 'usage':
-      return `Current budget: ${formatMsats(msats(d.currentBudgetMsatsRaw))}.\nUsage: ${d.prefix}ai provider budget <msats>`;
+      return `Current budget: ${formatMsats(msats(d.currentBudgetMsatsRaw))}.\nUsage: ${d.prefix}routstr budget <msats>`;
     case 'set':
       return `Budget set to: ${formatMsats(msats(d.budgetMsatsRaw))}`;
     default: {

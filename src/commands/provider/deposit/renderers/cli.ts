@@ -10,7 +10,7 @@ export function renderProviderDepositCli(
 
   switch (d.view) {
     case 'usage':
-      return `Usage: ${d.prefix}ai provider deposit <sats> [--new]`;
+      return `Usage: ${d.prefix}routstr deposit <sats> [--new] [--mint <url>]`;
     case 'no-mint':
       return `No mint configured. Use ${d.prefix}wallet mint <url> first.`;
     case 'no-mnemonic':

@@ -5,10 +5,18 @@ import { createRepresentationSchema } from '@src/system/representation';
 export const ProviderSyncModelsDataSchema = z.discriminatedUnion('view', [
   z.object({
     view: z.literal('fetched'),
+    discoveredProviders: z.number().int().nonnegative(),
+    fetchedProviders: z.number().int().nonnegative(),
+    failedProviders: z.number().int().nonnegative(),
+    modelProviderRows: z.number().int().nonnegative(),
+    uniqueModels: z.number().int().nonnegative(),
+    fetchedAtMs: z.number(),
   }),
   z.object({
     view: z.literal('cached'),
-    count: z.number().int().nonnegative(),
+    providerCount: z.number().int().nonnegative(),
+    modelProviderRows: z.number().int().nonnegative(),
+    uniqueModels: z.number().int().nonnegative(),
     updatedAtMs: z.number(),
   }),
 ]);

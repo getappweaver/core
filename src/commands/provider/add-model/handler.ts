@@ -1,11 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'path';
 
-import type { CoreDb } from '@src/db';
-import { getCachedRoutstrModels, setCachedRoutstrModels } from '@src/db';
+import { listRoutstrModelProviders } from '@src/db';
 import {
   buildOpenCodeModelEntry,
-  fetchRoutstrModels,
+  type RoutstrModel,
 } from '@src/providers/routstr-models';
 
 import type { RouteCommandContext } from '../../dispatch';
@@ -28,19 +27,6 @@ function toRepresentation(
   };
 }
 
-async function ensureModelsCache(seenDb: CoreDb) {
-  let result = getCachedRoutstrModels(seenDb);
-
-  if (!result) {
-    const models = await fetchRoutstrModels();
-
-    setCachedRoutstrModels(seenDb, models);
-    result = { models, ts: Date.now() };
-  }
-
-  return result;
-}
-
 export async function runProviderAddModel(
   props: RunProviderAddModelProps,
 ): Promise<ProviderAddModelRepresentation> {
@@ -51,8 +37,15 @@ export async function runProviderAddModel(
     return toRepresentation({ view: 'usage', prefix: p });
   }
 
-  const result = await ensureModelsCache(ctx.seenDb);
-  const model = result.models.find((m) => m.id === modelId);
+  const providers = listRoutstrModelProviders({
+    db: ctx.seenDb,
+    modelId,
+    minFetchedAtMs: null,
+  });
+
+  const model = providers[0]?.modelJson
+    ? (JSON.parse(providers[0].modelJson) as RoutstrModel)
+    : null;
 
   if (!model) {
     return toRepresentation({ view: 'not-found', modelId });

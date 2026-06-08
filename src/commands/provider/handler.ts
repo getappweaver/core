@@ -1,18 +1,13 @@
 // ---------------------------------------------------------------------------
-// src/commands/provider/handler.ts — Routstr / provider (invoked from ai)
+// src/commands/provider/handler.ts — Routstr provider operations
 // ---------------------------------------------------------------------------
 
-import {
-  getProviderName,
-  getRoutstrBudget,
-  getWalletDefaultMintUrl,
-} from '@src/db';
+import { getProviderName, getRoutstrBudget } from '@src/db';
 import { msatsRaw } from '@src/types';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { RouteCommandContext } from '../dispatch';
 import { handleError } from '../dispatch';
-import { appendStatusBlock } from '../shared/with-status';
 
 import { runProviderAddModel } from './add-model/handler';
 import { runProviderBalance } from './balance/handler';
@@ -21,8 +16,8 @@ import { renderProviderCli } from './cli-representation';
 import { runProviderDeposit } from './deposit/handler';
 import { runProviderModels } from './models/handler';
 import { runProviderRefund } from './refund/handler';
-import { handleProviderSet } from './set/handler';
 import { runProviderStatus } from './status/handler';
+import { renderProviderStatusWeb } from './status/renderers/web';
 import { runProviderSyncModels } from './sync-models/handler';
 import {
   buildProviderCommandsOnlyUsage,
@@ -30,9 +25,9 @@ import {
 } from './usage/representation';
 
 /**
- * Provider subcommands after `ai provider` (args[0] = set|deposit|…).
+ * Routstr subcommands after `routstr` (args[0] = deposit|balance|…).
  */
-export async function runProviderCommandsFromArgs(
+export async function runRoutstrCommandsFromArgs(
   input: RouteCommandContext,
   args: string[],
 ): Promise<WebHandlerResult> {
@@ -55,16 +50,6 @@ export async function runProviderCommandsFromArgs(
   }
 
   switch (subcmd) {
-    case 'set': {
-      const rep = handleProviderSet({
-        seenDb: input.seenDb,
-        name: args[1]?.toLowerCase(),
-        prefix: p,
-      });
-
-      return appendStatusBlock(input, render(rep));
-    }
-
     case 'deposit':
       return handleError(
         async () => render(await runProviderDeposit({ ctx: input, args })),
@@ -97,22 +82,15 @@ export async function runProviderCommandsFromArgs(
       );
 
     case 'status': {
-      const mintUrl = getWalletDefaultMintUrl(
-        input.seenDb,
-        input.config.cashuDefaultMintUrl,
-      );
+      return handleError(async () => {
+        const rep = await runProviderStatus({
+          ctx: input,
+        });
 
-      return handleError(
-        async () =>
-          render(
-            runProviderStatus({
-              seenDb: input.seenDb,
-              mintUrl,
-              prefix: p,
-            }),
-          ),
-        'Failed to get status',
-      );
+        return input.source === 'web'
+          ? renderProviderStatusWeb(rep)
+          : render(rep);
+      }, 'Failed to get status');
     }
 
     case 'models':
@@ -120,7 +98,7 @@ export async function runProviderCommandsFromArgs(
         async () =>
           render(
             await runProviderModels({
-              seenDb: input.seenDb,
+              ctx: input,
               filter: args[1],
             }),
           ),
@@ -129,7 +107,7 @@ export async function runProviderCommandsFromArgs(
 
     case 'sync-models':
       return handleError(
-        async () => render(await runProviderSyncModels(input.seenDb)),
+        async () => render(await runProviderSyncModels(input)),
         'Failed to sync models',
       );
 

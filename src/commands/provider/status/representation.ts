@@ -1,21 +1,29 @@
 import { z } from 'zod';
 
+import { ProviderNameSchema } from '@src/db';
 import { createRepresentationSchema } from '@src/system/representation';
 
 export const ProviderStatusDataSchema = z.discriminatedUnion('view', [
   z.object({
-    view: z.literal('no-mint'),
-    prefix: z.string().min(1),
-  }),
-  z.object({
-    view: z.literal('local'),
-  }),
-  z.object({
-    view: z.literal('routstr'),
+    view: z.literal('status'),
+    providerName: ProviderNameSchema,
     sessionKeyShort: z.string().nullable(),
-    mintUrl: z.string().min(1),
+    hasSessionKey: z.boolean(),
     budgetMsatsRaw: z.number().int().nonnegative(),
+    routstrBalanceMsatsRaw: z.number().int().nonnegative().nullable(),
+    routstrBalanceError: z.string().nullable(),
     modelId: z.string().nullable(),
+    hasMnemonic: z.boolean(),
+    hasWalletDb: z.boolean(),
+    defaultMintUrl: z.string().nullable(),
+    walletTotalSats: z.number().int().nonnegative(),
+    walletMints: z.array(
+      z.object({
+        mintUrl: z.string().min(1),
+        totalSats: z.number().int().nonnegative(),
+        isDefault: z.boolean(),
+      }),
+    ),
   }),
 ]);
 

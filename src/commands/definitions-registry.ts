@@ -9,6 +9,7 @@ import { getBotCommandDefinition } from './bot/definition';
 import { getBunkerCommandDefinition } from './bunker/definition';
 import { getPluginsCommandDefinition } from './plugin-manager/definition';
 import { getRoadmapCommandDefinition } from './roadmap/definition';
+import { getRoutstrCommandDefinition } from './routstr/definition';
 import { getSessionCommandDefinition } from './session/definition';
 import { getStoryCommandDefinition } from './story/definition';
 import { getWalletCommandDefinition } from './wallet/definition';
@@ -22,6 +23,7 @@ export const BUILTIN_ROOT_NAMES = [
   'plugins',
   'roadmap',
   'ai',
+  'routstr',
   'wallet',
   'bunker',
   'wot',
@@ -57,7 +59,7 @@ are all valid.\n`,
         arguments: [
           {
             name: 'path',
-            summary: 'e.g. session, session new, ai provider',
+            summary: 'e.g. session, session new, routstr status',
             kind: 'string',
             required: false,
             variadic: true,
@@ -67,7 +69,7 @@ are all valid.\n`,
         examples: [
           `${prefix}help`,
           `${prefix}help bot`,
-          `${prefix}help ai provider`,
+          `${prefix}help routstr status`,
         ],
       },
     ],
@@ -98,6 +100,8 @@ export function getBuiltinCommandDefinition({
       return getRoadmapCommandDefinition({ prefix });
     case 'ai':
       return getAiCommandDefinition({ prefix });
+    case 'routstr':
+      return getRoutstrCommandDefinition({ prefix });
     case 'wallet':
       return getWalletCommandDefinition({ prefix });
     case 'bunker':
@@ -125,6 +129,7 @@ export function getBuiltinDefinitionsMap({
     plugins: getPluginsCommandDefinition({ prefix }),
     roadmap: getRoadmapCommandDefinition({ prefix }),
     ai: getAiCommandDefinition({ prefix }),
+    routstr: getRoutstrCommandDefinition({ prefix }),
     wallet: getWalletCommandDefinition({ prefix }),
     bunker: getBunkerCommandDefinition({ prefix }),
     wot: getWotCommandDefinition({ prefix }),

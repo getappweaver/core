@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.39.0] - 2026-06-08
+
+- feat: add Routstr provider index and discovery (cf2fce3)
+
 ## [v9.38.0] - 2026-06-07
 
-- feat: add Cashu wallet setup and web wallet modal (1a76150)
+- feat: add Cashu wallet setup and web wallet modal (fbe6f13)
 
 ## [v9.37.8] - 2026-06-05
 

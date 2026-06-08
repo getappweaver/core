@@ -1,4 +1,4 @@
-import { getRoutstrSkKey, getWalletDefaultMintUrl } from '@src/db';
+import { getRoutstrSkKey } from '@src/db';
 import { refundRoutstr } from '@src/providers/routstr';
 
 import type { RouteCommandContext } from '../../dispatch';
@@ -19,15 +19,6 @@ function toRepresentation(
 export async function runProviderRefund(
   ctx: RouteCommandContext,
 ): Promise<ProviderRefundRepresentation> {
-  const mintUrl = getWalletDefaultMintUrl(
-    ctx.seenDb,
-    ctx.config.cashuDefaultMintUrl,
-  );
-
-  if (!mintUrl) {
-    return toRepresentation({ view: 'no-mint' });
-  }
-
   const mnemonic = ctx.config.cashuMnemonic;
 
   if (!mnemonic) {
@@ -48,7 +39,6 @@ export async function runProviderRefund(
     mnemonic,
     providerDb: ctx.providerDb,
     seenDb: ctx.seenDb,
-    mintUrl,
     skKey,
   });
 

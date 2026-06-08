@@ -10,9 +10,9 @@ export function renderProviderAddModelCli(
 
   switch (d.view) {
     case 'usage':
-      return `Usage: ${d.prefix}ai provider add-model <model-id>`;
+      return `Usage: ${d.prefix}routstr add-model <model-id>`;
     case 'not-found':
-      return `Model "${d.modelId}" not found in cached Routstr models. Try ai provider sync-models first.`;
+      return `Model "${d.modelId}" not found in cached Routstr models. Try routstr sync-models first.`;
     case 'success': {
       const action = d.isUpdate ? 'Updated' : 'Added';
 

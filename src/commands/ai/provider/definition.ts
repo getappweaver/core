@@ -9,24 +9,20 @@ export function getAiProviderSubcommandDefinition(
 
   return {
     name: 'provider',
-    summary: `Payment provider and Routstr (set, deposit, balance, …).`,
+    summary: 'Select the active AI payment provider.',
     aliases: [],
     arguments: [
       {
-        name: 'subcommand',
-        summary:
-          'set, deposit, refund, balance, budget, status, models, sync-models, add-model',
+        name: 'name',
+        summary: `Provider name: ${providerOpts}`,
         kind: 'string',
         required: false,
-        variadic: true,
+        variadic: false,
+        choices: ProviderNameSchema.options,
       },
     ],
     options: [],
-    examples: [
-      `${p}ai provider set [${providerOpts}]`,
-      `${p}ai provider deposit <sats> [--new]`,
-      `${p}ai provider balance`,
-      `${p}ai provider models [filter]`,
-    ],
+    examples: [`${p}ai provider [${providerOpts}]`, `${p}ai provider routstr`],
+    webExecutionMode: 'runnable_customizable',
   };
 }

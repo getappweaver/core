@@ -1,11 +1,10 @@
-import { ProviderNameSchema } from '@src/db';
 import type { TextRenderContext } from '@src/system/render-context';
 import { formatMsats, msats } from '@src/types';
 
 import type { ProviderUsageRepresentation } from '../representation';
 
 function formatProviderUsageBlock(usageBase: string): string {
-  return `Usage: ${usageBase} set [${ProviderNameSchema.options.join('|')}] | ${usageBase} deposit <sats> [--new] | ${usageBase} refund | ${usageBase} balance | ${usageBase} budget <sats> | ${usageBase} status | ${usageBase} models [filter] | ${usageBase} sync-models | ${usageBase} add-model <id>`;
+  return `Usage: ${usageBase} deposit <sats> [--new] | ${usageBase} refund | ${usageBase} balance | ${usageBase} budget <msats> | ${usageBase} status | ${usageBase} models [filter] | ${usageBase} sync-models | ${usageBase} add-model <id>`;
 }
 
 export function renderProviderUsageCli(
@@ -13,11 +12,11 @@ export function renderProviderUsageCli(
   context: TextRenderContext,
 ): string {
   const p = context.prefix;
-  const usageBase = `${p}ai provider`;
+  const usageBase = `${p}routstr`;
   const d = representation.data;
 
   if (d.view === 'commands-only') {
-    return formatProviderUsageBlock(`${d.prefix}ai provider`);
+    return formatProviderUsageBlock(`${d.prefix}routstr`);
   }
 
   const providerLine =

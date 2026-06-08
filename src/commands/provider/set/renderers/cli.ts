@@ -10,7 +10,7 @@ export function renderProviderSetCli(
 
   switch (d.view) {
     case 'usage':
-      return `Usage: ${d.prefix}ai provider set [${d.providerOpts}]`;
+      return `Usage: ${d.prefix}ai provider [${d.providerOpts}]`;
     case 'invalid':
       return `Invalid provider: ${d.name}. Use: ${d.providerOpts}`;
     case 'local':
@@ -21,7 +21,7 @@ export function renderProviderSetCli(
       lines.push(
         d.hasSessionKey
           ? `Session key: ${d.sessionKeyPreview ?? ''}`
-          : 'No session yet. Use ai provider deposit <sats> or append !!<sats> to your prompt.',
+          : 'No session yet. Use routstr deposit <sats> or append !!<sats> to your prompt.',
       );
 
       return lines.join('\n');

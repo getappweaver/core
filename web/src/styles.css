@@ -2920,6 +2920,21 @@ button.composer-meta-text--context {
   text-decoration: underline;
 }
 
+button.composer-meta-text--link {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+button.composer-meta-text--link:disabled {
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 button.composer-meta-text--context:disabled {
   cursor: not-allowed;
   text-decoration: none;

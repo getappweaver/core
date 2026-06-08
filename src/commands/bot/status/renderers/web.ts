@@ -226,7 +226,7 @@ export function renderBotStatusWeb(
       action: commandAction({
         command: 'ai',
         subcommand: 'provider',
-        arguments: { subcommand: 'set local' },
+        arguments: { name: 'local' },
       }),
     },
     {
@@ -234,7 +234,7 @@ export function renderBotStatusWeb(
       action: commandAction({
         command: 'ai',
         subcommand: 'provider',
-        arguments: { subcommand: 'set routstr' },
+        arguments: { name: 'routstr' },
       }),
     },
   ];

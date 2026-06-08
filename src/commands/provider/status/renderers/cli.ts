@@ -9,23 +9,13 @@ export function renderProviderStatusCli(
 ): string {
   const d = representation.data;
 
-  switch (d.view) {
-    case 'no-mint':
-      return `No mint configured. Use ${d.prefix}wallet mint <url> first.`;
-    case 'local':
-      return 'Provider: local | no payment';
-    case 'routstr':
-      return [
-        `Provider:       routstr`,
-        `Session key:    ${d.sessionKeyShort ? `${d.sessionKeyShort}...` : 'none'}`,
-        `Mint:           ${d.mintUrl}`,
-        `Default budget: ${formatMsats(msats(d.budgetMsatsRaw))}`,
-        `Model:          ${d.modelId ? `routstr/${d.modelId}` : '(not set)'}`,
-      ].join('\n');
-    default: {
-      const _exhaustive: never = d;
-
-      return _exhaustive;
-    }
-  }
+  return [
+    `Provider:       ${d.providerName}`,
+    `Session key:    ${d.sessionKeyShort ? `${d.sessionKeyShort}...` : 'none'}`,
+    `Routstr balance:${d.routstrBalanceMsatsRaw == null ? ' unknown' : ` ${formatMsats(msats(d.routstrBalanceMsatsRaw))}`}`,
+    `Default budget: ${formatMsats(msats(d.budgetMsatsRaw))}`,
+    `Model:          ${d.modelId ? `routstr/${d.modelId}` : '(not set)'}`,
+    `Wallet:         ${d.hasWalletDb ? `${d.walletTotalSats} sats across ${d.walletMints.length} mint${d.walletMints.length === 1 ? '' : 's'}` : 'not available'}`,
+    `Default mint:   ${d.defaultMintUrl ?? '(not set)'}`,
+  ].join('\n');
 }

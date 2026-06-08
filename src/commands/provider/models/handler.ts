@@ -1,11 +1,15 @@
-import type { CoreDb } from '@src/db';
-import { getCachedRoutstrModels, setCachedRoutstrModels } from '@src/db';
-import { fetchRoutstrModels } from '@src/providers/routstr-models';
+import type { RouteCommandContext } from '@src/commands/dispatch';
+import {
+  getNewestRoutstrModelFetchMs,
+  listRoutstrModelProviders,
+  listRoutstrUniqueModels,
+} from '@src/db';
+import { ROUTSTR_MODEL_INDEX_TTL_MS } from '@src/providers/routstr-models';
 
 import type { ProviderModelsRepresentation } from './representation';
 
 type RunProviderModelsProps = {
-  seenDb: CoreDb;
+  ctx: RouteCommandContext;
   filter: string | undefined;
 };
 
@@ -23,48 +27,73 @@ function toRepresentation(
 export async function runProviderModels(
   props: RunProviderModelsProps,
 ): Promise<ProviderModelsRepresentation> {
-  const { seenDb, filter } = props;
+  const { ctx, filter } = props;
+  const needle = filter?.trim() ?? '';
+  const newestFetchedAtMs = getNewestRoutstrModelFetchMs(ctx.seenDb);
 
-  let result = getCachedRoutstrModels(seenDb);
+  const isFresh =
+    newestFetchedAtMs !== null &&
+    Date.now() - newestFetchedAtMs <= ROUTSTR_MODEL_INDEX_TTL_MS;
 
-  if (!result) {
-    const models = await fetchRoutstrModels();
+  if (needle !== '') {
+    const exactProviders = listRoutstrModelProviders({
+      db: ctx.seenDb,
+      modelId: needle,
+      minFetchedAtMs: isFresh ? Date.now() - ROUTSTR_MODEL_INDEX_TTL_MS : null,
+    });
 
-    setCachedRoutstrModels(seenDb, models);
-    result = { models, ts: Date.now() };
+    if (exactProviders.length > 0) {
+      return toRepresentation({
+        view: 'model-providers',
+        modelId: needle,
+        newestFetchedAtMs: Math.max(
+          ...exactProviders.map((p) => p.fetchedAtMs),
+        ),
+        providers: exactProviders.map((p) => ({
+          providerKey: p.providerKey,
+          providerPubkey: p.providerPubkey,
+          providerD: p.providerD,
+          endpointUrl: p.endpointUrl,
+          modelName: p.modelName,
+          contextLength: p.contextLength,
+          inputPrice: p.inputPrice,
+          outputPrice: p.outputPrice,
+          requestPrice: p.requestPrice,
+          fetchedAtMs: p.fetchedAtMs,
+        })),
+      });
+    }
   }
 
-  const { models, ts } = result;
-  const needle = filter?.trim().toLowerCase() ?? '';
+  const items = listRoutstrUniqueModels({
+    db: ctx.seenDb,
+    filter: needle === '' ? null : needle,
+    minFetchedAtMs: isFresh ? Date.now() - ROUTSTR_MODEL_INDEX_TTL_MS : null,
+    limit: 200,
+  });
 
-  const filtered =
-    needle === ''
-      ? models
-      : models.filter(
-          (m) =>
-            m.id.toLowerCase().includes(needle) ||
-            (m.name?.toLowerCase().includes(needle) ?? false),
-        );
-
-  if (filtered.length === 0) {
+  if (items.length === 0) {
     if (needle === '') {
       return toRepresentation({ view: 'empty-no-cache' });
     }
 
     return toRepresentation({
       view: 'empty-filter',
-      filter: filter?.trim() ?? needle,
+      filter: needle,
     });
   }
 
   return toRepresentation({
     view: 'list',
-    filter: filter?.trim() ?? '',
-    updatedAtMs: ts,
-    items: filtered.map((m) => ({
-      id: m.id,
-      name: m.name,
-      contextLength: m.context_length ?? null,
+    filter: needle,
+    newestFetchedAtMs: Math.max(...items.map((item) => item.newestFetchedAtMs)),
+    items: items.map((item) => ({
+      id: item.modelId,
+      providerCount: item.providerCount,
+      cheapestInputPrice: item.cheapestInputPrice,
+      cheapestOutputPrice: item.cheapestOutputPrice,
+      cheapestRequestPrice: item.cheapestRequestPrice,
+      newestFetchedAtMs: item.newestFetchedAtMs,
     })),
   });
 }

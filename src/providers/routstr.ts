@@ -11,7 +11,7 @@ import type { BotConfig } from '../env';
 import { debug, debugAsync, log } from '../logger';
 import type { Msats } from '../types';
 import { formatMsats, msats, msatsRaw } from '../types';
-import { CashuWallet } from '../wallet/cashu';
+import { CashuWallet, decodeTokenMintUrl } from '../wallet/cashu';
 import type { WalletDb } from '../wallet/db';
 import { getBalanceByMint, logWalletOperation } from '../wallet/db';
 
@@ -290,14 +290,13 @@ export type RefundRoutstrProps = {
   mnemonic: string;
   seenDb: CoreDb;
   providerDb: ProviderDb;
-  mintUrl: string;
   skKey: string;
 };
 
 export async function refundRoutstr(
   props: RefundRoutstrProps,
 ): Promise<number> {
-  const { mnemonic, seenDb, mintUrl, skKey, providerDb } = props;
+  const { mnemonic, seenDb, skKey, providerDb } = props;
 
   const res = await fetch(`${ROUTSTR_BASE_URL}/balance/refund`, {
     method: 'POST',
@@ -309,7 +308,7 @@ export async function refundRoutstr(
     logSpend(providerDb, {
       ts: null,
       provider: 'routstr',
-      mint_url: mintUrl,
+      mint_url: '',
       budget_msats: 0,
       refund_msats: 0,
       spent_msats: 0,
@@ -333,6 +332,7 @@ export async function refundRoutstr(
     throw new Error(`Unexpected refund response: ${JSON.stringify(data)}`);
   }
 
+  const mintUrl = decodeTokenMintUrl(data.token);
   const wallet = new CashuWallet({ mnemonic, mintUrl });
 
   const { actuallyReceived, fee: receivedFee } = await wallet.receiveToken(

@@ -24,6 +24,7 @@ import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
 import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
+import { ComposerProviderMenuButton } from './components/ComposerProviderMenuButton';
 import { ComposerWorkingButton } from './components/ComposerWorkingButton';
 import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
@@ -2730,9 +2731,11 @@ function AppInner(): JSX.Element {
                       wsConnected={wsConnected()}
                       onRunWebAction={runWebAction}
                     />
-                    <span class="composer-meta-text composer-meta-text--muted">
-                      {composerAiState()!.provider}
-                    </span>
+                    <ComposerProviderMenuButton
+                      provider={composerAiState()!.provider}
+                      wsConnected={wsConnected()}
+                      onRunWebAction={runWebAction}
+                    />
                     <ComposerWorkingButton
                       working={agentWorking()}
                       runStatus={chatRunStatus()}

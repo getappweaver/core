@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { CoreDb } from '../db';
-import { getRoutstrSkKey, getWalletDefaultMintUrl } from '../db';
+import { getRoutstrSkKey } from '../db';
 import { log } from '../logger';
 import type { ProviderDb } from '../providers/db';
 import { refundRoutstr } from '../providers/routstr';
@@ -23,7 +23,6 @@ export async function finalizeAutoFlowRefund({
   isAutoFlow,
   walletDb,
   seenDb,
-  cashuDefaultMintUrl,
   cashuMnemonic,
   providerDb,
   sendReply,
@@ -58,14 +57,6 @@ export async function finalizeAutoFlowRefund({
     return;
   }
 
-  const mintUrl = getWalletDefaultMintUrl(seenDb, cashuDefaultMintUrl);
-
-  if (!mintUrl) {
-    await sendReply('No mint configured. Use !wallet mint <url> first.');
-
-    return;
-  }
-
   if (!providerDb) {
     return;
   }
@@ -74,7 +65,6 @@ export async function finalizeAutoFlowRefund({
     mnemonic: cashuMnemonic,
     providerDb,
     seenDb,
-    mintUrl,
     skKey,
   });
 

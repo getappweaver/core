@@ -4,8 +4,24 @@ import { createRepresentationSchema } from '@src/system/representation';
 
 export const ProviderModelsListItemSchema = z.object({
   id: z.string().min(1),
-  name: z.string().optional(),
+  providerCount: z.number().int().nonnegative(),
+  cheapestInputPrice: z.number().nullable(),
+  cheapestOutputPrice: z.number().nullable(),
+  cheapestRequestPrice: z.number().nullable(),
+  newestFetchedAtMs: z.number(),
+});
+
+export const ProviderModelsProviderItemSchema = z.object({
+  providerKey: z.string().min(1),
+  providerPubkey: z.string().min(1),
+  providerD: z.string().min(1),
+  endpointUrl: z.string().min(1),
+  modelName: z.string().nullable(),
   contextLength: z.number().int().positive().nullable(),
+  inputPrice: z.string().nullable(),
+  outputPrice: z.string().nullable(),
+  requestPrice: z.string().nullable(),
+  fetchedAtMs: z.number(),
 });
 
 export const ProviderModelsDataSchema = z.discriminatedUnion('view', [
@@ -20,7 +36,13 @@ export const ProviderModelsDataSchema = z.discriminatedUnion('view', [
     view: z.literal('list'),
     filter: z.string(),
     items: z.array(ProviderModelsListItemSchema),
-    updatedAtMs: z.number(),
+    newestFetchedAtMs: z.number(),
+  }),
+  z.object({
+    view: z.literal('model-providers'),
+    modelId: z.string().min(1),
+    providers: z.array(ProviderModelsProviderItemSchema),
+    newestFetchedAtMs: z.number(),
   }),
 ]);
 

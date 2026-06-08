@@ -29,17 +29,37 @@ export async function runProviderDeposit(
   const p = ctx.prefix;
   const depositArgs = args.slice(1);
   const forceNew = depositArgs.includes('--new');
-  const satsArg = depositArgs.find((a) => a !== '--new');
+
+  const optionValue = (flag: string): string | null => {
+    const flagIndex = depositArgs.findIndex((arg) => arg === flag);
+
+    if (flagIndex < 0) {
+      return null;
+    }
+
+    const value = depositArgs[flagIndex + 1];
+
+    return value && !value.startsWith('--') ? value : null;
+  };
+
+  const mintOverride = optionValue('--mint');
+
+  const satsArg = depositArgs.find(
+    (a, index) =>
+      a !== '--new' &&
+      a !== '--mint' &&
+      (index === 0 || depositArgs[index - 1] !== '--mint'),
+  );
+
   const sats = parseInt(satsArg ?? '', 10);
 
   if (isNaN(sats) || sats <= 0) {
     return toRepresentation({ view: 'usage', prefix: p });
   }
 
-  const mintUrl = getWalletDefaultMintUrl(
-    ctx.seenDb,
-    ctx.config.cashuDefaultMintUrl,
-  );
+  const mintUrl =
+    mintOverride ??
+    getWalletDefaultMintUrl(ctx.seenDb, ctx.config.cashuDefaultMintUrl);
 
   if (!mintUrl) {
     return toRepresentation({ view: 'no-mint', prefix: p });
