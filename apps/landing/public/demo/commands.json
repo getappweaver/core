@@ -13,7 +13,7 @@
         "arguments": [
           {
             "name": "path",
-            "summary": "e.g. session, session new, ai provider",
+            "summary": "e.g. session, session new, routstr status",
             "kind": "string",
             "required": false,
             "variadic": true
@@ -23,7 +23,7 @@
         "examples": [
           "/help",
           "/help bot",
-          "/help ai provider"
+          "/help routstr status"
         ],
         "inferredWeb": {
           "generated": true,
@@ -357,6 +357,38 @@
         }
       },
       {
+        "name": "update-check",
+        "summary": "Fetch upstream and check whether a core update is available.",
+        "usage": "update-check",
+        "aliases": [
+          "updates"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot update-check"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "update",
+        "summary": "Run git pull --ff-only for AppWeaver and restart if updated.",
+        "usage": "update",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/bot update"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
         "name": "version",
         "summary": "Show git hash for this AppWeaver core checkout.",
         "usage": "version",
@@ -554,7 +586,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: install.",
+            "summary": "Optional subcommand: install, releases, or publish.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -563,7 +595,9 @@
         "options": [],
         "examples": [
           "/plugins help",
-          "/plugins help install"
+          "/plugins help install",
+          "/plugins help releases",
+          "/plugins help publish"
         ],
         "inferredWeb": {
           "generated": true,
@@ -603,6 +637,48 @@
           "modalTitle": "Plugin installer",
           "icon": "/src/commands/plugin-manager/install/renderers/plugins.svg",
           "order": 15
+        }
+      },
+      {
+        "name": "releases",
+        "summary": "List installed plugins whose published plugin events match a local signer.",
+        "usage": "releases",
+        "aliases": [
+          "release",
+          "publish-status"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/plugins releases"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "publish",
+        "summary": "Publish the local plugin package version to the Nostr plugin catalog.",
+        "usage": "publish <alias>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "alias",
+            "summary": "Installed plugin alias from plugins.json.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/plugins publish bm"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       }
     ]
@@ -1659,24 +1735,26 @@
       },
       {
         "name": "provider",
-        "summary": "Payment provider and Routstr (set, deposit, balance, …).",
-        "usage": "provider [<subcommand...>]",
+        "summary": "Select the active AI payment provider.",
+        "usage": "provider [<name>]",
         "aliases": [],
         "arguments": [
           {
-            "name": "subcommand",
-            "summary": "set, deposit, refund, balance, budget, status, models, sync-models, add-model",
+            "name": "name",
+            "summary": "Provider name: local|routstr",
             "kind": "string",
             "required": false,
-            "variadic": true
+            "variadic": false,
+            "choices": [
+              "local",
+              "routstr"
+            ]
           }
         ],
         "options": [],
         "examples": [
-          "/ai provider set [local|routstr]",
-          "/ai provider deposit <sats> [--new]",
-          "/ai provider balance",
-          "/ai provider models [filter]"
+          "/ai provider [local|routstr]",
+          "/ai provider routstr"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1686,8 +1764,213 @@
     ]
   },
   {
+    "name": "routstr",
+    "summary": "Routstr deposits, balances, budgets, and model catalog.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for routstr or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: status, deposit, balance, models, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/routstr help",
+          "/routstr help status",
+          "/routstr help deposit",
+          "/routstr help models"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "status",
+        "summary": "Show Routstr provider status.",
+        "usage": "status",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/routstr status"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "balance",
+        "summary": "Show Routstr account balance.",
+        "usage": "balance",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/routstr balance"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "deposit",
+        "summary": "Deposit Cashu sats into Routstr.",
+        "usage": "deposit <sats> [--new] [--mint <mint>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "sats",
+            "summary": "Sats to deposit.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "new",
+            "summary": "Create a new Routstr session instead of topping up.",
+            "flag": "--new",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "mint",
+            "summary": "Wallet mint URL to deposit from. Defaults to selected wallet mint.",
+            "flag": "--mint",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/routstr deposit 100",
+          "/routstr deposit 100 --new"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "refund",
+        "summary": "Refund remaining Routstr session funds.",
+        "usage": "refund",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/routstr refund"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "budget",
+        "summary": "Set per-request Routstr budget in millisats.",
+        "usage": "budget <msats>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "msats",
+            "summary": "Budget in millisats.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/routstr budget 100000"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "models",
+        "summary": "List cached Routstr models, optionally filtered.",
+        "usage": "models [<filter>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "filter",
+            "summary": "Optional model id/name filter.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/routstr models",
+          "/routstr models kimi"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "sync-models",
+        "summary": "Refresh the Routstr model catalog cache.",
+        "usage": "sync-models",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/routstr sync-models"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "add-model",
+        "summary": "Add a cached Routstr model to opencode.json.",
+        "usage": "add-model <model-id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "model-id",
+            "summary": "Routstr model id from the cached catalog.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/routstr add-model openai/gpt-4.1-mini"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
     "name": "wallet",
-    "summary": "Cashu wallet: mint, balance, receive, send, history.",
+    "summary": "Cashu wallet: mint, melt, balance, receive, send, history.",
     "aliases": [],
     "source": "builtin",
     "subcommands": [
@@ -1717,6 +2000,29 @@
         }
       },
       {
+        "name": "list",
+        "summary": "Show the Cashu wallet widget in the web UI.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/wallet list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "modal",
+          "label": "Wallet",
+          "modalTitle": "Cashu Wallet",
+          "icon": "/src/commands/wallet/list/renderers/wallet.svg",
+          "order": 30
+        }
+      },
+      {
         "name": "mint",
         "summary": "Show or set default Cashu mint URL.",
         "usage": "mint [<url>]",
@@ -1734,6 +2040,95 @@
         "examples": [
           "/wallet mint",
           "/wallet mint <url>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "melt",
+        "summary": "Pay a BOLT11 Lightning invoice using Cashu proofs.",
+        "usage": "melt <sats> [<invoice>] [--mint <mint>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "sats",
+            "summary": "Invoice amount in satoshis",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "invoice",
+            "summary": "BOLT11 Lightning invoice",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "mint",
+            "summary": "Mint URL to melt from. Defaults to the selected wallet mint.",
+            "flag": "--mint",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/wallet melt <sats> <bolt11-invoice>",
+          "/wallet melt <sats> <bolt11-invoice> --mint <url>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "pay",
+        "summary": "Mint Cashu tokens by paying a Lightning invoice.",
+        "usage": "pay <sats> [--mint <mint>] [--quote <quote>] [--claim]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "sats",
+            "summary": "Amount in satoshis",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "mint",
+            "summary": "Mint URL to use. Defaults to the selected wallet mint.",
+            "flag": "--mint",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "quote",
+            "summary": "Mint quote id used when claiming a paid invoice.",
+            "flag": "--quote",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "claim",
+            "summary": "Claim the quote after the invoice is paid.",
+            "flag": "--claim",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/wallet pay <sats>",
+          "/wallet pay <sats> --mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -1819,7 +2214,7 @@
       {
         "name": "send",
         "summary": "Create and send a Cashu token (sats).",
-        "usage": "send <sats>",
+        "usage": "send <sats> [--mint <mint>]",
         "aliases": [],
         "arguments": [
           {
@@ -1830,9 +2225,19 @@
             "variadic": false
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "mint",
+            "summary": "Mint URL to send from. Defaults to the selected wallet mint.",
+            "flag": "--mint",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          }
+        ],
         "examples": [
-          "/wallet send <sats>"
+          "/wallet send <sats>",
+          "/wallet send <sats> --mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2784,7 +3189,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name: upload, download, tree, search, view, diff, history, bottomup, bottomup_context, summarize, or topdown.",
+            "summary": "Optional subcommand name: upload, download, tree, commit, create, delete, init, search, view, edit, rename, restore, diff, history, bottomup, bottomup_context, summarize, or topdown.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2796,8 +3201,15 @@
           "/file help upload",
           "/file help download",
           "/file help tree",
+          "/file help commit",
+          "/file help create",
+          "/file help delete",
+          "/file help init",
           "/file help search",
           "/file help view",
+          "/file help edit",
+          "/file help rename",
+          "/file help restore",
           "/file help diff",
           "/file help history",
           "/file help bottomup",
@@ -2865,7 +3277,7 @@
       {
         "name": "tree",
         "summary": "Print a text tree of the workspace (depth, folder, extension filter). Web UI loads folders lazily.",
-        "usage": "tree [<rest...>] [--ext <ext>] [--expanded <expanded>]",
+        "usage": "tree [<rest...>] [--ext <ext>] [--expanded <expanded>] [--reveal <reveal>]",
         "aliases": [],
         "arguments": [
           {
@@ -2890,6 +3302,13 @@
             "flag": "--expanded",
             "kind": "string",
             "required": false
+          },
+          {
+            "name": "reveal",
+            "summary": "Web UI internal path to scroll into view after refresh.",
+            "flag": "--reveal",
+            "kind": "string",
+            "required": false
           }
         ],
         "examples": [
@@ -2909,6 +3328,152 @@
           "label": "Tree",
           "modalTitle": "Workspace tree",
           "icon": "/plugins/file/commands/tree/renderers/tree.svg"
+        }
+      },
+      {
+        "name": "commit",
+        "summary": "Commit selected git diff files with a message.",
+        "usage": "commit <message...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "message",
+            "summary": "Commit message.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file commit \"Update files\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "create",
+        "summary": "Create an empty file or folder in a workspace directory.",
+        "usage": "create <dir> <name> [--folder] [--tree-dir <treeDir>] [--ext <ext>] [--expanded <expanded>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "dir",
+            "summary": "Directory path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "name",
+            "summary": "New file or folder name. Slashes are not allowed.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "folder",
+            "summary": "Create a folder instead of a file.",
+            "flag": "--folder",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "treeDir",
+            "summary": "Web UI tree directory to return to after creating the item.",
+            "flag": "--tree-dir",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "ext",
+            "summary": "Web UI extension filter to preserve after creating the file.",
+            "flag": "--ext",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "expanded",
+            "summary": "Web UI expanded folder state to preserve after creating the item.",
+            "flag": "--expanded",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/file create docs notes.md"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a workspace file or folder.",
+        "usage": "delete <path> [--tree-dir <treeDir>] [--ext <ext>] [--expanded <expanded>]",
+        "aliases": [
+          "remove"
+        ],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "Existing file or folder path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "treeDir",
+            "summary": "Web UI tree directory to return to after deleting.",
+            "flag": "--tree-dir",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "ext",
+            "summary": "Web UI extension filter to preserve after deleting.",
+            "flag": "--ext",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "expanded",
+            "summary": "Web UI expanded folder state to preserve after deleting.",
+            "flag": "--expanded",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/file delete docs/old.md"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "init",
+        "summary": "Initialize a Git repository in the workspace.",
+        "usage": "init",
+        "aliases": [
+          "git-init"
+        ],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/file init"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
         }
       },
       {
@@ -2998,6 +3563,120 @@
         "examples": [
           "/file view README.md",
           "/file view src/cli.ts"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "edit",
+        "summary": "Overwrite a workspace text file with edited content and show a diff.",
+        "usage": "edit <path> <content...> [--previous-dir <previousDir>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "File path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "content",
+            "summary": "New file content.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [
+          {
+            "name": "previousDir",
+            "summary": "Tree directory to return to in the web UI.",
+            "flag": "--previous-dir",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null
+          }
+        ],
+        "examples": [
+          "/file edit README.md \"new content\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "rename",
+        "summary": "Rename a workspace file or folder within its current directory.",
+        "usage": "rename <path> <name> [--tree-dir <treeDir>] [--ext <ext>] [--expanded <expanded>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "path",
+            "summary": "Existing file or folder path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "name",
+            "summary": "New filename or folder name. Slashes are not allowed.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "treeDir",
+            "summary": "Web UI tree directory to return to after renaming.",
+            "flag": "--tree-dir",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "ext",
+            "summary": "Web UI extension filter to preserve after renaming.",
+            "flag": "--ext",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "expanded",
+            "summary": "Web UI expanded folder state to preserve after renaming.",
+            "flag": "--expanded",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/file rename docs/old.md new.md"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "restore",
+        "summary": "Restore one changed git file to HEAD, deleting it if it is untracked or newly added.",
+        "usage": "restore <file>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "file",
+            "summary": "Changed file path relative to workspace root.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/file restore README.md"
         ],
         "inferredWeb": {
           "generated": true,
@@ -4332,7 +5011,7 @@
       {
         "name": "list",
         "summary": "List todos in the current scope or a selected subtree.",
-        "usage": "list [<rootId>] [--status <status>] [--flat] [--desc] [--level <level>]",
+        "usage": "list [<rootId>] [--status <status>] [--flat] [--champion] [--desc] [--level <level>]",
         "aliases": [],
         "arguments": [
           {
@@ -4362,6 +5041,12 @@
             "kind": "boolean"
           },
           {
+            "name": "champion",
+            "summary": "Show only branch champions and the priority winner.",
+            "flag": "--champion",
+            "kind": "boolean"
+          },
+          {
             "name": "desc",
             "summary": "Include descriptions.",
             "flag": "--desc",
@@ -4378,7 +5063,8 @@
           "/todo list",
           "/todo list --status in_progress",
           "/todo list --status pending --status done",
-          "/todo list 12 --status done --flat"
+          "/todo list 12 --status done --flat",
+          "/todo list --champion --flat"
         ],
         "inferredWeb": {
           "generated": true,

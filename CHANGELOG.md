@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.40.1] - 2026-06-09
+
+- build: deploy landing page (684aefc)
+
 ## [v9.40.0] - 2026-06-09
 
-- feat: add Cashu melt flow and history kinds (0576bdc)
+- feat: add Cashu melt flow and history kinds (16e4e0a)
 
 ## [v9.39.0] - 2026-06-08
 
