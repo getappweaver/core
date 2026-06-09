@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.40.2] - 2026-06-09
+
+- local first blog post (9eddc5c)
+
 ## [v9.40.1] - 2026-06-09
 
-- build: deploy landing page (684aefc)
+- build: deploy landing page (0402557)
 
 ## [v9.40.0] - 2026-06-09
 
