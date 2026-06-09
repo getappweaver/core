@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.40.4] - 2026-06-09
+
+- fix: todo duel story (f2b7e13)
+
 ## [v9.40.3] - 2026-06-09
 
-- fix: working indicator height problem (21dfd2c)
+- fix: working indicator height problem (857bbbd)
 
 ## [v9.40.2] - 2026-06-09
 
