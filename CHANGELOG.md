@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.42.0] - 2026-06-14
+
+- feat: add landing demo recorder and showcase UI (ed74daa)
+
 ## [v9.41.0] - 2026-06-14
 
-- feat: improve story playback controls and targets (5fd8962)
+- feat: improve story playback controls and targets (0124f07)
 
 ## [v9.40.4] - 2026-06-09
 

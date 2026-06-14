@@ -39,7 +39,7 @@ export const officialApps: OfficialApp[] = [
     packageName: 'appweaver-bm-plugin',
     repo: 'nostr://_@getappweaver.com/bm',
     displayName: 'Bookmark Manager',
-    shortName: 'Bookmarks',
+    shortName: 'Bookmark',
   },
   {
     name: "Captain's Log",
@@ -59,7 +59,7 @@ export const officialApps: OfficialApp[] = [
     packageName: 'appweaver-job-plugin',
     repo: 'nostr://_@getappweaver.com/job',
     displayName: 'Job Scheduler',
-    shortName: 'Jobs',
+    shortName: 'Job',
   },
   {
     name: 'File manager',
@@ -69,7 +69,7 @@ export const officialApps: OfficialApp[] = [
     packageName: 'appweaver-file-plugin',
     repo: 'nostr://_@getappweaver.com/file',
     displayName: 'File Manager',
-    shortName: 'Files',
+    shortName: 'File',
   },
 ];
 

@@ -385,18 +385,6 @@ a {
   padding: 0.1rem 0 1.25rem 1.65rem;
 }
 
-.features-next {
-  display: flex;
-  justify-content: center;
-  margin-top: 2.25rem;
-}
-
-.demo-next {
-  display: flex;
-  justify-content: center;
-  margin-top: 1.5rem;
-}
-
 .feature-panel-point {
   position: relative;
   padding-left: 1.25rem;
@@ -595,8 +583,13 @@ a {
   width: 100%;
   height: calc(100dvh - 6rem);
   min-height: 480px;
+  margin-inline: auto;
   border: 0;
   background: #111;
+}
+
+.one-page-demo-frame--mobile {
+  width: min(100%, 390px);
 }
 
 .one-page-section--install {
@@ -765,8 +758,193 @@ a {
 .plugin-page-section--demo {
   display: grid;
   min-height: auto;
-  padding-block: 0 2rem;
+  padding-block: 2rem;
   overflow: hidden;
+}
+
+.plugin-demo-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.plugin-demo-carousel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.plugin-panel-title {
+  margin: 0;
+  color: white;
+  font-size: clamp(1.35rem, 2.5vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.plugin-interactive-demo-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.plugin-demo-view-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-demo-view-toggle--interactive {
+  display: flex;
+}
+
+.plugin-demo-view-button,
+.plugin-demo-thumb,
+.plugin-demo-lightbox-close {
+  border: 1px solid rgb(250 204 21 / 75%);
+  border-radius: 0;
+  background: #0a0d14;
+  color: rgb(250 204 21);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.plugin-demo-view-button {
+  min-width: 6.5rem;
+  padding: 0.45rem 0.7rem;
+  text-transform: uppercase;
+}
+
+.plugin-demo-view-button:disabled {
+  color: rgb(113 113 122);
+  border-color: rgb(255 255 255 / 10%);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.plugin-demo-gif-card {
+  display: grid;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(0 0 0 / 30%);
+}
+
+.plugin-demo-gif-card--active {
+  background: #111;
+}
+
+.plugin-demo-gif-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.plugin-demo-gif {
+  display: block;
+  width: 100%;
+  height: clamp(16rem, 32vw, 28rem);
+  background: #111;
+  object-fit: contain;
+}
+
+.plugin-demo-thumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.plugin-demo-thumb {
+  padding: 0.4rem 0.55rem;
+  color: rgb(212 212 216);
+  border-color: rgb(255 255 255 / 18%);
+}
+
+.plugin-demo-thumb:disabled {
+  color: rgb(113 113 122);
+  border-color: rgb(255 255 255 / 10%);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.plugin-demo-view-button--active,
+.plugin-demo-thumb--active,
+.plugin-demo-view-button:not(:disabled):hover,
+.plugin-demo-thumb:not(:disabled):hover,
+.plugin-demo-lightbox-close:hover {
+  background: rgb(250 204 21);
+  color: #0a0d14;
+}
+
+.plugin-demo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.plugin-demo-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 82%);
+  cursor: zoom-out;
+}
+
+.plugin-demo-lightbox-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  max-width: min(96vw, 90rem);
+  max-height: 94vh;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(250 204 21 / 65%);
+  background: #050608;
+}
+
+.plugin-demo-lightbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  color: rgb(244 244 245);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.plugin-demo-lightbox-close {
+  padding: 0.25rem 0.5rem;
+}
+
+.plugin-demo-lightbox-gif {
+  display: block;
+  max-width: 100%;
+  max-height: calc(94vh - 2.6rem);
+  object-fit: contain;
+}
+
+.plugin-demo-lightbox-card--screenshot {
+  max-width: min(96vw, 76rem);
+}
+
+.plugin-demo-lightbox-gif--screenshot {
+  width: auto;
+  height: auto;
 }
 
 .plugin-page-section--install {
@@ -868,8 +1046,13 @@ a {
   width: 100%;
   height: calc(100dvh - 5rem);
   min-height: 480px;
+  margin-inline: auto;
   border: 0;
   background: #111;
+}
+
+.plugin-page-demo-frame--mobile {
+  width: min(100%, 390px);
 }
 
 .plugin-section-title {
@@ -904,7 +1087,6 @@ a {
 .plugin-install-screenshot-card {
   position: relative;
   display: grid;
-  min-height: 10rem;
   overflow: hidden;
   margin: 0;
   border: 1px solid rgb(255 255 255 / 10%);
@@ -920,13 +1102,22 @@ a {
   opacity: 0;
 }
 
+.plugin-install-screenshot-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .plugin-install-screenshot.is-ready {
   opacity: 1;
 }
 
 .plugin-install-screenshot-placeholder {
   position: absolute;
-  inset: 0 0 1.9rem 0;
+  inset: 1.9rem 0 0 0;
   display: grid;
   place-content: center;
   gap: 0.45rem;
@@ -950,7 +1141,7 @@ a {
 
 .plugin-install-screenshot-card figcaption {
   padding: 0.5rem 0.65rem;
-  border-top: 1px solid rgb(255 255 255 / 10%);
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
   color: rgb(212 212 216);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.78rem;
@@ -979,32 +1170,16 @@ a {
   height: 100%;
   min-width: 0;
   align-content: center;
+  justify-content: center;
   padding-block: 1rem;
 }
 
-.hero-next,.features-next {
-  position: absolute;
-  right: 1rem;
-  bottom: 2rem;
-  left: 1rem;
-  display: flex;
-  justify-content: center;
-}
-
 .short-viewport-section-title {
-  display: none;
+  display: block;
+  margin: 0 0 1rem;
 }
 
 @media (height < 800px) {
-  .hero-next,.features-next,.demo-next {
-    display: none;
-  }
-
-  .short-viewport-section-title {
-    display: block;
-    margin: 0 0 1rem;
-  }
-
   .features-accordion,.one-page-demo-frame {
     margin-top: 2rem;
     margin-bottom: 2rem;
@@ -1237,9 +1412,18 @@ a {
 }
 
 .hero-install-block {
-  min-width: 0;
-  max-width: 48rem;
+  width: fit-content;
   margin-top: 1.75rem;
+}
+
+.hero-install-title {
+  max-width: 34rem;
+  margin: 0 0 0.6rem;
+  color: white;
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
 }
 
 .hero-install-label {
@@ -1279,8 +1463,8 @@ a {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 0.85rem;
-  margin-left: 2.0rem;
 }
 
 .hero-install-guide-link {
@@ -1299,45 +1483,6 @@ a {
 .hero-install-guide-link:hover {
   color: white;
   text-decoration-color: rgb(250 204 21 / 80%);
-}
-
-.bouncing-section-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: rgb(125 211 252);
-  cursor: pointer;
-  font-size: 1.2rem;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-align: center;
-  text-decoration: none;
-  text-shadow: 0 0 1rem rgb(14 165 233 / 55%);
-  text-transform: uppercase;
-}
-
-.bouncing-section-link svg {
-  width: 2rem;
-  height: 2rem;
-  color: rgb(56 189 248);
-  fill: currentColor;
-  filter:
-    drop-shadow(0 0 0.45rem rgb(56 189 248 / 82%))
-    drop-shadow(0 0 1.25rem rgb(37 99 235 / 52%));
-}
-
-.bouncing-section-link:hover {
-  color: white;
-}
-
-.bouncing-section-link:hover svg {
-  color: rgb(191 219 254);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bouncing-section-link {
-    animation: none;
-  }
 }
 
 .stage-primary-button,
@@ -1571,6 +1716,7 @@ a {
   }
 
   .one-page-demo-frame {
+    width: 100%;
     min-height: 360px;
   }
 
@@ -1586,7 +1732,21 @@ a {
     min-height: 38rem;
   }
 
+  .plugin-demo-carousel {
+    padding: 0.75rem;
+  }
+
+  .plugin-demo-view-toggle--interactive {
+    display: none;
+  }
+
+  .plugin-demo-gif {
+    height: auto;
+    max-height: 34rem;
+  }
+
   .plugin-page-demo-frame {
+    width: 100%;
     height: auto;
     min-height: 38rem;
   }
@@ -1635,10 +1795,12 @@ a {
 
 .section-title {
   margin-top: 0.75rem;
+  margin-bottom: 2rem;
   color: white;
   font-size: 1.875rem;
   font-weight: 600;
   line-height: 1.15;
+  text-align: center;
 }
 
 .section-summary,

@@ -42,8 +42,9 @@
     "summary": "appweaver-file-plugin walkthroughs",
     "examples": [],
     "storyIds": [
-      "file-tree-read-markdown",
-      "file-tree-git-diff"
+      "file-tree-edit-diff-markdown",
+      "file-tree-review-commit-diff",
+      "file-tree-history-commit-diff"
     ]
   },
   {

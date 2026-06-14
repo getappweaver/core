@@ -2,6 +2,7 @@ import { For, createSignal, onCleanup, onMount } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { render } from 'solid-js/web';
 
+import { AppWeaverInstallBlock } from './appweaver-install-block';
 import {
   PluginRoute,
   isPluginRoute,
@@ -30,19 +31,7 @@ type HeaderProps = {
 };
 
 type HomePageProps = {
-  featuresHref: string;
   demoHref: string;
-};
-
-type BouncingSectionLinkProps = {
-  href: string;
-  label: string;
-};
-
-type CopyableCommandBlockProps = {
-  className: string;
-  ariaLabel: string;
-  lines: string[];
 };
 
 type Feature = {
@@ -131,111 +120,6 @@ const features: Feature[] = [
   },
 ];
 
-function DownBlocksIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 512 512"
-      aria-hidden="true"
-    >
-      <path d="M277.333,320h-42.667C211.136,320,192,339.136,192,362.667v42.667c0,23.53,19.136,42.666,42.667,42.666h42.667c23.53,0,42.666-19.136,42.666-42.667v-42.667C320,339.136,300.864,320,277.333,320z" />
-      <path d="M384,192h-42.667c-23.531,0-42.667,19.136-42.667,42.667v42.667c0,23.531,19.136,42.667,42.667,42.667H384c23.531,0,42.667-19.136,42.667-42.667v-42.667C426.667,211.136,407.531,192,384,192z" />
-      <path d="M469.333,64h-42.667C403.136,64,384,83.136,384,106.667v42.667c0,23.53,19.136,42.666,42.667,42.666h42.667c23.53,0,42.666-19.136,42.666-42.667v-42.667C512,83.136,492.864,64,469.333,64z" />
-      <path d="M85.333,64H42.667C19.136,64,0,83.136,0,106.667v42.667C0,172.864,19.136,192,42.667,192h42.667c23.53,0,42.666-19.136,42.666-42.667v-42.667C128,83.136,108.864,64,85.333,64z" />
-      <path d="M170.666,191.999H128c-23.531,0-42.667,19.136-42.667,42.667v42.667C85.333,300.864,104.469,320,128,320h42.667c23.53,0,42.666-19.136,42.666-42.667v-42.667C213.333,211.135,194.197,191.999,170.666,191.999z" />
-    </svg>
-  );
-}
-
-function BouncingSectionLink(props: BouncingSectionLinkProps) {
-  return (
-    <a href={props.href} class="bouncing-section-link">
-      <DownBlocksIcon />
-      <span>{props.label}</span>
-    </a>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function CopyableCommandBlock(props: CopyableCommandBlockProps) {
-  const [copied, setCopied] = createSignal(false);
-  let resetTimer: number | null = null;
-
-  onCleanup(() => {
-    if (resetTimer !== null) {
-      window.clearTimeout(resetTimer);
-    }
-  });
-
-  const copyCommands = () => {
-    void navigator.clipboard.writeText(props.lines.join('\n')).then(() => {
-      setCopied(true);
-
-      if (resetTimer !== null) {
-        window.clearTimeout(resetTimer);
-      }
-
-      resetTimer = window.setTimeout(() => setCopied(false), 2200);
-    });
-  };
-
-  return (
-    <div class={`${props.className} command-copy-block`} aria-label={props.ariaLabel}>
-      <button
-        type="button"
-        class="command-copy-button"
-        classList={{ 'is-copied': copied() }}
-        aria-label={copied() ? 'Copied install command' : 'Copy install command'}
-        title={copied() ? 'Copied' : 'Copy'}
-        onClick={copyCommands}
-      >
-        {copied() ? <CheckIcon /> : <CopyIcon />}
-      </button>
-      <div class="command-copy-lines">
-        <For each={props.lines}>{(line) => <code>{line}</code>}</For>
-      </div>
-    </div>
-  );
-}
-
 function Header(props: HeaderProps) {
   return (
     <header class="stage-header">
@@ -311,32 +195,7 @@ function HomePage(props: HomePageProps) {
           , prompts, local terminal input, WebSocket API, or your favourite Nostr
           chat app.
         </p>
-        <div class="hero-install-block">
-          <div class="hero-install-label">
-            Go to your project/workspace folder and run:
-          </div>
-          <CopyableCommandBlock
-            className="hero-install-command"
-            ariaLabel="Install command"
-            lines={[
-              'git clone https://github.com/getappweaver/core.git appweaver',
-              'cd appweaver && bun install && bun run start',
-            ]}
-          />
-        </div>
-        <div class="hero-actions">
-          <a
-            href="https://github.com/getappweaver/core/blob/main/DOCKER.md"
-            class="hero-install-guide-link"
-            rel="noreferrer"
-            target="_blank"
-          >
-            Alternative: Docker
-          </a>
-        </div>
-      </div>
-      <div class="hero-next">
-        <BouncingSectionLink href={props.featuresHref} label="Features" />
+        <AppWeaverInstallBlock title={null} />
       </div>
     </section>
   );
@@ -414,6 +273,9 @@ function OnePage(props: {
   onHeroTitleReachedChange: (reached: boolean) => void;
 }) {
   const [openFeatureIndex, setOpenFeatureIndex] = createSignal(0);
+  const [demoViewMode, setDemoViewMode] = createSignal<'desktop' | 'mobile'>(
+    'desktop',
+  );
 
   onMount(() => {
     const root = document.querySelector('.one-page-stage');
@@ -482,7 +344,7 @@ function OnePage(props: {
   return (
     <div class="one-page-stage">
       <section id="intro" class="one-page-section one-page-section--intro">
-        <HomePage demoHref="#demo" featuresHref="#features" />
+        <HomePage demoHref="#demo" />
       </section>
       <section id="features" class="one-page-section one-page-section--features">
         <h2 class="section-title short-viewport-section-title">Features</h2>
@@ -490,20 +352,33 @@ function OnePage(props: {
           openFeatureIndex={openFeatureIndex()}
           setOpenFeatureIndex={setOpenFeatureIndex}
         />
-        <div class="features-next">
-          <BouncingSectionLink href="#demo" label="Interactive Demo" />
-        </div>
       </section>
       <section id="demo" class="one-page-section one-page-section--demo">
         <h2 class="section-title short-viewport-section-title">Interactive Demo</h2>
+        <div class="plugin-demo-view-toggle plugin-demo-view-toggle--interactive" aria-label="Choose interactive demo viewport">
+          <button
+            type="button"
+            class="plugin-demo-view-button"
+            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'desktop' }}
+            onClick={() => setDemoViewMode('desktop')}
+          >
+            Desktop
+          </button>
+          <button
+            type="button"
+            class="plugin-demo-view-button"
+            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'mobile' }}
+            onClick={() => setDemoViewMode('mobile')}
+          >
+            Mobile
+          </button>
+        </div>
         <iframe
           title="AppWeaver interactive demo"
           src="/demo/app/index.html"
           class="one-page-demo-frame"
+          classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
         />
-        <div class="demo-next">
-          <BouncingSectionLink href="#apps" label="Apps" />
-        </div>
       </section>
       <section id="apps" class="one-page-section one-page-section--apps">
         <OfficialAppsSection />

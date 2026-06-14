@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-09T17:49:25.235Z",
+  "generatedAt": "2026-06-11T17:54:19.659Z",
   "prefix": "/",
   "widgets": [
     {
@@ -24,7 +24,7 @@
       "alias": "todo",
       "name": "appweaver-todo-plugin",
       "repo": "nostr://_@getappweaver.com/todo",
-      "version": "5.4.1",
+      "version": "5.4.3",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
@@ -49,7 +49,7 @@
       "name": "appweaver-file-plugin",
       "repo": "nostr://_@getappweaver.com/file",
       "version": "3.2.0",
-      "commandStoryCount": 2,
+      "commandStoryCount": 3,
       "aiStoryCount": 0
     },
     {
