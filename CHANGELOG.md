@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.41.0] - 2026-06-14
+
+- feat: improve story playback controls and targets (5fd8962)
+
 ## [v9.40.4] - 2026-06-09
 
-- fix: todo duel story (f2b7e13)
+- fix: todo duel story (cf88f75)
 
 ## [v9.40.3] - 2026-06-09
 

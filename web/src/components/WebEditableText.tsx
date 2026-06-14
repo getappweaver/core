@@ -11,6 +11,8 @@ import {
 import type { WebElementNode } from '@src/web/ui-schema';
 
 import { registerEditableTextEntry } from '../editableTextRegistry';
+import { registerStoryDomTarget } from '../story/dom-targets';
+import { onStoryFillForm } from '../story/events';
 
 type WebEditableTextProps = {
   element: WebElementNode;
@@ -66,6 +68,18 @@ function firstChangedLine(props: {
 
 function contentEditableMode(): 'plaintext-only' {
   return 'plaintext-only';
+}
+
+function setEditorText(params: {
+  editorEl: HTMLDivElement;
+  value: string;
+  setText: (value: string) => void;
+  scheduleMeasureLineHeights: () => void;
+}): void {
+  params.editorEl.innerText = params.value;
+  params.setText(params.value);
+  params.editorEl.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  params.scheduleMeasureLineHeights();
 }
 
 export function WebEditableText(props: WebEditableTextProps): JSX.Element {
@@ -186,6 +200,40 @@ export function WebEditableText(props: WebEditableTextProps): JSX.Element {
   });
 
   createEffect(() => {
+    const targetId = props.element.props?.storyTargetId;
+
+    if (!targetId || !editorEl) {
+      return;
+    }
+
+    registerStoryDomTarget(targetId, editorEl);
+    onCleanup(() => registerStoryDomTarget(targetId, null));
+  });
+
+  createEffect(() => {
+    const stop = onStoryFillForm((values) => {
+      if (!editorEl) {
+        return;
+      }
+
+      const value = values.arguments.content ?? values.options.content;
+
+      if (typeof value !== 'string' && typeof value !== 'number') {
+        return;
+      }
+
+      setEditorText({
+        editorEl,
+        value: String(value),
+        setText,
+        scheduleMeasureLineHeights,
+      });
+    });
+
+    onCleanup(stop);
+  });
+
+  createEffect(() => {
     logicalLines();
     showLineNumbers();
     scheduleMeasureLineHeights();
@@ -212,6 +260,7 @@ export function WebEditableText(props: WebEditableTextProps): JSX.Element {
     <div
       class={classNameForElement(props.element)}
       data-ui={props.element.props?.ui}
+      data-story-target={props.element.props?.storyTargetId}
     >
       <div
         class="web-editable-text__grid"

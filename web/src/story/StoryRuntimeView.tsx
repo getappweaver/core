@@ -74,6 +74,10 @@ function stepLabel(step: StoryStep<unknown>): string {
     return 'Story complete.';
   }
 
+  if (step.type === 'scroll_to_bottom') {
+    return 'Scroll to the latest result.';
+  }
+
   return step.type.replace(/_/g, ' ');
 }
 
@@ -132,6 +136,13 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
 
   const [complete, setComplete] = createSignal(false);
 
+  const [runCommandStepIndex, setRunCommandStepIndex] = createSignal<
+    number | null
+  >(null);
+
+  const [bootstrappedWidgetStoryId, setBootstrappedWidgetStoryId] =
+    createSignal<string | null>(null);
+
   const [passivePaused, setPassivePaused] = createSignal(
     props.payload.walkthrough === false,
   );
@@ -148,6 +159,53 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
   });
 
   const isPassivePlayback = () => props.payload.walkthrough === false;
+
+  function runStoryCommand(
+    step: Extract<StoryStep<unknown>, { type: 'run_command' }>,
+  ): void {
+    props.onRunWebAction({
+      type: 'command',
+      command: step.command,
+      subcommand: step.subcommand,
+      arguments: step.payload.arguments,
+      options: step.payload.options,
+      recordInTimeline: true,
+      surface: 'timeline',
+    });
+  }
+
+  function firstHeaderWidgetStep(): Extract<
+    StoryStep<unknown>,
+    { type: 'focus_target' }
+  > | null {
+    return (
+      steps().find(
+        (step): step is Extract<StoryStep<unknown>, { type: 'focus_target' }> =>
+          step.type === 'focus_target' && step.target.type === 'header_widget',
+      ) ?? null
+    );
+  }
+
+  function bootstrapOpenHeaderWidget(): void {
+    const step = firstHeaderWidgetStep();
+
+    if (step?.target.type !== 'header_widget') {
+      return;
+    }
+
+    if (!isStoryWidgetOpen(step.target)) {
+      return;
+    }
+
+    props.onRunWebAction({
+      type: 'command',
+      command: step.target.command,
+      subcommand: step.target.subcommand,
+      arguments: {},
+      options: {},
+      recordInTimeline: false,
+    });
+  }
 
   const relatedStories = () => props.payload.relatedStories ?? [];
 
@@ -295,6 +353,10 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       return { type: 'fill_form', values: step.values };
     }
 
+    if (step.type === 'scroll_to_bottom') {
+      return { type: 'scroll_to_bottom' };
+    }
+
     if (step.type !== 'wait_for_action') {
       return { type: 'none' };
     }
@@ -373,12 +435,15 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       props.payload.story.description ?? 'Follow the story steps.',
     );
 
+    setRunCommandStepIndex(null);
+    setBootstrappedWidgetStoryId(null);
     setStepIndex(0);
     setComplete(false);
     setStarted(true);
   }
 
   function advance(): void {
+    setRunCommandStepIndex(null);
     setStepIndex((current) => Math.min(current + 1, steps().length));
   }
 
@@ -523,6 +588,14 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       return;
     }
 
+    if (
+      !isPassivePlayback() &&
+      bootstrappedWidgetStoryId() !== props.payload.id
+    ) {
+      setBootstrappedWidgetStoryId(props.payload.id);
+      bootstrapOpenHeaderWidget();
+    }
+
     const step = steps()[stepIndex()];
 
     logStoryDebug('runtime.step-effect', {
@@ -608,6 +681,36 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
         return;
       }
 
+      if (step.type === 'run_command') {
+        emitPassivePlayback({
+          step,
+          currentStepIndex: stepIndex(),
+          instructionText: passiveInstruction,
+          stepDurationMs: delayMs,
+          stepStartedAtMs: performance.now(),
+          target: passiveTarget,
+          action: { type: 'none' },
+          complete: false,
+          catchingUp,
+        });
+
+        if (runCommandStepIndex() === stepIndex()) {
+          return;
+        }
+
+        setRunCommandStepIndex(stepIndex());
+
+        const timeoutId = window.setTimeout(() => {
+          runStoryCommand(step);
+        }, delayMs);
+
+        onCleanup(() => {
+          window.clearTimeout(timeoutId);
+        });
+
+        return;
+      }
+
       emitPassivePlayback({
         step,
         currentStepIndex: stepIndex(),
@@ -631,6 +734,17 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       return;
     }
 
+    if (step.type === 'run_command') {
+      setInstruction(`Running /${step.command} ${step.subcommand}.`);
+
+      if (runCommandStepIndex() !== stepIndex()) {
+        setRunCommandStepIndex(stepIndex());
+        runStoryCommand(step);
+      }
+
+      return;
+    }
+
     if (step.type === 'seed_sandbox') {
       advance();
 
@@ -639,6 +753,13 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
 
     if (step.type === 'instruction') {
       setInstruction(step.text);
+      advance();
+
+      return;
+    }
+
+    if (step.type === 'scroll_to_bottom') {
+      setInstruction('Scroll to the latest result.');
       advance();
 
       return;
@@ -709,6 +830,17 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
     }
 
     const step = steps()[stepIndex()];
+
+    if (
+      step?.type === 'run_command' &&
+      step.command === event.command &&
+      step.subcommand === event.subcommand
+    ) {
+      clearWalkthrough();
+      advance();
+
+      return;
+    }
 
     if (step?.type !== 'wait_for_action') {
       return;
@@ -784,6 +916,17 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
 
     const step = steps()[stepIndex()];
 
+    if (
+      step?.type === 'run_command' &&
+      step.command === event.command &&
+      step.subcommand === event.subcommand
+    ) {
+      clearWalkthrough();
+      advance();
+
+      return;
+    }
+
     if (step?.type !== 'wait_for_action') {
       return;
     }
@@ -821,6 +964,7 @@ export function StoryRuntimeView(props: StoryRuntimeViewProps) {
       }
 
       activateStorySandbox(props.payload);
+      setRunCommandStepIndex(null);
       setPassivePaused(false);
       setComplete(false);
       setStarted(true);

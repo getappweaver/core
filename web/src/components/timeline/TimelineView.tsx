@@ -3,6 +3,8 @@ import { For, Match, Show, Switch, createSignal } from 'solid-js';
 import type { TimelineFileDiff } from '@src/timeline/types';
 
 import { CommandFormCard } from '../../commands/CommandFormCard';
+import { registerStoryDomTarget } from '../../story/dom-targets';
+import { emitStoryTargetClicked } from '../../story/events';
 import type { TimelineItem } from '../../types';
 import {
   isChatItem,
@@ -833,6 +835,11 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
   const fileNames = () => props.item.files.map((file) => file.file);
 
+  const diffFileTargetId = (file: string) => `diff-card-file-${file}`;
+
+  const diffFileCheckboxTargetId = (file: string) =>
+    `diff-card-file-checkbox-${file}`;
+
   const [selectedFiles, setSelectedFiles] = createSignal(
     new Set(
       (props.item.meta?.stagedFiles ?? []).filter((file) =>
@@ -1108,13 +1115,27 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
             <button
               type="button"
               class="diff-file__summary"
-              onClick={() => toggleFile(index())}
+              data-story-target={diffFileTargetId(file.file)}
+              ref={(el) =>
+                registerStoryDomTarget(diffFileTargetId(file.file), el)
+              }
+              onClick={() => {
+                emitStoryTargetClicked(diffFileTargetId(file.file));
+                toggleFile(index());
+              }}
               aria-expanded={openFiles().has(index())}
             >
               <Show when={workspaceDiff()}>
                 <input
                   type="checkbox"
                   class="web-checkbox web-checkbox--retro diff-file__checkbox"
+                  data-story-target={diffFileCheckboxTargetId(file.file)}
+                  ref={(el) =>
+                    registerStoryDomTarget(
+                      diffFileCheckboxTargetId(file.file),
+                      el,
+                    )
+                  }
                   checked={selectedFiles().has(file.file)}
                   aria-label={`Include ${file.file} in commit`}
                   onClick={(event) => event.stopPropagation()}
@@ -1185,8 +1206,11 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
             <textarea
               ref={(el) => {
                 messageEl = el;
+                registerStoryDomTarget('diff-card-commit-message', el);
                 resizeMessageTextarea();
               }}
+              name="message"
+              data-story-target="diff-card-commit-message"
               rows={1}
               value={commitMessage()}
               placeholder="Commit message"
@@ -1201,7 +1225,12 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
             <WebButton
               type="submit"
               class="web-button diff-card__commit-button"
+              data-story-target="diff-card-commit-submit"
+              ref={(el) =>
+                registerStoryDomTarget('diff-card-commit-submit', el)
+              }
               disabled={commitDisabled()}
+              onClick={() => emitStoryTargetClicked('diff-card-commit-submit')}
             >
               {commitBusy()
                 ? 'Committing…'
@@ -1209,7 +1238,17 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
             </WebButton>
           </div>
           <Show when={commitStatus()}>
-            {(status) => <div class="diff-card__commit-status">{status()}</div>}
+            {(status) => (
+              <div
+                class="diff-card__commit-status"
+                data-story-target="diff-card-commit-status"
+                ref={(el) =>
+                  registerStoryDomTarget('diff-card-commit-status', el)
+                }
+              >
+                {status()}
+              </div>
+            )}
           </Show>
         </form>
       </Show>

@@ -71,23 +71,31 @@ function storyWidgetIconUrl(params: {
       step.type === 'focus_target' && step.target.type === 'header_widget',
   );
 
+  const definition = resolvePluginDefinition(params.plugin);
+
+  const fallbackSubcommand = definition?.subcommands.find(
+    (item) => item.name === 'tree' && item.webWidget?.icon,
+  );
+
   if (
     !target ||
     target.type !== 'focus_target' ||
     target.target.type !== 'header_widget'
   ) {
-    return undefined;
+    return publishedIconUrl({
+      icon: fallbackSubcommand?.webWidget?.icon,
+      pluginAlias: params.plugin.identity.alias,
+    });
   }
 
   const storyTarget = target.target;
-  const definition = resolvePluginDefinition(params.plugin);
 
   const subcommand = definition?.subcommands.find(
     (item) => item.name === storyTarget.subcommand,
   );
 
   return publishedIconUrl({
-    icon: subcommand?.webWidget?.icon,
+    icon: subcommand?.webWidget?.icon ?? fallbackSubcommand?.webWidget?.icon,
     pluginAlias: params.plugin.identity.alias,
   });
 }

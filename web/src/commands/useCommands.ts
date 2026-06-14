@@ -605,8 +605,6 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
             await webln.sendPayment(invoice);
             adapters.setChromeLoading(false);
-
-            return true;
           })().catch((err) => {
             adapters.setChromeError(
               err instanceof Error ? err.message : String(err),
@@ -794,10 +792,16 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       });
     }
 
-    const recordTl =
-      commandAction.recordInTimeline ??
-      uiExecutionPolicy?.recordInTimeline ??
-      true;
+    const actionTargetsTaskbar = adapters.isTaskbarSubcommand(
+      commandAction.command,
+      commandAction.subcommand,
+    );
+
+    const recordTl = actionTargetsTaskbar
+      ? false
+      : (commandAction.recordInTimeline ??
+        uiExecutionPolicy?.recordInTimeline ??
+        true);
 
     const suppressSystemMessage =
       uiExecutionPolicy?.suppressSystemMessage ?? false;
@@ -817,6 +821,27 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const refreshHighlightTargetIds = [
       ...(commandAction.refresh?.highlightTargetIds ?? []),
     ];
+
+    if (actionTargetsTaskbar) {
+      adapters.setTaskbarDockResult({
+        command: commandAction.command,
+        subcommand: commandAction.subcommand,
+        values: {
+          arguments: commandAction.arguments ?? {},
+          options: commandAction.options ?? {},
+        },
+        output: {
+          text: null,
+          web: taskbarLoadingWeb(
+            commandAction.command,
+            commandAction.subcommand,
+          ),
+          clientView: null,
+          timelineEvent: null,
+        },
+        visible: true,
+      });
+    }
 
     function collectRefreshHighlightTargets(outputText: string | null): void {
       const fromOutput = commandAction.refresh?.highlightTargetIdFromOutput;
@@ -959,6 +984,23 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         if (timelineEventItem !== null) {
           adapters.setTimeline((prev) => [...prev, timelineEventItem]);
+
+          dispatchRefreshOnce('final');
+
+          return;
+        }
+
+        if (actionTargetsTaskbar) {
+          adapters.setTaskbarDockResult({
+            command: commandAction.command,
+            subcommand: commandAction.subcommand,
+            values: {
+              arguments: commandAction.arguments ?? {},
+              options: commandAction.options ?? {},
+            },
+            output,
+            visible: true,
+          });
 
           dispatchRefreshOnce('final');
 
@@ -1270,6 +1312,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         onCommandResult: (message) => {
           const output = splitCommandOutput(message.output);
           resolve(output);
+        },
+        onDone: () => {
+          emitStoryCommandCompleted({
+            command: props.command,
+            subcommand: props.subcommand,
+          });
         },
         onError: (message) => reject(new Error(message.message)),
       });

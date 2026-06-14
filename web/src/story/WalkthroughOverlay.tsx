@@ -19,6 +19,12 @@ type TargetRect = {
   height: number;
 };
 
+type PanelVertical = 'bottom' | 'top';
+
+type PanelHorizontal = 'left' | 'right';
+
+const PANEL_MARGIN_PX = 16;
+
 function viewportRect(): TargetRect {
   return {
     top: 0,
@@ -87,8 +93,49 @@ function rectAround(outer: TargetRect, inner: TargetRect) {
   };
 }
 
+function rectsIntersect(params: { a: TargetRect; b: TargetRect }): boolean {
+  return (
+    params.a.left < params.b.left + params.b.width &&
+    params.a.left + params.a.width > params.b.left &&
+    params.a.top < params.b.top + params.b.height &&
+    params.a.top + params.a.height > params.b.top
+  );
+}
+
+function panelRectForPlacement(params: {
+  panelEl: HTMLElement;
+  vertical: PanelVertical;
+  horizontal: PanelHorizontal;
+}): TargetRect {
+  const panelRect = params.panelEl.getBoundingClientRect();
+  const width = panelRect.width;
+  const height = panelRect.height;
+
+  const top =
+    params.vertical === 'bottom'
+      ? window.innerHeight - height - PANEL_MARGIN_PX
+      : PANEL_MARGIN_PX;
+
+  const left =
+    params.horizontal === 'right'
+      ? window.innerWidth - width - PANEL_MARGIN_PX
+      : PANEL_MARGIN_PX;
+
+  return { top, left, width, height };
+}
+
+function otherPanelVertical(vertical: PanelVertical): PanelVertical {
+  return vertical === 'bottom' ? 'top' : 'bottom';
+}
+
 export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
+  let panelEl: HTMLDivElement | undefined;
+
   const [rect, setRect] = createSignal<TargetRect>(elementRect(props.targetEl));
+
+  const [panelVertical, setPanelVertical] = createSignal<'bottom' | 'top'>(
+    'bottom',
+  );
 
   const [contextRect, setContextRect] =
     createSignal<TargetRect>(viewportRect());
@@ -113,15 +160,51 @@ export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
     return props.targetEl;
   };
 
+  const panelHorizontal = (targetRect: TargetRect): PanelHorizontal => {
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+
+    return targetCenterX < window.innerWidth / 2 ? 'right' : 'left';
+  };
+
+  const avoidPanelTargetCollision = (targetRect: TargetRect): void => {
+    if (!panelEl || props.state.target === null) {
+      return;
+    }
+
+    const horizontal = panelHorizontal(targetRect);
+    const currentVertical = panelVertical();
+    const nextVertical = otherPanelVertical(currentVertical);
+
+    const currentPanelRect = panelRectForPlacement({
+      panelEl,
+      vertical: currentVertical,
+      horizontal,
+    });
+
+    const nextPanelRect = panelRectForPlacement({
+      panelEl,
+      vertical: nextVertical,
+      horizontal,
+    });
+
+    if (
+      rectsIntersect({ a: currentPanelRect, b: targetRect }) &&
+      !rectsIntersect({ a: nextPanelRect, b: targetRect })
+    ) {
+      setPanelVertical(nextVertical);
+    }
+  };
+
   createEffect(() => {
     const update = () => {
       const currentTargetEl = targetEl();
 
-      setRect(
+      const nextRect =
         props.state.target === null
           ? viewportRect()
-          : elementRect(currentTargetEl),
-      );
+          : elementRect(currentTargetEl);
+
+      setRect(nextRect);
 
       setContextRect(
         props.state.target === null
@@ -132,6 +215,8 @@ export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
       setFillButtonRect(
         props.state.fillFormValues ? elementRect(fillButtonEl()) : null,
       );
+
+      avoidPanelTargetCollision(nextRect);
 
       raf = requestAnimationFrame(update);
     };
@@ -195,13 +280,13 @@ export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
 
   const panelClass = () => {
     const r = rect();
-    const viewport = viewportRect();
-    const targetCenterX = r.left + r.width / 2;
-    const targetCenterY = r.top + r.height / 2;
-    const vertical = targetCenterY < viewport.height / 2 ? 'bottom' : 'top';
-    const horizontal = targetCenterX < viewport.width / 2 ? 'right' : 'left';
+    const horizontal = panelHorizontal(r);
 
-    return `story-walkthrough__panel story-walkthrough__panel--${vertical}-${horizontal}`;
+    return `story-walkthrough__panel story-walkthrough__panel--${panelVertical()}-${horizontal}`;
+  };
+
+  const togglePanelVertical = () => {
+    setPanelVertical((current) => (current === 'bottom' ? 'top' : 'bottom'));
   };
 
   return (
@@ -244,7 +329,12 @@ export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
           }}
         />
       ) : null}
-      <div class={panelClass()}>
+      <div
+        ref={(el) => {
+          panelEl = el;
+        }}
+        class={panelClass()}
+      >
         <div class="story-walkthrough__eyebrow">
           {props.state.complete ? 'Story complete' : 'Story mode'}
         </div>
@@ -274,6 +364,13 @@ export function WalkthroughOverlay(props: WalkthroughOverlayProps) {
               Continue
             </button>
           ) : null}
+          <button
+            type="button"
+            class="story-walkthrough__quit"
+            onClick={togglePanelVertical}
+          >
+            Move panel {panelVertical() === 'bottom' ? 'top' : 'bottom'}
+          </button>
           <button
             ref={setQuitButtonEl}
             type="button"

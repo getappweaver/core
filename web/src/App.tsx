@@ -987,6 +987,24 @@ function AppInner(): JSX.Element {
         ? [preferredField]
         : [];
 
+    if (preferredFields.length > 0) {
+      let typedPreferred = false;
+
+      for (const field of preferredFields) {
+        const name = field.name;
+        const value = values.arguments[name] ?? values.options[name];
+
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          continue;
+        }
+
+        await typeIntoField(field, String(value));
+        typedPreferred = true;
+      }
+
+      return typedPreferred;
+    }
+
     const documentFields = Array.from(
       document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
         'input[name], textarea[name]',
@@ -1097,6 +1115,19 @@ function AppInner(): JSX.Element {
 
       if (!didType) {
         emitStoryFillForm(action.values);
+      }
+
+      return;
+    }
+
+    if (action.type === 'scroll_to_bottom') {
+      if (timelineEl) {
+        timelineEl.scrollTo({
+          top: timelineEl.scrollHeight,
+          behavior: playback.catchingUp === true ? 'auto' : 'smooth',
+        });
+
+        scheduleTimelineBottomFadeUpdate();
       }
 
       return;

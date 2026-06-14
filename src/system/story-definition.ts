@@ -130,6 +130,9 @@ export type StoryStep<TState> = StoryStepBase &
         };
       }
     | {
+        type: 'scroll_to_bottom';
+      }
+    | {
         type: 'user_message';
         text: string;
       }

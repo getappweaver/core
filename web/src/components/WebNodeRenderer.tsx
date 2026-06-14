@@ -175,6 +175,12 @@ function renderElement({
         <a
           class={elementClass(element)}
           data-ui={elementUi(element)}
+          data-story-target={element.props?.storyTargetId}
+          ref={(el) =>
+            element.props?.storyTargetId
+              ? registerStoryDomTarget(element.props.storyTargetId, el)
+              : undefined
+          }
           style={elementStyle(element)}
           contentEditable={element.props?.contentEditable}
           href={element.props?.href ?? '#'}
@@ -186,6 +192,11 @@ function renderElement({
             }
 
             e.stopPropagation();
+
+            if (element.props?.storyTargetId) {
+              emitStoryTargetClicked(element.props.storyTargetId);
+            }
+
             runAction(element.props?.action);
           }}
         >

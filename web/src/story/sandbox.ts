@@ -1,9 +1,20 @@
-import type { PromptPayload, WebSocketServerMessage } from '../ws-types';
+import type {
+  CommandResultServerMessage,
+  PromptPayload,
+  WebSocketServerMessage,
+} from '../ws-types';
 
 import type { StoryRuntimePayload } from './types';
 
 type RunCommandClientMessageLike = {
   type: 'run_command';
+  requestId: string;
+  command: string;
+  subcommand: string;
+};
+
+type JsonCommandClientMessageLike = {
+  type: 'json_command';
   requestId: string;
   command: string;
   subcommand: string;
@@ -34,6 +45,8 @@ type ScriptedTransition = {
   advanceOutputs?: Array<{ command: string; subcommand: string }>;
 };
 
+type StoryCommandOutputValue = CommandResultServerMessage['output'];
+
 let activeSandbox: StorySandboxState | null = null;
 
 function isRunCommandMessage(
@@ -53,6 +66,23 @@ function isRunCommandMessage(
   );
 }
 
+function isJsonCommandMessage(
+  message: unknown,
+): message is JsonCommandClientMessageLike {
+  if (!message || typeof message !== 'object') {
+    return false;
+  }
+
+  const value = message as Record<string, unknown>;
+
+  return (
+    value.type === 'json_command' &&
+    typeof value.requestId === 'string' &&
+    typeof value.command === 'string' &&
+    typeof value.subcommand === 'string'
+  );
+}
+
 function isPromptAnswerMessage(
   message: unknown,
 ): message is PromptAnswerClientMessageLike {
@@ -66,6 +96,27 @@ function isPromptAnswerMessage(
     value.type === 'prompt_answer' &&
     typeof value.requestId === 'string' &&
     typeof value.answer === 'string'
+  );
+}
+
+function isStoryCommandOutputValue(
+  value: unknown,
+): value is StoryCommandOutputValue {
+  if (typeof value === 'string') {
+    return true;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  return (
+    (record.kind === 'ui' ||
+      record.kind === 'client_view' ||
+      record.kind === 'timeline_event') &&
+    record.version === 1
   );
 }
 
@@ -169,9 +220,10 @@ export function handleStorySandboxSocketMessage(params: {
   }
 
   if (isPromptAnswerMessage(params.message)) {
+    const promptAnswer = params.message;
     const prompt = sandbox.activePrompt;
 
-    if (!prompt || prompt.requestId !== params.message.requestId) {
+    if (!prompt || prompt.requestId !== promptAnswer.requestId) {
       return false;
     }
 
@@ -188,7 +240,7 @@ export function handleStorySandboxSocketMessage(params: {
 
     if (nextPrompt) {
       sandbox.activePrompt = {
-        requestId: params.message.requestId,
+        requestId: promptAnswer.requestId,
         command: prompt.command,
         subcommand: prompt.subcommand,
         key: promptKey,
@@ -196,7 +248,7 @@ export function handleStorySandboxSocketMessage(params: {
 
       params.emit({
         type: 'prompt',
-        requestId: params.message.requestId,
+        requestId: promptAnswer.requestId,
         prompt: nextPrompt,
       });
 
@@ -208,7 +260,7 @@ export function handleStorySandboxSocketMessage(params: {
         transition.on.command !== prompt.command ||
         transition.on.subcommand !== prompt.subcommand ||
         (transition.answer !== undefined &&
-          transition.answer !== params.message.answer)
+          transition.answer !== promptAnswer.answer)
       ) {
         return [];
       }
@@ -230,24 +282,29 @@ export function handleStorySandboxSocketMessage(params: {
     const outputIndex = sandbox.outputIndexes[promptKey] ?? 0;
     const scriptedOutput = Array.isArray(outputs) ? outputs[outputIndex] : null;
 
-    if (scriptedOutput !== null) {
+    if (isStoryCommandOutputValue(scriptedOutput)) {
       params.emit({
         type: 'command_result',
-        requestId: params.message.requestId,
+        requestId: promptAnswer.requestId,
         output: scriptedOutput,
       });
     }
 
-    params.emit({ type: 'done', requestId: params.message.requestId });
+    params.emit({ type: 'done', requestId: promptAnswer.requestId });
 
     return true;
   }
 
-  if (!isRunCommandMessage(params.message)) {
+  if (
+    !isRunCommandMessage(params.message) &&
+    !isJsonCommandMessage(params.message)
+  ) {
     return false;
   }
 
-  const key = commandKey(params.message.command, params.message.subcommand);
+  const commandMessage = params.message;
+
+  const key = commandKey(commandMessage.command, commandMessage.subcommand);
   const outputs = scriptedOutputs()[key];
   const outputIndex = sandbox.outputIndexes[key] ?? 0;
   const scriptedOutput = Array.isArray(outputs) ? outputs[outputIndex] : null;
@@ -255,8 +312,8 @@ export function handleStorySandboxSocketMessage(params: {
 
   if (
     !canStorySandboxHandleCommand(
-      params.message.command,
-      params.message.subcommand,
+      commandMessage.command,
+      commandMessage.subcommand,
     )
   ) {
     return false;
@@ -266,15 +323,15 @@ export function handleStorySandboxSocketMessage(params: {
 
   if (prompt) {
     sandbox.activePrompt = {
-      requestId: params.message.requestId,
-      command: params.message.command,
-      subcommand: params.message.subcommand,
+      requestId: commandMessage.requestId,
+      command: commandMessage.command,
+      subcommand: commandMessage.subcommand,
       key,
     };
 
     params.emit({
       type: 'prompt',
-      requestId: params.message.requestId,
+      requestId: commandMessage.requestId,
       prompt,
     });
 
@@ -283,8 +340,8 @@ export function handleStorySandboxSocketMessage(params: {
 
   const transitionTargets = scriptedTransitions().flatMap((transition) => {
     if (
-      transition.on.command !== params.message.command ||
-      transition.on.subcommand !== params.message.subcommand ||
+      transition.on.command !== commandMessage.command ||
+      transition.on.subcommand !== commandMessage.subcommand ||
       transition.answer !== undefined
     ) {
       return [];
@@ -307,11 +364,17 @@ export function handleStorySandboxSocketMessage(params: {
       (sandbox.outputIndexes[targetKey] ?? 0) + 1;
   }
 
+  const fallbackOutput =
+    output?.web ?? output?.clientView ?? output?.text ?? '';
+
+  const commandOutput = isStoryCommandOutputValue(scriptedOutput)
+    ? scriptedOutput
+    : fallbackOutput;
+
   params.emit({
     type: 'command_result',
-    requestId: params.message.requestId,
-    output:
-      scriptedOutput ?? output.web ?? output.clientView ?? output.text ?? '',
+    requestId: commandMessage.requestId,
+    output: commandOutput,
   });
 
   for (const target of transitionTargets) {
@@ -325,7 +388,7 @@ export function handleStorySandboxSocketMessage(params: {
       (sandbox.outputIndexes[targetKey] ?? 0) + 1;
   }
 
-  params.emit({ type: 'done', requestId: params.message.requestId });
+  params.emit({ type: 'done', requestId: commandMessage.requestId });
 
   return true;
 }

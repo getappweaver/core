@@ -10,7 +10,9 @@ import {
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
 import { isWebDemoMode } from '../../demo/runtime';
+import { registerStoryDomTarget } from '../../story/dom-targets';
 import {
+  emitStoryTargetClicked,
   emitStoryPassivePlaybackPausedChange,
   emitStoryPassivePlaybackReplayRequested,
   emitStoryPassivePlaybackSeekRequested,
@@ -429,7 +431,9 @@ function StoryPlaybackToolbar(props: { buttonClass: string; storyId: string }) {
         type="button"
         class={btnClass()}
         data-ui="story-playback-toggle"
+        data-story-playback-complete={completed() ? 'true' : 'false'}
         classList={{
+          'story-playback-toggle--complete': completed(),
           'story-playback-toggle--attention': !interacted() && paused(),
         }}
         title={paused() ? 'Play story' : 'Pause story'}
@@ -475,6 +479,31 @@ export function TimelineCommandResultCard(
   );
 
   const widgetHelp = createMemo(() => props.item.web?.widgetHelp ?? null);
+
+  const storyTargetId = createMemo(
+    () =>
+      `timeline-command-result-${props.item.command}-${props.item.subcommand}`,
+  );
+
+  createEffect(() => {
+    const el = cardEl();
+
+    if (!el) {
+      return;
+    }
+
+    const targetId = storyTargetId();
+    const clickHandler = () => emitStoryTargetClicked(targetId);
+
+    el.dataset.storyTarget = targetId;
+    el.addEventListener('click', clickHandler);
+    registerStoryDomTarget(targetId, el);
+
+    onCleanup(() => {
+      el.removeEventListener('click', clickHandler);
+      registerStoryDomTarget(targetId, null);
+    });
+  });
 
   createEffect(() => {
     if (isWebDemoMode() && widgetHelp()) {

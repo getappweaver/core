@@ -55,7 +55,8 @@ export type StoryPassivePlaybackState = {
           arguments: Record<string, unknown>;
           options: Record<string, unknown>;
         };
-      };
+      }
+    | { type: 'scroll_to_bottom' };
   complete?: boolean;
   catchingUp?: boolean;
 };

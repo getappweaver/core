@@ -151,15 +151,34 @@ export const WebActionSchema = z.discriminatedUnion('type', [
 export const WebToolbarActionSchema = z.object({
   label: z.string().min(1),
   icon: z
-    .enum(['add', 'checklist', 'copy', 'edit', 'log', 'openTimeline', 'save'])
+    .enum([
+      'add',
+      'checklist',
+      'copy',
+      'diff',
+      'edit',
+      'log',
+      'openTimeline',
+      'save',
+    ])
     .optional(),
   activeLabel: z.string().min(1).optional(),
   activeIcon: z
-    .enum(['add', 'checklist', 'copy', 'edit', 'log', 'openTimeline', 'save'])
+    .enum([
+      'add',
+      'checklist',
+      'copy',
+      'diff',
+      'edit',
+      'log',
+      'openTimeline',
+      'save',
+    ])
     .optional(),
   toggleKey: z.string().min(1).optional(),
   className: z.string().min(1).optional(),
   visibleOnSurfaces: z.array(z.enum(['dock', 'modal', 'timeline'])).optional(),
+  storyTargetId: z.string().min(1).optional(),
   action: WebActionSchema,
   activeAction: WebActionSchema.optional(),
 });

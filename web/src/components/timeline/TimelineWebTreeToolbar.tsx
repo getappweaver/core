@@ -1,6 +1,9 @@
 import type { Accessor, JSX } from 'solid-js';
 import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js';
 
+import { registerStoryDomTarget } from '../../story/dom-targets';
+import { emitStoryTargetClicked } from '../../story/events';
+
 import { WebButton } from '../WebButton';
 import type { WebTreeToolbarRegistration } from '../WebNodeRenderer';
 
@@ -8,6 +11,7 @@ import {
   cardHeadAddIcon,
   cardHeadChecklistIcon,
   cardHeadCopyIcon,
+  cardHeadDiffIcon,
   cardHeadEditIcon,
   cardHeadLogIcon,
   cardHeadOpenTimelineIcon,
@@ -99,15 +103,17 @@ export function TimelineWebTreeToolbar(
         ? cardHeadChecklistIcon()
         : icon === 'copy'
           ? cardHeadCopyIcon()
-          : icon === 'edit'
-            ? cardHeadEditIcon()
-            : icon === 'log'
-              ? cardHeadLogIcon()
-              : icon === 'openTimeline'
-                ? cardHeadOpenTimelineIcon()
-                : icon === 'save'
-                  ? cardHeadSaveIcon()
-                  : label;
+          : icon === 'diff'
+            ? cardHeadDiffIcon()
+            : icon === 'edit'
+              ? cardHeadEditIcon()
+              : icon === 'log'
+                ? cardHeadLogIcon()
+                : icon === 'openTimeline'
+                  ? cardHeadOpenTimelineIcon()
+                  : icon === 'save'
+                    ? cardHeadSaveIcon()
+                    : label;
 
   /*
    * `when` must be a boolean or data value — never pass `when={() => ...}` here:
@@ -165,6 +171,12 @@ export function TimelineWebTreeToolbar(
                 type="button"
                 class={`${btnClass()}${item.className ? ` ${item.className}` : ''}${actionIcon(item) === 'copy' ? ' chat-copy-btn' : ''}${copiedActionLabel() === item.label ? ' chat-copy-btn--show-text' : ''}`}
                 data-ui={`toolbar-${actionIcon(item) ?? 'action'}`}
+                data-story-target={item.storyTargetId}
+                ref={(el) => {
+                  if (item.storyTargetId) {
+                    registerStoryDomTarget(item.storyTargetId, el);
+                  }
+                }}
                 title={
                   copiedActionLabel() === item.label
                     ? 'Copied'
@@ -181,6 +193,10 @@ export function TimelineWebTreeToolbar(
                     : undefined
                 }
                 onClick={() => {
+                  if (item.storyTargetId) {
+                    emitStoryTargetClicked(item.storyTargetId);
+                  }
+
                   const runActiveAction = actionIsActive(item);
 
                   if (item.activeIcon != null || item.activeLabel != null) {
