@@ -141,24 +141,6 @@ async function sendNip46Request(params: {
 
   const signedEvent = finalizeEvent(template, ephemeralSecret);
 
-  await Promise.all(pool.publish(relays, signedEvent)).catch((err) => {
-    console.error('Failed to publish NIP-46 request to a relay: ', err);
-
-    throw err;
-  });
-
-  const publishOutcomes = await publishSignedEventToRelays(relays, signedEvent);
-
-  const acceptedRelays = publishOutcomes
-    .filter(isRelaySuccess)
-    .map((r) => r.relay);
-
-  if (acceptedRelays.length === 0) {
-    throw new Error(`Failed to publish NIP-46 request to any relay`);
-  }
-
-  debug('NIP-46 sign request published to relays: ', acceptedRelays);
-
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       sub.close();
@@ -221,6 +203,24 @@ async function sendNip46Request(params: {
         resolve(parsed);
       },
     });
+
+    void publishSignedEventToRelays(relays, signedEvent)
+      .then((publishOutcomes) => {
+        const acceptedRelays = publishOutcomes
+          .filter(isRelaySuccess)
+          .map((r) => r.relay);
+
+        if (acceptedRelays.length === 0) {
+          throw new Error('Failed to publish NIP-46 request to any relay');
+        }
+
+        debug('NIP-46 sign request published to relays: ', acceptedRelays);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        sub.close();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      });
   });
 }
 
