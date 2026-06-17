@@ -65680,7 +65680,7 @@
                                         "children": [
                                           {
                                             "type": "text",
-                                            "value": "Latest WoT bookmarks can use this same flat tree once the backend supports it."
+                                            "value": "Search results are ranked by WoT score when available."
                                           }
                                         ]
                                       }
@@ -66015,7 +66015,7 @@
                                                                   ],
                                                                   [
                                                                     "published_at",
-                                                                    "1781200459"
+                                                                    "1781717142"
                                                                   ],
                                                                   [
                                                                     "title",
@@ -66581,7 +66581,7 @@
                                         "children": [
                                           {
                                             "type": "text",
-                                            "value": "Latest WoT bookmarks can use this same flat tree once the backend supports it."
+                                            "value": "Search results are ranked by WoT score when available."
                                           }
                                         ]
                                       }
@@ -67240,7 +67240,7 @@
                                                               ],
                                                               [
                                                                 "published_at",
-                                                                "1781200459"
+                                                                "1781717142"
                                                               ],
                                                               [
                                                                 "title",
@@ -67806,7 +67806,7 @@
                                     "children": [
                                       {
                                         "type": "text",
-                                        "value": "Latest WoT bookmarks can use this same flat tree once the backend supports it."
+                                        "value": "Search results are ranked by WoT score when available."
                                       }
                                     ]
                                   }
@@ -68004,7 +68004,8 @@
                             "surface": "timeline"
                           },
                           "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
+                          "className": "web-file-timeline-diff-button",
+                          "storyTargetId": "file-tree-diff-."
                         }
                       },
                       {
@@ -69445,7 +69446,8 @@
                             "surface": "timeline"
                           },
                           "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
+                          "className": "web-file-timeline-diff-button",
+                          "storyTargetId": "file-tree-diff-."
                         }
                       },
                       {
@@ -73496,6 +73498,7 @@
     "pluginName": "appweaver-file-plugin",
     "sourceType": "command",
     "sourceName": "stories",
+    "iconUrl": "/plugin-icons/file/commands__tree__renderers__tree.svg",
     "story": {
       "id": "file-tree-review-commit-diff",
       "title": "Review multiple file changes and commit",
@@ -73661,1448 +73664,8 @@
                             "surface": "timeline"
                           },
                           "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "View history",
-                          "action": {
-                            "type": "command",
-                            "command": "file",
-                            "subcommand": "history",
-                            "arguments": {},
-                            "options": {}
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-history-button",
-                          "storyTargetId": "file-tree-history-."
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "Open in timeline",
-                          "action": {
-                            "type": "command",
-                            "command": "file",
-                            "subcommand": "tree",
-                            "arguments": {
-                              "rest": []
-                            },
-                            "options": {},
-                            "surface": "timeline",
-                            "recordInTimeline": true
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-open-timeline-button"
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "type": "element",
-                    "tag": "form",
-                    "props": {
-                      "className": "web-form web-form--stacked web-file-tree-inline-form",
-                      "revealId": "file-tree-create-file-_",
-                      "hiddenUntilRevealed": true,
-                      "action": {
-                        "type": "command",
-                        "command": "file",
-                        "subcommand": "create",
-                        "arguments": {
-                          "dir": "."
-                        },
-                        "options": {
-                          "treeDir": ".",
-                          "expanded": "%5B%22docs%22%5D"
-                        },
-                        "recordInTimeline": false
-                      }
-                    },
-                    "children": [
-                      {
-                        "type": "element",
-                        "tag": "text",
-                        "props": {
-                          "tone": "muted",
-                          "size": "sm"
-                        },
-                        "children": [
-                          {
-                            "type": "text",
-                            "value": "Create file in ./"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "element",
-                        "tag": "textField",
-                        "props": {
-                          "formFieldName": "name",
-                          "inputPlaceholder": "filename.ext",
-                          "autoFocus": true
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "row",
-                        "props": {
-                          "className": "web-form__actions",
-                          "gap": "sm"
-                        },
-                        "children": [
-                          {
-                            "type": "element",
-                            "tag": "button",
-                            "props": {
-                              "label": "Create",
-                              "htmlType": "submit"
-                            }
-                          },
-                          {
-                            "type": "element",
-                            "tag": "button",
-                            "props": {
-                              "label": "Close",
-                              "className": "web-button",
-                              "action": {
-                                "type": "hideReveal",
-                                "targetId": "file-tree-create-file-_"
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "type": "element",
-                    "tag": "form",
-                    "props": {
-                      "className": "web-form web-form--stacked web-file-tree-inline-form",
-                      "revealId": "file-tree-create-folder-_",
-                      "hiddenUntilRevealed": true,
-                      "action": {
-                        "type": "command",
-                        "command": "file",
-                        "subcommand": "create",
-                        "arguments": {
-                          "dir": "."
-                        },
-                        "options": {
-                          "treeDir": ".",
-                          "expanded": "%5B%22docs%22%5D",
-                          "folder": true
-                        },
-                        "recordInTimeline": false
-                      }
-                    },
-                    "children": [
-                      {
-                        "type": "element",
-                        "tag": "text",
-                        "props": {
-                          "tone": "muted",
-                          "size": "sm"
-                        },
-                        "children": [
-                          {
-                            "type": "text",
-                            "value": "Create folder in ./"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "element",
-                        "tag": "textField",
-                        "props": {
-                          "formFieldName": "name",
-                          "inputPlaceholder": "folder-name",
-                          "autoFocus": true
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "row",
-                        "props": {
-                          "className": "web-form__actions",
-                          "gap": "sm"
-                        },
-                        "children": [
-                          {
-                            "type": "element",
-                            "tag": "button",
-                            "props": {
-                              "label": "Create",
-                              "htmlType": "submit"
-                            }
-                          },
-                          {
-                            "type": "element",
-                            "tag": "button",
-                            "props": {
-                              "label": "Close",
-                              "className": "web-button",
-                              "action": {
-                                "type": "hideReveal",
-                                "targetId": "file-tree-create-folder-_"
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "type": "element",
-                    "tag": "box",
-                    "props": {
-                      "className": "web-file-tree-block"
-                    },
-                    "children": [
-                      {
-                        "type": "element",
-                        "tag": "tree",
-                        "props": {
-                          "gap": "xs",
-                          "ui": "file-workspace-tree",
-                          "filterable": true,
-                          "filterIndexKey": "file-tree:.:ext=:rows=3",
-                          "filterPlaceholder": "Filter files"
-                        },
-                        "children": [
-                          {
-                            "type": "element",
-                            "tag": "treeItem",
-                            "props": {
-                              "id": "file-tree-item-docs",
-                              "ui": "file-tree-item",
-                              "filterText": "docs\ndocs",
-                              "filterName": "docs",
-                              "filterPath": "docs",
-                              "defaultExpanded": true,
-                              "lazyLoaded": true
-                            },
-                            "children": [
-                              {
-                                "type": "element",
-                                "tag": "row",
-                                "props": {
-                                  "align": "start",
-                                  "itemAlign": "center",
-                                  "className": "web-file-tree-line"
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-file-tree-link-wrap",
-                                      "fill": true
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "docs/",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "tree",
-                                            "arguments": {
-                                              "rest": [
-                                                "docs"
-                                              ]
-                                            },
-                                            "options": {},
-                                            "recordInTimeline": false,
-                                            "refresh": {
-                                              "command": "file",
-                                              "subcommand": "tree",
-                                              "arguments": {
-                                                "rest": [
-                                                  "docs"
-                                                ]
-                                              },
-                                              "options": {}
-                                            }
-                                          },
-                                          "stopPropagation": true,
-                                          "className": "web-tree-link web-tree-link-dir",
-                                          "storyTargetId": "file-tree-open-docs"
-                                        }
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "overflowMenu",
-                                    "props": {
-                                      "label": "⋮",
-                                      "buttonVariant": "icon",
-                                      "className": "web-file-tree-row-menu",
-                                      "storyTargetId": "file-tree-row-actions-docs"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Create file here…",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-create-file-docs",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-docs"
-                                            ]
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Create folder here…",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-create-folder-docs",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-docs"
-                                            ]
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Rename…",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-rename-docs",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-docs"
-                                            ]
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Search here…",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "search",
-                                            "arguments": {},
-                                            "options": {
-                                              "path": "docs"
-                                            },
-                                            "presentation": "form"
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Check diff",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "diff",
-                                            "arguments": {
-                                              "path": "docs"
-                                            },
-                                            "options": {
-                                              "previousDir": ".",
-                                              "timeline": true
-                                            },
-                                            "recordInTimeline": false,
-                                            "surface": "timeline"
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Check history",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "history",
-                                            "arguments": {
-                                              "path": "docs"
-                                            },
-                                            "options": {}
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Delete…",
-                                          "className": "web-file-tree-delete-menu-item",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-delete-docs",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-docs"
-                                            ]
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form",
-                                  "revealId": "file-tree-create-file-docs",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "create",
-                                    "arguments": {
-                                      "dir": "docs"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D"
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "muted",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Create file in docs/"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "textField",
-                                    "props": {
-                                      "formFieldName": "name",
-                                      "inputPlaceholder": "filename.ext",
-                                      "autoFocus": true
-                                    }
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Create",
-                                          "htmlType": "submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-create-file-docs"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form",
-                                  "revealId": "file-tree-create-folder-docs",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "create",
-                                    "arguments": {
-                                      "dir": "docs"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D",
-                                      "folder": true
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "muted",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Create folder in docs/"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "textField",
-                                    "props": {
-                                      "formFieldName": "name",
-                                      "inputPlaceholder": "folder-name",
-                                      "autoFocus": true
-                                    }
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Create",
-                                          "htmlType": "submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-create-folder-docs"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form",
-                                  "revealId": "file-tree-rename-docs",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "rename",
-                                    "arguments": {
-                                      "path": "docs"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D"
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "muted",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Rename docs"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "textField",
-                                    "props": {
-                                      "formFieldName": "name",
-                                      "inputPlaceholder": "docs",
-                                      "value": "docs",
-                                      "autoFocus": true
-                                    }
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Rename",
-                                          "htmlType": "submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-rename-docs"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form web-file-tree-delete-form",
-                                  "revealId": "file-tree-delete-docs",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "delete",
-                                    "arguments": {
-                                      "path": "docs"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D"
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "danger",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Delete docs?"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Delete",
-                                          "htmlType": "submit",
-                                          "className": "web-file-tree-delete-submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-delete-docs"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "stack",
-                                "props": {
-                                  "gap": "xs",
-                                  "className": "web-file-tree-children"
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "treeItem",
-                                    "props": {
-                                      "id": "file-tree-item-docs_DEMO_SYSTEM_md",
-                                      "ui": "file-tree-item",
-                                      "className": "web-file-tree-item-leaf",
-                                      "filterText": "DEMO_SYSTEM.md\ndocs/DEMO_SYSTEM.md",
-                                      "filterName": "DEMO_SYSTEM.md",
-                                      "filterPath": "docs/DEMO_SYSTEM.md",
-                                      "defaultExpanded": false,
-                                      "lazyLoaded": false
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "row",
-                                        "props": {
-                                          "align": "start",
-                                          "itemAlign": "center",
-                                          "className": "web-file-tree-line"
-                                        },
-                                        "children": [
-                                          {
-                                            "type": "element",
-                                            "tag": "row",
-                                            "props": {
-                                              "className": "web-file-tree-link-wrap",
-                                              "fill": true
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "element",
-                                                "tag": "button",
-                                                "props": {
-                                                  "label": "DEMO_SYSTEM.md",
-                                                  "action": {
-                                                    "type": "command",
-                                                    "command": "file",
-                                                    "subcommand": "view",
-                                                    "arguments": {
-                                                      "path": "docs/DEMO_SYSTEM.md"
-                                                    },
-                                                    "options": {
-                                                      "previousDir": "."
-                                                    },
-                                                    "recordInTimeline": false,
-                                                    "surface": "timeline"
-                                                  },
-                                                  "stopPropagation": true,
-                                                  "className": "web-tree-link web-tree-link-file",
-                                                  "storyTargetId": "file-tree-open-docs_DEMO_SYSTEM_md"
-                                                }
-                                              }
-                                            ]
-                                          },
-                                          {
-                                            "type": "element",
-                                            "tag": "overflowMenu",
-                                            "props": {
-                                              "label": "⋮",
-                                              "buttonVariant": "icon",
-                                              "className": "web-file-tree-row-menu",
-                                              "storyTargetId": "file-tree-row-actions-docs/DEMO_SYSTEM.md"
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "element",
-                                                "tag": "menuItem",
-                                                "props": {
-                                                  "label": "Rename…",
-                                                  "action": {
-                                                    "type": "reveal",
-                                                    "targetId": "file-tree-rename-docs_DEMO_SYSTEM_md",
-                                                    "expandTreeItemIds": [
-                                                      "file-tree-item-docs_DEMO_SYSTEM_md"
-                                                    ]
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "element",
-                                                "tag": "menuItem",
-                                                "props": {
-                                                  "label": "Check diff",
-                                                  "action": {
-                                                    "type": "command",
-                                                    "command": "file",
-                                                    "subcommand": "diff",
-                                                    "arguments": {
-                                                      "path": "docs/DEMO_SYSTEM.md"
-                                                    },
-                                                    "options": {
-                                                      "previousDir": "."
-                                                    },
-                                                    "recordInTimeline": false
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "element",
-                                                "tag": "menuItem",
-                                                "props": {
-                                                  "label": "Check history",
-                                                  "action": {
-                                                    "type": "command",
-                                                    "command": "file",
-                                                    "subcommand": "history",
-                                                    "arguments": {
-                                                      "path": "docs/DEMO_SYSTEM.md"
-                                                    },
-                                                    "options": {}
-                                                  }
-                                                }
-                                              },
-                                              {
-                                                "type": "element",
-                                                "tag": "menuItem",
-                                                "props": {
-                                                  "label": "Delete…",
-                                                  "className": "web-file-tree-delete-menu-item",
-                                                  "action": {
-                                                    "type": "reveal",
-                                                    "targetId": "file-tree-delete-docs_DEMO_SYSTEM_md",
-                                                    "expandTreeItemIds": [
-                                                      "file-tree-item-docs_DEMO_SYSTEM_md"
-                                                    ]
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "form",
-                                        "props": {
-                                          "className": "web-form web-form--stacked web-file-tree-inline-form",
-                                          "revealId": "file-tree-rename-docs_DEMO_SYSTEM_md",
-                                          "hiddenUntilRevealed": true,
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "rename",
-                                            "arguments": {
-                                              "path": "docs/DEMO_SYSTEM.md"
-                                            },
-                                            "options": {
-                                              "treeDir": ".",
-                                              "expanded": "%5B%22docs%22%5D"
-                                            },
-                                            "recordInTimeline": false
-                                          }
-                                        },
-                                        "children": [
-                                          {
-                                            "type": "element",
-                                            "tag": "text",
-                                            "props": {
-                                              "tone": "muted",
-                                              "size": "sm"
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "text",
-                                                "value": "Rename docs/DEMO_SYSTEM.md"
-                                              }
-                                            ]
-                                          },
-                                          {
-                                            "type": "element",
-                                            "tag": "textField",
-                                            "props": {
-                                              "formFieldName": "name",
-                                              "inputPlaceholder": "DEMO_SYSTEM.md",
-                                              "value": "DEMO_SYSTEM.md",
-                                              "autoFocus": true
-                                            }
-                                          },
-                                          {
-                                            "type": "element",
-                                            "tag": "row",
-                                            "props": {
-                                              "className": "web-form__actions",
-                                              "gap": "sm"
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "element",
-                                                "tag": "button",
-                                                "props": {
-                                                  "label": "Rename",
-                                                  "htmlType": "submit"
-                                                }
-                                              },
-                                              {
-                                                "type": "element",
-                                                "tag": "button",
-                                                "props": {
-                                                  "label": "Close",
-                                                  "className": "web-button",
-                                                  "action": {
-                                                    "type": "hideReveal",
-                                                    "targetId": "file-tree-rename-docs_DEMO_SYSTEM_md"
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "form",
-                                        "props": {
-                                          "className": "web-form web-form--stacked web-file-tree-inline-form web-file-tree-delete-form",
-                                          "revealId": "file-tree-delete-docs_DEMO_SYSTEM_md",
-                                          "hiddenUntilRevealed": true,
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "delete",
-                                            "arguments": {
-                                              "path": "docs/DEMO_SYSTEM.md"
-                                            },
-                                            "options": {
-                                              "treeDir": ".",
-                                              "expanded": "%5B%22docs%22%5D"
-                                            },
-                                            "recordInTimeline": false
-                                          }
-                                        },
-                                        "children": [
-                                          {
-                                            "type": "element",
-                                            "tag": "text",
-                                            "props": {
-                                              "tone": "danger",
-                                              "size": "sm"
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "text",
-                                                "value": "Delete docs/DEMO_SYSTEM.md?"
-                                              }
-                                            ]
-                                          },
-                                          {
-                                            "type": "element",
-                                            "tag": "row",
-                                            "props": {
-                                              "className": "web-form__actions",
-                                              "gap": "sm"
-                                            },
-                                            "children": [
-                                              {
-                                                "type": "element",
-                                                "tag": "button",
-                                                "props": {
-                                                  "label": "Delete",
-                                                  "htmlType": "submit",
-                                                  "className": "web-file-tree-delete-submit"
-                                                }
-                                              },
-                                              {
-                                                "type": "element",
-                                                "tag": "button",
-                                                "props": {
-                                                  "label": "Close",
-                                                  "className": "web-button",
-                                                  "action": {
-                                                    "type": "hideReveal",
-                                                    "targetId": "file-tree-delete-docs_DEMO_SYSTEM_md"
-                                                  }
-                                                }
-                                              }
-                                            ]
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          },
-                          {
-                            "type": "element",
-                            "tag": "treeItem",
-                            "props": {
-                              "id": "file-tree-item-README_md",
-                              "ui": "file-tree-item",
-                              "className": "web-file-tree-item-leaf",
-                              "filterText": "README.md\nREADME.md",
-                              "filterName": "README.md",
-                              "filterPath": "README.md",
-                              "defaultExpanded": false,
-                              "lazyLoaded": false
-                            },
-                            "children": [
-                              {
-                                "type": "element",
-                                "tag": "row",
-                                "props": {
-                                  "align": "start",
-                                  "itemAlign": "center",
-                                  "className": "web-file-tree-line"
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-file-tree-link-wrap",
-                                      "fill": true
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "README.md",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "view",
-                                            "arguments": {
-                                              "path": "README.md"
-                                            },
-                                            "options": {
-                                              "previousDir": "."
-                                            },
-                                            "recordInTimeline": false,
-                                            "surface": "timeline"
-                                          },
-                                          "stopPropagation": true,
-                                          "className": "web-tree-link web-tree-link-file",
-                                          "storyTargetId": "file-tree-open-README_md"
-                                        }
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "overflowMenu",
-                                    "props": {
-                                      "label": "⋮",
-                                      "buttonVariant": "icon",
-                                      "className": "web-file-tree-row-menu",
-                                      "storyTargetId": "file-tree-row-actions-README.md"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Rename…",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-rename-README_md",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-README_md"
-                                            ]
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Check diff",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "diff",
-                                            "arguments": {
-                                              "path": "README.md"
-                                            },
-                                            "options": {
-                                              "previousDir": "."
-                                            },
-                                            "recordInTimeline": false
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Check history",
-                                          "action": {
-                                            "type": "command",
-                                            "command": "file",
-                                            "subcommand": "history",
-                                            "arguments": {
-                                              "path": "README.md"
-                                            },
-                                            "options": {}
-                                          }
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "menuItem",
-                                        "props": {
-                                          "label": "Delete…",
-                                          "className": "web-file-tree-delete-menu-item",
-                                          "action": {
-                                            "type": "reveal",
-                                            "targetId": "file-tree-delete-README_md",
-                                            "expandTreeItemIds": [
-                                              "file-tree-item-README_md"
-                                            ]
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form",
-                                  "revealId": "file-tree-rename-README_md",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "rename",
-                                    "arguments": {
-                                      "path": "README.md"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D"
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "muted",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Rename README.md"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "textField",
-                                    "props": {
-                                      "formFieldName": "name",
-                                      "inputPlaceholder": "README.md",
-                                      "value": "README.md",
-                                      "autoFocus": true
-                                    }
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Rename",
-                                          "htmlType": "submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-rename-README_md"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "element",
-                                "tag": "form",
-                                "props": {
-                                  "className": "web-form web-form--stacked web-file-tree-inline-form web-file-tree-delete-form",
-                                  "revealId": "file-tree-delete-README_md",
-                                  "hiddenUntilRevealed": true,
-                                  "action": {
-                                    "type": "command",
-                                    "command": "file",
-                                    "subcommand": "delete",
-                                    "arguments": {
-                                      "path": "README.md"
-                                    },
-                                    "options": {
-                                      "treeDir": ".",
-                                      "expanded": "%5B%22docs%22%5D"
-                                    },
-                                    "recordInTimeline": false
-                                  }
-                                },
-                                "children": [
-                                  {
-                                    "type": "element",
-                                    "tag": "text",
-                                    "props": {
-                                      "tone": "danger",
-                                      "size": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "text",
-                                        "value": "Delete README.md?"
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "type": "element",
-                                    "tag": "row",
-                                    "props": {
-                                      "className": "web-form__actions",
-                                      "gap": "sm"
-                                    },
-                                    "children": [
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Delete",
-                                          "htmlType": "submit",
-                                          "className": "web-file-tree-delete-submit"
-                                        }
-                                      },
-                                      {
-                                        "type": "element",
-                                        "tag": "button",
-                                        "props": {
-                                          "label": "Close",
-                                          "className": "web-button",
-                                          "action": {
-                                            "type": "hideReveal",
-                                            "targetId": "file-tree-delete-README_md"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              },
-              "stylesheets": [
-                {
-                  "id": "file-plugin-tree",
-                  "cssText": ".web-file-tree-modal-layout.web-stack {\n  flex: 1;\n  min-height: 0;\n  overflow: hidden;\n  display: flex;\n  flex-direction: column;\n}\n\n.web-file-tree-modal-layout > .web-box.web-file-tree-block {\n  flex: 1;\n  min-height: 0;\n  overflow: auto;\n}\n\n.web-file-tree-modal-layout > .web-row.web-file-tree-controls {\n  flex-shrink: 0;\n}\n\n.web-file-tree-block {\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  font-size: 0.82rem;\n  line-height: 1.45;\n  padding: 0.35rem 0.5rem;\n  background: rgba(0, 0, 0, 0.2);\n  border-radius: 4px;\n  overflow-x: auto;\n}\n\n.web-file-tree-block > .web-node.web-tree {\n  gap: 0.06rem;\n}\n\n.web-file-tree-children.web-stack {\n  gap: 0.06rem;\n}\n\n.web-file-tree-line.web-row {\n  gap: 0.35rem;\n  flex-wrap: nowrap;\n  align-items: center;\n  min-width: 0;\n}\n\n.web-file-tree-item-leaf > .web-tree-item-summary > .web-tree-toggle {\n  visibility: hidden;\n  pointer-events: none;\n}\n\n.web-file-tree-line .web-overflow-trigger.web-file-tree-row-menu {\n  opacity: 0;\n  pointer-events: none;\n}\n\n.web-file-tree-line:hover .web-overflow-trigger.web-file-tree-row-menu,\n.web-file-tree-line:focus-within .web-overflow-trigger.web-file-tree-row-menu,\n.web-overflow-menu.is-open .web-overflow-trigger.web-file-tree-row-menu {\n  opacity: 1;\n  pointer-events: auto;\n}\n\n.web-file-tree-inline-form.web-form {\n  margin: 0.16rem 0 0.2rem 1.6rem;\n  padding: 0.35rem 0.45rem;\n  background: rgba(0, 0, 0, 0.18);\n}\n\n.web-file-tree-inline-form .web-textField__input {\n  min-width: min(18rem, 100%);\n}\n\n.web-file-tree-delete-form.web-form {\n  border-left: 2px solid var(--color-danger, #f48771);\n}\n\n.web-button.web-file-tree-delete-menu-item {\n  color: #000 !important;\n}\n\n.web-button.web-file-tree-delete-menu-item:hover,\n.web-button.web-file-tree-delete-menu-item:focus-visible {\n  background: var(--color-danger, #f48771) !important;\n  color: #000 !important;\n}\n\n.web-button.web-file-tree-delete-submit {\n  background: color-mix(in srgb, var(--color-danger, #f48771) 86%, transparent) !important;\n  color: #000 !important;\n}\n\n.web-button.web-file-tree-delete-submit:hover,\n.web-button.web-file-tree-delete-submit:focus-visible {\n  background: var(--color-danger, #f48771) !important;\n  color: #000 !important;\n}\n\n.web-file-tree-glyph-line {\n  white-space: pre;\n  user-select: none;\n  flex-shrink: 0;\n  color: inherit;\n  opacity: 0.78;\n}\n\n.web-file-tree-link-wrap {\n  min-width: 0;\n}\n\n.web-file-tree-path {\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  font-size: 0.78rem;\n}\n\n.web-file-tree-controls.web-row {\n  flex-wrap: wrap;\n  margin-top: 0.2rem;\n}\n\n.web-file-tree-breadcrumb {\n  flex: 1;\n}\n\n.web-file-tree-nav-sep {\n  opacity: 0.45;\n  user-select: none;\n}\n\n.web-button.web-file-new-file,\n.web-button.web-file-new-folder,\n.web-button.web-file-advanced-search-button,\n.web-button.web-file-timeline-diff-button,\n.web-button.web-file-history-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 1.55rem;\n  height: 1.45rem;\n  min-height: 0;\n  padding: 0 !important;\n  border: 1px solid #000;\n  border-radius: 0;\n  background: color-mix(in srgb, var(--color-accent, #8ecae6) 86%, transparent) !important;\n  box-shadow: 3px 3px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  color: #000;\n  font-size: 0;\n  line-height: 1;\n  transform: none;\n}\n\n.web-button.web-file-new-file::before,\n.web-button.web-file-new-folder::before,\n.web-button.web-file-advanced-search-button::before,\n.web-button.web-file-timeline-diff-button::before,\n.web-button.web-file-history-button::before {\n  content: '';\n  display: block;\n  width: 1.125rem;\n  height: 1.125rem;\n  background: currentColor;\n}\n\n.web-button.web-file-new-file::before {\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 14C4.448 14 4 13.552 4 13V3C4 2.448 4.448 2 5 2H8V4.5C8 5.328 8.672 6 9.5 6H12V6.025C12.344 6.056 12.677 6.121 13 6.213V5.414C13 5.016 12.842 4.635 12.561 4.353L9.647 1.439C9.366 1.158 8.984 1 8.586 1H5C3.895 1 3 1.895 3 3V13C3 14.105 3.895 15 5 15H7.261C7.008 14.693 6.791 14.357 6.607 14H5ZM9 2.207L11.793 5H9.5C9.224 5 9 4.776 9 4.5V2.207ZM11.5 7C9.015 7 7 9.015 7 11.5C7 13.985 9.015 16 11.5 16C13.985 16 16 13.985 16 11.5C16 9.015 13.985 7 11.5 7ZM14 12H12V14C12 14.276 11.776 14.5 11.5 14.5C11.224 14.5 11 14.276 11 14V12H9C8.724 12 8.5 11.776 8.5 11.5C8.5 11.224 8.724 11 9 11H11V9C11 8.724 11.224 8.5 11.5 8.5C11.776 8.5 12 8.724 12 9V11H14C14.276 11 14.5 11.224 14.5 11.5C14.5 11.776 14.276 12 14 12Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 14C4.448 14 4 13.552 4 13V3C4 2.448 4.448 2 5 2H8V4.5C8 5.328 8.672 6 9.5 6H12V6.025C12.344 6.056 12.677 6.121 13 6.213V5.414C13 5.016 12.842 4.635 12.561 4.353L9.647 1.439C9.366 1.158 8.984 1 8.586 1H5C3.895 1 3 1.895 3 3V13C3 14.105 3.895 15 5 15H7.261C7.008 14.693 6.791 14.357 6.607 14H5ZM9 2.207L11.793 5H9.5C9.224 5 9 4.776 9 4.5V2.207ZM11.5 7C9.015 7 7 9.015 7 11.5C7 13.985 9.015 16 11.5 16C13.985 16 16 13.985 16 11.5C16 9.015 13.985 7 11.5 7ZM14 12H12V14C12 14.276 11.776 14.5 11.5 14.5C11.224 14.5 11 14.276 11 14V12H9C8.724 12 8.5 11.776 8.5 11.5C8.5 11.224 8.724 11 9 11H11V9C11 8.724 11.224 8.5 11.5 8.5C11.776 8.5 12 8.724 12 9V11H14C14.276 11 14.5 11.224 14.5 11.5C14.5 11.776 14.276 12 14 12Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-file-new-folder::before {\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4.5V6H5.58579C5.71839 6 5.84557 5.94732 5.93934 5.85355L7.29289 4.5L5.93934 3.14645C5.84557 3.05268 5.71839 3 5.58579 3H3.5C2.67157 3 2 3.67157 2 4.5ZM1 4.5C1 3.11929 2.11929 2 3.5 2H5.58579C5.98361 2 6.36514 2.15804 6.64645 2.43934L8.20711 4H12.5C13.8807 4 15 5.11929 15 6.5V7.25716C14.6929 7.00353 14.3578 6.78261 14 6.59971V6.5C14 5.67157 13.3284 5 12.5 5H8.20711L6.64645 6.56066C6.36514 6.84197 5.98361 7 5.58579 7H2V11.5C2 12.3284 2.67157 13 3.5 13H6.20703C6.30564 13.3486 6.43777 13.6832 6.59971 14H3.5C2.11929 14 1 12.8807 1 11.5V4.5ZM16 11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5C7 9.01472 9.01472 7 11.5 7C13.9853 7 16 9.01472 16 11.5ZM12 9C12 8.72386 11.7761 8.5 11.5 8.5C11.2239 8.5 11 8.72386 11 9V11H9C8.72386 11 8.5 11.2239 8.5 11.5C8.5 11.7761 8.72386 12 9 12H11V14C11 14.2761 11.2239 14.5 11.5 14.5C11.7761 14.5 12 14.2761 12 14V12H14C14.2761 12 14.5 11.7761 14.5 11.5C14.5 11.2239 14.2761 11 14 11H12V9Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4.5V6H5.58579C5.71839 6 5.84557 5.94732 5.93934 5.85355L7.29289 4.5L5.93934 3.14645C5.84557 3.05268 5.71839 3 5.58579 3H3.5C2.67157 3 2 3.67157 2 4.5ZM1 4.5C1 3.11929 2.11929 2 3.5 2H5.58579C5.98361 2 6.36514 2.15804 6.64645 2.43934L8.20711 4H12.5C13.8807 4 15 5.11929 15 6.5V7.25716C14.6929 7.00353 14.3578 6.78261 14 6.59971V6.5C14 5.67157 13.3284 5 12.5 5H8.20711L6.64645 6.56066C6.36514 6.84197 5.98361 7 5.58579 7H2V11.5C2 12.3284 2.67157 13 3.5 13H6.20703C6.30564 13.3486 6.43777 13.6832 6.59971 14H3.5C2.11929 14 1 12.8807 1 11.5V4.5ZM16 11.5C16 13.9853 13.9853 16 11.5 16C9.01472 16 7 13.9853 7 11.5C7 9.01472 9.01472 7 11.5 7C13.9853 7 16 9.01472 16 11.5ZM12 9C12 8.72386 11.7761 8.5 11.5 8.5C11.2239 8.5 11 8.72386 11 9V11H9C8.72386 11 8.5 11.2239 8.5 11.5C8.5 11.7761 8.72386 12 9 12H11V14C11 14.2761 11.2239 14.5 11.5 14.5C11.7761 14.5 12 14.2761 12 14V12H14C14.2761 12 14.5 11.7761 14.5 11.5C14.5 11.2239 14.2761 11 14 11H12V9Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-file-advanced-search-button::before {\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14,6v6H10.66718a3.66156,3.66156,0,0,0,.24884-1.30225A3.70117,3.70117,0,0,0,7.21973,7,3.65379,3.65379,0,0,0,6,7.22308V2h4V6ZM11,2V5h3ZM9.87445,10.69754a2.69732,2.69732,0,0,1-4.73038,1.77284L2.52149,14l-.47964-.823,2.61261-1.52332a2.69756,2.69756,0,1,1,5.22-.95614Zm-.95195,0a1.74533,1.74533,0,1,0-1.74506,1.74558A1.74723,1.74723,0,0,0,8.9225,10.69754Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14,6v6H10.66718a3.66156,3.66156,0,0,0,.24884-1.30225A3.70117,3.70117,0,0,0,7.21973,7,3.65379,3.65379,0,0,0,6,7.22308V2h4V6ZM11,2V5h3ZM9.87445,10.69754a2.69732,2.69732,0,0,1-4.73038,1.77284L2.52149,14l-.47964-.823,2.61261-1.52332a2.69756,2.69756,0,1,1,5.22-.95614Zm-.95195,0a1.74533,1.74533,0,1,0-1.74506,1.74558A1.74723,1.74723,0,0,0,8.9225,10.69754Z'/%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-file-new-file:hover,\n.web-button.web-file-new-folder:hover,\n.web-button.web-file-advanced-search-button:hover,\n.web-button.web-file-timeline-diff-button:hover,\n.web-button.web-file-history-button:hover,\n.web-button.web-file-new-file:focus-visible,\n.web-button.web-file-new-folder:focus-visible,\n.web-button.web-file-timeline-diff-button:focus-visible,\n.web-button.web-file-history-button:focus-visible,\n.web-button.web-file-advanced-search-button:focus-visible {\n  background: var(--color-accent, #8ecae6) !important;\n  color: #000;\n  box-shadow: 3px 3px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  transform: none;\n}\n\n.web-button.web-file-new-file:active,\n.web-button.web-file-new-folder:active,\n.web-button.web-file-advanced-search-button:active,\n.web-button.web-file-timeline-diff-button:active,\n.web-button.web-file-history-button:active {\n  background: color-mix(in srgb, var(--color-accent, #8ecae6) 72%, #000) !important;\n  box-shadow: 1px 1px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  transform: translate(2px, 2px);\n}\n\n.web-button.web-file-timeline-diff-button::before {\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M476 399.1c0-3.9-3.1-7.1-7-7.1h-42c-3.8 0-7 3.2-7 7.1V484h-84.5c-4.1 0-7.5 3.1-7.5 7v42c0 3.8 3.4 7 7.5 7H420v84.9c0 3.9 3.2 7.1 7 7.1h42c3.9 0 7-3.2 7-7.1V540h84.5c4.1 0 7.5-3.2 7.5-7v-42c0-3.9-3.4-7-7.5-7H476v-84.9zM560.5 704h-225c-4.1 0-7.5 3.2-7.5 7v42c0 3.8 3.4 7 7.5 7h225c4.1 0 7.5-3.2 7.5-7v-42c0-3.8-3.4-7-7.5-7zm-7.1-502.6c-6-6-14.1-9.4-22.6-9.4H192c-17.7 0-32 14.3-32 32v704c0 17.7 14.3 32 32 32h512c17.7 0 32-14.3 32-32V397.3c0-8.5-3.4-16.6-9.4-22.6L553.4 201.4zM664 888H232V264h282.2L664 413.8V888zm190.2-581.4L611.3 72.9c-6-5.7-13.9-8.9-22.2-8.9H296c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h277l219 210.6V824c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V329.6c0-8.7-3.5-17-9.8-23z'/%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 1024 1024' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M476 399.1c0-3.9-3.1-7.1-7-7.1h-42c-3.8 0-7 3.2-7 7.1V484h-84.5c-4.1 0-7.5 3.1-7.5 7v42c0 3.8 3.4 7 7.5 7H420v84.9c0 3.9 3.2 7.1 7 7.1h42c3.9 0 7-3.2 7-7.1V540h84.5c4.1 0 7.5-3.2 7.5-7v-42c0-3.9-3.4-7-7.5-7H476v-84.9zM560.5 704h-225c-4.1 0-7.5 3.2-7.5 7v42c0 3.8 3.4 7 7.5 7h225c4.1 0 7.5-3.2 7.5-7v-42c0-3.8-3.4-7-7.5-7zm-7.1-502.6c-6-6-14.1-9.4-22.6-9.4H192c-17.7 0-32 14.3-32 32v704c0 17.7 14.3 32 32 32h512c17.7 0 32-14.3 32-32V397.3c0-8.5-3.4-16.6-9.4-22.6L553.4 201.4zM664 888H232V264h282.2L664 413.8V888zm190.2-581.4L611.3 72.9c-6-5.7-13.9-8.9-22.2-8.9H296c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h277l219 210.6V824c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V329.6c0-8.7-3.5-17-9.8-23z'/%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-file-history-button::before {\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(85.572501, 42.666667)'%3E%3Cpath d='M236.349632 0H1.68296533V234.666667H44.349632V42.6666667H218.642965L300.349632 124.373333V234.666667H343.016299V106.666667L236.349632 0ZM0 405.333333V277.360521H28.8096875V382.755208H83.81V405.333333H0ZM153.17 275.102708C173.279583 275.102708 188.692917 281.484792 199.41 294.248958C209.705625 306.47125 214.853437 322.185625 214.853437 341.392083C214.853437 362.404792 208.772396 379.112604 196.610312 391.515521C186.134062 402.232604 171.653958 407.591146 153.17 407.591146C133.060417 407.591146 117.647083 401.209062 106.93 388.444896C96.634375 376.222604 91.4865625 360.267396 91.4865625 340.579271C91.4865625 319.988021 97.5676042 303.490937 109.729687 291.088021C120.266146 280.431146 134.74625 275.102708 153.17 275.102708ZM153.079687 297.680833C142.663646 297.680833 134.625833 302.015833 128.96625 310.685833C123.848542 318.512917 121.289687 328.567708 121.289687 340.850208C121.289687 355.059375 124.330208 366.0775 130.41125 373.904583C136.131042 381.310208 143.717292 385.013021 153.17 385.013021C163.525833 385.013021 171.59375 380.647917 177.37375 371.917708C182.491458 364.211042 185.050312 354.035833 185.050312 341.392083C185.050312 327.483958 182.009792 316.616354 175.92875 308.789271C170.208958 301.383646 162.592604 297.680833 153.079687 297.680833ZM343.91 333.715521V399.011458C336.564583 401.48 331.386667 403.105625 328.37625 403.888333C319.043958 406.356875 309.019271 407.591146 298.302187 407.591146C277.229271 407.591146 261.18375 402.292812 250.165625 391.696146C237.943333 380.015729 231.832187 363.729375 231.832187 342.837083C231.832187 318.813958 239.418437 300.69125 254.590937 288.468958C265.609062 279.558125 280.480521 275.102708 299.205312 275.102708C315.220729 275.102708 330.122292 278.022812 343.91 283.863021L334.065937 306.350833C327.563437 303.099583 321.87375 300.826719 316.996875 299.53224C312.12 298.23776 306.761458 297.590521 300.92125 297.590521C286.952917 297.590521 276.657292 302.13625 270.034375 311.227708C264.435 318.934375 261.635312 329.079479 261.635312 341.663021C261.635312 356.775312 265.849896 368.154687 274.279062 375.801146C281.022396 381.942396 289.391354 385.013021 299.385937 385.013021C305.226146 385.013021 310.765312 384.019583 316.003437 382.032708V356.293646H293.967187V333.715521H343.91Z'/%3E%3C/g%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(85.572501, 42.666667)'%3E%3Cpath d='M236.349632 0H1.68296533V234.666667H44.349632V42.6666667H218.642965L300.349632 124.373333V234.666667H343.016299V106.666667L236.349632 0ZM0 405.333333V277.360521H28.8096875V382.755208H83.81V405.333333H0ZM153.17 275.102708C173.279583 275.102708 188.692917 281.484792 199.41 294.248958C209.705625 306.47125 214.853437 322.185625 214.853437 341.392083C214.853437 362.404792 208.772396 379.112604 196.610312 391.515521C186.134062 402.232604 171.653958 407.591146 153.17 407.591146C133.060417 407.591146 117.647083 401.209062 106.93 388.444896C96.634375 376.222604 91.4865625 360.267396 91.4865625 340.579271C91.4865625 319.988021 97.5676042 303.490937 109.729687 291.088021C120.266146 280.431146 134.74625 275.102708 153.17 275.102708ZM153.079687 297.680833C142.663646 297.680833 134.625833 302.015833 128.96625 310.685833C123.848542 318.512917 121.289687 328.567708 121.289687 340.850208C121.289687 355.059375 124.330208 366.0775 130.41125 373.904583C136.131042 381.310208 143.717292 385.013021 153.17 385.013021C163.525833 385.013021 171.59375 380.647917 177.37375 371.917708C182.491458 364.211042 185.050312 354.035833 185.050312 341.392083C185.050312 327.483958 182.009792 316.616354 175.92875 308.789271C170.208958 301.383646 162.592604 297.680833 153.079687 297.680833ZM343.91 333.715521V399.011458C336.564583 401.48 331.386667 403.105625 328.37625 403.888333C319.043958 406.356875 309.019271 407.591146 298.302187 407.591146C277.229271 407.591146 261.18375 402.292812 250.165625 391.696146C237.943333 380.015729 231.832187 363.729375 231.832187 342.837083C231.832187 318.813958 239.418437 300.69125 254.590937 288.468958C265.609062 279.558125 280.480521 275.102708 299.205312 275.102708C315.220729 275.102708 330.122292 278.022812 343.91 283.863021L334.065937 306.350833C327.563437 303.099583 321.87375 300.826719 316.996875 299.53224C312.12 298.23776 306.761458 297.590521 300.92125 297.590521C286.952917 297.590521 276.657292 302.13625 270.034375 311.227708C264.435 318.934375 261.635312 329.079479 261.635312 341.663021C261.635312 356.775312 265.849896 368.154687 274.279062 375.801146C281.022396 381.942396 289.391354 385.013021 299.385937 385.013021C305.226146 385.013021 310.765312 384.019583 316.003437 382.032708V356.293646H293.967187V333.715521H343.91Z'/%3E%3C/g%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-tree-link {\n  display: block;\n  background: transparent !important;\n  box-shadow: none !important;\n  padding: 0 !important;\n  margin: 0;\n  border: none;\n  border-radius: 0;\n  color: inherit;\n  text-decoration: none;\n  text-align: left;\n  min-height: 0;\n  transform: none !important;\n  vertical-align: baseline;\n  font: inherit;\n  cursor: pointer;\n  max-width: 100%;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n}\n\n.web-button.web-tree-link:hover,\n.web-button.web-tree-link:focus-visible {\n  background: transparent !important;\n  box-shadow: none !important;\n  text-decoration: underline;\n  transform: none !important;\n}\n\n.web-button.web-tree-link:active {\n  background: transparent !important;\n  box-shadow: none !important;\n  transform: none !important;\n}\n\n.web-tree-link-dir {\n  color: var(--color-accent, #8ecae6);\n}\n\n.web-tree-link-file {\n  color: inherit;\n}\n\n/* Git filename + badge share one tone per row (see web-file-tree-line-git-*). */\n.web-tree-link-git-modified {\n  color: #d7ba7d;\n}\n\n.web-tree-link-git-added,\n.web-tree-link-git-untracked {\n  color: #73c991;\n}\n\n.web-tree-link-git-deleted,\n.web-tree-link-git-conflicted {\n  color: var(--color-danger, #f48771);\n}\n\n.web-tree-link-git-renamed {\n  color: var(--color-info, #75beff);\n}\n\n.web-file-tree-line.web-file-tree-line-git-modified .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-modified .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-modified .web-button.web-tree-git-badge-button {\n  color: #d7ba7d;\n}\n\n.web-file-tree-line.web-file-tree-line-git-added .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-added .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-added .web-button.web-tree-git-badge-button,\n.web-file-tree-line.web-file-tree-line-git-untracked .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-untracked .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-untracked .web-button.web-tree-git-badge-button {\n  color: #73c991;\n}\n\n.web-file-tree-line.web-file-tree-line-git-renamed .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-renamed .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-renamed .web-button.web-tree-git-badge-button {\n  color: var(--color-info, #75beff);\n}\n\n.web-file-tree-line.web-file-tree-line-git-deleted .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-deleted .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-deleted .web-button.web-tree-git-badge-button,\n.web-file-tree-line.web-file-tree-line-git-conflicted .web-button.web-tree-link,\n.web-file-tree-line.web-file-tree-line-git-conflicted .web-node.web-badge,\n.web-file-tree-line.web-file-tree-line-git-conflicted .web-button.web-tree-git-badge-button {\n  color: var(--color-danger, #f48771);\n}\n\n.web-file-tree-line.web-file-tree-line-git-deleted .web-button.web-tree-link {\n  text-decoration: line-through;\n}\n\n.web-file-tree-line.web-file-tree-line-git-deleted\n  .web-button.web-tree-link:hover,\n.web-file-tree-line.web-file-tree-line-git-deleted\n  .web-button.web-tree-link:focus-visible {\n  text-decoration: line-through underline;\n}\n\n.web-tree-link-nav {\n  color: var(--color-text-muted, #a8a8a8);\n}\n\n.web-button.web-tree-link.web-tree-link-nav:hover,\n.web-button.web-tree-link.web-tree-link-nav:focus-visible {\n  color: var(--color-text);\n}\n\n.web-node.web-badge.web-tree-git-badge,\n.web-button.web-tree-git-badge-button {\n  flex-shrink: 0;\n  min-width: 1.2rem;\n  padding: 0;\n  border: none;\n  background: transparent;\n  box-shadow: none;\n  font-size: 0.72rem;\n  font-weight: 700;\n  line-height: 1;\n  text-align: center;\n  justify-content: center;\n}\n\n.web-button.web-tree-git-badge-button {\n  min-height: 0;\n  cursor: pointer;\n}\n\n.web-button.web-tree-git-badge-button:hover,\n.web-button.web-tree-git-badge-button:focus-visible {\n  text-decoration: underline;\n  transform: none !important;\n}\n\n.web-tree-git-badge.web-tree-git-modified {\n  color: #d7ba7d;\n}\n\n.web-tree-git-badge.web-tree-git-added,\n.web-tree-git-badge.web-tree-git-untracked {\n  color: #73c991;\n}\n\n.web-tree-git-badge.web-tree-git-deleted,\n.web-tree-git-badge.web-tree-git-conflicted {\n  color: var(--color-danger, #f48771);\n}\n\n.web-tree-git-badge.web-tree-git-renamed {\n  color: var(--color-info, #75beff);\n}\n\n.web-file-breadcrumb.web-row {\n  flex-wrap: wrap;\n  min-width: 0;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  font-size: 0.78rem;\n  line-height: 1.4;\n}\n\n.web-button.web-file-breadcrumb-link {\n  display: inline;\n  background: transparent !important;\n  box-shadow: none !important;\n  padding: 0 !important;\n  margin: 0;\n  border: none;\n  border-radius: 0;\n  color: var(--color-accent, #8ecae6);\n  text-decoration: none;\n  text-align: left;\n  min-height: 0;\n  transform: none !important;\n  vertical-align: baseline;\n  font: inherit;\n  cursor: pointer;\n}\n\n.web-button.web-file-breadcrumb-link:hover,\n.web-button.web-file-breadcrumb-link:focus-visible {\n  background: transparent !important;\n  box-shadow: none !important;\n  text-decoration: underline;\n  transform: none !important;\n}\n\n.web-button.web-file-breadcrumb-link:active {\n  background: transparent !important;\n  box-shadow: none !important;\n  transform: none !important;\n}\n\n.web-file-breadcrumb-current {\n  color: var(--color-text, #d4d4d4);\n}\n\n.web-file-breadcrumb-separator {\n  color: var(--color-text-muted, #a8a8a8);\n  opacity: 0.55;\n  user-select: none;\n}\n\n.web-button.web-file-open-timeline-button {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 1.55rem;\n  height: 1.45rem;\n  min-height: 0;\n  padding: 0 !important;\n  border: 1px solid #000;\n  border-radius: 0;\n  background: color-mix(in srgb, var(--color-accent, #8ecae6) 86%, transparent) !important;\n  box-shadow: 3px 3px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  color: #000;\n  font-size: 0;\n  line-height: 1;\n  transform: none;\n}\n\n.web-button.web-file-open-timeline-button::before {\n  content: '';\n  display: block;\n  width: 1.125rem;\n  height: 1.125rem;\n  background: currentColor;\n  mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(85.333333,64)'%3E%3Cpath d='M128 63.999444v42.667l-85.333333.000223V320H256v-85.333556h42.666l.000667 128.000223H0V64l128-.000556ZM362.666667 0v170.666667H320V72.835L143.084945 249.751611l-30.16989-30.169889L289.83 42.666H192V0h170.666667Z'/%3E%3C/g%3E%3C/svg%3E\") center / contain no-repeat;\n  -webkit-mask: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(85.333333,64)'%3E%3Cpath d='M128 63.999444v42.667l-85.333333.000223V320H256v-85.333556h42.666l.000667 128.000223H0V64l128-.000556ZM362.666667 0v170.666667H320V72.835L143.084945 249.751611l-30.16989-30.169889L289.83 42.666H192V0h170.666667Z'/%3E%3C/g%3E%3C/svg%3E\") center / contain no-repeat;\n}\n\n.web-button.web-file-open-timeline-button:hover,\n.web-button.web-file-open-timeline-button:focus-visible {\n  background: var(--color-accent, #8ecae6) !important;\n  color: #000;\n  box-shadow: 3px 3px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  transform: none;\n}\n\n.web-button.web-file-open-timeline-button:active {\n  background: color-mix(in srgb, var(--color-accent, #8ecae6) 72%, #000) !important;\n  box-shadow: 1px 1px 0 var(--color-panel-shadow, rgba(0, 0, 0, 0.7));\n  transform: translate(2px, 2px);\n}\n\n:host(.web-ui-shadow-host--timeline) .web-button.web-file-open-timeline-button {\n  display: none;\n}"
-                }
-              ],
-              "shadowMountOverflow": "hidden"
-            },
-            {
-              "kind": "ui",
-              "version": 1,
-              "meta": {
-                "command": "file",
-                "subcommand": "tree"
-              },
-              "widgetHelp": {
-                "title": "File manager",
-                "body": [
-                  "Browse project files, open markdown or code, inspect history, and jump into diffs without leaving the app."
-                ],
-                "stories": [
-                  {
-                    "id": "file-tree-edit-diff-markdown",
-                    "title": "Edit markdown and check the diff",
-                    "description": "Open a markdown file from the tree, save an edit, and review the resulting diff.",
-                    "pluginAlias": "file",
-                    "iconUrl": "/plugin-icons/file/commands__tree__renderers__tree.svg"
-                  },
-                  {
-                    "id": "file-tree-review-commit-diff",
-                    "title": "Review multiple file changes and commit",
-                    "description": "Open a workspace diff card, review multiple changed files, and commit the selected set.",
-                    "pluginAlias": "file",
-                    "iconUrl": "/plugin-icons/file/commands__tree__renderers__tree.svg"
-                  },
-                  {
-                    "id": "file-tree-history-commit-diff",
-                    "title": "Check commit history and inspect a diff",
-                    "description": "Open workspace history, pick a commit, and review the files changed by that commit.",
-                    "pluginAlias": "file",
-                    "iconUrl": "/plugin-icons/file/commands__tree__renderers__tree.svg"
-                  }
-                ]
-              },
-              "tree": {
-                "type": "element",
-                "tag": "stack",
-                "props": {
-                  "gap": "md",
-                  "className": "web-file-tree-modal-layout"
-                },
-                "children": [
-                  {
-                    "type": "element",
-                    "tag": "row",
-                    "props": {
-                      "gap": "sm",
-                      "align": "between",
-                      "itemAlign": "baseline",
-                      "className": "web-file-tree-controls"
-                    },
-                    "children": [
-                      {
-                        "type": "element",
-                        "tag": "row",
-                        "props": {
-                          "gap": "xs",
-                          "align": "start",
-                          "itemAlign": "baseline",
-                          "className": "web-file-breadcrumb web-file-tree-breadcrumb"
-                        },
-                        "children": [
-                          {
-                            "type": "element",
-                            "tag": "text",
-                            "props": {
-                              "className": "web-file-breadcrumb-current",
-                              "whiteSpace": "pre-wrap"
-                            },
-                            "children": [
-                              {
-                                "type": "text",
-                                "value": "."
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "Create file here",
-                          "action": {
-                            "type": "reveal",
-                            "targetId": "file-tree-create-file-_"
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-new-file"
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "Create folder here",
-                          "action": {
-                            "type": "reveal",
-                            "targetId": "file-tree-create-folder-_"
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-new-folder"
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "Advanced search",
-                          "action": {
-                            "type": "command",
-                            "command": "file",
-                            "subcommand": "search",
-                            "arguments": {},
-                            "options": {},
-                            "presentation": "form"
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-advanced-search-button"
-                        }
-                      },
-                      {
-                        "type": "element",
-                        "tag": "button",
-                        "props": {
-                          "label": "Show folder diff",
-                          "action": {
-                            "type": "command",
-                            "command": "file",
-                            "subcommand": "diff",
-                            "arguments": {
-                              "path": "."
-                            },
-                            "options": {
-                              "previousDir": ".",
-                              "timeline": true
-                            },
-                            "recordInTimeline": false,
-                            "surface": "timeline"
-                          },
-                          "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
+                          "className": "web-file-timeline-diff-button",
+                          "storyTargetId": "file-tree-diff-."
                         }
                       },
                       {
@@ -76132,7 +74695,7 @@
                               "id": "file-tree-item-README_md",
                               "ui": "file-tree-item",
                               "className": "web-file-tree-item-leaf",
-                              "filterText": "README.md\nREADME.md",
+                              "filterText": "README.md\nREADME.md\nM\nmodified\nfile",
                               "filterName": "README.md",
                               "filterPath": "README.md",
                               "defaultExpanded": false,
@@ -76145,7 +74708,7 @@
                                 "props": {
                                   "align": "start",
                                   "itemAlign": "center",
-                                  "className": "web-file-tree-line"
+                                  "className": "web-file-tree-line web-file-tree-line-git web-file-tree-line-git-modified"
                                 },
                                 "children": [
                                   {
@@ -76175,11 +74738,33 @@
                                             "surface": "timeline"
                                           },
                                           "stopPropagation": true,
-                                          "className": "web-tree-link web-tree-link-file",
+                                          "className": "web-tree-link web-tree-link-file web-tree-link-git web-tree-link-git-modified",
                                           "storyTargetId": "file-tree-open-README_md"
                                         }
                                       }
                                     ]
+                                  },
+                                  {
+                                    "type": "element",
+                                    "tag": "button",
+                                    "props": {
+                                      "label": "M",
+                                      "action": {
+                                        "type": "command",
+                                        "command": "file",
+                                        "subcommand": "diff",
+                                        "arguments": {
+                                          "path": "README.md"
+                                        },
+                                        "options": {
+                                          "previousDir": "."
+                                        },
+                                        "recordInTimeline": false
+                                      },
+                                      "stopPropagation": true,
+                                      "className": "web-tree-git-badge web-tree-git-badge-button web-tree-git-modified web-tree-git-scope-file",
+                                      "storyTargetId": "file-tree-diff-README_md"
+                                    }
                                   },
                                   {
                                     "type": "element",
@@ -77075,6 +75660,30 @@
       "steps": [
         {
           "type": "instruction",
+          "text": "Open the File tree widget from the header.",
+          "showcase": {
+            "title": "Start from the workspace tree",
+            "description": "The File widget is the launch point for workspace review flows."
+          }
+        },
+        {
+          "type": "focus_target",
+          "target": {
+            "type": "header_widget",
+            "command": "file",
+            "subcommand": "tree"
+          }
+        },
+        {
+          "type": "wait_for_action",
+          "match": {
+            "type": "widget_opened",
+            "command": "file",
+            "subcommand": "tree"
+          }
+        },
+        {
+          "type": "instruction",
           "text": "Open the workspace diff card for all changed files.",
           "showcase": {
             "title": "Changed files are grouped together",
@@ -77082,16 +75691,25 @@
           }
         },
         {
-          "type": "run_command",
-          "command": "file",
-          "subcommand": "diff",
-          "payload": {
-            "arguments": {
-              "path": "."
-            },
-            "options": {
-              "timeline": true
-            }
+          "type": "focus_target",
+          "target": {
+            "type": "web_node",
+            "targetId": "file-tree-diff-."
+          }
+        },
+        {
+          "type": "wait_for_action",
+          "match": {
+            "type": "target_clicked",
+            "targetId": "file-tree-diff-."
+          }
+        },
+        {
+          "type": "wait_for_action",
+          "match": {
+            "type": "command_completed",
+            "command": "file",
+            "subcommand": "diff"
           }
         },
         {
@@ -77117,6 +75735,9 @@
           }
         },
         {
+          "type": "scroll_to_bottom"
+        },
+        {
           "type": "instruction",
           "text": "Expand DEMO_SYSTEM.md to see its changes.",
           "showcase": {
@@ -77137,6 +75758,9 @@
             "type": "target_clicked",
             "targetId": "diff-card-file-docs/DEMO_SYSTEM.md"
           }
+        },
+        {
+          "type": "scroll_to_bottom"
         },
         {
           "type": "instruction",
@@ -77187,25 +75811,28 @@
           }
         },
         {
+          "type": "scroll_to_bottom"
+        },
+        {
           "type": "instruction",
           "text": "See the commit result message in the timeline.",
           "showcase": {
-            "title": "The timeline keeps the commit result visible",
-            "description": "The command result confirms the commit hash and the exact commit message."
+            "title": "The review card confirms the commit",
+            "description": "The commit status confirms the hash and the exact commit message without leaving review context."
           }
         },
         {
           "type": "focus_target",
           "target": {
             "type": "web_node",
-            "targetId": "timeline-command-result-file-commit"
+            "targetId": "diff-card-commit-status"
           }
         },
         {
           "type": "wait_for_action",
           "match": {
             "type": "target_clicked",
-            "targetId": "timeline-command-result-file-commit"
+            "targetId": "diff-card-commit-status"
           }
         },
         {
@@ -78062,7 +76689,8 @@
                             "surface": "timeline"
                           },
                           "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
+                          "className": "web-file-timeline-diff-button",
+                          "storyTargetId": "file-tree-diff-."
                         }
                       },
                       {
@@ -79503,7 +78131,8 @@
                             "surface": "timeline"
                           },
                           "stopPropagation": true,
-                          "className": "web-file-timeline-diff-button"
+                          "className": "web-file-timeline-diff-button",
+                          "storyTargetId": "file-tree-diff-."
                         }
                       },
                       {
@@ -81553,7 +80182,7 @@
                                 "surface": "timeline"
                               },
                               "className": "web-file-history-link",
-                              "storyTargetId": "file-history-commit-a1b2c3d"
+                              "storyTargetId": "file-history-commit-first"
                             },
                             "children": [
                               {
@@ -81817,14 +80446,14 @@
           "type": "focus_target",
           "target": {
             "type": "web_node",
-            "targetId": "file-history-commit-a1b2c3d"
+            "targetId": "file-history-commit-first"
           }
         },
         {
           "type": "wait_for_action",
           "match": {
             "type": "target_clicked",
-            "targetId": "file-history-commit-a1b2c3d"
+            "targetId": "file-history-commit-first"
           }
         },
         {
@@ -81858,6 +80487,9 @@
           }
         },
         {
+          "type": "scroll_to_bottom"
+        },
+        {
           "type": "instruction",
           "text": "Expand DEMO_SYSTEM.md to compare the second file changed by the commit.",
           "showcase": {
@@ -81878,6 +80510,9 @@
             "type": "target_clicked",
             "targetId": "diff-card-file-docs/DEMO_SYSTEM.md"
           }
+        },
+        {
+          "type": "scroll_to_bottom"
         },
         {
           "type": "complete",
@@ -81980,7 +80615,7 @@
                             "surface": "timeline"
                           },
                           "className": "web-file-history-link",
-                          "storyTargetId": "file-history-commit-a1b2c3d"
+                          "storyTargetId": "file-history-commit-first"
                         },
                         "children": [
                           {

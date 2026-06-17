@@ -1,5 +1,9 @@
-import { APPWEAVER_RELAY } from '@src/appweaver-relay';
 import type { CommandDefinition } from '@src/system/command-definition';
+
+import { activeRoadmapRelays } from './model';
+
+const DEFAULT_ROADMAP_RELAY =
+  activeRoadmapRelays()[0] ?? 'ws://localhost:10547';
 
 export function getRoadmapCommandDefinition({
   prefix,
@@ -13,23 +17,23 @@ export function getRoadmapCommandDefinition({
     subcommands: [
       {
         name: 'list',
-        summary: 'Read roadmap issues from the AppWeaver roadmap relay.',
+        summary: 'Read roadmap issues from repo/default roadmap relays.',
         aliases: [],
         arguments: [],
         options: [
           {
             name: 'relay',
-            summary: 'Relay URL to read from.',
+            summary: 'Relay URL or comma-separated relay URLs to read from.',
             flag: '--relay',
             shortFlag: null,
             kind: 'string',
             required: false,
-            webDefaultValue: APPWEAVER_RELAY,
+            webDefaultValue: DEFAULT_ROADMAP_RELAY,
           },
         ],
         examples: [
           `${prefix}roadmap list`,
-          `${prefix}roadmap list --relay ${APPWEAVER_RELAY}`,
+          `${prefix}roadmap list --relay ${DEFAULT_ROADMAP_RELAY}`,
         ],
         webWidget: {
           placement: 'header',
@@ -80,12 +84,12 @@ export function getRoadmapCommandDefinition({
         options: [
           {
             name: 'relay',
-            summary: 'Relay URL to publish to.',
+            summary: 'Relay URL or comma-separated relay URLs to publish to.',
             flag: '--relay',
             shortFlag: null,
             kind: 'string',
             required: false,
-            webDefaultValue: APPWEAVER_RELAY,
+            webDefaultValue: DEFAULT_ROADMAP_RELAY,
           },
         ],
         examples: [
@@ -125,12 +129,12 @@ export function getRoadmapCommandDefinition({
           },
           {
             name: 'relay',
-            summary: 'Relay URL to use for verification.',
+            summary: 'Relay URL to use as the issue lookup hint.',
             flag: '--relay',
             shortFlag: null,
             kind: 'string',
             required: false,
-            webDefaultValue: APPWEAVER_RELAY,
+            webDefaultValue: DEFAULT_ROADMAP_RELAY,
           },
         ],
         examples: [
@@ -154,12 +158,12 @@ export function getRoadmapCommandDefinition({
         options: [
           {
             name: 'relay',
-            summary: 'Relay URL to read from.',
+            summary: 'Relay URL or comma-separated relay URLs to read from.',
             flag: '--relay',
             shortFlag: null,
             kind: 'string',
             required: false,
-            webDefaultValue: APPWEAVER_RELAY,
+            webDefaultValue: DEFAULT_ROADMAP_RELAY,
           },
         ],
         examples: [`${prefix}roadmap board appweaver-roadmap`],

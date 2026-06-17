@@ -12,6 +12,7 @@ import {
 import type { WebNodeRendererProps } from './web-node/contexts';
 import {
   TreeExpandRequestSetterContext,
+  TreeFilterStateContext,
   TreeItemExpandedStateContext,
   useWebCurrentUserPubkey,
   WebRevealContext,
@@ -60,6 +61,26 @@ type RenderElementProps = {
   renderChild: (child: WebNode) => JSX.Element;
 };
 
+function isTreeFilterActionActive(
+  action: WebAction,
+  currentFilterValue: string,
+): boolean {
+  if (action.type !== 'clientAction') {
+    return false;
+  }
+
+  if (action.action !== 'web.toggleTreeFilter') {
+    return false;
+  }
+
+  const value = action.payload?.value;
+
+  return (
+    typeof value === 'string' &&
+    currentFilterValue.trim().toLowerCase() === value.trim().toLowerCase()
+  );
+}
+
 function renderElement({
   element,
   props,
@@ -67,6 +88,7 @@ function renderElement({
   renderChild,
 }: RenderElementProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
+  const filterState = useContext(TreeFilterStateContext);
 
   return (
     <Switch>
@@ -344,13 +366,36 @@ function renderElement({
       </Match>
 
       <Match when={element.tag === 'badge'}>
-        <span
-          class={elementClass(element)}
-          data-ui={elementUi(element)}
-          style={elementStyle(element)}
+        <Show
+          when={element.props?.action}
+          fallback={
+            <span
+              class={elementClass(element)}
+              data-ui={elementUi(element)}
+              style={elementStyle(element)}
+            >
+              {element.props?.label ?? ''}
+            </span>
+          }
         >
-          {element.props?.label ?? ''}
-        </span>
+          {(action) => (
+            <button
+              type="button"
+              class={`${elementClass(element)}${isTreeFilterActionActive(action(), filterState?.query() ?? '') ? ' is-active' : ''}`}
+              data-ui={elementUi(element)}
+              style={elementStyle(element)}
+              onClick={(e) => {
+                if (element.props?.stopPropagation) {
+                  e.stopPropagation();
+                }
+
+                runAction(action());
+              }}
+            >
+              {element.props?.label ?? ''}
+            </button>
+          )}
+        </Show>
       </Match>
 
       <Match when={element.tag === 'image'}>
@@ -459,6 +504,7 @@ function renderElement({
 export function WebNodeRenderer(props: WebNodeRendererProps) {
   const revealContext = useContext(WebRevealContext);
   const toggleContext = useContext(WebToggleContext);
+  const filterState = useContext(TreeFilterStateContext);
   const currentUserPubkey = useWebCurrentUserPubkey();
   const expandedById = useContext(TreeItemExpandedStateContext);
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
@@ -476,6 +522,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
         expandTreeItems: requestTreeItemExpansion,
         revealContext,
         toggleContext,
+        filterState,
       })
     ) {
       return;

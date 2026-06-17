@@ -4,18 +4,12 @@ import { SimplePool } from 'nostr-tools/pool';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 
+import { DEFAULT_ROADMAP_RELAYS } from '@src/commands/roadmap/model';
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
 const ISSUE_KIND = 1621;
 const REPO_KIND = 30617;
 const PROFILE_KIND = 0;
-
-const DEFAULT_ZAP_RELAYS = [
-  'wss://relay.damus.io/',
-  'wss://nos.lol/',
-  'wss://relay.primal.net/',
-  'wss://relay.nostr.band/',
-];
 
 const LOG_PREFIX = '[roadmap.lightningZap]';
 
@@ -23,6 +17,7 @@ const LightningZapPayloadSchema = z.object({
   issueId: z.string().min(1),
   title: z.string().min(1),
   relay: z.string().min(1),
+  relays: z.array(z.string()).optional(),
   amount: z.string().min(1),
   comment: z.string().optional(),
   anonymous: z.string().optional(),
@@ -234,7 +229,15 @@ export async function handleRoadmapLightningZap({
     }
 
     const pool = new SimplePool();
-    const relays = Array.from(new Set([payload.relay, ...DEFAULT_ZAP_RELAYS]));
+
+    const relays = Array.from(
+      new Set([
+        payload.relay,
+        ...(payload.relays ?? []),
+        ...DEFAULT_ROADMAP_RELAYS,
+      ]),
+    );
+
     let issue: NostrEvent | null = null;
     let profileEvent: NostrEvent | null = null;
     let repoOwner = '';
@@ -328,7 +331,11 @@ export async function handleRoadmapLightningZap({
     const anonymous = payload.anonymous === 'on';
 
     const zapRelays = Array.from(
-      new Set([payload.relay, ...DEFAULT_ZAP_RELAYS]),
+      new Set([
+        payload.relay,
+        ...(payload.relays ?? []),
+        ...DEFAULT_ROADMAP_RELAYS,
+      ]),
     );
 
     const zapTemplate: EventTemplate = {

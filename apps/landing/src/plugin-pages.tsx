@@ -11,8 +11,9 @@ import {
 import { AppWeaverInstallBlock } from './appweaver-install-block';
 import { officialApps, officialAuthor, socialLinks } from './landing-data';
 import { OfficialAppGrid, pluginIconSrcForSlug } from './official-app-grid';
+import { RoadmapPanel } from './roadmap-panel';
 
-type PluginPageSectionId = 'features' | 'demo' | 'install' | 'apps';
+type PluginPageSectionId = 'features' | 'demo' | 'roadmap' | 'install' | 'apps';
 
 type PluginPage = {
   routeSlug: string;
@@ -120,6 +121,14 @@ const pluginFeatures: Record<string, string[]> = {
     'AI agents cannot edit your todos directly; they create drafts that you can accept, revise, or decline.',
     'Your local todo app, accessible from anywhere you use AppWeaver.',
   ],
+};
+
+const pluginRoadmapBoardKeys: Record<string, string> = {
+  bm: 'appweaver-plugin-bookmarks-roadmap',
+  file: 'appweaver-plugin-file-roadmap',
+  job: 'appweaver-plugin-job-roadmap',
+  journal: 'appweaver-plugin-journal-roadmap',
+  todo: 'appweaver-plugin-todo-roadmap',
 };
 
 const pluginDemoStories: Record<string, PluginDemoStory[]> = {
@@ -331,6 +340,7 @@ function hasDemoGifsForView(
 const pluginPageSections: PluginPageSectionId[] = [
   'features',
   'demo',
+  'roadmap',
   'install',
   'apps',
 ];
@@ -358,6 +368,7 @@ export function pluginNavItemsForPath(_pathname: string): PluginNavItem[] {
       label: `Demo`,
       href: '#demo',
     },
+    { sectionId: 'roadmap', label: 'Roadmap', href: '#roadmap' },
     { sectionId: 'install', label: 'Install', href: '#install' },
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
   ];
@@ -885,6 +896,13 @@ function PluginLandingPage(props: {
         aria-label={`${props.page.eyebrow} demo`}
       >
         <PluginDemoSection page={props.page} />
+      </section>
+      <section id="roadmap" class="plugin-page-section plugin-page-section--roadmap">
+        <RoadmapPanel
+          title={`${props.page.shortName} Roadmap`}
+          summary={`See public ${props.page.shortName} app issues, board status, comments, and funding signal from Nostr.`}
+          boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
+        />
       </section>
       <section id="install" class="plugin-page-section plugin-page-section--install">
         <PluginInstallPreview page={props.page} />

@@ -256,6 +256,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
             expandTreeItems: undefined,
             revealContext,
             toggleContext,
+            filterState: undefined,
           })
         ) {
           return;

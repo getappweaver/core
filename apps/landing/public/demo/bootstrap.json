@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T17:54:19.659Z",
+  "generatedAt": "2026-06-17T17:25:42.221Z",
   "prefix": "/",
   "widgets": [
     {
@@ -24,7 +24,7 @@
       "alias": "todo",
       "name": "appweaver-todo-plugin",
       "repo": "nostr://_@getappweaver.com/todo",
-      "version": "5.4.3",
+      "version": "5.5.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
@@ -32,7 +32,7 @@
       "alias": "job",
       "name": "appweaver-job-plugin",
       "repo": "nostr://_@getappweaver.com/job",
-      "version": "4.0.6",
+      "version": "4.1.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     },
@@ -40,7 +40,7 @@
       "alias": "bm",
       "name": "appweaver-bm-plugin",
       "repo": "nostr://_@getappweaver.com/bm",
-      "version": "4.1.1",
+      "version": "4.2.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     },
@@ -48,7 +48,7 @@
       "alias": "file",
       "name": "appweaver-file-plugin",
       "repo": "nostr://_@getappweaver.com/file",
-      "version": "3.2.0",
+      "version": "3.3.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
@@ -56,7 +56,7 @@
       "alias": "browser",
       "name": "appweaver-browser-plugin",
       "repo": "nostr://_@getappweaver.com/browser",
-      "version": "1.1.5",
+      "version": "1.2.0",
       "commandStoryCount": 0,
       "aiStoryCount": 0
     },
@@ -64,7 +64,7 @@
       "alias": "journal",
       "name": "appweaver-journal-plugin",
       "repo": "nostr://_@getappweaver.com/journal",
-      "version": "0.3.5",
+      "version": "0.4.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     }

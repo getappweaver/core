@@ -2,7 +2,11 @@ import type { WebAction } from '@src/web/ui-schema';
 
 import { writeClipboardText } from '../../utils/clipboard';
 
-import type { WebRevealContextValue, WebToggleContextValue } from './contexts';
+import type {
+  TreeFilterState,
+  WebRevealContextValue,
+  WebToggleContextValue,
+} from './contexts';
 
 // ---------------------------------------------------------------------------
 // Tree item expanded state (module-level cache, keyed by scope id)
@@ -92,6 +96,7 @@ type RunLocalWebActionProps = {
   expandTreeItems: ((ids: string[]) => void) | undefined;
   revealContext: WebRevealContextValue | undefined;
   toggleContext: WebToggleContextValue | undefined;
+  filterState: TreeFilterState | undefined;
 };
 
 export function runLocalWebAction({
@@ -100,6 +105,7 @@ export function runLocalWebAction({
   expandTreeItems,
   revealContext,
   toggleContext,
+  filterState,
 }: RunLocalWebActionProps): boolean {
   expandTreeItemsForAction(action, expandedById, expandTreeItems);
 
@@ -139,6 +145,29 @@ export function runLocalWebAction({
 
       if (typeof key === 'string' && key.length > 0) {
         toggleContext?.toggle(key);
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'web.setTreeFilter') {
+      const value = action.payload?.value;
+
+      if (typeof value === 'string') {
+        filterState?.setValue(value);
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'web.toggleTreeFilter') {
+      const value = action.payload?.value;
+
+      if (typeof value === 'string') {
+        const current = filterState?.query().trim().toLowerCase() ?? '';
+        const next = value.trim();
+
+        filterState?.setValue(current === next.toLowerCase() ? '' : next);
       }
 
       return true;

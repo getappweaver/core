@@ -1,3 +1,7 @@
+import {
+  renderRoadmapIssueModalWeb,
+  renderRoadmapNewIssueWeb,
+} from '@src/commands/roadmap/renderers/web';
 import type {
   TimelineEventOutput,
   WebAction,
@@ -18,6 +22,7 @@ import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
 import {
   handleRoadmapDeleteIssue,
   handleRoadmapMarkIssue,
+  handleRoadmapTrackIssue,
 } from '../roadmap/markIssue';
 import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
@@ -497,6 +502,70 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
+      } else if (clientActionName === 'roadmap.openIssue') {
+        adapters.setChromeModal({
+          command: 'roadmap',
+          subcommand: 'issue',
+          title: 'Roadmap issue',
+          iconUrl:
+            '/builtin-icons/src__commands__roadmap__renderers__roadmap.svg',
+        });
+
+        adapters.setChromeLoading(false);
+        adapters.setChromeError(null);
+        adapters.setChromeText(null);
+
+        adapters.setChromeWeb(
+          renderRoadmapIssueModalWeb({
+            issue: action.payload.issue as never,
+            workflow: action.payload.workflow as never,
+            relay:
+              typeof action.payload.relay === 'string'
+                ? action.payload.relay
+                : '',
+            boardKey:
+              typeof action.payload.boardKey === 'string'
+                ? action.payload.boardKey
+                : null,
+            columnId:
+              typeof action.payload.columnId === 'string'
+                ? action.payload.columnId
+                : null,
+            focus:
+              action.payload.focus === 'comments' ||
+              action.payload.focus === 'manage'
+                ? action.payload.focus
+                : 'activity',
+          }),
+        );
+      } else if (clientActionName === 'roadmap.openNewIssue') {
+        adapters.setChromeModal({
+          command: 'roadmap',
+          subcommand: 'new',
+          title: 'New roadmap issue',
+          iconUrl:
+            '/builtin-icons/src__commands__roadmap__renderers__roadmap.svg',
+        });
+
+        adapters.setChromeLoading(false);
+        adapters.setChromeError(null);
+        adapters.setChromeText(null);
+
+        adapters.setChromeWeb(
+          renderRoadmapNewIssueWeb({
+            workflow: action.payload.workflow as never,
+            relay:
+              typeof action.payload.relay === 'string'
+                ? action.payload.relay
+                : '',
+          }),
+        );
+      } else if (clientActionName === 'roadmap.closeModal') {
+        adapters.setChromeModal(null);
+        adapters.setChromeLoading(false);
+        adapters.setChromeWeb(null);
+        adapters.setChromeText(null);
+        adapters.setChromeError(null);
       } else if (clientActionName === 'roadmap.commentIssue') {
         runClientAction(
           handleRoadmapCommentIssue({
@@ -512,6 +581,19 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       } else if (clientActionName === 'roadmap.markIssue') {
         runClientAction(
           handleRoadmapMarkIssue({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'roadmap.trackIssue') {
+        runClientAction(
+          handleRoadmapTrackIssue({
             action,
             currentUserPubkey: adapters.currentUserPubkey(),
             signEvent: adapters.signEvent,

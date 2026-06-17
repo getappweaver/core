@@ -114,6 +114,7 @@ export const TreeExpandRequestSetterContext = createContext<
 export type TreeFilterState = {
   query: Accessor<string>;
   visibleIds: Accessor<Set<string> | null>;
+  setValue: (value: string) => void;
 };
 
 export const TreeFilterStateContext = createContext<

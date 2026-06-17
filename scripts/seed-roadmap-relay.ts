@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 
+import { nip19 } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
 import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 
 import { APPWEAVER_RELAY } from '@src/appweaver-relay';
 
 const PROJECT_KIND = 30617;
+const PROFILE_KIND = 0;
 const ISSUE_KIND = 1621;
 const STATUS_RESOLVED_KIND = 1631;
 const STATUS_CLOSED_KIND = 1632;
@@ -20,7 +22,7 @@ type SignedEvent = ReturnType<typeof finalizeEvent>;
 
 type IssueSeed = {
   key: string;
-  project: 'core' | 'plugin';
+  project: ProjectKey;
   author: Uint8Array;
   subject: string;
   content: string;
@@ -42,6 +44,73 @@ type ZapSeed = {
   payer: Uint8Array;
   offset: number;
 };
+
+type PluginSeed = {
+  key: PluginKey;
+  projectD: string;
+  projectName: string;
+  catalogD: string;
+  repo: string;
+  description: string;
+  workflowD: string;
+  workflowTitle: string;
+};
+
+type PluginKey = 'todo' | 'bookmarks' | 'journal' | 'job' | 'file';
+type ProjectKey = 'core' | PluginKey;
+
+const pluginSeeds: PluginSeed[] = [
+  {
+    key: 'todo',
+    projectD: 'appweaver-plugin-todo',
+    projectName: 'AppWeaver Todo Plugin',
+    catalogD: 'todo',
+    repo: 'https://github.com/getappweaver/plugin-todo',
+    description: 'Official AppWeaver plugin for todo management.',
+    workflowD: 'appweaver-plugin-todo-roadmap',
+    workflowTitle: 'Todo Plugin Roadmap',
+  },
+  {
+    key: 'bookmarks',
+    projectD: 'appweaver-plugin-bookmarks',
+    projectName: 'AppWeaver Bookmarks Plugin',
+    catalogD: 'bookmarks',
+    repo: 'https://github.com/getappweaver/plugin-bookmarks',
+    description: 'Official AppWeaver plugin for bookmark management.',
+    workflowD: 'appweaver-plugin-bookmarks-roadmap',
+    workflowTitle: 'Bookmarks Plugin Roadmap',
+  },
+  {
+    key: 'journal',
+    projectD: 'appweaver-plugin-journal',
+    projectName: 'AppWeaver Journal Plugin',
+    catalogD: 'journal',
+    repo: 'https://github.com/getappweaver/plugin-journal',
+    description: "Official AppWeaver plugin for Captain's Log journaling.",
+    workflowD: 'appweaver-plugin-journal-roadmap',
+    workflowTitle: 'Journal Plugin Roadmap',
+  },
+  {
+    key: 'job',
+    projectD: 'appweaver-plugin-job',
+    projectName: 'AppWeaver Job Plugin',
+    catalogD: 'job',
+    repo: 'https://github.com/getappweaver/plugin-job',
+    description: 'Official AppWeaver plugin for scheduled jobs.',
+    workflowD: 'appweaver-plugin-job-roadmap',
+    workflowTitle: 'Job Plugin Roadmap',
+  },
+  {
+    key: 'file',
+    projectD: 'appweaver-plugin-file',
+    projectName: 'AppWeaver File Plugin',
+    catalogD: 'file',
+    repo: 'https://github.com/getappweaver/plugin-file',
+    description: 'Official AppWeaver plugin for workspace file tools.',
+    workflowD: 'appweaver-plugin-file-roadmap',
+    workflowTitle: 'File Plugin Roadmap',
+  },
+];
 
 function secret(label: string): Uint8Array {
   return createHash('sha256').update(`appweaver-roadmap:${label}`).digest();
@@ -93,6 +162,7 @@ async function verifySeed(relay: string): Promise<void> {
       [relay],
       {
         kinds: [
+          PROFILE_KIND,
           PROJECT_KIND,
           ISSUE_KIND,
           STATUS_RESOLVED_KIND,
@@ -133,18 +203,54 @@ async function main(): Promise<void> {
   const carol = secret('carol');
   const dave = secret('dave');
   const eve = secret('eve');
+  const zapServer = secret('zap-server');
   const payerOne = secret('payer-one');
   const payerTwo = secret('payer-two');
   const payerThree = secret('payer-three');
   const maintainerPubkey = getPublicKey(maintainer);
   const pluginMaintainerPubkey = getPublicKey(pluginMaintainer);
+  const zapServerPubkey = getPublicKey(zapServer);
   const coreRepo = `${PROJECT_KIND}:${maintainerPubkey}:appweaver`;
-  const pluginRepo = `${PROJECT_KIND}:${pluginMaintainerPubkey}:appweaver-plugin-bookmarks`;
+
+  const pluginRepos = new Map<PluginKey, string>(
+    pluginSeeds.map((plugin) => [
+      plugin.key,
+      `${PROJECT_KIND}:${pluginMaintainerPubkey}:${plugin.projectD}`,
+    ]),
+  );
+
+  const maintainerProfile = sign(
+    maintainer,
+    PROFILE_KIND,
+    BASE_CREATED_AT + 1_000,
+    [],
+    JSON.stringify({
+      name: 'getappweaver',
+      display_name: 'AppWeaver',
+      nip05: '_@getappweaver.com',
+      lud16: 'donations_test@getappweaver.com',
+      website: 'https://getappweaver.com',
+    }),
+  );
+
+  const pluginMaintainerProfile = sign(
+    pluginMaintainer,
+    PROFILE_KIND,
+    BASE_CREATED_AT + 1_000,
+    [],
+    JSON.stringify({
+      name: 'getappweaver-plugins',
+      display_name: 'AppWeaver Plugins',
+      nip05: 'plugins@getappweaver.com',
+      lud16: 'donations_test@getappweaver.com',
+      website: 'https://getappweaver.com',
+    }),
+  );
 
   const coreProject = sign(
     maintainer,
     PROJECT_KIND,
-    BASE_CREATED_AT,
+    BASE_CREATED_AT + 1,
     [
       ['d', 'appweaver'],
       ['name', 'AppWeaver'],
@@ -160,43 +266,60 @@ async function main(): Promise<void> {
     '',
   );
 
-  const pluginProject = sign(
-    pluginMaintainer,
-    PROJECT_KIND,
-    BASE_CREATED_AT + 1,
-    [
-      ['d', 'appweaver-plugin-bookmarks'],
-      ['name', 'AppWeaver Bookmarks Plugin'],
-      ['description', 'Official AppWeaver plugin for bookmark management.'],
-      ['web', 'https://getappweaver.com/plugins/bookmarks'],
-      ['relays', relay],
-      ['maintainers', pluginMaintainerPubkey],
-      ['t', 'appweaver'],
-      ['t', 'plugin'],
-    ],
-    '',
-  );
+  const pluginProjects = new Map<PluginKey, SignedEvent>();
+  const pluginCatalogs = new Map<PluginKey, SignedEvent>();
 
-  const pluginCatalog = sign(
-    pluginMaintainer,
-    PLUGIN_KIND,
-    BASE_CREATED_AT + 2,
-    [
-      ['d', 'bookmarks'],
-      ['repo', 'https://github.com/getappweaver/plugin-bookmarks'],
-      ['description', 'Official AppWeaver bookmark management plugin.'],
-      ['version', '1.4.0'],
-      ['core-api-version', '9'],
-      ['ref', 'v1.4.0', '9', 'Roadmap test plugin catalog entry'],
-      ['a', pluginRepo, relay],
-    ],
-    '',
-  );
+  pluginSeeds.forEach((plugin, index) => {
+    const repo = pluginRepos.get(plugin.key);
+
+    if (!repo) {
+      throw new Error(`missing plugin repo: ${plugin.key}`);
+    }
+
+    pluginProjects.set(
+      plugin.key,
+      sign(
+        pluginMaintainer,
+        PROJECT_KIND,
+        BASE_CREATED_AT + 1 + index,
+        [
+          ['d', plugin.projectD],
+          ['name', plugin.projectName],
+          ['description', plugin.description],
+          ['web', `https://getappweaver.com/${plugin.catalogD}`],
+          ['relays', relay],
+          ['maintainers', pluginMaintainerPubkey],
+          ['t', 'appweaver'],
+          ['t', 'plugin'],
+        ],
+        '',
+      ),
+    );
+
+    pluginCatalogs.set(
+      plugin.key,
+      sign(
+        pluginMaintainer,
+        PLUGIN_KIND,
+        BASE_CREATED_AT + 10 + index,
+        [
+          ['d', plugin.catalogD],
+          ['repo', plugin.repo],
+          ['description', plugin.description],
+          ['version', '1.4.0'],
+          ['core-api-version', '9'],
+          ['ref', 'v1.4.0', '9', 'Roadmap test plugin catalog entry'],
+          ['a', repo, relay],
+        ],
+        '',
+      ),
+    );
+  });
 
   const coreWorkflow = sign(
     maintainer,
     WORKFLOW_KIND,
-    BASE_CREATED_AT + 3,
+    BASE_CREATED_AT + 20,
     [
       ['d', 'appweaver-roadmap'],
       ['title', 'AppWeaver Roadmap'],
@@ -211,27 +334,41 @@ async function main(): Promise<void> {
     '',
   );
 
-  const pluginWorkflow = sign(
-    pluginMaintainer,
-    WORKFLOW_KIND,
-    BASE_CREATED_AT + 4,
-    [
-      ['d', 'appweaver-plugin-bookmarks-roadmap'],
-      ['title', 'Bookmarks Plugin Roadmap'],
-      [
-        'description',
-        'Maintainer-selected roadmap issues for the official bookmarks plugin',
-      ],
-      ['col', 'planned', 'Planned'],
-      ['col', 'in-progress', 'In Progress'],
-      ['col', 'shipped', 'Shipped'],
-      ['col', 'rejected', 'Rejected'],
-      ['col', 'archived', 'Archived'],
-      ['a', pluginRepo, relay, 'project'],
-      ['e', pluginCatalog.id, relay, 'plugin'],
-    ],
-    '',
-  );
+  const pluginWorkflows = new Map<PluginKey, SignedEvent>();
+
+  pluginSeeds.forEach((plugin, index) => {
+    const repo = pluginRepos.get(plugin.key);
+    const catalog = pluginCatalogs.get(plugin.key);
+
+    if (!repo || !catalog) {
+      throw new Error(`missing plugin workflow dependency: ${plugin.key}`);
+    }
+
+    pluginWorkflows.set(
+      plugin.key,
+      sign(
+        pluginMaintainer,
+        WORKFLOW_KIND,
+        BASE_CREATED_AT + 21 + index,
+        [
+          ['d', plugin.workflowD],
+          ['title', plugin.workflowTitle],
+          [
+            'description',
+            `Maintainer-selected roadmap issues for the official ${plugin.catalogD} plugin`,
+          ],
+          ['col', 'planned', 'Planned'],
+          ['col', 'in-progress', 'In Progress'],
+          ['col', 'shipped', 'Shipped'],
+          ['col', 'rejected', 'Rejected'],
+          ['col', 'archived', 'Archived'],
+          ['a', repo, relay, 'project'],
+          ['e', catalog.id, relay, 'plugin'],
+        ],
+        '',
+      ),
+    );
+  });
 
   const issues: IssueSeed[] = [
     {
@@ -276,7 +413,7 @@ async function main(): Promise<void> {
     },
     {
       key: 'bookmark-search',
-      project: 'plugin',
+      project: 'bookmarks',
       author: eve,
       subject: 'Bookmarks plugin should search by tag synonyms',
       content:
@@ -289,7 +426,12 @@ async function main(): Promise<void> {
   const issueEvents = new Map<string, SignedEvent>();
 
   for (const issue of issues) {
-    const repo = issue.project === 'core' ? coreRepo : pluginRepo;
+    const repo =
+      issue.project === 'core' ? coreRepo : pluginRepos.get(issue.project);
+
+    if (!repo) {
+      throw new Error(`missing issue repo: ${issue.project}`);
+    }
 
     const projectOwner =
       issue.project === 'core' ? maintainerPubkey : pluginMaintainerPubkey;
@@ -309,6 +451,12 @@ async function main(): Promise<void> {
         issue.content,
       ),
     );
+  }
+
+  const bookmarkWorkflow = pluginWorkflows.get('bookmarks');
+
+  if (!bookmarkWorkflow) {
+    throw new Error('missing bookmarks workflow');
   }
 
   const trackers: TrackerSeed[] = [
@@ -335,7 +483,7 @@ async function main(): Promise<void> {
     },
     {
       issueKey: 'bookmark-search',
-      workflow: pluginWorkflow,
+      workflow: bookmarkWorkflow,
       column: 'planned',
       rank: 10,
       offset: 33,
@@ -466,12 +614,13 @@ async function main(): Promise<void> {
     }
 
     return sign(
-      zap.payer,
+      zapServer,
       MOCK_ZAP_KIND,
       BASE_CREATED_AT + zap.offset,
       [
         ['e', issue.id, relay],
         ['p', issue.pubkey],
+        ['P', getPublicKey(zap.payer)],
         ['amount', amountMsats(zap.amountSats)],
         ['bolt11', `lnbc${zap.amountSats}n1mockroadmap${idx}`],
         ['description', `mock verified zap for ${zap.issueKey}`],
@@ -485,11 +634,13 @@ async function main(): Promise<void> {
   });
 
   const events = [
+    maintainerProfile,
+    pluginMaintainerProfile,
     coreProject,
-    pluginProject,
-    pluginCatalog,
+    ...pluginProjects.values(),
+    ...pluginCatalogs.values(),
     coreWorkflow,
-    pluginWorkflow,
+    ...pluginWorkflows.values(),
     ...issueEvents.values(),
     ...trackerEvents,
     ...statusEvents,
@@ -500,6 +651,29 @@ async function main(): Promise<void> {
   console.log(`Publishing ${events.length} roadmap seed events to ${relay}...`);
   await publishAll(relay, events);
   await verifySeed(relay);
+  console.log('\nStable roadmap addresses:');
+  console.log(`  dev LNURL nostrPubkey: ${zapServerPubkey}`);
+  console.log(`  core project: ${coreRepo}`);
+
+  console.log(
+    `  core board: ${nip19.naddrEncode({ kind: WORKFLOW_KIND, pubkey: coreWorkflow.pubkey, identifier: 'appweaver-roadmap', relays: [relay] })}`,
+  );
+
+  for (const plugin of pluginSeeds) {
+    const repo = pluginRepos.get(plugin.key);
+    const workflow = pluginWorkflows.get(plugin.key);
+
+    if (!repo || !workflow) {
+      continue;
+    }
+
+    console.log(`  ${plugin.key} project: ${repo}`);
+
+    console.log(
+      `  ${plugin.key} board: ${nip19.naddrEncode({ kind: WORKFLOW_KIND, pubkey: workflow.pubkey, identifier: plugin.workflowD, relays: [relay] })}`,
+    );
+  }
+
   console.log('\nSeed complete.');
 }
 

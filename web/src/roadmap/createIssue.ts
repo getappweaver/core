@@ -9,7 +9,9 @@ const REPO_KIND = 30617;
 
 const CreateIssuePayloadSchema = z.object({
   repo: z.string().min(1),
+  repoOwner: z.string().optional(),
   relay: z.string().min(1),
+  relays: z.array(z.string()).optional(),
   type: z.string().min(1),
   title: z.string().min(1),
   description: z.string().optional(),
@@ -17,7 +19,10 @@ const CreateIssuePayloadSchema = z.object({
 
 type CreateIssueDeps = {
   action: Extract<WebAction, { type: 'clientAction' }>;
-  signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
+  signEvent: (
+    event: EventTemplate,
+    options?: { title: string | null; allowedPubkeys?: string[] | null },
+  ) => Promise<NostrEvent | null>;
   setChromeWeb: (root: WebNodeRoot | null) => void;
   setChromeText: (text: string | null) => void;
   setChromeError: (text: string | null) => void;
@@ -58,19 +63,26 @@ function parseRepoOwner(repoAddress: string): string {
   return kind === String(REPO_KIND) ? (pubkey ?? '') : '';
 }
 
-function publishEvent(relay: string, event: NostrEvent): Promise<void> {
+function publishEvent(relays: string[], event: NostrEvent): Promise<void> {
   const pool = new SimplePool();
+  const targets = [...new Set(relays.filter(Boolean))];
 
-  return Promise.allSettled(pool.publish([relay], event))
+  return Promise.allSettled(pool.publish(targets, event))
     .then((results) => {
-      const rejected = results.find((result) => result.status === 'rejected');
+      const fulfilled = results.find((result) => result.status === 'fulfilled');
 
-      if (rejected?.status === 'rejected') {
-        throw new Error(String(rejected.reason));
+      if (!fulfilled) {
+        const rejected = results.find((result) => result.status === 'rejected');
+
+        throw new Error(
+          rejected?.status === 'rejected'
+            ? String(rejected.reason)
+            : 'Publish failed on all relays.',
+        );
       }
     })
     .finally(() => {
-      pool.close([relay]);
+      pool.close(targets);
     });
 }
 
@@ -89,7 +101,7 @@ export async function handleRoadmapCreateIssue({
 
   try {
     const payload = CreateIssuePayloadSchema.parse(action.payload ?? {});
-    const repoOwner = parseRepoOwner(payload.repo);
+    const repoOwner = payload.repoOwner || parseRepoOwner(payload.repo);
     const title = payload.title.trim();
     const description = payload.description?.trim() ?? '';
     const issueType = payload.type.trim().toLowerCase();
@@ -114,18 +126,22 @@ export async function handleRoadmapCreateIssue({
       ],
     };
 
-    const signed = await signEvent(template);
+    const signed = await signEvent(template, { title: 'Create roadmap issue' });
 
     if (!signed) {
       throw new Error('Connect or unlock a Nostr signer to create issues.');
     }
 
-    await publishEvent(payload.relay, signed);
+    const publishRelays = payload.relays?.length
+      ? payload.relays
+      : [payload.relay];
+
+    await publishEvent(publishRelays, signed);
 
     setChromeWeb(
       statusRoot(
         'Issue published',
-        `${title}\n\nEvent: ${signed.id}\nRelay: ${payload.relay}`,
+        `${title}\n\nEvent: ${signed.id}\nRelays: ${publishRelays.join(', ')}`,
       ),
     );
 

@@ -211,10 +211,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
                 : 'default',
           }}
         >
-          <Show
-            when={hasChildren()}
-            fallback={<span class="web-tree-toggle web-tree-toggle-spacer" />}
-          >
+          <Show when={hasChildren()} fallback={null}>
             <button
               type="button"
               class="web-tree-toggle"
@@ -419,6 +416,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
         expandTreeItems: requestTreeItemExpansion,
         revealContext,
         toggleContext,
+        filterState: undefined,
       })
     ) {
       return;
@@ -498,7 +496,11 @@ export function WebTreeElement(props: WebTreeElementProps) {
         >
           <TreeBulkExpandContext.Provider value={bulk}>
             <TreeFilterStateContext.Provider
-              value={{ query: filterQuery, visibleIds: visibleFilterIds }}
+              value={{
+                query: filterQuery,
+                visibleIds: visibleFilterIds,
+                setValue: setTreeFilterValue,
+              }}
             >
               <div
                 class={elementClass(props.element)}

@@ -77,7 +77,10 @@ export type CommandsAdapters = {
   setTimeline: Setter<TimelineItem[]>;
   setComposerAiState: Setter<ComposerAiState | null>;
   appendSystemMessage: (text: string) => void;
-  signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
+  signEvent: (
+    event: EventTemplate,
+    options?: { title: string | null; allowedPubkeys?: string[] | null },
+  ) => Promise<NostrEvent | null>;
   nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   createId: () => string;
   requestComposerAiState: () => void;

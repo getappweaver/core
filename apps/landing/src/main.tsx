@@ -1,15 +1,17 @@
 import { For, createSignal, onCleanup, onMount } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { render } from 'solid-js/web';
+import { NostrAuthProvider } from '@web/src/contexts/NostrAuthContext';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
+import { officialApps, socialLinks } from './landing-data';
+import { OfficialAppGrid } from './official-app-grid';
 import {
   PluginRoute,
   isPluginRoute,
   pluginNavItemsForPath,
 } from './plugin-pages';
-import { officialApps, socialLinks } from './landing-data';
-import { OfficialAppGrid } from './official-app-grid';
+import { RoadmapPanel } from './roadmap-panel';
 
 import './styles.css';
 
@@ -21,7 +23,7 @@ type NavItem = {
   href: string;
 };
 
-type OnePageSectionId = 'intro' | 'features' | 'demo' | 'apps';
+type OnePageSectionId = 'intro' | 'features' | 'demo' | 'roadmap' | 'apps';
 
 type HeaderProps = {
   activeSection: string | null;
@@ -43,6 +45,7 @@ const onePageNavItems: NavItem[] = [
   { sectionId: 'intro', label: 'Intro', href: '#intro' },
   { sectionId: 'features', label: 'Features', href: '#features' },
   { sectionId: 'demo', label: 'Demo', href: '#demo' },
+  { sectionId: 'roadmap', label: 'Roadmap', href: '#roadmap' },
   { sectionId: 'apps', label: 'Apps', href: '#apps' },
 ];
 
@@ -288,6 +291,7 @@ function OnePage(props: {
       'intro',
       'features',
       'demo',
+      'roadmap',
       'apps',
     ];
     let frameId: number | null = null;
@@ -380,6 +384,12 @@ function OnePage(props: {
           classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
         />
       </section>
+      <section id="roadmap" class="one-page-section one-page-section--roadmap">
+        <RoadmapPanel
+          title="Core Roadmap"
+          boardKey="appweaver-roadmap"
+        />
+      </section>
       <section id="apps" class="one-page-section one-page-section--apps">
         <OfficialAppsSection />
         <SiteFooter />
@@ -442,4 +452,11 @@ function App() {
   );
 }
 
-render(() => <App />, document.getElementById('root')!);
+render(
+  () => (
+    <NostrAuthProvider mode="landing">
+      <App />
+    </NostrAuthProvider>
+  ),
+  document.getElementById('root')!,
+);

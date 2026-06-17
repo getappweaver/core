@@ -691,14 +691,14 @@
     "subcommands": [
       {
         "name": "list",
-        "summary": "Read roadmap issues from the AppWeaver roadmap relay.",
+        "summary": "Read roadmap issues from repo/default roadmap relays.",
         "usage": "list [--relay <relay>]",
         "aliases": [],
         "arguments": [],
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL to read from.",
+            "summary": "Relay URL or comma-separated relay URLs to read from.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
@@ -768,7 +768,7 @@
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL to publish to.",
+            "summary": "Relay URL or comma-separated relay URLs to publish to.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
@@ -819,7 +819,7 @@
           },
           {
             "name": "relay",
-            "summary": "Relay URL to use for verification.",
+            "summary": "Relay URL to use as the issue lookup hint.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
@@ -852,7 +852,7 @@
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL to read from.",
+            "summary": "Relay URL or comma-separated relay URLs to read from.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",

@@ -77,12 +77,12 @@ These are not MVP requirements. The MVP should start with free issue creation an
 | Board model | Maintainer-controlled workflow; tracker events assign existing issues to statuses/columns |
 | Board scope | Core AppWeaver board plus separate official plugin boards |
 | Landing page default | Top funded issues only |
-| Canonical relay | AppWeaver-controlled Khatru relay |
-| Funding verification | Relay verifies before accepting zap/nutzap events |
-| Funding total source | Clients compute from verified events accepted by the AppWeaver relay |
+| Repo relays | NIP-34 repo `relays` tag, falling back to AppWeaver default roadmap relays |
+| Funding verification | Clients verify board author `lud16`/`lud06` -> LNURLP -> `nostrPubkey` -> zap receipt pubkey |
+| Funding total source | Clients compute from verified zap receipts fetched from repo relays plus relevant NIP-65 relays |
 | First AppWeaver entry point | Header Roadmap button |
 | First surfaces | Usable from AppWeaver, viewable from landing page |
-| Payment priority | Lightning zaps and/or Nutzaps, verified by relay policy |
+| Payment priority | Lightning zaps first; Nutzaps later |
 
 ## 4. User Experience
 
@@ -118,7 +118,6 @@ The in-app UI does not need to show a full board. It should behave like a single
 - Search results and similar issues before submission.
 - Top funded issues.
 - Issues created by the current user.
-- A submission form only after search.
 - A funding button on each issue.
 - Status sections or accordions for board columns.
 
@@ -159,6 +158,10 @@ MVP maintainer actions:
 - Mark issues as planned, in progress, shipped, rejected, or archived.
 - Add maintainer notes.
 
+The next maintainer UI should make the issue itself the editing surface. Clicking an issue title can open an issue detail view with controls for assignment, status, duplicate handling, moderation, comments, and funding context. Assignment tools should publish tracker events rather than mutate the original issue.
+
+The issue detail UI should use a signer-aware capability layer before showing or enabling mutation controls. This layer should derive `canCreate`, `canComment`, `canMove`, `canMark`, `canDelete`, and similar booleans from all applicable signing identities, not only the current browser pubkey. In the app this includes browser signers and saved bunker connections; on the landing page it includes only landing-supported signers. For example, `canMove` is true when any available identity matches the board/workflow author, while `canDelete` is true only when an available identity matches the original issue author. The publish handlers must still enforce these rules after signing, but the UI should avoid showing controls that no available signer can execute.
+
 ## 5. Issue Model
 
 An issue represents either a feature request or a bug report. The issue event should follow NIP-34 as closely as possible.
@@ -189,9 +192,9 @@ Derived view data is not part of the issue event itself. Clients can build a vie
 
 - Board assignment from tracker/workflow events.
 - Broad issue state from NIP-34 status events.
-- Funding total and count from relay-accepted zap/nutzap events.
+- Funding total and count from client-verified zap receipts.
 - Comments from NIP-22 replies.
-- Moderation state from relay policy and NIP-56 reports/deletions.
+- Moderation state from maintainer authority, NIP-56 reports, and client filtering.
 
 Avoid adding AppWeaver-specific issue fields unless NIP-34 tags are not enough. Extra tags can be added later if a concrete need appears.
 
@@ -317,7 +320,7 @@ This makes the system easy to explain:
 
 > The most-funded unassigned issues appear first.
 
-Clients should compute funding totals from verified payment events accepted by the AppWeaver relay. For the MVP, the relay is the source of truth: if a zap/nutzap event is stored by the AppWeaver relay, clients may treat it as verified and count it.
+Clients should compute funding totals from verified zap receipts. For the MVP, clients should not treat relay acceptance as proof of payment. Instead, the client derives the board author's Lightning address from kind `0` profile metadata, fetches the LNURLP document, reads the LNURLP `nostrPubkey`, and only counts zap receipts authored by that pubkey.
 
 Aggregate tables and summary events can be added later for performance, but they are not required for the first version.
 
@@ -333,18 +336,20 @@ These should be deferred until there is real usage data.
 
 ## 8. Payments
 
-### 8.1 Relay-Verified Funding
+### 8.1 Client-Verified Funding
 
-The AppWeaver relay should verify funding events before accepting them.
+The MVP should start with repo relays rather than a dedicated AppWeaver relay. Repo relays come from the NIP-34 repository announcement `relays` tag, falling back to the AppWeaver default roadmap relays when the announcement has no relay list.
 
-For the MVP, the rule is simple:
+The verification rule is:
 
 ```text
-If the AppWeaver relay accepts a zap/nutzap event, clients may count it.
-If the payment cannot be verified, the relay rejects it.
+board author kind:0 lud16/lud06
+  -> LNURLP payRequest document
+  -> LNURLP nostrPubkey
+  -> zap receipt pubkey must match
 ```
 
-This avoids needing clients to verify payments independently before rendering ranked lists. Clients can fetch accepted funding events from the canonical relay, sum them locally, and sort issues by total funding.
+Clients can fetch roadmap events and zap receipts from repo relays plus relevant NIP-65 relays, verify the receipts locally with this rule, sum the verified amounts, and sort issues by total funding.
 
 Expected flow:
 
@@ -352,10 +357,10 @@ Expected flow:
 User chooses an issue
   -> clicks Fund
   -> chooses amount
-  -> sends zap or nutzap linked to the issue
-  -> AppWeaver relay verifies the payment
-  -> relay accepts the funding event only if valid
-  -> clients count the accepted funding event
+  -> sends zap linked to the issue
+  -> zap provider publishes a NIP-57 receipt
+  -> client fetches receipts from repo relays and relevant NIP-65 relays
+  -> client counts the receipt only if its pubkey matches the board author's LNURLP nostrPubkey
 ```
 
 ### 8.2 Nutzaps
@@ -368,7 +373,7 @@ Nutzaps fit the product values well:
 - Compatible with Cashu wallets.
 - Verifiable without relying on fake public zap receipts.
 
-Relay policy for Nutzaps should verify as much as practical before accepting the event:
+When Nutzaps are added, clients or a later indexing/relay service should verify as much as practical before counting the event:
 
 - The event references a valid AppWeaver issue.
 - The mint is accepted by AppWeaver policy.
@@ -376,24 +381,21 @@ Relay policy for Nutzaps should verify as much as practical before accepting the
 - The token is spendable by the AppWeaver receiving key.
 - The token can be redeemed or swapped into the maintainer wallet.
 
-The event should only count after successful verification and redemption/swap.
+The event should only count after successful verification and redemption/swap. Nutzaps are not part of the first landing-page path.
 
 ### 8.3 Lightning Zaps
 
-Lightning zaps can be supported if they are verified by the AppWeaver relay policy. The system must not blindly trust NIP-57 zap receipts.
+Lightning zaps should be supported with client-side receipt verification. The system must not blindly trust arbitrary NIP-57 zap receipts.
 
-The relay can verify Lightning zaps through a trusted payment provider or node, such as Blink, Breez SDK, or another backend controlled by the maintainer.
-
-Relay policy for Lightning zaps should verify:
+Client verification for Lightning zaps should verify:
 
 - The zap receipt references a valid AppWeaver issue.
-- The payment belongs to the AppWeaver maintainer/board payment destination.
-- The `bolt11` invoice was actually paid.
+- The zap receipt author pubkey matches the `nostrPubkey` from the board author's LNURLP payRequest document.
 - The paid amount matches the amount being counted.
-- The invoice metadata links to the expected issue or board context.
-- The payment hash has not already been accepted by the relay.
+- The invoice metadata links to the expected issue context when available.
+- The payment hash has not already been counted.
 
-Fake, unverifiable, duplicate, or unrelated zap receipts must be rejected and must not affect funding totals.
+Fake, unverifiable, duplicate, or unrelated zap receipts must be ignored and must not affect funding totals.
 
 ### 8.4 Refunds And Expectations
 
@@ -403,7 +405,7 @@ Funding is a voluntary signal. Refunds should not be promised by default unless 
 
 ## 9. Moderation And Abuse
 
-Because issue creation is free, moderation is required.
+Because issue creation is free and events may be fetched from public relays, moderation is required.
 
 MVP controls:
 
@@ -413,8 +415,8 @@ MVP controls:
 - Allow duplicate marking instead of deleting useful signals.
 - Filter low-quality issues from default public views if needed.
 - Use NIP-56 reports from the maintainer or moderators as moderation signals.
-- Delete abusive events from the AppWeaver relay when needed.
-- Ban abusive users from writing to the AppWeaver relay when needed.
+- Ignore events from abusive users in the client projection.
+- Add relay deletion/ban policy later if AppWeaver introduces its own relay or indexer.
 
 Possible later controls:
 
@@ -432,7 +434,7 @@ Important distinction:
 - Creating an issue should be easy.
 - Appearing prominently on the public roadmap should depend on funding, maintainer curation, or both.
 
-NIP-56 is useful because moderation can stay event-based and auditable. If the maintainer or an accepted moderator reports an event as spam, abuse, or another moderation reason, the AppWeaver relay can use that report to hide/delete the event or ban the user according to relay policy.
+NIP-56 is useful because moderation can stay event-based and auditable. If the maintainer or an accepted moderator reports an event as spam, abuse, or another moderation reason, clients can use that report to hide the event in the roadmap projection. A later AppWeaver relay or indexer can also use the same report events for deletion, bans, or review workflows.
 
 The relay dashboard is not part of the MVP, but the relay should be designed so moderation state can eventually be changed at runtime rather than requiring relay restarts.
 
@@ -453,25 +455,38 @@ If AppWeaver wants compatibility with NIP-34 clients, it should announce the pro
     ["name", "AppWeaver"],
     ["description", "Nostr-native app builder"],
     ["web", "https://getappweaver.com"],
-    ["relays", "wss://relay.getappweaver.com"],
-    ["maintainers", "maintainer-pubkey"]
+    ["relays", "wss://relay.damus.io", "wss://relay.primal.net", "wss://relay.snort.social", "wss://nostr.mom", "wss://nos.lol"]
   ]
 }
 ```
 
 The repository/project announcement gives issues a canonical `a` tag target.
 
-### 10.2 Canonical Relay Policy
+### 10.2 Relay Strategy And NIP-65 Outbox
 
-The AppWeaver relay is not a general-purpose public relay. It should only accept AppWeaver-related events and events needed by supported boards.
+The MVP should start on repo relays instead of requiring an AppWeaver-controlled relay. Repo relays are the relays declared by the NIP-34 repository announcement, with AppWeaver defaults as fallback/bootstrap.
 
-Canonical relay for now:
+Default roadmap relays:
 
 ```text
-wss://relay.getappweaver.com
+wss://relay.damus.io
+wss://relay.primal.net
+wss://relay.snort.social
+wss://nostr.mom
+wss://nos.lol
 ```
 
-Relay write policy should allow only related event classes, such as:
+Relay resolver:
+
+```text
+repoRelays = repoAnnouncement.relays.length > 0
+  ? repoAnnouncement.relays
+  : DEFAULT_ROADMAP_RELAYS
+```
+
+The repository announcement `relays` tag should include the relays that clients monitor for issues, tracker events, comments, status events, and funding receipts. This follows the NIP-34 direction that issues should be sent to the relays listed by the repository announcement. Clients can use default roadmap relays for bootstrap before the repo announcement is loaded or when the announcement omits relays.
+
+Clients should subscribe to relevant event classes on repo relays:
 
 - AppWeaver core NIP-34 repository/project announcement.
 - Official plugin NIP-34 repository/project announcements.
@@ -479,14 +494,51 @@ Relay write policy should allow only related event classes, such as:
 - NIP-34 issues for allowed AppWeaver/plugin project anchors.
 - NIP-22 comments on accepted issues.
 - NIP-34 status events for accepted issues.
-- Maintainer workflow/board events for allowed project anchors.
+- Board/workflow events for allowed project anchors.
 - Tracker events assigning accepted issues to accepted workflows.
-- Relay-verified zap/nutzap events referencing accepted issues.
-- NIP-56 reports from accepted moderators or maintainers.
+- Zap receipts referencing accepted issues.
+- NIP-56 reports from accepted moderators or board/project authors.
 
-The relay should reject unrelated events. This keeps the data set small, makes client fetches fast, and makes moderation/spam policy easier to reason about.
+Because these are public relays, clients must filter and validate the event graph themselves. A dedicated AppWeaver relay or indexer can be added later for performance, moderation, and stricter write policy, but it should not be required for the first public roadmap.
 
-### 10.3 Issue Events
+NIP-65 relay lists should augment repo relays for publishing and discovery:
+
+- Repo relays are the project-level inbox and public discovery set.
+- Author write relays are where the event author expects their signed events to be published.
+- Target read relays are where referenced users are more likely to see events about them.
+- Clients should dedupe events across all relays by event ID.
+
+Suggested publish targets:
+
+| Action | Publish to |
+|--------|------------|
+| Create issue | Repo relays + issue author NIP-65 write relays |
+| Comment on issue | Repo relays + commenter NIP-65 write relays + replied-to author NIP-65 read relays |
+| Zap issue | Repo relays + zapper NIP-65 write relays + repo owner NIP-65 read relays |
+| Close own issue | Repo relays + issue author NIP-65 write relays |
+| Close/resolve issue as owner | Repo relays + owner NIP-65 write relays + issue author NIP-65 read relays |
+| Tracker assignment/status change | Repo relays + board/repo owner NIP-65 write relays + issue author NIP-65 read relays |
+| Board/workflow update | Repo relays + board/repo owner NIP-65 write relays |
+
+For reading, clients should start with repo relays and optionally query relevant NIP-65 read relays for issue authors, board authors, zappers, and commenters when more complete discovery is needed.
+
+### 10.3 Board Authority
+
+To avoid delegated authority complexity, AppWeaver should derive roadmap authority from event authorship. The project/repository event author is the project owner, and the board/workflow event author must be the same key.
+
+Authority rules:
+
+- A board/workflow event is authoritative only when its author matches the author of the referenced NIP-34 project/repository event.
+- A tracker event affects a board only when authored by that board's author.
+- A tracker event should be ignored if its workflow points to a board whose author does not match the referenced project/repository author.
+- AppWeaver should not treat third-party tracker events as board assignments, even if they reference the same workflow and issue.
+- If board control needs to move to a new key, the new board author should publish a replacement board/workflow and replacement tracker events.
+
+For official plugin boards, the same rule applies: the plugin board author must match the plugin's NIP-34 project/repository author. If plugin catalog metadata is linked, clients can also require the plugin catalog event author to match the same key.
+
+This is simpler than trying to determine whether another key was a valid maintainer at the time a tracker was created. If AppWeaver later needs multi-key administration, it should add an explicit AppWeaver delegation mechanism instead of relying on the NIP-34 repository announcement.
+
+### 10.4 Issue Events
 
 Users create issues with NIP-34 `kind:1621` events.
 
@@ -495,8 +547,8 @@ Users create issues with NIP-34 `kind:1621` events.
   "kind": 1621,
   "content": "Markdown description of the bug report or feature request.",
   "tags": [
-    ["a", "30617:appweaver-maintainer-pubkey:appweaver"],
-    ["p", "appweaver-maintainer-pubkey"],
+    ["a", "30617:appweaver-owner-pubkey:appweaver"],
+    ["p", "appweaver-owner-pubkey"],
     ["subject", "Add project export"],
     ["t", "feature"],
     ["t", "appweaver"]
@@ -513,7 +565,7 @@ Recommended issue labels:
 
 Replies and discussion should use NIP-22 comments, as NIP-34 recommends.
 
-### 10.4 NIP-34 Status Events
+### 10.5 NIP-34 Status Events
 
 NIP-34 defines status events for issues:
 
@@ -539,7 +591,7 @@ Recommendation:
 
 This gives both sides flexibility. Users can close their own issue when appropriate. Maintainers can close or resolve issues at the NIP-34 layer, and separately control roadmap placement through board/tracker events.
 
-### 10.5 Maintainer Board / Workflow Event
+### 10.6 Board / Workflow Event
 
 The board event is controlled by the maintainer. It defines the roadmap workflow: title, description, columns, and visual metadata.
 
@@ -549,7 +601,7 @@ After reviewing the workflow and Kanban proposals, the better model is:
 - Separate tracker events assign existing issues to those columns.
 - Issues remain canonical NIP-34 issue events.
 
-This avoids large mutable board events that contain every card assignment. It also avoids race conditions if more than one maintainer or automation process later updates assignments.
+This avoids large mutable board events that contain every card assignment. It also avoids race conditions if automation later updates assignments.
 
 Possible board/workflow event shape. The exact AppWeaver event kind can be chosen later; the important schema decision is the tags and relationships.
 
@@ -566,14 +618,14 @@ Possible board/workflow event shape. The exact AppWeaver event kind can be chose
     ["col", "shipped", "Shipped"],
     ["col", "rejected", "Rejected"],
     ["col", "archived", "Archived"],
-    ["a", "30617:appweaver-maintainer-pubkey:appweaver", "wss://relay.getappweaver.com", "project"]
+    ["a", "30617:appweaver-owner-pubkey:appweaver", "wss://relay.damus.io", "project"]
   ]
 }
 ```
 
-Only maintainer-signed board/workflow events should be accepted as the canonical AppWeaver roadmap board.
+Only board-author-signed board/workflow events should be accepted as the canonical AppWeaver roadmap board, and the board author must match the referenced project/repository author.
 
-### 10.6 Tracker Events For Board Assignment
+### 10.7 Tracker Events For Board Assignment
 
 Tracker events are the assignment layer. A tracker says: this issue is tracked in this workflow, with this workflow-specific state.
 
@@ -586,17 +638,26 @@ Possible tracker event shape. The exact AppWeaver event kind can be chosen later
   "kind": 39011,
   "content": "in-progress",
   "tags": [
-    ["d", "appweaver-roadmap-issue-event-id-1"],
-    ["e", "issue-event-id-1", "wss://relay.getappweaver.com", "tracked_item"],
-    ["a", "39010:appweaver-maintainer-pubkey:appweaver-roadmap", "wss://relay.getappweaver.com", "workflow"],
+    ["d", "appweaver-roadmap:issue-event-id-1"],
+    ["e", "issue-event-id-1", "wss://relay.damus.io", "tracked_item"],
+    ["a", "39010:appweaver-board-pubkey:appweaver-roadmap", "wss://relay.damus.io", "workflow"],
     ["rank", "10"]
   ]
 }
 ```
 
+The tracker uses both `d` and `e` tags for different reasons:
+
+- `d` gives the parameterized replaceable tracker event a stable assignment key for one workflow/issue pair.
+- `e` is the canonical Nostr reference to the tracked issue event.
+- Clients should not parse the issue ID out of `d` as the source of truth.
+- If `d` and `e` disagree, the tracker should be ignored.
+
+Using only `d` would make the event harder to query with standard `#e` filters and would hide the actual issue relationship inside an AppWeaver-specific identifier.
+
 Tracker rules:
 
-- Only tracker events authored by the maintainer, or by keys explicitly accepted by the maintainer workflow, should affect the AppWeaver board.
+- Only tracker events authored by the board author should affect the AppWeaver board, and the board author must match the referenced project/repository author.
 - The tracker `content` is the board column ID, such as `planned`, `in-progress`, `shipped`, `rejected`, or `archived`.
 - The optional `rank` tag can define manual ordering inside a column.
 - If multiple valid trackers exist for the same issue and workflow, clients should use the latest valid tracker by `created_at`, unless a later spec defines different consensus rules.
@@ -604,30 +665,30 @@ Tracker rules:
 
 Unassigned issues are all valid NIP-34 issue events for the AppWeaver project that have no latest valid tracker in the AppWeaver roadmap workflow.
 
-### 10.7 Funding Events
+### 10.8 Funding Events
 
 Users zap/fund issues directly, not board columns.
 
 Funding events should reference the issue event ID. For Nutzaps, the event should include an `e` tag pointing to the `kind:1621` issue.
 
-The AppWeaver relay is the canonical source of truth for funding events. Clients should compute funding totals by scanning funding events accepted by the AppWeaver relay. They do not need to verify raw payments themselves for the MVP.
+Repo and NIP-65 relays are transport, not payment authority. Clients should compute funding totals by scanning zap receipts from repo relays and relevant NIP-65 relays, then verifying that each receipt was authored by the LNURLP `nostrPubkey` for the relevant board author.
 
-This means ordering is deterministic for clients that use the same canonical relay:
+This means ordering is deterministic for clients that use the same relay set and verification rules:
 
 ```text
-funding_total(issue) = sum(amount of accepted funding events referencing issue)
+funding_total(issue) = sum(amount of verified funding events referencing issue)
 ```
 
-If a funding event is not accepted by the AppWeaver relay, it does not count toward ranking.
+If a funding event cannot be verified against the board author's LNURLP payRequest metadata, it does not count toward ranking.
 
 Board assignment does not affect funding. If a funded issue later moves from unassigned to `Planned`, the issue keeps its funding total.
 
-### 10.8 Derived Views
+### 10.9 Derived Views
 
 Clients can derive the main views from the same data:
 
 - Unassigned issues: NIP-34 issues for AppWeaver without a latest valid tracker in the AppWeaver roadmap workflow, sorted by verified funding total.
-- Roadmap board: issues referenced by valid tracker events for the maintainer workflow, grouped by tracker column.
+- Roadmap board: issues referenced by valid tracker events for the board workflow, grouped by tracker column.
 - Top funded: all visible issues, or only unassigned issues, sorted by verified funding total depending on UI context.
 
 Current technical decisions:
@@ -635,7 +696,8 @@ Current technical decisions:
 - Issues use NIP-34 `kind:1621`.
 - Issues are regular events, so references should use `e` tags.
 - NIP-34 status events should be used alongside board/tracker events.
-- Canonical relay is `wss://relay.getappweaver.com`.
+- Repo relays come from the NIP-34 project announcement `relays` tag, falling back to AppWeaver default roadmap relays.
+- NIP-65 relay lists augment repo relays for publishing and discovery.
 - Funding summary events and aggregation tables are not part of the MVP.
 - Draft board/workflow proposals are useful references, but AppWeaver does not need to commit to their exact event kinds yet.
 
@@ -685,7 +747,7 @@ This can support subscriptions, paid plans, sponsorships, or future commercial f
 
 - Define the AppWeaver NIP-34 project/repository announcement.
 - Use NIP-34 `kind:1621` for issue events.
-- Configure `wss://relay.getappweaver.com` to accept only AppWeaver-related roadmap events.
+- Start with repo relays, where the NIP-34 repo `relays` tag falls back to AppWeaver default roadmap relays.
 - Define the maintainer board event format.
 - Define tracker events for board assignment.
 - Publish and read feature/bug issues from Nostr.
@@ -706,14 +768,16 @@ This can support subscriptions, paid plans, sponsorships, or future commercial f
 ### Phase 3: Funding
 
 - Add funding button to issues.
-- Implement relay-level verification for zap/nutzap events.
-- Reject unverifiable, duplicate, or unrelated payment events at the AppWeaver relay.
-- Compute funding totals client-side from accepted funding events on the canonical relay.
+- Implement client-side verification for zap receipts: board author `lud16`/`lud06` -> LNURLP -> `nostrPubkey` -> zap receipt pubkey.
+- Ignore unverifiable, duplicate, or unrelated payment events.
+- Compute funding totals client-side from verified zap receipts fetched from repo relays and relevant NIP-65 relays.
 - Display funding totals and funding count.
 
 ### Phase 4: Maintainer Tools
 
 - Assign issues to board statuses/columns.
+- Open an issue detail UI when clicking an issue title.
+- Add assignment controls in the issue detail UI.
 - Hide/archive spam.
 - Mark duplicates.
 - Add maintainer notes.
@@ -726,7 +790,7 @@ This can support subscriptions, paid plans, sponsorships, or future commercial f
 | Should bugs and features share one ranked list? | Start together, add filters | Pending |
 | Should landing page show all issues or only funded/top issues? | Top funded only | Decided |
 | Should maintainers be able to pin issues above funded ranking? | Maybe later | Pending |
-| Should funding totals be computed client-side or published by AppWeaver? | Client computes from relay-accepted verified events | Decided |
+| Should funding totals be computed client-side or published by AppWeaver? | Client computes from locally verified zap receipts | Decided |
 | Which Nostr event kind should be used for issues? | NIP-34 `kind:1621` | Proposed |
 | Should anonymous/throwaway submissions be encouraged? | Useful, but may increase spam | Pending |
 | What minimum moderation tools are required before public launch? | Hide/archive/rate limit/NIP-56 reports | Pending |
@@ -737,14 +801,14 @@ This can support subscriptions, paid plans, sponsorships, or future commercial f
 
 Before development starts, decide:
 
-1. The exact Nostr event model for the maintainer workflow, tracker assignments, and funding references.
+1. The exact Nostr event model for the board workflow, tracker assignments, and funding references.
 2. Whether the public status accordion should be available on the landing page immediately or after the top-funded list.
 3. Whether bug reports and feature requests need different form fields in the first version.
-4. The exact zap/nutzap verification policy for the Khatru relay.
-5. The exact relay write policy for AppWeaver core, official plugins, comments, status events, reports, trackers, and funding events.
+4. The exact issue detail UI and assignment controls for board workflow actions.
+5. Whether and when to add an AppWeaver relay or indexer after the public-relay MVP.
 
 ## 15. Current Summary
 
 Build a Nostr-native Roadmap module for AppWeaver first.
 
-Anyone with Nostr can submit feature requests or bug reports for free as NIP-34 issues. New issues start unassigned. Users should search before submitting and comment/fund an existing issue when one already exists. Any user can fund any issue. Funding is a public prioritization signal, not a contract. The AppWeaver Khatru relay at `wss://relay.getappweaver.com` accepts only AppWeaver-related events, verifies zap/nutzap events before accepting them, and lets clients compute totals from accepted funding events on that canonical relay. Maintainers control workflow events that define board columns for AppWeaver core and official plugins, while tracker events assign selected issues to planned, in progress, shipped, rejected, or archived columns. The app provides creation and funding through a header Roadmap button that opens a singleton timeline widget; the landing page highlights top-funded unassigned issues and can show roadmap boards as separate widgets.
+Anyone with Nostr can submit feature requests or bug reports for free as NIP-34 issues. New issues start unassigned. Users should search before submitting and comment/fund an existing issue when one already exists. Any user can fund any issue. Funding is a public prioritization signal, not a contract. The MVP uses repo relays from the NIP-34 repo `relays` tag, falling back to AppWeaver default roadmap relays, and NIP-65 relay lists augment publishing and discovery. Clients compute funding totals by verifying zap receipts against the board author's LNURLP `nostrPubkey`. Board authors control workflow events that define board columns for AppWeaver core and official plugins, and clients should only accept boards whose author matches the referenced NIP-34 project/repository author. Tracker events assign selected issues to planned, in progress, shipped, rejected, or archived columns. The app provides creation and funding through a header Roadmap button that opens a singleton timeline widget; the landing page highlights top-funded unassigned issues and can show roadmap boards as separate widgets. The next maintainer tooling step is an issue detail UI, opened from the issue title, with assignment controls that publish tracker events.

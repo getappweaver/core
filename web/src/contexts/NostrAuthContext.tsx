@@ -9,7 +9,13 @@ import type { EventTemplate } from 'nostr-tools';
 import { finalizeEvent, getPublicKey, nip44 } from 'nostr-tools';
 import { decrypt } from 'nostr-tools/nip49';
 import type { Accessor, JSX } from 'solid-js';
-import { Show, createContext, createSignal, useContext } from 'solid-js';
+import {
+  Show,
+  createContext,
+  createMemo,
+  createSignal,
+  useContext,
+} from 'solid-js';
 
 import { SignEventModal } from '../components/SignEventModal';
 import { isWebDemoMode } from '../demo/runtime';
@@ -134,11 +140,13 @@ type SignEventChoice =
 
 type SignEventRequest = {
   title: string;
+  allowedPubkeys: Set<string> | null;
   resolve: (choice: SignEventChoice | null) => void;
 };
 
 type SignEventOptions = {
   title: string | null;
+  allowedPubkeys?: string[] | null;
 };
 
 export type NostrAuthContextValue = {
@@ -229,9 +237,12 @@ function readInitialAuthState(): AuthState {
 
 type NostrAuthProviderProps = {
   children: JSX.Element;
+  mode?: 'app' | 'landing';
 };
 
 export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
+  const mode = () => props.mode ?? 'app';
+
   const [authState, setAuthState] = createSignal<AuthState>(
     readInitialAuthState(),
   );
@@ -242,6 +253,17 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
 
   const [signEventRequest, setSignEventRequest] =
     createSignal<SignEventRequest | null>(null);
+
+  const activeSignEventRequest = createMemo(() => {
+    const request = signEventRequest();
+    const state = authState();
+
+    if (!request || state.status !== 'connected') {
+      return null;
+    }
+
+    return { currentPubkey: state.pubkey, request };
+  });
 
   let nip49ExpiryTimer: number | null = null;
 
@@ -381,30 +403,41 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   }
 
   async function refreshBunkerConnections(): Promise<void> {
+    if (mode() === 'landing') {
+      setBunkerConnections([]);
+
+      return;
+    }
+
     setBunkerConnections(await listBunkerConnections());
   }
 
-  async function addBunkerConnection(props: {
+  async function addBunkerConnection(args: {
     name: string;
     data: BunkerSignerData;
   }): Promise<BunkerConnection> {
-    const { name, data } = props;
+    if (mode() === 'landing') {
+      throw new Error(
+        'Saved bunker connections are only available in app mode.',
+      );
+    }
 
-    const connection = await saveBunkerConnection({
-      name,
-      data,
-    });
+    const connection = await saveBunkerConnection(args);
 
     await refreshBunkerConnections();
 
     return connection;
   }
 
-  function requestSignEventChoice(
-    title: string,
-  ): Promise<SignEventChoice | null> {
+  function requestSignEventChoice({
+    title,
+    allowedPubkeys,
+  }: {
+    title: string;
+    allowedPubkeys: Set<string> | null;
+  }): Promise<SignEventChoice | null> {
     return new Promise((resolve) => {
-      setSignEventRequest({ title, resolve });
+      setSignEventRequest({ title, allowedPubkeys, resolve });
     });
   }
 
@@ -554,14 +587,40 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
       setBunkerConnections([]);
     }
 
-    const choice = await requestSignEventChoice(options?.title ?? 'Sign event');
+    const allowedPubkeys = options?.allowedPubkeys
+      ? new Set(options.allowedPubkeys)
+      : null;
+
+    if (mode() === 'landing') {
+      if (allowedPubkeys !== null && !allowedPubkeys.has(state.pubkey)) {
+        return null;
+      }
+
+      return signWithCurrentAccount(event);
+    }
+
+    const choice = await requestSignEventChoice({
+      title: options?.title ?? 'Sign event',
+      allowedPubkeys,
+    });
 
     if (!choice) {
       return null;
     }
 
     if (choice.method === 'bunker') {
+      if (
+        allowedPubkeys !== null &&
+        !allowedPubkeys.has(choice.bunkerData.userPubkey)
+      ) {
+        return null;
+      }
+
       return bunkerSignEvent(choice.bunkerData, event);
+    }
+
+    if (allowedPubkeys !== null && !allowedPubkeys.has(state.pubkey)) {
+      return null;
     }
 
     return signWithCurrentAccount(event);
@@ -683,25 +742,18 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   return (
     <NostrAuthContext.Provider value={value}>
       {props.children}
-      <Show when={signEventRequest()}>
-        {() => {
-          const state = authState();
-
-          if (state.status !== 'connected') {
-            return null;
+      <Show when={activeSignEventRequest()}>
+        <SignEventModal
+          title={activeSignEventRequest()?.request.title ?? 'Sign event'}
+          currentPubkey={activeSignEventRequest()?.currentPubkey ?? ''}
+          allowedPubkeys={
+            activeSignEventRequest()?.request.allowedPubkeys ?? null
           }
-
-          return (
-            <SignEventModal
-              title={signEventRequest()?.title ?? 'Sign event'}
-              currentPubkey={state.pubkey}
-              bunkerConnections={bunkerConnections()}
-              onAddBunker={addBunkerConnection}
-              onChoose={resolveSignEventChoice}
-              onCancel={() => resolveSignEventChoice(null)}
-            />
-          );
-        }}
+          bunkerConnections={bunkerConnections()}
+          onAddBunker={addBunkerConnection}
+          onChoose={resolveSignEventChoice}
+          onCancel={() => resolveSignEventChoice(null)}
+        />
       </Show>
     </NostrAuthContext.Provider>
   );

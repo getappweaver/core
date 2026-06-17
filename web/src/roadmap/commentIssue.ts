@@ -12,13 +12,17 @@ const CommentIssuePayloadSchema = z.object({
   issueAuthor: z.string().min(1),
   repo: z.string().min(1),
   relay: z.string().min(1),
+  relays: z.array(z.string()).optional(),
   title: z.string().min(1),
   comment: z.string().min(1),
 });
 
 type CommentIssueDeps = {
   action: Extract<WebAction, { type: 'clientAction' }>;
-  signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
+  signEvent: (
+    event: EventTemplate,
+    options?: { title: string | null; allowedPubkeys?: string[] | null },
+  ) => Promise<NostrEvent | null>;
   setChromeWeb: (root: WebNodeRoot | null) => void;
   setChromeText: (text: string | null) => void;
   setChromeError: (text: string | null) => void;
@@ -53,19 +57,26 @@ function statusRoot(title: string, body: string): WebNodeRoot {
   };
 }
 
-function publishEvent(relay: string, event: NostrEvent): Promise<void> {
+function publishEvent(relays: string[], event: NostrEvent): Promise<void> {
   const pool = new SimplePool();
+  const targets = [...new Set(relays.filter(Boolean))];
 
-  return Promise.allSettled(pool.publish([relay], event))
+  return Promise.allSettled(pool.publish(targets, event))
     .then((results) => {
-      const rejected = results.find((result) => result.status === 'rejected');
+      const fulfilled = results.find((result) => result.status === 'fulfilled');
 
-      if (rejected?.status === 'rejected') {
-        throw new Error(String(rejected.reason));
+      if (!fulfilled) {
+        const rejected = results.find((result) => result.status === 'rejected');
+
+        throw new Error(
+          rejected?.status === 'rejected'
+            ? String(rejected.reason)
+            : 'Publish failed on all relays.',
+        );
       }
     })
     .finally(() => {
-      pool.close([relay]);
+      pool.close(targets);
     });
 }
 
@@ -102,18 +113,24 @@ export async function handleRoadmapCommentIssue({
       ],
     };
 
-    const signed = await signEvent(template);
+    const signed = await signEvent(template, {
+      title: 'Comment on roadmap issue',
+    });
 
     if (!signed) {
       throw new Error('Connect or unlock a Nostr signer to comment.');
     }
 
-    await publishEvent(payload.relay, signed);
+    const publishRelays = payload.relays?.length
+      ? payload.relays
+      : [payload.relay];
+
+    await publishEvent(publishRelays, signed);
 
     setChromeWeb(
       statusRoot(
         'Comment published',
-        `${payload.title}\n\nEvent: ${signed.id}\nRelay: ${payload.relay}`,
+        `${payload.title}\n\nEvent: ${signed.id}\nRelays: ${publishRelays.join(', ')}`,
       ),
     );
 

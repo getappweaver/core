@@ -4,7 +4,7 @@
 
 import { nip19 } from 'nostr-tools';
 import type { JSX } from 'solid-js';
-import { For, Show, createSignal, onCleanup } from 'solid-js';
+import { For, Show, createEffect, createSignal, onCleanup } from 'solid-js';
 
 import {
   completeNostrConnect,
@@ -24,6 +24,7 @@ type SignEventChoice =
 type SignEventModalProps = {
   title: string;
   currentPubkey: string;
+  allowedPubkeys: Set<string> | null;
   bunkerConnections: BunkerConnection[];
   onAddBunker: (props: {
     name: string;
@@ -134,6 +135,17 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
   const [error, setError] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
 
+  const currentAllowed = (): boolean =>
+    props.allowedPubkeys === null ||
+    props.allowedPubkeys.has(props.currentPubkey);
+
+  const allowedBunkerConnections = (): BunkerConnection[] =>
+    props.allowedPubkeys === null
+      ? props.bunkerConnections
+      : props.bunkerConnections.filter((connection) =>
+          props.allowedPubkeys?.has(connection.data.userPubkey),
+        );
+
   function trimmedConnectionName(): string {
     return connectionName().trim();
   }
@@ -156,6 +168,12 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
 
   onCleanup(() => {
     mounted = false;
+  });
+
+  createEffect(() => {
+    if (!currentAllowed() && mainTab() === 'current') {
+      setMainTab('bunker');
+    }
   });
 
   function handleBackdropClick(e: MouseEvent): void {
@@ -382,13 +400,15 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
         </div>
 
         <div class="modal-tabs">
-          <button
-            type="button"
-            class={`modal-tab${mainTab() === 'current' ? ' active' : ''}`}
-            onClick={() => setMainTab('current')}
-          >
-            Use current web account
-          </button>
+          <Show when={currentAllowed()}>
+            <button
+              type="button"
+              class={`modal-tab${mainTab() === 'current' ? ' active' : ''}`}
+              onClick={() => setMainTab('current')}
+            >
+              Use current web account
+            </button>
+          </Show>
           <button
             type="button"
             class={`modal-tab${mainTab() === 'bunker' ? ' active' : ''}`}
@@ -399,7 +419,7 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
         </div>
 
         <div class="modal-body" style={{ overflow: 'auto' }}>
-          <Show when={mainTab() === 'current'}>
+          <Show when={mainTab() === 'current' && currentAllowed()}>
             <div style={cardStyle}>
               <strong>Current web account</strong>
               <span class="muted" style={{ 'font-size': '0.82rem' }}>
@@ -424,19 +444,19 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
           <Show when={mainTab() === 'bunker'}>
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               <Show
-                when={props.bunkerConnections.length > 0}
+                when={allowedBunkerConnections().length > 0}
                 fallback={
                   <p
                     class="muted"
                     style={{ margin: 0, 'font-size': '0.85rem' }}
                   >
-                    No saved bunker connections yet.
+                    No applicable saved bunker connections.
                   </p>
                 }
               >
                 <div style={{ display: 'grid', gap: '0.45rem' }}>
                   <strong>Saved bunker connections</strong>
-                  <For each={props.bunkerConnections}>
+                  <For each={allowedBunkerConnections()}>
                     {(connection) => (
                       <div style={cardStyle}>
                         <span>{connection.name}</span>

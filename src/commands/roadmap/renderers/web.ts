@@ -1,227 +1,11 @@
 import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 import { row, stack, textBlock, textNode } from '@src/web/widgets';
 
-import type { IssueView, RoadmapView, WorkflowView } from '../handler';
+import type { IssueView, RoadmapView, WorkflowView } from '../model';
 
-const roadmapStylesheet = {
-  id: 'roadmap-web',
-  cssText: `
-    .web-tree.roadmap-layout {
-      gap: 0.85rem;
-    }
-
-    .web-row.roadmap-header {
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-
-    .web-box.roadmap-card,
-    .web-box.roadmap-section {
-      background: color-mix(in srgb, var(--color-panel, #242424) 92%, transparent);
-    }
-
-    .web-stack.roadmap-board-summary {
-      padding: 0.25rem 0.1rem 0.45rem;
-    }
-
-    .web-stack.roadmap-inline-new-wrap {
-      padding-top: 5px;
-    }
-
-    .web-treeItem.roadmap-status {
-      padding: 0.55rem 0.6rem;
-      border-radius: var(--radius-md, 0.5rem);
-      border: 1px solid color-mix(in srgb, var(--roadmap-status-color, #7c7c7c) 35%, transparent);
-      background: color-mix(in srgb, var(--roadmap-status-color, #7c7c7c) 18%, var(--color-panel, #242424));
-    }
-
-    .web-treeItem.roadmap-status > .web-tree-item-summary {
-      color: color-mix(in srgb, var(--roadmap-status-color, currentColor) 70%, var(--color-text, currentColor));
-    }
-
-    .web-treeItem.roadmap-status-pending { --roadmap-status-color: #f59e0b; }
-    .web-treeItem.roadmap-status-unassigned { --roadmap-status-color: #f59e0b; }
-    .web-treeItem.roadmap-status-next { --roadmap-status-color: #38bdf8; }
-    .web-treeItem.roadmap-status-in-progress { --roadmap-status-color: #a78bfa; }
-    .web-treeItem.roadmap-status-done { --roadmap-status-color: #22c55e; }
-    .web-treeItem.roadmap-status-shipped { --roadmap-status-color: #22c55e; }
-    .web-treeItem.roadmap-status-rejected { --roadmap-status-color: #ef4444; }
-    .web-treeItem.roadmap-status-archived { --roadmap-status-color: #eab308; }
-    .web-treeItem.roadmap-status-archive { --roadmap-status-color: #eab308; }
-
-    .web-treeItem.roadmap-issue-item {
-      padding: 0.38rem 0.25rem 0.38rem 0.65rem;
-      border-left: 2px solid color-mix(in srgb, var(--color-accent, #60a5fa) 45%, transparent);
-    }
-
-    .web-treeItem.roadmap-issue-item > .web-tree-item-children {
-      margin-top: 0.45rem;
-      margin-left: 0.85rem;
-    }
-
-    .web-text.roadmap-description {
-      display: block;
-      padding: 0.1rem 0 0.15rem;
-      color: color-mix(in srgb, var(--color-text, currentColor) 82%, var(--color-text-muted, currentColor));
-    }
-
-    .web-text.roadmap-readable-muted {
-      color: color-mix(in srgb, var(--color-text, currentColor) 78%, var(--color-text-muted, currentColor));
-      font-size: 0.86em;
-    }
-
-    .web-row.roadmap-meta-badges {
-      flex-wrap: wrap;
-    }
-
-    .web-badge.roadmap-meta-badge,
-    .web-badge.roadmap-label-badge {
-      border-radius: 999px;
-      color: var(--color-text, currentColor);
-      background: color-mix(in srgb, var(--color-text, currentColor) 14%, var(--color-panel, #242424));
-    }
-
-    .web-badge.roadmap-label-badge {
-      color: #fff;
-      background: color-mix(in srgb, var(--color-accent, #60a5fa) 55%, #000);
-      font-size: 0.68rem;
-    }
-
-    .web-badge.roadmap-label-badge-bug {
-      background: color-mix(in srgb, #ef4444 72%, #000);
-    }
-
-    .web-badge.roadmap-label-badge-feature {
-      background: color-mix(in srgb, #22c55e 68%, #000);
-    }
-
-    .web-button.roadmap-meta-action {
-      padding: 0;
-      border: 0;
-      color: var(--color-text-muted, currentColor);
-      background: transparent;
-      box-shadow: none;
-      font: inherit;
-      text-decoration: none;
-    }
-
-    .web-button.roadmap-meta-action:hover,
-    .web-button.roadmap-meta-action:focus-visible {
-      color: var(--color-accent, currentColor);
-      background: transparent;
-      text-decoration: underline;
-    }
-
-    .web-stack.roadmap-comments-panel {
-      margin-top: 0.15rem;
-      padding: 0.65rem;
-      border-radius: var(--radius-md, 0.5rem);
-      background: color-mix(in srgb, var(--color-panel, #242424) 82%, var(--color-text, currentColor) 7%);
-    }
-
-    .web-stack.roadmap-comment-item {
-      padding: 0.45rem 0;
-      border-bottom: 1px solid color-mix(in srgb, var(--color-text, currentColor) 12%, transparent);
-    }
-
-    .web-stack.roadmap-comment-item:last-child {
-      border-bottom: 0;
-    }
-
-    .web-form.roadmap-mark-row {
-      display: flex;
-      gap: 0.45rem;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-top: 0.2rem;
-      padding-top: 0.35rem;
-    }
-
-    .web-form.roadmap-mark-row .web-select {
-      min-width: 8rem;
-    }
-
-    .web-row.roadmap-issue-head {
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 0.75rem;
-    }
-
-    .web-stack.roadmap-issue-main {
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid color-mix(in srgb, var(--color-text, currentColor) 12%, transparent);
-      min-width: 0;
-      flex: 1;
-    }
-
-    .web-row.roadmap-badges {
-      flex-wrap: wrap;
-    }
-
-    .web-text.roadmap-issue-title {
-      overflow-wrap: anywhere;
-      border-radius: 0.2rem;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: color 120ms ease, background 120ms ease;
-    }
-
-    .web-text.roadmap-section-title {
-      font-family: monospace;
-      font-size: 1.22rem;
-      line-height: 1.2;
-    }
-
-    .web-text.roadmap-issue-title:hover {
-      color: var(--color-accent, #60a5fa);
-      background: color-mix(in srgb, var(--color-accent, #60a5fa) 13%, transparent);
-    }
-
-    .web-text.roadmap-money {
-      white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .web-stack.roadmap-fund-modal {
-      padding-bottom: 0.75rem;
-    }
-
-    .web-button.roadmap-money-button {
-      padding: 0.12rem 0.35rem;
-      border-radius: 0.25rem;
-      color: var(--color-success, currentColor);
-      background: transparent;
-      box-shadow: none;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .web-button.roadmap-money-button:hover {
-      color: #000;
-      background: var(--color-warning);
-    }
-
-  `,
-} as const;
+import { roadmapStylesheet } from './styles';
 
 const ROADMAP_COLUMN_VISIBLE_LIMIT = 5;
-
-function revealAddIssueAction(revealId: string): WebAction {
-  return {
-    type: 'reveal',
-    targetId: revealId,
-  };
-}
-
-function hideAddIssueAction(revealId: string): WebAction {
-  return {
-    type: 'hideReveal',
-    targetId: revealId,
-  };
-}
 
 function boardAction(workflow: WorkflowView, relay: string): WebAction {
   return {
@@ -253,11 +37,26 @@ function badge(
   label: string,
   tone: 'muted' | 'success' | 'warning' | 'info',
   className: string | null = null,
+  action: WebAction | null = null,
 ): WebNode {
   return {
     type: 'element',
     tag: 'badge',
-    props: { label, tone, size: 'sm', ...(className ? { className } : {}) },
+    props: {
+      label,
+      tone,
+      size: 'sm',
+      ...(className ? { className } : {}),
+      ...(action ? { action, stopPropagation: true } : {}),
+    },
+  };
+}
+
+function filterByLabelAction(label: string): WebAction {
+  return {
+    type: 'clientAction',
+    action: 'web.toggleTreeFilter',
+    payload: { value: label },
   };
 }
 
@@ -278,6 +77,57 @@ function issueDescription(content: string): WebNode {
     tag: 'text',
     props: { whiteSpace: 'pre-wrap', className: 'roadmap-description' },
     children: [textNode(content)],
+  };
+}
+
+function issueDescriptionPreview({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: {
+  issue: IssueView;
+  workflow: WorkflowView | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+}): WebNode | null {
+  const content = issue.content.trim();
+  const limit = 180;
+
+  if (!content) {
+    return null;
+  }
+
+  if (content.length <= limit) {
+    return issueDescription(content);
+  }
+
+  return {
+    type: 'element',
+    tag: 'text',
+    props: { whiteSpace: 'pre-wrap', className: 'roadmap-description' },
+    children: [
+      textNode(`${content.slice(0, limit).trimEnd()}... `),
+      {
+        type: 'element',
+        tag: 'button',
+        props: {
+          label: 'More',
+          className: 'web-button web-button--link roadmap-meta-action',
+          stopPropagation: true,
+          action: openIssueAction({
+            issue,
+            workflow,
+            relay,
+            boardKey,
+            columnId,
+            focus: 'activity',
+          }),
+        },
+      },
+    ],
   };
 }
 
@@ -310,112 +160,152 @@ function metaBadges(labels: string[]): WebNode {
   };
 }
 
-function addIssueRevealId(workflow: WorkflowView): string {
-  return `roadmap-new-issue-${classSuffix(workflow.key)}`;
+export type RoadmapWorkflowPayload = {
+  id: string;
+  address: string;
+  key: string;
+  title: string;
+  authorPubkey: string;
+  projectAddress: string;
+  columns: { id: string; label: string }[];
+};
+
+export type RoadmapIssuePayload = {
+  id: string;
+  project: string;
+  projectAddress: string;
+  authorPubkey: string;
+  repoMaintainers: string[];
+  subject: string;
+  content: string;
+  labels: string[];
+  createdAt: number;
+  fundingSats: number;
+  zapCount: number;
+  commentCount: number;
+  comments: IssueView['comments'];
+  status: string | null;
+};
+
+export type RoadmapCapabilities = {
+  canCreate: boolean;
+  canComment: boolean;
+  canMove: boolean;
+  canMark: boolean;
+  canDelete: boolean;
+};
+
+type RoadmapCapabilityProps = {
+  issue: RoadmapIssuePayload;
+  workflow: RoadmapWorkflowPayload | null;
+  availableSignerPubkeys: string[] | null;
+};
+
+export function roadmapCapabilities({
+  issue,
+  workflow,
+  availableSignerPubkeys,
+}: RoadmapCapabilityProps): RoadmapCapabilities {
+  if (availableSignerPubkeys === null) {
+    return {
+      canCreate: true,
+      canComment: true,
+      canMove: workflow !== null,
+      canMark: true,
+      canDelete: false,
+    };
+  }
+
+  const signers = new Set(availableSignerPubkeys.filter(Boolean));
+  const repoOwner = issue.projectAddress.split(':')[1] ?? '';
+
+  return {
+    canCreate: true,
+    canComment: true,
+    canMove: workflow !== null && signers.has(workflow.authorPubkey),
+    canMark: [issue.authorPubkey, repoOwner, ...issue.repoMaintainers].some(
+      (pubkey) => signers.has(pubkey),
+    ),
+    canDelete: signers.has(issue.authorPubkey),
+  };
 }
 
-function commentRevealId(issue: IssueView): string {
-  return `roadmap-comment-${issue.id}`;
+export function workflowPayload(
+  workflow: WorkflowView,
+): RoadmapWorkflowPayload {
+  return {
+    id: workflow.id,
+    address: workflow.address,
+    key: workflow.key,
+    title: workflow.title,
+    authorPubkey: workflow.authorPubkey,
+    projectAddress: workflow.projectAddress,
+    columns: workflow.columns.map((column) => ({
+      id: column.id,
+      label: column.label,
+    })),
+  };
 }
 
-function inlineIssueForm({
+export function issuePayload(issue: IssueView): RoadmapIssuePayload {
+  return {
+    id: issue.id,
+    project: issue.project,
+    projectAddress: issue.projectAddress,
+    authorPubkey: issue.authorPubkey,
+    repoMaintainers: issue.repoMaintainers,
+    subject: issue.subject,
+    content: issue.content,
+    labels: issue.labels,
+    createdAt: issue.createdAt,
+    fundingSats: issue.fundingSats,
+    zapCount: issue.zapCount,
+    commentCount: issue.commentCount,
+    comments: issue.comments,
+    status: issue.status,
+  };
+}
+
+function openIssueAction({
+  issue,
   workflow,
   relay,
-  revealId,
+  boardKey,
+  columnId,
+  focus,
+}: {
+  issue: IssueView;
+  workflow: WorkflowView | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+  focus: 'activity' | 'comments' | 'manage';
+}): WebAction {
+  return {
+    type: 'clientAction',
+    action: 'roadmap.openIssue',
+    payload: {
+      issue: issuePayload(issue),
+      workflow: workflow ? workflowPayload(workflow) : null,
+      relay,
+      boardKey,
+      columnId,
+      focus,
+    },
+  };
+}
+
+function openNewIssueAction({
+  workflow,
+  relay,
 }: {
   workflow: WorkflowView;
   relay: string;
-  revealId: string;
-}): WebNode {
+}): WebAction {
   return {
-    type: 'element',
-    tag: 'stack',
-    props: {
-      revealId,
-      hiddenUntilRevealed: true,
-      gap: 'xs',
-      className: 'roadmap-inline-new-wrap',
-    },
-    children: [
-      {
-        type: 'element',
-        tag: 'text',
-        props: { weight: 'bold', className: 'roadmap-section-title' },
-        children: [textNode(`New issue for ${workflow.title}`)],
-      },
-      {
-        type: 'element',
-        tag: 'form',
-        props: {
-          className: 'web-form web-form--stacked',
-          revealId,
-          hiddenUntilRevealed: true,
-          action: {
-            type: 'clientAction',
-            action: 'roadmap.createIssue',
-            payload: {
-              repo: workflow.projectAddress,
-              relay,
-            },
-            refresh: {
-              command: 'roadmap',
-              subcommand: 'board',
-              arguments: { id: workflow.key },
-              options: { relay },
-            },
-          },
-        },
-        children: [
-          {
-            type: 'element',
-            tag: 'select',
-            props: {
-              formFieldName: 'type',
-              choices: ['feature', 'bug'],
-              value: 'feature',
-            },
-          },
-          {
-            type: 'element',
-            tag: 'textField',
-            props: {
-              formFieldName: 'title',
-              inputPlaceholder: 'Short issue title',
-              autoFocus: true,
-            },
-          },
-          {
-            type: 'element',
-            tag: 'textArea',
-            props: {
-              formFieldName: 'description',
-              inputPlaceholder:
-                'Describe the problem, feature, or expected outcome',
-              maxRows: 8,
-            },
-          },
-          row(
-            [
-              {
-                type: 'element',
-                tag: 'button',
-                props: { label: 'Create issue', htmlType: 'submit' },
-              },
-              {
-                type: 'element',
-                tag: 'button',
-                props: {
-                  label: 'Close',
-                  className: 'web-button',
-                  action: hideAddIssueAction(revealId),
-                },
-              },
-            ],
-            'sm',
-          ),
-        ],
-      },
-    ],
+    type: 'clientAction',
+    action: 'roadmap.openNewIssue',
+    payload: { workflow: workflowPayload(workflow), relay },
   };
 }
 
@@ -426,90 +316,117 @@ function issueFilterText(issue: IssueView, status: string): string {
     issue.project,
     status,
     issue.status ?? '',
-    ...issue.labels,
+    ...issue.labels.flatMap((label) => [label, `label:${label}`]),
   ].join(' ');
 }
 
-function issueContent(
+function issueTitleButton({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: {
+  issue: IssueView;
+  workflow: WorkflowView | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+}): WebNode {
+  return {
+    type: 'element',
+    tag: 'button',
+    props: {
+      label: issue.subject,
+      className: 'web-button web-button--link roadmap-issue-title',
+      stopPropagation: true,
+      action: openIssueAction({
+        issue,
+        workflow,
+        relay,
+        boardKey,
+        columnId,
+        focus: 'activity',
+      }),
+    },
+    children: [textNode(issue.subject)],
+  };
+}
+
+function issueDetailsContent(
   issue: IssueView,
   showProject: boolean,
   relay: string,
   boardKey: string | null,
+  workflow: WorkflowView | null,
+  columnId: string | null,
 ): WebNode {
   const labels = issue.labels.slice(0, 4);
-  const revealId = commentRevealId(issue);
+
+  const description = issueDescriptionPreview({
+    issue,
+    workflow,
+    relay,
+    boardKey,
+    columnId,
+  });
 
   return {
     type: 'element',
     tag: 'stack',
-    props: { gap: 'xs' },
+    props: { gap: 'xs', className: 'roadmap-issue-details' },
     children: [
       {
         type: 'element',
         tag: 'row',
-        props: { gap: 'md', className: 'roadmap-issue-head' },
+        props: { gap: 'xs', className: 'roadmap-badges' },
+        children: [
+          ...(showProject ? [badge(issue.project, 'info')] : []),
+          ...labels.map((label) =>
+            badge(
+              label,
+              'muted',
+              `roadmap-label-badge roadmap-label-badge-${classSuffix(label)}`,
+              filterByLabelAction(label),
+            ),
+          ),
+        ],
+      },
+      ...(description ? [description] : []),
+      {
+        type: 'element',
+        tag: 'row',
+        props: { gap: 'xs', className: 'roadmap-readable-muted' },
         children: [
           {
             type: 'element',
-            tag: 'stack',
-            props: { gap: 'xs', className: 'roadmap-issue-main' },
-            children: [
-              {
-                type: 'element',
-                tag: 'text',
-                props: { weight: 'bold', className: 'roadmap-issue-title' },
-                children: [textNode(issue.subject)],
-              },
-              {
-                type: 'element',
-                tag: 'row',
-                props: { gap: 'xs', className: 'roadmap-badges' },
-                children: [
-                  ...(showProject ? [badge(issue.project, 'info')] : []),
-                  ...labels.map((label) =>
-                    badge(
-                      label,
-                      'muted',
-                      `roadmap-label-badge roadmap-label-badge-${classSuffix(label)}`,
-                    ),
-                  ),
-                ],
-              },
-              ...(issue.content.trim().length > 0
-                ? [issueDescription(issue.content)]
-                : []),
-              {
-                type: 'element',
-                tag: 'row',
-                props: { gap: 'xs', className: 'roadmap-readable-muted' },
-                children: [
-                  {
-                    type: 'element',
-                    tag: 'button',
-                    props: {
-                      label: `${issue.zapCount} zap${issue.zapCount === 1 ? '' : 's'}`,
-                      className:
-                        'web-button web-button--link roadmap-meta-action',
-                      stopPropagation: true,
-                      action: fundIssueAction(issue, relay),
-                    },
-                  },
-                  textNode('·'),
-                  {
-                    type: 'element',
-                    tag: 'button',
-                    props: {
-                      label: `${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}`,
-                      className:
-                        'web-button web-button--link roadmap-meta-action',
-                      stopPropagation: true,
-                      action: revealAddIssueAction(revealId),
-                    },
-                  },
-                ],
-              },
-            ],
+            tag: 'button',
+            props: {
+              label: `${issue.zapCount} zap${issue.zapCount === 1 ? '' : 's'}`,
+              className: 'web-button web-button--link roadmap-meta-action',
+              stopPropagation: true,
+              action: fundIssueAction(issue, relay),
+            },
           },
+          textNode('·'),
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: `${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}`,
+              className: 'web-button web-button--link roadmap-meta-action',
+              stopPropagation: true,
+              action: openIssueAction({
+                issue,
+                workflow,
+                relay,
+                boardKey,
+                columnId,
+                focus: 'comments',
+              }),
+            },
+          },
+          textNode('·'),
           {
             type: 'element',
             tag: 'button',
@@ -521,8 +438,32 @@ function issueContent(
           },
         ],
       },
-      issueCommentForm(issue, relay, boardKey),
-      issueMarkForm(issue, relay, boardKey),
+    ],
+  };
+}
+
+function issueContent(
+  issue: IssueView,
+  showProject: boolean,
+  relay: string,
+  boardKey: string | null,
+  workflow: WorkflowView | null,
+  columnId: string | null,
+): WebNode {
+  return {
+    type: 'element',
+    tag: 'stack',
+    props: { gap: 'xs' },
+    children: [
+      issueTitleButton({ issue, workflow, relay, boardKey, columnId }),
+      issueDetailsContent(
+        issue,
+        showProject,
+        relay,
+        boardKey,
+        workflow,
+        columnId,
+      ),
     ],
   };
 }
@@ -545,17 +486,15 @@ function boardRefreshAction(
 
 function issueCommentForm(
   issue: IssueView,
+  workflow: RoadmapWorkflowPayload | null,
   relay: string,
   boardKey: string | null,
+  columnId: string | null,
 ): WebNode {
-  const revealId = commentRevealId(issue);
-
   return {
     type: 'element',
     tag: 'form',
     props: {
-      revealId,
-      hiddenUntilRevealed: true,
       className: 'web-form web-form--stacked roadmap-comments-panel',
       action: {
         type: 'clientAction',
@@ -566,6 +505,10 @@ function issueCommentForm(
           repo: issue.projectAddress,
           relay,
           title: issue.subject,
+          modalIssue: issue,
+          modalWorkflow: workflow,
+          modalBoardKey: boardKey,
+          modalColumnId: columnId,
         },
         ...(boardRefreshAction(relay, boardKey)
           ? { refresh: boardRefreshAction(relay, boardKey) }
@@ -618,15 +561,6 @@ function issueCommentForm(
             tag: 'button',
             props: { label: 'Send comment', htmlType: 'submit' },
           },
-          {
-            type: 'element',
-            tag: 'button',
-            props: {
-              label: 'Close',
-              className: 'web-button',
-              action: hideAddIssueAction(revealId),
-            },
-          },
         ],
         'sm',
       ),
@@ -650,23 +584,24 @@ function statusKindForIssue(issue: IssueView): string {
   return '1630';
 }
 
-function issueMarkForm(
-  issue: IssueView,
-  relay: string,
-  boardKey: string | null,
-): WebNode {
-  const refresh = boardRefreshAction(relay, boardKey);
-
-  const allowedPubkeys = [
-    ...new Set([issue.authorPubkey, ...issue.repoMaintainers]),
-  ];
-
+function issueMarkForm({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: {
+  issue: RoadmapIssuePayload;
+  workflow: RoadmapWorkflowPayload | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+}): WebNode {
   return {
     type: 'element',
     tag: 'form',
     props: {
       className: 'web-form roadmap-mark-row',
-      visibleForPubkeys: allowedPubkeys,
       action: {
         type: 'clientAction',
         action: 'roadmap.markIssue',
@@ -677,8 +612,11 @@ function issueMarkForm(
           repoMaintainers: issue.repoMaintainers,
           relay,
           title: issue.subject,
+          modalIssue: issue,
+          modalWorkflow: workflow,
+          modalBoardKey: boardKey,
+          modalColumnId: columnId,
         },
-        ...(refresh ? { refresh } : {}),
       },
     },
     children: [
@@ -703,27 +641,274 @@ function issueMarkForm(
         tag: 'button',
         props: { label: 'OK', htmlType: 'submit' },
       },
+    ],
+  };
+}
+
+function issueTrackerForm({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: {
+  issue: RoadmapIssuePayload;
+  workflow: RoadmapWorkflowPayload;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+}): WebNode {
+  return {
+    type: 'element',
+    tag: 'form',
+    props: {
+      className: 'web-form roadmap-mark-row',
+      action: {
+        type: 'clientAction',
+        action: 'roadmap.trackIssue',
+        payload: {
+          issueId: issue.id,
+          issueAuthor: issue.authorPubkey,
+          repo: issue.projectAddress,
+          workflow: workflow.address,
+          workflowAuthor: workflow.authorPubkey,
+          relay,
+          title: issue.subject,
+          modalIssue: issue,
+          modalWorkflow: workflow,
+          modalBoardKey: boardKey,
+        },
+      },
+    },
+    children: [
+      readableMuted('Move to'),
+      {
+        type: 'element',
+        tag: 'select',
+        props: {
+          formFieldName: 'columnId',
+          value: columnId ?? 'pending',
+          choices: workflow.columns.map((column) => column.id),
+          choiceLabels: Object.fromEntries(
+            workflow.columns.map((column) => [column.id, column.label]),
+          ),
+        },
+      },
       {
         type: 'element',
         tag: 'button',
-        props: {
-          label: 'Delete',
-          className: 'web-button web-button--link roadmap-meta-action',
-          visibleForPubkeys: [issue.authorPubkey],
-          action: {
-            type: 'clientAction',
-            action: 'roadmap.deleteIssue',
-            payload: {
-              issueId: issue.id,
-              issueAuthor: issue.authorPubkey,
-              relay,
-              title: issue.subject,
-            },
-            ...(refresh ? { refresh } : {}),
-          },
-        },
+        props: { label: 'Publish move', htmlType: 'submit' },
       },
     ],
+  };
+}
+
+function issueStatusForm({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: {
+  issue: RoadmapIssuePayload;
+  workflow: RoadmapWorkflowPayload | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+}): WebNode {
+  return issueMarkForm({ issue, workflow, relay, boardKey, columnId });
+}
+
+export function renderRoadmapIssueModalWeb({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+  focus,
+  availableSignerPubkeys = null,
+}: {
+  issue: RoadmapIssuePayload;
+  workflow: RoadmapWorkflowPayload | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+  focus: 'activity' | 'comments' | 'manage';
+  availableSignerPubkeys?: string[] | null;
+}): WebNodeRoot {
+  const capabilities = roadmapCapabilities({
+    issue,
+    workflow,
+    availableSignerPubkeys,
+  });
+
+  const manageChildren: WebNode[] = [];
+
+  if (workflow && capabilities.canMove) {
+    manageChildren.push(
+      issueTrackerForm({
+        issue,
+        workflow,
+        relay,
+        boardKey,
+        columnId,
+      }),
+    );
+  }
+
+  if (capabilities.canMark) {
+    manageChildren.push(
+      issueStatusForm({
+        issue,
+        workflow,
+        relay,
+        boardKey,
+        columnId,
+      }),
+    );
+  }
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'roadmap', subcommand: 'issue' },
+    tree: stack(
+      [
+        {
+          type: 'element',
+          tag: 'text',
+          props: { weight: 'bold', className: 'roadmap-section-title' },
+          children: [textNode(issue.subject)],
+        },
+        metaBadges([
+          issue.project,
+          issue.status ?? 'open',
+          formatSats(issue.fundingSats),
+          `${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}`,
+        ]),
+        ...(issue.content.trim().length > 0
+          ? [issueDescription(issue.content)]
+          : [textBlock('No description.', 'muted')]),
+        ...(capabilities.canComment
+          ? [issueCommentForm(issue, workflow, relay, boardKey, columnId)]
+          : []),
+        ...(manageChildren.length > 0
+          ? [
+              {
+                type: 'element' as const,
+                tag: 'stack' as const,
+                props: {
+                  gap: 'xs' as const,
+                  className: 'roadmap-management-panel',
+                  scrollIntoViewOnMount: focus === 'manage' ? true : undefined,
+                },
+                children: [
+                  {
+                    type: 'element' as const,
+                    tag: 'text' as const,
+                    props: { weight: 'bold' as const },
+                    children: [textNode('Manage')],
+                  },
+                  readableMuted(
+                    'Board owner controls publish signed Nostr events.',
+                  ),
+                  ...manageChildren,
+                ],
+              },
+            ]
+          : []),
+      ],
+      'md',
+    ),
+    stylesheets: [roadmapStylesheet],
+  };
+}
+
+export function renderRoadmapNewIssueWeb({
+  workflow,
+  relay,
+}: {
+  workflow: RoadmapWorkflowPayload;
+  relay: string;
+}): WebNodeRoot {
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'roadmap', subcommand: 'new' },
+    tree: stack(
+      [
+        {
+          type: 'element',
+          tag: 'text',
+          props: { weight: 'bold', className: 'roadmap-section-title' },
+          children: [textNode(`New issue for ${workflow.title}`)],
+        },
+        {
+          type: 'element',
+          tag: 'form',
+          props: {
+            className: 'web-form web-form--stacked',
+            action: {
+              type: 'clientAction',
+              action: 'roadmap.createIssue',
+              payload: {
+                repo: workflow.projectAddress,
+                repoOwner: workflow.authorPubkey,
+                relay,
+              },
+              refresh: {
+                command: 'roadmap',
+                subcommand: 'board',
+                arguments: { id: workflow.key },
+                options: { relay },
+              },
+            },
+          },
+          children: [
+            {
+              type: 'element',
+              tag: 'select',
+              props: {
+                formFieldName: 'type',
+                choices: ['feature', 'bug'],
+                value: 'feature',
+              },
+            },
+            {
+              type: 'element',
+              tag: 'textField',
+              props: {
+                formFieldName: 'title',
+                inputPlaceholder: 'Short issue title',
+                autoFocus: true,
+              },
+            },
+            {
+              type: 'element',
+              tag: 'textArea',
+              props: {
+                formFieldName: 'description',
+                inputPlaceholder:
+                  'Describe the problem, feature, or expected outcome',
+                maxRows: 8,
+              },
+            },
+            row(
+              [
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: { label: 'Create issue', htmlType: 'submit' },
+                },
+              ],
+              'sm',
+            ),
+          ],
+        },
+      ],
+      'md',
+    ),
+    stylesheets: [roadmapStylesheet],
   };
 }
 
@@ -732,12 +917,16 @@ function issueCard(
   showProject: boolean,
   relay: string,
   boardKey: string | null,
+  workflow: WorkflowView | null,
+  columnId: string | null,
 ): WebNode {
   return {
     type: 'element',
     tag: 'box',
     props: { padding: 'md', className: 'roadmap-card' },
-    children: [issueContent(issue, showProject, relay, boardKey)],
+    children: [
+      issueContent(issue, showProject, relay, boardKey, workflow, columnId),
+    ],
   };
 }
 
@@ -750,6 +939,8 @@ function issueList(
     limit: number | null;
     relay: string;
     boardKey: string | null;
+    workflow: WorkflowView | null;
+    columnId: string | null;
   },
 ): WebNode[] {
   if (issues.length === 0) {
@@ -761,7 +952,14 @@ function issueList(
 
   if (options.treeStatus === null) {
     return visibleIssues.map((issue) =>
-      issueCard(issue, options.showProject, options.relay, options.boardKey),
+      issueCard(
+        issue,
+        options.showProject,
+        options.relay,
+        options.boardKey,
+        options.workflow,
+        options.columnId,
+      ),
     );
   }
 
@@ -775,15 +973,24 @@ function issueList(
       filterPath: `${options.treeStatus}/${issue.subject}`,
       defaultExpanded: false,
       className: 'roadmap-issue-item',
-      toggleSelector: '.roadmap-issue-title',
     },
-    summary: issueContent(
+    summary: issueTitleButton({
       issue,
-      options.showProject,
-      options.relay,
-      options.boardKey,
-    ),
-    children: [],
+      workflow: options.workflow,
+      relay: options.relay,
+      boardKey: options.boardKey,
+      columnId: options.columnId,
+    }),
+    children: [
+      issueDetailsContent(
+        issue,
+        options.showProject,
+        options.relay,
+        options.boardKey,
+        options.workflow,
+        options.columnId,
+      ),
+    ],
   }));
 }
 
@@ -807,7 +1014,6 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
   const issues = workflow.columns.flatMap((column) => column.issues);
   const openIssues = issues.filter((issue) => issue.status === null);
   const zapCount = issues.reduce((total, issue) => total + issue.zapCount, 0);
-  const revealId = addIssueRevealId(workflow);
   const unassignedColumn = workflow.columns[0];
   const boardColumns = workflow.columns.slice(1);
 
@@ -874,6 +1080,8 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
                           limit: null,
                           relay,
                           boardKey: workflow.key,
+                          workflow,
+                          columnId: unassignedColumn.id,
                         },
                       ),
                     },
@@ -901,12 +1109,20 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
                 children: [
                   {
                     type: 'element' as const,
-                    tag: 'text' as const,
-                    props: {
-                      weight: 'bold' as const,
-                      className: 'roadmap-section-title',
-                    },
-                    children: [textNode(workflow.title)],
+                    tag: 'row' as const,
+                    props: { className: 'roadmap-section-title-row' },
+                    children: [
+                      {
+                        type: 'element' as const,
+                        tag: 'text' as const,
+                        props: {
+                          weight: 'bold' as const,
+                          className: 'roadmap-section-title',
+                        },
+                        children: [textNode(workflow.title)],
+                      },
+                      workflowAuthor(workflow),
+                    ],
                   },
                 ],
               },
@@ -944,6 +1160,8 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
                     limit: ROADMAP_COLUMN_VISIBLE_LIMIT,
                     relay,
                     boardKey: workflow.key,
+                    workflow,
+                    columnId: column.id,
                   },
                 ),
               })),
@@ -952,8 +1170,31 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
           ),
         ],
       },
-      inlineIssueForm({ workflow, relay, revealId }),
+      {
+        type: 'element',
+        tag: 'button',
+        props: {
+          label: 'New Issue',
+          ui: 'toolbar-add',
+          className: 'roadmap-new-issue-button',
+          action: openNewIssueAction({ workflow, relay }),
+        },
+      },
     ],
+  };
+}
+
+function workflowAuthor(workflow: WorkflowView): WebNode {
+  return {
+    type: 'element',
+    tag: 'link',
+    props: {
+      href: workflow.author.href,
+      external: true,
+      tone: workflow.author.verified ? 'success' : 'muted',
+      className: 'roadmap-board-author',
+    },
+    children: [textNode(workflow.author.label)],
   };
 }
 
@@ -1032,11 +1273,12 @@ export function renderRoadmapWeb(view: RoadmapView): WebNodeRoot {
           ? {
               toolbarActions: [
                 {
-                  label: 'New issue',
+                  label: 'New Issue',
                   icon: 'add' as const,
-                  action: revealAddIssueAction(
-                    addIssueRevealId(activeWorkflow),
-                  ),
+                  action: openNewIssueAction({
+                    workflow: activeWorkflow,
+                    relay: view.relay,
+                  }),
                 },
               ],
             }
