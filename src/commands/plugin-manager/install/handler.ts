@@ -1,10 +1,18 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { nip19, type NostrEvent } from 'nostr-tools';
+import type { NostrEvent } from 'nostr-tools';
 
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
 import type { CoreUpdateSnapshot } from '@src/core/update-check';
+import {
+  authorHref,
+  decodeNpub,
+  fallbackAuthorIdentity,
+  normalizeNip05,
+  verifyNip05,
+  type AuthorIdentity,
+} from '@src/nostr/author-identity';
 
 import type { RouteCommandContext } from '../../dispatch';
 
@@ -22,7 +30,6 @@ export const PLUGIN_QUERY_RELAYS = [
 
 const PLUGIN_QUERY_MAX_WAIT_MS = 10_000;
 const AUTHOR_PROFILE_QUERY_MAX_WAIT_MS = 2_000;
-const NIP05_VERIFY_MAX_WAIT_MS = 3_000;
 
 type RefEntry = {
   tag: string;
@@ -42,7 +49,7 @@ export type PluginCatalogEntry = {
   version: string;
   coreApiVersion: string;
   repo: string;
-  author: PluginAuthorIdentity;
+  author: AuthorIdentity;
   refs: RefEntry[];
   installedAlias: string | null;
   installedVersion: string | null;
@@ -52,12 +59,6 @@ export type PluginCatalogEntry = {
   coreUpdateCanUnlockBlockedRef: boolean;
   changelogRefs: RefEntry[];
   updateAvailable: boolean;
-};
-
-export type PluginAuthorIdentity = {
-  label: string;
-  href: string;
-  verified: boolean;
 };
 
 export type InstalledPluginEntry = {
@@ -123,36 +124,6 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
   };
 }
 
-function maskedNpub(pubkey: string): string {
-  try {
-    const npub = nip19.npubEncode(pubkey);
-
-    return `${npub.slice(0, 12)}...${npub.slice(-6)}`;
-  } catch {
-    return `${pubkey.slice(0, 8)}...${pubkey.slice(-6)}`;
-  }
-}
-
-function npubHref(pubkey: string): string {
-  try {
-    return `https://nosta.me/${nip19.npubEncode(pubkey)}`;
-  } catch {
-    return `https://nosta.me/${pubkey}`;
-  }
-}
-
-function fallbackAuthorIdentity(pubkey: string): PluginAuthorIdentity {
-  return {
-    label: maskedNpub(pubkey),
-    href: npubHref(pubkey),
-    verified: false,
-  };
-}
-
-function authorHref(nip05: string): string {
-  return `https://nosta.me/${nip05.replace(/^_@/, '')}`;
-}
-
 function repoAuthorHint(repo: string): string | null {
   if (!repo.startsWith('nostr://')) {
     return null;
@@ -162,79 +133,6 @@ function repoAuthorHint(repo: string): string | null {
   const firstSegment = rest.split('/')[0]?.trim() ?? '';
 
   return firstSegment || null;
-}
-
-function normalizeNip05(value: string): string | null {
-  const trimmed = value.trim().toLowerCase();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  if (trimmed.startsWith('@')) {
-    return `_${trimmed}`;
-  }
-
-  if (!trimmed.includes('@')) {
-    return `_${trimmed.startsWith('@') ? '' : '@'}${trimmed}`;
-  }
-
-  return trimmed;
-}
-
-function decodeNpub(value: string): string | null {
-  try {
-    const decoded = nip19.decode(value);
-
-    return decoded.type === 'npub' && typeof decoded.data === 'string'
-      ? decoded.data
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-type VerifyNip05Props = {
-  nip05: string;
-  expectedPubkey: string;
-};
-
-async function verifyNip05({
-  nip05,
-  expectedPubkey,
-}: VerifyNip05Props): Promise<boolean> {
-  const normalized = normalizeNip05(nip05);
-
-  if (!normalized) {
-    return false;
-  }
-
-  const [name, domain] = normalized.split('@');
-
-  if (!name || !domain) {
-    return false;
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), NIP05_VERIFY_MAX_WAIT_MS);
-
-  try {
-    const url = `https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`;
-    const response = await fetch(url, { signal: controller.signal });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = (await response.json()) as { names?: Record<string, unknown> };
-    const pubkey = data.names?.[name];
-
-    return typeof pubkey === 'string' && pubkey === expectedPubkey;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 async function queryProfileNip05(
@@ -265,7 +163,7 @@ async function queryProfileNip05(
 async function authorIdentityForEntry(
   ctx: RouteCommandContext,
   entry: PluginCatalogEntry,
-): Promise<PluginAuthorIdentity> {
+): Promise<AuthorIdentity> {
   const hint = repoAuthorHint(entry.repo);
   const fallback = fallbackAuthorIdentity(entry.pubkey);
 
@@ -292,6 +190,7 @@ async function authorIdentityForEntry(
         label: normalized,
         href: authorHref(normalized),
         verified: true,
+        nip05: normalized,
       };
     }
 
@@ -304,7 +203,12 @@ async function authorIdentityForEntry(
     normalized &&
     (await verifyNip05({ nip05: normalized, expectedPubkey: entry.pubkey }))
   ) {
-    return { label: normalized, href: authorHref(normalized), verified: true };
+    return {
+      label: normalized,
+      href: authorHref(normalized),
+      verified: true,
+      nip05: normalized,
+    };
   }
 
   return fallback;

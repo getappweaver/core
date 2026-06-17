@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.42.2] - 2026-06-17
+
+- refactor: share nostr author identity helpers (ca80eeb)
+
 ## [v9.42.1] - 2026-06-14
 
-- docs: add story system blog draft (f42a5da)
+- docs: add story system blog draft (88845ae)
 
 ## [v9.42.0] - 2026-06-14
 
