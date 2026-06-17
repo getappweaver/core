@@ -211,7 +211,10 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
                 : 'default',
           }}
         >
-          <Show when={hasChildren()} fallback={null}>
+          <Show
+            when={hasChildren()}
+            fallback={<span class="web-tree-toggle-spacer" />}
+          >
             <button
               type="button"
               class="web-tree-toggle"

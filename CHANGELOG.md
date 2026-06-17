@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.43.2] - 2026-06-18
+
+- fix: added tree item spacer back (1898292)
+
 ## [v9.43.1] - 2026-06-17
 
-- fix: subscribe before publishing bunker requests (f04aed2)
+- fix: subscribe before publishing bunker requests (7697080)
 
 ## [v9.43.0] - 2026-06-17
 
