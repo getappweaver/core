@@ -10,9 +10,17 @@ import {
   decodeNpub,
   fallbackAuthorIdentity,
   normalizeNip05,
+  resolveNip05Identity,
   verifyNip05,
   type AuthorIdentity,
 } from '@src/nostr/author-identity';
+import { fetchNip65RelaySet, uniqueRelays } from '@src/nostr/nip65';
+import {
+  nostrRepoAddress,
+  parseNostrRepoAddress,
+  repoAddressAuthorNip05,
+  repoAddressAuthorNpub,
+} from '@src/nostr/repo-address';
 
 import type { RouteCommandContext } from '../../dispatch';
 
@@ -71,6 +79,43 @@ export type InstalledPluginEntry = {
 type PluginsJson = {
   plugins: InstalledPluginEntry[];
 };
+
+type ResolvedPluginTarget = {
+  repoId: string;
+  pubkey: string;
+  authorHint: string;
+  relays: string[];
+  repoAddress: string;
+};
+
+type QueryPluginCatalogOptions = {
+  relays: string[] | null;
+  authors: string[] | null;
+};
+
+function isInstalledPluginEntry(entry: unknown): entry is InstalledPluginEntry {
+  return (
+    entry !== null &&
+    typeof entry === 'object' &&
+    typeof (entry as InstalledPluginEntry).alias === 'string' &&
+    (typeof (entry as InstalledPluginEntry).name === 'undefined' ||
+      typeof (entry as InstalledPluginEntry).name === 'string') &&
+    typeof (entry as InstalledPluginEntry).repo === 'string' &&
+    (typeof (entry as InstalledPluginEntry).version === 'undefined' ||
+      typeof (entry as InstalledPluginEntry).version === 'string')
+  );
+}
+
+function normalizeInstalledPluginEntry(
+  entry: InstalledPluginEntry,
+): InstalledPluginEntry {
+  return {
+    alias: entry.alias,
+    ...(entry.name ? { name: entry.name } : {}),
+    repo: entry.repo,
+    ...(entry.version ? { version: entry.version } : {}),
+  };
+}
 
 export type PluginsInstallRepresentation = {
   coreVersion: string;
@@ -135,6 +180,86 @@ function repoAuthorHint(repo: string): string | null {
   return firstSegment || null;
 }
 
+async function resolvePluginTarget(
+  ctx: RouteCommandContext,
+  target: string,
+): Promise<ResolvedPluginTarget | null> {
+  const parsed = parseNostrRepoAddress(target);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const npubPubkey = repoAddressAuthorNpub(parsed.authorHint);
+  const nip05 = repoAddressAuthorNip05(parsed.authorHint);
+  const identity = npubPubkey ? null : await resolveNip05Identity(nip05 ?? '');
+  const pubkey = npubPubkey ?? identity?.pubkey ?? '';
+
+  const discoveryRelays = uniqueRelays([
+    ...parsed.relayHints,
+    ...(identity?.relays ?? []),
+    ...PLUGIN_QUERY_RELAYS,
+  ]);
+
+  if (!pubkey) {
+    return null;
+  }
+
+  const nip65Relays = await fetchNip65RelaySet({
+    pool: ctx.pool,
+    authorPubkey: pubkey,
+    fallbackRelays: discoveryRelays,
+  });
+
+  const relays = uniqueRelays([
+    ...discoveryRelays,
+    ...nip65Relays.readRelays,
+    ...nip65Relays.writeRelays,
+  ]);
+
+  return {
+    repoId: parsed.repoId,
+    pubkey,
+    authorHint: parsed.authorHint,
+    relays,
+    repoAddress: nostrRepoAddress({
+      authorHint: parsed.authorHint,
+      repoId: parsed.repoId,
+      relayHints: relays,
+    }),
+  };
+}
+
+function pluginTargetMatches({
+  entry,
+  normalizedTarget,
+  resolvedTarget,
+}: {
+  entry: PluginCatalogEntry;
+  normalizedTarget: string;
+  resolvedTarget: ResolvedPluginTarget | null;
+}): boolean {
+  if (resolvedTarget) {
+    return (
+      entry.pubkey === resolvedTarget.pubkey &&
+      [entry.name, suggestedAlias(entry.name), entry.repo]
+        .filter(Boolean)
+        .some((value) => {
+          const parsed = parseNostrRepoAddress(value);
+
+          return parsed
+            ? parsed.repoId.toLowerCase() ===
+                resolvedTarget.repoId.toLowerCase()
+            : value.toLowerCase() === resolvedTarget.repoId.toLowerCase();
+        })
+    );
+  }
+
+  return [entry.id, entry.name, entry.title]
+    .filter(Boolean)
+    .some((value) => value.toLowerCase() === normalizedTarget);
+}
+
 async function queryProfileNip05(
   ctx: RouteCommandContext,
   pubkey: string,
@@ -191,6 +316,8 @@ async function authorIdentityForEntry(
         href: authorHref(normalized),
         verified: true,
         nip05: normalized,
+        lud16: null,
+        lud06: null,
       };
     }
 
@@ -208,6 +335,8 @@ async function authorIdentityForEntry(
       href: authorHref(normalized),
       verified: true,
       nip05: normalized,
+      lud16: null,
+      lud06: null,
     };
   }
 
@@ -250,17 +379,9 @@ export function readInstalledPlugins(
     return [];
   }
 
-  return parsed.plugins.filter((entry): entry is InstalledPluginEntry => {
-    return (
-      entry !== null &&
-      typeof entry === 'object' &&
-      typeof entry.alias === 'string' &&
-      (typeof entry.name === 'undefined' || typeof entry.name === 'string') &&
-      typeof entry.repo === 'string' &&
-      (typeof entry.version === 'undefined' ||
-        typeof entry.version === 'string')
-    );
-  });
+  return parsed.plugins
+    .filter(isInstalledPluginEntry)
+    .map(normalizeInstalledPluginEntry);
 }
 
 function readPluginsJson(dmBotRoot: string): PluginsJson {
@@ -279,17 +400,9 @@ function readPluginsJson(dmBotRoot: string): PluginsJson {
   }
 
   return {
-    plugins: parsed.plugins.filter((entry): entry is InstalledPluginEntry => {
-      return (
-        entry !== null &&
-        typeof entry === 'object' &&
-        typeof entry.alias === 'string' &&
-        (typeof entry.name === 'undefined' || typeof entry.name === 'string') &&
-        typeof entry.repo === 'string' &&
-        (typeof entry.version === 'undefined' ||
-          typeof entry.version === 'string')
-      );
-    }),
+    plugins: parsed.plugins
+      .filter(isInstalledPluginEntry)
+      .map(normalizeInstalledPluginEntry),
   };
 }
 
@@ -581,11 +694,13 @@ type InstallCatalogEntryResult = {
 type UpdateInstalledCatalogEntryProps = {
   ctx: RouteCommandContext;
   entry: PluginCatalogEntry;
+  resolvedTarget: ResolvedPluginTarget | null;
 };
 
 function updateInstalledCatalogEntry({
   ctx,
   entry,
+  resolvedTarget,
 }: UpdateInstalledCatalogEntryProps): InstallCatalogEntryResult {
   if (!entry.installedAlias) {
     return {
@@ -668,7 +783,7 @@ function updateInstalledCatalogEntry({
   pluginsData.plugins[index] = {
     alias: current.alias,
     ...(current.name ? { name: current.name } : {}),
-    repo: entry.repo,
+    repo: resolvedTarget?.repoAddress ?? entry.repo,
   };
 
   writePluginsJson(ctx.dmBotRoot, pluginsData);
@@ -689,8 +804,13 @@ async function installCatalogEntry({
   coreVersion,
   installedPlugins,
 }: InstallCatalogEntryProps): Promise<InstallCatalogEntryResult> {
+  const resolvedTarget = await resolvePluginTarget(ctx, target);
+
   const entries = attachInstalledState({
-    entries: await queryPluginCatalog(ctx),
+    entries: await queryPluginCatalog(ctx, {
+      relays: resolvedTarget?.relays ?? null,
+      authors: resolvedTarget ? [resolvedTarget.pubkey] : null,
+    }),
     installedPlugins,
     coreVersion,
     coreUpdate: null,
@@ -699,11 +819,13 @@ async function installCatalogEntry({
 
   const normalizedTarget = target.trim().toLowerCase();
 
-  const entry = entries.find((candidate) => {
-    return [candidate.id, candidate.name, candidate.title]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase() === normalizedTarget);
-  });
+  const entry = entries.find((candidate) =>
+    pluginTargetMatches({
+      entry: candidate,
+      normalizedTarget,
+      resolvedTarget,
+    }),
+  );
 
   if (!entry) {
     return {
@@ -713,7 +835,7 @@ async function installCatalogEntry({
   }
 
   if (entry.installedAlias) {
-    return updateInstalledCatalogEntry({ ctx, entry });
+    return updateInstalledCatalogEntry({ ctx, entry, resolvedTarget });
   }
 
   if (!entry.compatibleRef) {
@@ -769,7 +891,7 @@ async function installCatalogEntry({
   pluginsData.plugins.push({
     alias,
     name: entry.name,
-    repo: entry.repo,
+    repo: resolvedTarget?.repoAddress ?? entry.repo,
   });
 
   writePluginsJson(ctx.dmBotRoot, pluginsData);
@@ -843,27 +965,35 @@ function attachInstalledState({
 
 export async function queryPluginCatalog(
   ctx: RouteCommandContext,
+  options?: QueryPluginCatalogOptions,
 ): Promise<PluginCatalogEntry[]> {
   const eventsById = new Map<string, NostrEvent>();
+
+  const relays = uniqueRelays([
+    ...(options?.relays ?? []),
+    ...PLUGIN_QUERY_RELAYS,
+  ]);
+
+  const filter = {
+    kinds: [PLUGIN_KIND],
+    ...(options?.authors ? { authors: options.authors } : {}),
+    limit: 50,
+  };
 
   const events = await new Promise<NostrEvent[]>((resolve) => {
     let settled = false;
     const timer = setTimeout(() => finish('timeout'), PLUGIN_QUERY_MAX_WAIT_MS);
 
-    const sub = ctx.pool.subscribeMany(
-      PLUGIN_QUERY_RELAYS,
-      { kinds: [PLUGIN_KIND], limit: 50 },
-      {
-        maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
-        onevent: (event) => {
-          eventsById.set(event.id, event as NostrEvent);
-        },
-        oneose: () => finish('eose'),
-        onclose: () => {
-          finish('closed');
-        },
+    const sub = ctx.pool.subscribeMany(relays, filter, {
+      maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
+      onevent: (event) => {
+        eventsById.set(event.id, event as NostrEvent);
       },
-    );
+      oneose: () => finish('eose'),
+      onclose: () => {
+        finish('closed');
+      },
+    });
 
     function finish(reason: 'closed' | 'eose' | 'timeout'): void {
       if (settled) {

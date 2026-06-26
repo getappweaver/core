@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.46.0] - 2026-06-26
+
+- feat: resolve direct nostr plugin install targets (cd4090f)
+
 ## [v9.45.1] - 2026-06-26
 
-- feat: align landing roadmap relay discovery (eebc943)
+- feat: align landing roadmap relay discovery (a8a7e98)
 
 ## [v9.45.0] - 2026-06-26
 
