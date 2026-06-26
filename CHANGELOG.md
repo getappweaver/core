@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.45.0] - 2026-06-26
+
+- feat: add roadmap board creation flow (39d251d)
+
 ## [v9.44.0] - 2026-06-26
 
-- feat: resolve roadmap relays from nostr repo addresses (a4b7dcd)
+- feat: resolve roadmap relays from nostr repo addresses (9382440)
 
 ## [v9.43.2] - 2026-06-18
 

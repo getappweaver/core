@@ -293,6 +293,21 @@ select {
   border-color: var(--color-warning);
 }
 
+.web-tree-filter-clear {
+  border: 0;
+  background: transparent;
+  color: var(--color-warning);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.web-tree-filter-clear:hover,
+.web-tree-filter-clear:focus-visible {
+  color: var(--color-text);
+}
+
 .web-treeItem {
   display: grid;
   gap: 0.2rem;

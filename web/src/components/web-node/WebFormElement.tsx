@@ -133,9 +133,7 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
       try {
         const parsed = JSON.parse(submitterAction) as WebAction;
 
-        if (parsed.type === 'command') {
-          action = parsed;
-        }
+        action = parsed;
       } catch {
         props.onError?.('Form submit action is invalid.');
 

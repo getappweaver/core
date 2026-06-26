@@ -193,6 +193,32 @@ function renderElement({
         })()}
       </Match>
 
+      <Match when={element.tag === 'treeFilterStatus'}>
+        <span
+          class={elementClass(element)}
+          data-ui={elementUi(element)}
+          style={elementStyle(element)}
+        >
+          <Show
+            when={(filterState?.query() ?? '').trim()}
+            fallback={element.props?.label ?? ''}
+          >
+            {(query) => (
+              <>
+                Filtering by: &quot;{query()}&quot;{' '}
+                <button
+                  type="button"
+                  class="web-tree-filter-clear"
+                  onClick={() => filterState?.setValue('')}
+                >
+                  Clear
+                </button>
+              </>
+            )}
+          </Show>
+        </span>
+      </Match>
+
       <Match when={element.tag === 'link'}>
         <a
           class={elementClass(element)}

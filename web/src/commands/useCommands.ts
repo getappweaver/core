@@ -1,6 +1,7 @@
 import {
   renderRoadmapIssueModalWeb,
   renderRoadmapNewIssueWeb,
+  renderRoadmapNewWorkflowWeb,
 } from '@src/commands/roadmap/renderers/web';
 import type {
   TimelineEventOutput,
@@ -18,6 +19,10 @@ import {
 } from '../restartStatus';
 import { handleRoadmapCommentIssue } from '../roadmap/commentIssue';
 import { handleRoadmapCreateIssue } from '../roadmap/createIssue';
+import {
+  handleRoadmapCreateWorkflow,
+  handleRoadmapFetchWorkflowRepo,
+} from '../roadmap/createWorkflow';
 import { handleRoadmapLightningZap } from '../roadmap/lightningZap';
 import {
   handleRoadmapDeleteIssue,
@@ -558,6 +563,55 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               typeof action.payload.relay === 'string'
                 ? action.payload.relay
                 : '',
+          }),
+        );
+      } else if (clientActionName === 'roadmap.openNewWorkflow') {
+        adapters.setChromeModal({
+          command: 'roadmap',
+          subcommand: 'new-board',
+          title: 'New roadmap board',
+          iconUrl:
+            '/builtin-icons/src__commands__roadmap__renderers__roadmap.svg',
+        });
+
+        adapters.setChromeLoading(false);
+        adapters.setChromeError(null);
+        adapters.setChromeText(null);
+
+        adapters.setChromeWeb(
+          renderRoadmapNewWorkflowWeb({
+            projects: Array.isArray(action.payload.projects)
+              ? (action.payload.projects as never)
+              : [],
+            relay:
+              typeof action.payload.relay === 'string'
+                ? action.payload.relay
+                : '',
+            relays: Array.isArray(action.payload.relays)
+              ? (action.payload.relays as string[])
+              : [],
+          }),
+        );
+      } else if (clientActionName === 'roadmap.createWorkflow') {
+        runClientAction(
+          handleRoadmapCreateWorkflow({
+            action,
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'roadmap.fetchWorkflowRepo') {
+        runClientAction(
+          handleRoadmapFetchWorkflowRepo({
+            action,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
           }),
         );
       } else if (clientActionName === 'roadmap.closeModal') {

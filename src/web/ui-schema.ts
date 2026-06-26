@@ -328,6 +328,8 @@ export const WebElementTagSchema = z.enum([
   'menuItem',
   /** Generic hierarchical container rendered with local expand/collapse state. */
   'tree',
+  /** Reads the nearest tree filter and shows a clear action when filtering. */
+  'treeFilterStatus',
   /** Hierarchical item. Prefer `summary` for the row and `children` for child items. */
   'treeItem',
   /** Generic tab list; direct children should be `tabPanel` elements. */

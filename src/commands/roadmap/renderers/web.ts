@@ -1,4 +1,9 @@
-import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
+import type {
+  WebAction,
+  WebElementNode,
+  WebNode,
+  WebNodeRoot,
+} from '@src/web/ui-schema';
 import { row, stack, textBlock, textNode } from '@src/web/widgets';
 
 import type { IssueView, RoadmapView, WorkflowView } from '../model';
@@ -6,6 +11,16 @@ import type { IssueView, RoadmapView, WorkflowView } from '../model';
 import { roadmapStylesheet } from './styles';
 
 const ROADMAP_COLUMN_VISIBLE_LIMIT = 5;
+
+const DEFAULT_WORKFLOW_COLUMNS = [
+  'Planning',
+  'In Progress',
+  'Test',
+  'Done',
+  'Rejected',
+] as const;
+
+const EXTRA_WORKFLOW_COLUMN_COUNT = 3;
 
 function boardAction(workflow: WorkflowView, relay: string): WebAction {
   return {
@@ -26,7 +41,12 @@ function fundIssueAction(issue: IssueView, relay: string): WebAction {
     arguments: {
       issueId: issue.id,
     },
-    options: { title: issue.subject, sats: issue.fundingSats, relay },
+    options: {
+      title: issue.subject,
+      sats: issue.fundingSats,
+      relay,
+      relays: issue.repoRelays,
+    },
     surface: 'modal',
     modalTitle: `Fund "${issue.subject}"`,
     recordInTimeline: false,
@@ -57,6 +77,17 @@ function filterByLabelAction(label: string): WebAction {
     type: 'clientAction',
     action: 'web.toggleTreeFilter',
     payload: { value: label },
+  };
+}
+
+function openNewWorkflowAction(view: RoadmapView): WebAction {
+  return {
+    type: 'clientAction',
+    action: 'roadmap.openNewWorkflow',
+    payload: {
+      relay: view.relay,
+      relays: view.relays,
+    },
   };
 }
 
@@ -167,6 +198,7 @@ export type RoadmapWorkflowPayload = {
   title: string;
   authorPubkey: string;
   projectAddress: string;
+  repoRelays: string[];
   columns: { id: string; label: string }[];
 };
 
@@ -174,6 +206,7 @@ export type RoadmapIssuePayload = {
   id: string;
   project: string;
   projectAddress: string;
+  repoRelays: string[];
   authorPubkey: string;
   repoMaintainers: string[];
   subject: string;
@@ -193,6 +226,15 @@ export type RoadmapCapabilities = {
   canMove: boolean;
   canMark: boolean;
   canDelete: boolean;
+};
+
+export type RoadmapProjectPayload = {
+  address: string;
+  authorPubkey: string;
+  name: string;
+  description: string;
+  repoRelays: string[];
+  ownerWriteRelays: string[];
 };
 
 type RoadmapCapabilityProps = {
@@ -240,6 +282,7 @@ export function workflowPayload(
     title: workflow.title,
     authorPubkey: workflow.authorPubkey,
     projectAddress: workflow.projectAddress,
+    repoRelays: workflow.repoRelays,
     columns: workflow.columns.map((column) => ({
       id: column.id,
       label: column.label,
@@ -252,6 +295,7 @@ export function issuePayload(issue: IssueView): RoadmapIssuePayload {
     id: issue.id,
     project: issue.project,
     projectAddress: issue.projectAddress,
+    repoRelays: issue.repoRelays,
     authorPubkey: issue.authorPubkey,
     repoMaintainers: issue.repoMaintainers,
     subject: issue.subject,
@@ -504,6 +548,7 @@ function issueCommentForm(
           issueAuthor: issue.authorPubkey,
           repo: issue.projectAddress,
           relay,
+          relays: issue.repoRelays,
           title: issue.subject,
           modalIssue: issue,
           modalWorkflow: workflow,
@@ -611,6 +656,7 @@ function issueMarkForm({
           repo: issue.projectAddress,
           repoMaintainers: issue.repoMaintainers,
           relay,
+          relays: issue.repoRelays,
           title: issue.subject,
           modalIssue: issue,
           modalWorkflow: workflow,
@@ -673,6 +719,7 @@ function issueTrackerForm({
           workflow: workflow.address,
           workflowAuthor: workflow.authorPubkey,
           relay,
+          relays: workflow.repoRelays,
           title: issue.subject,
           modalIssue: issue,
           modalWorkflow: workflow,
@@ -800,7 +847,9 @@ export function renderRoadmapIssueModalWeb({
                 props: {
                   gap: 'xs' as const,
                   className: 'roadmap-management-panel',
-                  scrollIntoViewOnMount: focus === 'manage' ? true : undefined,
+                  ...(focus === 'manage'
+                    ? { scrollIntoViewOnMount: true as const }
+                    : {}),
                 },
                 children: [
                   {
@@ -855,6 +904,7 @@ export function renderRoadmapNewIssueWeb({
                 repo: workflow.projectAddress,
                 repoOwner: workflow.authorPubkey,
                 relay,
+                relays: workflow.repoRelays,
               },
               refresh: {
                 command: 'roadmap',
@@ -899,6 +949,258 @@ export function renderRoadmapNewIssueWeb({
                   type: 'element',
                   tag: 'button',
                   props: { label: 'Create issue', htmlType: 'submit' },
+                },
+              ],
+              'sm',
+            ),
+          ],
+        },
+      ],
+      'md',
+    ),
+    stylesheets: [roadmapStylesheet],
+  };
+}
+
+function columnRow(
+  label: string,
+  index: number,
+  visible: boolean,
+): WebElementNode {
+  return {
+    type: 'element',
+    tag: 'row',
+    props: { gap: 'sm', itemAlign: 'center' },
+    children: [
+      {
+        type: 'element',
+        tag: 'checkbox',
+        props: {
+          formFieldName: `columnEnabled${index}`,
+          checked: visible,
+          className: 'web-checkbox web-checkbox--retro',
+        },
+      },
+      {
+        type: 'element',
+        tag: 'textField',
+        props: {
+          formFieldName: `columnLabel${index}`,
+          inputPlaceholder: 'Column label',
+          value: label,
+        },
+      },
+    ],
+  };
+}
+
+export function renderRoadmapNewWorkflowWeb({
+  projects,
+  relay,
+  relays,
+  initialRepoAuthor = '',
+  initialRepoD = '',
+}: {
+  projects: RoadmapProjectPayload[];
+  relay: string;
+  relays: string[];
+  initialRepoAuthor?: string;
+  initialRepoD?: string;
+}): WebNodeRoot {
+  const fetchedProject = projects[0] ?? null;
+
+  const publishRelays = fetchedProject
+    ? [
+        ...new Set([
+          ...fetchedProject.repoRelays,
+          ...fetchedProject.ownerWriteRelays,
+        ]),
+      ]
+    : [];
+
+  const columnRows = [
+    ...DEFAULT_WORKFLOW_COLUMNS.map((label, index) =>
+      columnRow(label, index, true),
+    ),
+    ...Array.from({ length: EXTRA_WORKFLOW_COLUMN_COUNT }, (_, offset) => {
+      const index = DEFAULT_WORKFLOW_COLUMNS.length + offset;
+      const rowNode = columnRow('', index, false);
+
+      return {
+        ...rowNode,
+        props: {
+          ...(rowNode.props ?? {}),
+          revealId: 'roadmap-extra-columns',
+          hiddenUntilRevealed: true as const,
+        },
+      };
+    }),
+  ];
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'roadmap', subcommand: 'new-board' },
+    tree: stack(
+      [
+        {
+          type: 'element',
+          tag: 'text',
+          props: { weight: 'bold', className: 'roadmap-section-title' },
+          children: [textNode('New roadmap board')],
+        },
+        readableMuted(
+          'The workflow event must be signed by the NIP-34 repo author. AppWeaver only treats it as authoritative when the signer matches the repo owner.',
+        ),
+        {
+          type: 'element',
+          tag: 'form',
+          props: {
+            className: 'web-form web-form--stacked',
+            action: {
+              type: 'clientAction',
+              action: 'roadmap.createWorkflow',
+              payload: {
+                projects,
+                relay,
+                relays,
+                columnCount:
+                  DEFAULT_WORKFLOW_COLUMNS.length + EXTRA_WORKFLOW_COLUMN_COUNT,
+              },
+              refresh: {
+                command: 'roadmap',
+                subcommand: 'list',
+                arguments: {},
+                options: relay ? { relay } : {},
+              },
+            },
+          },
+          children: [
+            readableMuted('Repo pubkey'),
+            {
+              type: 'element',
+              tag: 'textField',
+              props: {
+                formFieldName: 'repoAuthor',
+                inputPlaceholder: 'NIP-34 repo author pubkey',
+                value: initialRepoAuthor,
+                autoFocus: true,
+              },
+            },
+            readableMuted('Repo keyword'),
+            {
+              type: 'element',
+              tag: 'textField',
+              props: {
+                formFieldName: 'repoD',
+                inputPlaceholder: 'NIP-34 repo d tag, e.g. appweaver',
+                value: initialRepoD,
+              },
+            },
+            row(
+              [
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: {
+                    label: 'Fetch',
+                    htmlType: 'submit',
+                    submitAction: {
+                      type: 'clientAction',
+                      action: 'roadmap.fetchWorkflowRepo',
+                      payload: {
+                        relay,
+                        relays,
+                        columnCount:
+                          DEFAULT_WORKFLOW_COLUMNS.length +
+                          EXTRA_WORKFLOW_COLUMN_COUNT,
+                      },
+                    },
+                  },
+                },
+              ],
+              'sm',
+            ),
+            readableMuted(
+              'AppWeaver resolves this repo announcement, then publishes to its repo relays plus the repo owner NIP-65 write relays.',
+            ),
+            ...(fetchedProject
+              ? [
+                  {
+                    type: 'element' as const,
+                    tag: 'box' as const,
+                    props: {
+                      padding: 'sm' as const,
+                      className: 'roadmap-card',
+                    },
+                    children: [
+                      stack(
+                        [
+                          {
+                            type: 'element' as const,
+                            tag: 'text' as const,
+                            props: { weight: 'bold' as const },
+                            children: [textNode(fetchedProject.name)],
+                          },
+                          readableMuted(fetchedProject.address),
+                          ...(fetchedProject.description
+                            ? [readableMuted(fetchedProject.description)]
+                            : []),
+                          readableMuted(
+                            `Publish relays: ${publishRelays.length > 0 ? publishRelays.join(', ') : '(none discovered)'}`,
+                          ),
+                        ],
+                        'xs',
+                      ),
+                    ],
+                  },
+                ]
+              : []),
+            {
+              type: 'element',
+              tag: 'textField',
+              props: {
+                formFieldName: 'roadmapD',
+                inputPlaceholder: 'Roadmap d; blank uses the repo d tag',
+              },
+            },
+            {
+              type: 'element',
+              tag: 'textField',
+              props: {
+                formFieldName: 'title',
+                inputPlaceholder: 'Roadmap title',
+              },
+            },
+            {
+              type: 'element',
+              tag: 'textArea',
+              props: {
+                formFieldName: 'description',
+                inputPlaceholder: 'Describe this roadmap board',
+                maxRows: 5,
+              },
+            },
+            readableMuted('Columns'),
+            ...columnRows,
+            {
+              type: 'element',
+              tag: 'button',
+              props: {
+                label: 'Add column',
+                className: 'web-button web-button--link roadmap-meta-action',
+                action: {
+                  type: 'reveal',
+                  targetId: 'roadmap-extra-columns',
+                },
+              },
+            },
+            row(
+              [
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: { label: 'Create roadmap', htmlType: 'submit' },
                 },
               ],
               'sm',
@@ -1043,7 +1345,14 @@ function workflowSection(workflow: WorkflowView, relay: string): WebNode {
               readableMuted(
                 "Issues are sorted by zapped amount. You can zap unsigned issues too. Zapping is signaling, it's not a contract.",
               ),
-              readableMuted('Use filter button to search existing issues.'),
+              {
+                type: 'element' as const,
+                tag: 'treeFilterStatus' as const,
+                props: {
+                  label: 'Use filter button to search existing issues.',
+                  className: 'roadmap-readable-muted',
+                },
+              },
               ...(unassignedColumn
                 ? [
                     {
@@ -1247,6 +1556,9 @@ export function renderRoadmapWeb(view: RoadmapView): WebNodeRoot {
   const isBoardMode = view.mode === 'board';
   const activeWorkflow = isBoardMode ? view.workflows[0] : undefined;
 
+  const relaySummary =
+    view.relays.length > 0 ? view.relays.join(', ') : view.relay;
+
   return {
     kind: 'ui',
     version: 1,
@@ -1282,7 +1594,17 @@ export function renderRoadmapWeb(view: RoadmapView): WebNodeRoot {
                 },
               ],
             }
-          : {}),
+          : !isBoardMode && view.projects.length > 0
+            ? {
+                toolbarActions: [
+                  {
+                    label: 'New Roadmap',
+                    icon: 'add' as const,
+                    action: openNewWorkflowAction(view),
+                  },
+                ],
+              }
+            : {}),
       },
       children: [
         stack(
@@ -1303,10 +1625,15 @@ export function renderRoadmapWeb(view: RoadmapView): WebNodeRoot {
                             type: 'element' as const,
                             tag: 'text' as const,
                             props: { weight: 'bold' as const },
-                            children: [textNode('Roadmap')],
+                            children: [textNode('Public Roadmaps')],
                           },
                           readableMuted(
-                            `${view.issueCount} issues · ${view.zapCount} verified zap events · ${view.relay}`,
+                            `${view.issueCount} issues · ${view.zapCount} verified zap events`,
+                          ),
+                          readableMuted(
+                            relaySummary
+                              ? `Relays: ${relaySummary}`
+                              : 'Relays: none',
                           ),
                         ],
                       },
@@ -1358,11 +1685,13 @@ export function renderRoadmapFundWeb({
   title,
   sats,
   relay,
+  relays,
 }: {
   issueId: string;
   title: string;
   sats: number;
   relay: string;
+  relays?: string[];
 }): WebNodeRoot {
   return {
     kind: 'ui',
@@ -1395,7 +1724,7 @@ export function renderRoadmapFundWeb({
             action: {
               type: 'clientAction',
               action: 'roadmap.lightningZap',
-              payload: { issueId, title, sats, relay },
+              payload: { issueId, title, sats, relay, relays: relays ?? [] },
             },
           },
           children: [
