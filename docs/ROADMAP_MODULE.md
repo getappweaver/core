@@ -77,7 +77,7 @@ These are not MVP requirements. The MVP should start with free issue creation an
 | Board model | Maintainer-controlled workflow; tracker events assign existing issues to statuses/columns |
 | Board scope | Core AppWeaver board plus separate official plugin boards |
 | Landing page default | Top funded issues only |
-| Repo relays | NIP-34 repo `relays` tag, falling back to AppWeaver default roadmap relays |
+| Repo relays | `relays` tag on the NIP-34 repo announcement, discovered through repo author NIP-65 when needed |
 | Funding verification | Clients verify board author `lud16`/`lud06` -> LNURLP -> `nostrPubkey` -> zap receipt pubkey |
 | Funding total source | Clients compute from verified zap receipts fetched from repo relays plus relevant NIP-65 relays |
 | First AppWeaver entry point | Header Roadmap button |
@@ -338,7 +338,7 @@ These should be deferred until there is real usage data.
 
 ### 8.1 Client-Verified Funding
 
-The MVP should start with repo relays rather than a dedicated AppWeaver relay. Repo relays come from the NIP-34 repository announcement `relays` tag, falling back to the AppWeaver default roadmap relays when the announcement has no relay list.
+The MVP should start with repo relays rather than a dedicated AppWeaver relay. Repo relays are the `relays` tag values on the NIP-34 repository announcement. Clients can use the repo author's NIP-65 outbox write relays to discover the announcement, but the announcement's `relays` tag is the final project-level relay set for board/workflow events, tracker events, created issues, comments, status events, and zap receipts for that repository.
 
 The verification rule is:
 
@@ -464,27 +464,29 @@ The repository/project announcement gives issues a canonical `a` tag target.
 
 ### 10.2 Relay Strategy And NIP-65 Outbox
 
-The MVP should start on repo relays instead of requiring an AppWeaver-controlled relay. Repo relays are the relays declared by the NIP-34 repository announcement, with AppWeaver defaults as fallback/bootstrap.
+The MVP should start on repo relays instead of requiring an AppWeaver-controlled relay. Repo relays are the `relays` tag values on the NIP-34 repository announcement. Clients may use public discovery relays only to resolve an author hint, find the owner's NIP-65 relay list, and fetch the repository announcement.
 
-Default roadmap relays:
+Discovery/bootstrap relays:
 
 ```text
+wss://purplepag.es
+wss://relay.nos.social
+wss://user.kindpag.es
 wss://relay.damus.io
 wss://relay.primal.net
-wss://relay.snort.social
-wss://nostr.mom
-wss://nos.lol
 ```
 
 Relay resolver:
 
 ```text
-repoRelays = repoAnnouncement.relays.length > 0
-  ? repoAnnouncement.relays
-  : DEFAULT_ROADMAP_RELAYS
+repoAddress = nostr://_@getappweaver.com/core
+authorPubkey = nip05(repoAddress.authorHint)
+announcementDiscoveryRelays = nip65WriteRelays(authorPubkey)
+repoAnnouncement = query kind:30617 by authorPubkey and d tag from announcementDiscoveryRelays
+repoRelays = repoAnnouncement.tags.relays
 ```
 
-The repository announcement `relays` tag should include the relays that clients monitor for issues, tracker events, comments, status events, and funding receipts. This follows the NIP-34 direction that issues should be sent to the relays listed by the repository announcement. Clients can use default roadmap relays for bootstrap before the repo announcement is loaded or when the announcement omits relays.
+The repository announcement `relays` tag is the relay set that clients monitor for issues, board/workflow events, tracker events, comments, status events, and funding receipts. Created issues should be published to those relays as well. The repository owner's NIP-65 write relays remain the discovery path for finding or refreshing the repository announcement itself. If the announcement has no `relays` tag, clients may fall back to the owner's NIP-65 write relays.
 
 Clients should subscribe to relevant event classes on repo relays:
 
@@ -503,7 +505,8 @@ Because these are public relays, clients must filter and validate the event grap
 
 NIP-65 relay lists should augment repo relays for publishing and discovery:
 
-- Repo relays are the project-level inbox and public discovery set.
+- Repo relays are the project-level inbox and public discovery set, derived from the NIP-34 repository announcement `relays` tag.
+- Repo owner NIP-65 write relays are used to discover the repository announcement when only an author hint and repo `d` tag are known.
 - Author write relays are where the event author expects their signed events to be published.
 - Target read relays are where referenced users are more likely to see events about them.
 - Clients should dedupe events across all relays by event ID.
@@ -512,13 +515,13 @@ Suggested publish targets:
 
 | Action | Publish to |
 |--------|------------|
-| Create issue | Repo relays + issue author NIP-65 write relays |
+| Create issue | Repo owner NIP-65 write relays + issue author NIP-65 write relays |
 | Comment on issue | Repo relays + commenter NIP-65 write relays + replied-to author NIP-65 read relays |
 | Zap issue | Repo relays + zapper NIP-65 write relays + repo owner NIP-65 read relays |
 | Close own issue | Repo relays + issue author NIP-65 write relays |
 | Close/resolve issue as owner | Repo relays + owner NIP-65 write relays + issue author NIP-65 read relays |
 | Tracker assignment/status change | Repo relays + board/repo owner NIP-65 write relays + issue author NIP-65 read relays |
-| Board/workflow update | Repo relays + board/repo owner NIP-65 write relays |
+| Board/workflow update | Repo owner NIP-65 write relays |
 
 For reading, clients should start with repo relays and optionally query relevant NIP-65 read relays for issue authors, board authors, zappers, and commenters when more complete discovery is needed.
 
@@ -696,7 +699,7 @@ Current technical decisions:
 - Issues use NIP-34 `kind:1621`.
 - Issues are regular events, so references should use `e` tags.
 - NIP-34 status events should be used alongside board/tracker events.
-- Repo relays come from the NIP-34 project announcement `relays` tag, falling back to AppWeaver default roadmap relays.
+- Repo relays come from the NIP-34 project announcement `relays` tag, with repo owner NIP-65 write relays used for announcement discovery and fallback.
 - NIP-65 relay lists augment repo relays for publishing and discovery.
 - Funding summary events and aggregation tables are not part of the MVP.
 - Draft board/workflow proposals are useful references, but AppWeaver does not need to commit to their exact event kinds yet.
@@ -747,7 +750,7 @@ This can support subscriptions, paid plans, sponsorships, or future commercial f
 
 - Define the AppWeaver NIP-34 project/repository announcement.
 - Use NIP-34 `kind:1621` for issue events.
-- Start with repo relays, where the NIP-34 repo `relays` tag falls back to AppWeaver default roadmap relays.
+- Start with repo relays from the NIP-34 repo event `relays` tag, discovering that repo event through NIP-05 and repo owner NIP-65 when needed.
 - Define the maintainer board event format.
 - Define tracker events for board assignment.
 - Publish and read feature/bug issues from Nostr.
@@ -811,4 +814,4 @@ Before development starts, decide:
 
 Build a Nostr-native Roadmap module for AppWeaver first.
 
-Anyone with Nostr can submit feature requests or bug reports for free as NIP-34 issues. New issues start unassigned. Users should search before submitting and comment/fund an existing issue when one already exists. Any user can fund any issue. Funding is a public prioritization signal, not a contract. The MVP uses repo relays from the NIP-34 repo `relays` tag, falling back to AppWeaver default roadmap relays, and NIP-65 relay lists augment publishing and discovery. Clients compute funding totals by verifying zap receipts against the board author's LNURLP `nostrPubkey`. Board authors control workflow events that define board columns for AppWeaver core and official plugins, and clients should only accept boards whose author matches the referenced NIP-34 project/repository author. Tracker events assign selected issues to planned, in progress, shipped, rejected, or archived columns. The app provides creation and funding through a header Roadmap button that opens a singleton timeline widget; the landing page highlights top-funded unassigned issues and can show roadmap boards as separate widgets. The next maintainer tooling step is an issue detail UI, opened from the issue title, with assignment controls that publish tracker events.
+Anyone with Nostr can submit feature requests or bug reports for free as NIP-34 issues. New issues start unassigned. Users should search before submitting and comment/fund an existing issue when one already exists. Any user can fund any issue. Funding is a public prioritization signal, not a contract. The MVP uses repo relays from the NIP-34 repo event `relays` tag, after discovering that repo event through NIP-05 and repo owner NIP-65 when needed, and created issues are published to those relays. Clients compute funding totals by verifying zap receipts against the board author's LNURLP `nostrPubkey`. Board authors control workflow events that define board columns for AppWeaver core and official plugins, and clients should only accept boards whose author matches the referenced NIP-34 project/repository author. Tracker events assign selected issues to planned, in progress, shipped, rejected, or archived columns. The app provides creation and funding through a header Roadmap button that opens a singleton timeline widget; the landing page highlights top-funded unassigned issues and can show roadmap boards as separate widgets. The next maintainer tooling step is an issue detail UI, opened from the issue title, with assignment controls that publish tracker events.

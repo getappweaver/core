@@ -1,23 +1,46 @@
-Building a todo app is the classic test for a javascript framework: Check out [todomvc.com](https://todomvc.com) to see how many JS frameworks implements one. It's simple but also has enough state machinery that you can show a framework can handle client side reactivity, prefarably with little code as possible.
+# Todo App in essense
 
-AppWeaver todo app is not client side, therefore we don't care about the javascript framework used. I didn't started it to showcase what appweaver can do either, it was born out of necessity.
+A local, database based, backend application that AppWeaver helps you to use it from a NOSTR chat application via text commands, or use it from the AppWeaver web UI  
 
-To be frank a regular markdown file is enough for the most part, and I decided to design the todo app to be close to regular markdown files. In fact you can view todo app as a markdown list too, in text mode or if you click the copy button on the widget header.
+These features are not specific to the Todo App, but it definetely helped shaping AppWeaver what it is today.
 
-One downside of markdown files is you can't easily edit them in your phone without the keyboard. You have to rely on the AI to edit it for you. I didn't like that beacuse why do I use AI if I know what to do exactly with this simple list.
+I decided to design the todo app to be very close to regular markdown lists. In fact if you use Todo App using NOSTR chat, you view the items in markdown format.
 
-So I started to develop and using it actively while working on AppWeaver to this day. I'm still using it everyday and trying to make it better because I genuinely need it. I got 96 active items on my plate (228 including done items) just for developing AppWeaver. It's very useful to me and I believe it would be to others too.
+But markdown as it turns is not exactly the best way to work with todos if you're constantly editing them. Some of the downsides:
 
-What else I provide with todo app:
+- Hard to edit with your phone
+- You need to either delete done items, or move them into a separate list
+- You can be lost in huge lists
+- Can't reliably reference them because lack of persistant IDs
+- Hard to sort/order
+- Hard to filter by status
 
-AI modifications are still possible -maybe you want to mass edit it-, but with using drafts. AI can manipulate the items through creating drafts that you can review and even revise them over and over until you are satisfied with them.
+and so on. I have built solutions to all of these problems while constantly using and testing it. It's very useful to me and I believe it would be to others as well.
 
-Focus mode: You have a lot of items but you want to focus on a specific branch of the tree. It reduces the clutter.
+# What else I provide with the Todo App
 
-Prioritization: It's hard to understand which item is the most important one, especially when it's deep in the tree. App helps you define "champions" within each branch, and let you do a tournament style match sessions between each other to have a clear "winner" 🏆. Nowadays this is my favourite feature, it helps me to see the all the important tasks and the most important one, so I don't get lost.
+## AI drafts
 
-Advanced filter: Use the checkmark toolbar button to filter items by their status. You can find the item you accidentally marked it as done and bring it back, or maybe you want to see your achievements and filter "done" items. Or sometimes just want to see what you are working at the moment by filtering only "In Progress" items. Now I added "flat" and "champions only" view options there. It's a powerful combination, I might say.
+AI modifications are still possible -maybe you want to mass edit it-, but with using drafts. AI can't directly modify your todo lists, instead it creates draft actions (add, edit, delete). You can review the drafts to reject or accept, and even revise the draft.
 
-Folding: Easily expand, collapse all items. Another little utility from the toolbar. Also check the filter when you need to find a specific item. It's powerful, too.
+## Focus mode
 
-I hope this blog article would help you understand the todo app better and make you use it on your daily tasks. Please share any feedback with me if you come across a bug or want a new feature through our [roadmap](NEED_TO_PUT_REAL_URL_WHEN_WE_HAVE_A_ROADMAP_IN_THE_WEBSITE).
+You have a lot of items but you want to focus on a specific branch of the tree. It reduces the clutter.
+
+## Prioritization
+
+It's hard to understand which item is the most important one, especially when it's deep in the tree. App helps you define "champions" within each branch, and let you do a tournament style match sessions between each other to have a clear "winner" 🏆. Nowadays this is my favourite feature, it helps me to see the all the important tasks and the most important one, so I don't get lost.
+
+## Advanced filter
+
+Use the checkmark toolbar button to filter items by their status. You can find the item you accidentally marked it as done and bring it back, or maybe you want to see your achievements and filter "done" items. Or sometimes just want to see what you are working at the moment by filtering only "In Progress" items. Now I added "flat" and "champions only" view options there. It's a powerful combination, I might say.
+
+## Folding
+
+Easily expand, collapse all items. Another little utility from the toolbar. Also check the filter when you need to find a specific item. It's powerful, too.
+
+# Thanks for reading so far
+
+It's really hard to explain all the features. It's simple yet a powerful tool. 
+
+Use [demo](https://getappweaver.com/todo-app#demo) to watch the story gifs, or use the interactive demo to see yourself. And don't forget to [install](https://getappweaver.com/todo-app#install)!
