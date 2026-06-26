@@ -9,6 +9,7 @@ import {
 } from 'solid-js';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
+import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, officialAuthor, socialLinks } from './landing-data';
 import { OfficialAppGrid, pluginIconSrcForSlug } from './official-app-grid';
 import { RoadmapPanel } from './roadmap-panel';
@@ -129,6 +130,14 @@ const pluginRoadmapBoardKeys: Record<string, string> = {
   job: 'appweaver-plugin-job-roadmap',
   journal: 'appweaver-plugin-journal-roadmap',
   todo: 'appweaver-plugin-todo-roadmap',
+};
+
+const pluginRoadmapRepos: Record<string, string> = {
+  bm: 'nostr://_@getappweaver.com/relay.ngit.dev/bm',
+  file: 'nostr://_@getappweaver.com/relay.ngit.dev/file',
+  job: 'nostr://_@getappweaver.com/relay.ngit.dev/job',
+  journal: 'nostr://_@getappweaver.com/relay.ngit.dev/journal',
+  todo: 'nostr://_@getappweaver.com/relay.ngit.dev/todo',
 };
 
 const pluginDemoStories: Record<string, PluginDemoStory[]> = {
@@ -871,13 +880,25 @@ function PluginLandingPage(props: {
       frameId = window.requestAnimationFrame(updateActiveSection);
     };
 
+    const handleHashChange = () => {
+      if (scrollStageToHash(root!)) {
+        scheduleUpdate();
+        return;
+      }
+
+      scheduleUpdate();
+    };
+
+    const cancelInitialHashScroll = scheduleStageHashScroll(root, scheduleUpdate);
+
     root.addEventListener('scroll', scheduleUpdate, { passive: true });
-    window.addEventListener('hashchange', scheduleUpdate);
+    window.addEventListener('hashchange', handleHashChange);
     updateActiveSection();
 
     onCleanup(() => {
       root?.removeEventListener('scroll', scheduleUpdate);
-      window.removeEventListener('hashchange', scheduleUpdate);
+      window.removeEventListener('hashchange', handleHashChange);
+      cancelInitialHashScroll();
 
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId);
@@ -900,8 +921,8 @@ function PluginLandingPage(props: {
       <section id="roadmap" class="plugin-page-section plugin-page-section--roadmap">
         <RoadmapPanel
           title={`${props.page.shortName} Roadmap`}
-          summary={`See public ${props.page.shortName} app issues, board status, comments, and funding signal from Nostr.`}
           boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
+          repo={pluginRoadmapRepos[props.page.command]}
         />
       </section>
       <section id="install" class="plugin-page-section plugin-page-section--install">

@@ -4,6 +4,7 @@ import { render } from 'solid-js/web';
 import { NostrAuthProvider } from '@web/src/contexts/NostrAuthContext';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
+import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, socialLinks } from './landing-data';
 import { OfficialAppGrid } from './official-app-grid';
 import {
@@ -331,13 +332,25 @@ function OnePage(props: {
       frameId = window.requestAnimationFrame(updateActiveSection);
     };
 
+    const handleHashChange = () => {
+      if (scrollStageToHash(root)) {
+        scheduleUpdate();
+        return;
+      }
+
+      scheduleUpdate();
+    };
+
+    const cancelInitialHashScroll = scheduleStageHashScroll(root, scheduleUpdate);
+
     root.addEventListener('scroll', scheduleUpdate, { passive: true });
-    window.addEventListener('hashchange', scheduleUpdate);
+    window.addEventListener('hashchange', handleHashChange);
     updateActiveSection();
 
     onCleanup(() => {
       root.removeEventListener('scroll', scheduleUpdate);
-      window.removeEventListener('hashchange', scheduleUpdate);
+      window.removeEventListener('hashchange', handleHashChange);
+      cancelInitialHashScroll();
 
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId);
@@ -388,6 +401,7 @@ function OnePage(props: {
         <RoadmapPanel
           title="Core Roadmap"
           boardKey="appweaver-roadmap"
+          repo="nostr://_@getappweaver.com/relay.ngit.dev/core"
         />
       </section>
       <section id="apps" class="one-page-section one-page-section--apps">

@@ -12,11 +12,14 @@ import { SimplePool } from 'nostr-tools/pool';
 
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 import {
-  DEFAULT_ROADMAP_RELAYS,
   materializeRoadmap,
   normalizeRoadmapRelay,
   PROFILE_KIND,
+  PROJECT_KIND,
   ROADMAP_EVENT_KINDS,
+  ROADMAP_RELAY_DISCOVERY_RELAYS,
+  repoNip65RelaysForProject,
+  repoRelaysForProject,
   uniqueRoadmapRelays,
 } from '@src/commands/roadmap/model';
 import {
@@ -29,8 +32,15 @@ import {
 } from '@src/commands/roadmap/renderers/web';
 import {
   type AuthorIdentity,
+  resolveNip05Identity,
   verifiedNip05AuthorIdentity,
 } from '@src/nostr/author-identity';
+import { fetchNip65RelaySet, NIP65_RELAY_LIST_KIND } from '@src/nostr/nip65';
+import {
+  parseNostrRepoAddress,
+  repoAddressAuthorNip05,
+  repoAddressAuthorNpub,
+} from '@src/nostr/repo-address';
 import { WebNodeShadowRoot } from '@web/src/components/WebNodeShadowRoot';
 import { ConnectModal } from '@web/src/components/ConnectModal';
 import { UnlockModal } from '@web/src/components/UnlockModal';
@@ -44,7 +54,6 @@ import {
   handleRoadmapTrackIssue,
 } from '@web/src/roadmap/markIssue';
 
-const DEFAULT_ROADMAP_RELAYS_DEV = ['ws://localhost:10547'] as const;
 const DEFAULT_ROADMAP_LNURLP_DEV =
   'https://getappweaver.com/.well-known/lnurlp/donations_test';
 const DEFAULT_ROADMAP_LNURLP_PROD = '/.well-known/lnurlp/donations';
@@ -63,6 +72,13 @@ type WorkflowZapSigner = {
 type RoadmapPanelProps = {
   title: string;
   boardKey: string;
+  repo?: string;
+};
+
+type ResolvedRoadmapRepo = {
+  pubkey: string;
+  repoId: string;
+  relays: string[];
 };
 
 type SignEventOptions = {
@@ -80,7 +96,7 @@ type RefreshedIssueOptions = {
   focus: 'activity' | 'comments' | 'manage';
 };
 
-function roadmapRelays(): string[] {
+function roadmapBootstrapRelays(): string[] {
   const raw =
     import.meta.env.VITE_APPWEAVER_ROADMAP_RELAYS?.trim() ||
     import.meta.env.VITE_APPWEAVER_ROADMAP_RELAY?.trim() ||
@@ -94,9 +110,11 @@ function roadmapRelays(): string[] {
     }
   }
 
-  return import.meta.env.DEV
-    ? [...DEFAULT_ROADMAP_RELAYS_DEV]
-    : [...DEFAULT_ROADMAP_RELAYS];
+  return [...ROADMAP_RELAY_DISCOVERY_RELAYS];
+}
+
+function uniqueEvents(events: NostrEvent[]): NostrEvent[] {
+  return [...new Map(events.map((event) => [event.id, event])).values()];
 }
 
 function roadmapLnurlpUrl(): string {
@@ -126,11 +144,58 @@ function logRoadmapDebug(label: string, details: Record<string, unknown>): void 
   console.info(`[roadmap] ${label}`, details);
 }
 
+async function resolveRoadmapRepo({
+  pool,
+  repo,
+  fallbackRelays,
+}: {
+  pool: SimplePool;
+  repo: string | null;
+  fallbackRelays: string[];
+}): Promise<ResolvedRoadmapRepo | null> {
+  const parsed = repo ? parseNostrRepoAddress(repo) : null;
+
+  if (!parsed) {
+    return null;
+  }
+
+  const npubPubkey = repoAddressAuthorNpub(parsed.authorHint);
+  const nip05 = repoAddressAuthorNip05(parsed.authorHint);
+  const identity = npubPubkey ? null : await resolveNip05Identity(nip05 ?? '');
+  const pubkey = npubPubkey ?? identity?.pubkey ?? '';
+
+  if (!pubkey) {
+    return null;
+  }
+
+  const discoveryRelays = uniqueRoadmapRelays([
+    ...parsed.relayHints,
+    ...(identity?.relays ?? []),
+    ...fallbackRelays,
+  ]);
+  const nip65Relays = await fetchNip65RelaySet({
+    pool,
+    authorPubkey: pubkey,
+    fallbackRelays: discoveryRelays,
+  });
+
+  return {
+    pubkey,
+    repoId: parsed.repoId,
+    relays: uniqueRoadmapRelays([
+      ...discoveryRelays,
+      ...nip65Relays.readRelays,
+      ...nip65Relays.writeRelays,
+    ]),
+  };
+}
+
 export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
   const auth = useNostrAuth();
-  const relays = roadmapRelays();
-  const relay = relays[0] ?? 'wss://relay.damus.io';
-  const relayLabel = relays.join(', ');
+  const bootstrapRelays = roadmapBootstrapRelays();
+  const [activeRelays, setActiveRelays] = createSignal<string[]>(bootstrapRelays);
+  const relay = createMemo(() => activeRelays()[0] ?? bootstrapRelays[0] ?? '');
+  const relayLabel = createMemo(() => activeRelays().join(', '));
   const lnurlpUrl = roadmapLnurlpUrl();
   const [events, setEvents] = createSignal<NostrEvent[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -239,6 +304,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
   async function reloadRoadmapEvents(options: ReloadOptions): Promise<void> {
     const pool = new SimplePool();
+    let queriedRelays = [...bootstrapRelays];
 
     if (options.showLoading) {
       setLoading(true);
@@ -247,18 +313,107 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
     setError(null);
 
     try {
-      const loadedEvents = await pool.querySync(
-        relays,
-        { kinds: [...ROADMAP_EVENT_KINDS], limit: 500 },
-        { maxWait: 4_000 },
+      const repoTarget = await resolveRoadmapRepo({
+        pool,
+        repo: props.repo ?? null,
+        fallbackRelays: bootstrapRelays,
+      });
+
+      if (mounted && repoTarget) {
+        setActiveRelays(repoTarget.relays);
+      }
+
+      const directRepoEvents = repoTarget
+        ? await pool.querySync(
+            repoTarget.relays,
+            {
+              kinds: [...ROADMAP_EVENT_KINDS],
+              authors: [repoTarget.pubkey],
+              '#d': [repoTarget.repoId],
+              limit: 500,
+            },
+            { maxWait: 4_000 },
+          )
+        : [];
+      queriedRelays = uniqueRoadmapRelays([
+        ...queriedRelays,
+        ...(repoTarget?.relays ?? []),
+      ]);
+      const bootstrapEvents = repoTarget
+        ? []
+        : await pool.querySync(
+            bootstrapRelays,
+            { kinds: [...ROADMAP_EVENT_KINDS], limit: 500 },
+            { maxWait: 4_000 },
+          );
+
+      const relayListsByPubkey = new Map(
+        bootstrapEvents
+          .filter((event) => event.kind === NIP65_RELAY_LIST_KIND)
+          .map((event) => [event.pubkey, event]),
       );
+
+      const repoDiscoveryRelays = uniqueRoadmapRelays(
+        repoTarget
+          ? []
+          : bootstrapEvents
+              .filter((event) => event.kind === PROJECT_KIND)
+              .flatMap((event) =>
+                repoNip65RelaysForProject(event, relayListsByPubkey),
+              ),
+      );
+
+      queriedRelays = uniqueRoadmapRelays([
+        ...bootstrapRelays,
+        ...repoDiscoveryRelays,
+      ]);
+
+      const repoDiscoveryEvents = repoDiscoveryRelays.length
+        ? await pool.querySync(
+            repoDiscoveryRelays,
+            { kinds: [...ROADMAP_EVENT_KINDS], limit: 500 },
+            { maxWait: 4_000 },
+          )
+        : [];
+
+      const discoveredEvents = uniqueEvents([
+        ...directRepoEvents,
+        ...bootstrapEvents,
+        ...repoDiscoveryEvents,
+      ]);
+      const loadedRelayListsByPubkey = new Map(
+        discoveredEvents
+          .filter((event) => event.kind === NIP65_RELAY_LIST_KIND)
+          .map((event) => [event.pubkey, event]),
+      );
+      const repoRelays = uniqueRoadmapRelays(
+        discoveredEvents
+          .filter((event) => event.kind === PROJECT_KIND)
+          .flatMap((event) =>
+            repoRelaysForProject(event, loadedRelayListsByPubkey),
+          ),
+      );
+      queriedRelays = uniqueRoadmapRelays([...queriedRelays, ...repoRelays]);
+
+      const repoEvents = repoRelays.length
+        ? await pool.querySync(
+            repoRelays,
+            { kinds: [...ROADMAP_EVENT_KINDS], limit: 500 },
+            { maxWait: 4_000 },
+          )
+        : [];
+      const loadedEvents = uniqueEvents([...discoveredEvents, ...repoEvents]);
 
       if (!mounted) {
         return;
       }
 
       logRoadmapDebug('relay events fetched', {
-        relays,
+        bootstrapRelays,
+        directRepoRelays: repoTarget?.relays ?? [],
+        repoDiscoveryRelays,
+        repoRelays,
+        queriedRelays,
         totalEvents: loadedEvents.length,
         zapReceipts: loadedEvents
           .filter((event) => event.kind === 9735)
@@ -271,12 +426,19 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
       });
 
       setEvents(loadedEvents);
+      setActiveRelays(
+        repoRelays.length > 0
+          ? repoRelays
+          : repoTarget?.relays.length
+            ? repoTarget.relays
+            : bootstrapRelays,
+      );
     } catch (err) {
       if (mounted) {
         setError(err instanceof Error ? err.message : String(err));
       }
     } finally {
-      pool.close(relays);
+      pool.close(queriedRelays);
 
       if (mounted && options.showLoading) {
         setLoading(false);
@@ -308,7 +470,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
         return renderRoadmapIssueModalWeb({
           issue: issuePayload(issue),
           workflow: workflowPayload(workflow),
-          relay,
+          relay: relay(),
           boardKey: workflow.key,
           columnId: column.id,
           focus,
@@ -340,7 +502,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
   const unverifiedView = createMemo(() =>
     materializeRoadmap({
-      relay,
+      relay: relay(),
       events: events(),
       authorIdentities: authorIdentities(),
       zapReceiptPubkeys: null,
@@ -350,7 +512,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
   const view = createMemo(() =>
     materializeRoadmap({
-      relay,
+      relay: relay(),
       events: events(),
       authorIdentities: authorIdentities(),
       zapReceiptPubkeys: zapReceiptPubkeys(),
@@ -363,8 +525,8 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
     const materialized = view();
 
     logRoadmapDebug('materialized', {
-      relay,
-      relays,
+      relay: relay(),
+      relays: activeRelays(),
       lnurlpUrl,
       totalEvents: loadedEvents.length,
       fetchedZapReceipts: loadedEvents.filter((event) => event.kind === 9735)
@@ -393,9 +555,12 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
   const selectedWorkflow = createMemo(() => {
     const target = selectedBoardKey();
+    const workflows = view().workflows;
 
-    return view().workflows.find(
-      (workflow) => workflow.key === target || workflow.id === target,
+    return (
+      workflows.find(
+        (workflow) => workflow.key === target || workflow.id === target,
+      ) ?? workflows[0]
     );
   });
 
@@ -556,7 +721,9 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
           issue: action.payload.issue as never,
           workflow: action.payload.workflow as never,
           relay:
-            typeof action.payload.relay === 'string' ? action.payload.relay : relay,
+            typeof action.payload.relay === 'string'
+              ? action.payload.relay
+              : relay(),
           boardKey:
             typeof action.payload.boardKey === 'string'
               ? action.payload.boardKey
@@ -584,7 +751,9 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
         renderRoadmapNewIssueWeb({
           workflow: action.payload.workflow as never,
           relay:
-            typeof action.payload.relay === 'string' ? action.payload.relay : relay,
+            typeof action.payload.relay === 'string'
+              ? action.payload.relay
+              : relay(),
         }),
       );
 
@@ -703,6 +872,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
         const title = action.options?.title;
         const sats = action.options?.sats;
         const actionRelay = action.options?.relay;
+        const actionRelays = action.options?.relays;
 
         setPaymentError(null);
         setPaymentText(null);
@@ -712,10 +882,13 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
             issueId: typeof issueId === 'string' ? issueId : '',
             title: typeof title === 'string' ? title : 'roadmap issue',
             sats: typeof sats === 'number' ? sats : 0,
-                relay:
-                  typeof actionRelay === 'string'
-                    ? (normalizeRoadmapRelay(actionRelay) ?? relay)
-                    : relay,
+            relay:
+              typeof actionRelay === 'string'
+                ? (normalizeRoadmapRelay(actionRelay) ?? relay())
+                : relay(),
+            relays: Array.isArray(actionRelays)
+              ? actionRelays.filter((entry): entry is string => typeof entry === 'string')
+              : activeRelays(),
           }),
         );
       }
@@ -732,7 +905,14 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
           {(message) => <div class="roadmap-panel-status">{message()}</div>}
         </Show>
         <Show when={!error()}>
-            <Show when={!loading()} fallback={<div class="roadmap-panel-status">Loading roadmap from {relayLabel}</div>}>
+          <Show
+            when={!loading()}
+            fallback={
+              <div class="roadmap-panel-status">
+                Loading roadmap from {relayLabel()}
+              </div>
+            }
+          >
             <div class="web-surface roadmap-panel-surface">
               <WebNodeShadowRoot
                 root={root()}
