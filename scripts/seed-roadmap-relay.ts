@@ -6,7 +6,7 @@ import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 
 import { APPWEAVER_RELAY } from '@src/appweaver-relay';
 
-const PROJECT_KIND = 30617;
+const NIP34_REPO_KIND = 30617;
 const PROFILE_KIND = 0;
 const ISSUE_KIND = 1621;
 const STATUS_RESOLVED_KIND = 1631;
@@ -163,7 +163,7 @@ async function verifySeed(relay: string): Promise<void> {
       {
         kinds: [
           PROFILE_KIND,
-          PROJECT_KIND,
+          NIP34_REPO_KIND,
           ISSUE_KIND,
           STATUS_RESOLVED_KIND,
           STATUS_CLOSED_KIND,
@@ -210,12 +210,12 @@ async function main(): Promise<void> {
   const maintainerPubkey = getPublicKey(maintainer);
   const pluginMaintainerPubkey = getPublicKey(pluginMaintainer);
   const zapServerPubkey = getPublicKey(zapServer);
-  const coreRepo = `${PROJECT_KIND}:${maintainerPubkey}:appweaver`;
+  const coreRepo = `${NIP34_REPO_KIND}:${maintainerPubkey}:appweaver`;
 
   const pluginRepos = new Map<PluginKey, string>(
     pluginSeeds.map((plugin) => [
       plugin.key,
-      `${PROJECT_KIND}:${pluginMaintainerPubkey}:${plugin.projectD}`,
+      `${NIP34_REPO_KIND}:${pluginMaintainerPubkey}:${plugin.projectD}`,
     ]),
   );
 
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
 
   const coreProject = sign(
     maintainer,
-    PROJECT_KIND,
+    NIP34_REPO_KIND,
     BASE_CREATED_AT + 1,
     [
       ['d', 'appweaver'],
@@ -280,7 +280,7 @@ async function main(): Promise<void> {
       plugin.key,
       sign(
         pluginMaintainer,
-        PROJECT_KIND,
+        NIP34_REPO_KIND,
         BASE_CREATED_AT + 1 + index,
         [
           ['d', plugin.projectD],

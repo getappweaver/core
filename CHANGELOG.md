@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.44.0] - 2026-06-26
+
+- feat: resolve roadmap relays from nostr repo addresses (a4b7dcd)
+
 ## [v9.43.2] - 2026-06-18
 
-- fix: added tree item spacer back (1898292)
+- fix: added tree item spacer back (ee4311d)
 
 ## [v9.43.1] - 2026-06-17
 

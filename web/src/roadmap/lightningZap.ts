@@ -4,7 +4,6 @@ import { SimplePool } from 'nostr-tools/pool';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 
-import { DEFAULT_ROADMAP_RELAYS } from '@src/commands/roadmap/model';
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
 const ISSUE_KIND = 1621;
@@ -231,11 +230,7 @@ export async function handleRoadmapLightningZap({
     const pool = new SimplePool();
 
     const relays = Array.from(
-      new Set([
-        payload.relay,
-        ...(payload.relays ?? []),
-        ...DEFAULT_ROADMAP_RELAYS,
-      ]),
+      new Set([payload.relay, ...(payload.relays ?? [])]),
     );
 
     let issue: NostrEvent | null = null;
@@ -331,11 +326,7 @@ export async function handleRoadmapLightningZap({
     const anonymous = payload.anonymous === 'on';
 
     const zapRelays = Array.from(
-      new Set([
-        payload.relay,
-        ...(payload.relays ?? []),
-        ...DEFAULT_ROADMAP_RELAYS,
-      ]),
+      new Set([payload.relay, ...(payload.relays ?? [])]),
     );
 
     const zapTemplate: EventTemplate = {

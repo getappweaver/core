@@ -1,24 +1,57 @@
 // ---------------------------------------------------------------------------
-// src/nostr/nip65.ts — NIP-65 relay lists (kind 10050) for profile discovery
+// src/nostr/nip65.ts — NIP-65 relay lists (kind 10002)
 // ---------------------------------------------------------------------------
 
 import type { SimplePool } from 'nostr-tools/pool';
 
-import { APPWEAVER_RELAY } from '../appweaver-relay';
-import { ensureWss } from '../env';
+/** Kind 10002 — relay list metadata (NIP-65). */
+export const NIP65_RELAY_LIST_KIND = 10002;
 
-/** Kind 10050 — relay list metadata (NIP-65). */
-export const NIP65_RELAY_LIST_KIND = 10050;
+/** Kind 10050 — historical relay list used in this app for DM/profile discovery. */
+export const DM_RELAY_LIST_KIND = 10050;
 
-/** Relays used to *find* a pubkey's kind 10050 (same idea as scripts/nostr-setup.ts). */
+/** Relays used to find a pubkey's relay-list events. */
 export const PROFILE_RELAYS_FOR_QUERY: readonly string[] = [
   'wss://purplepag.es',
   'wss://relay.nos.social',
   'wss://user.kindpag.es',
   'wss://relay.damus.io',
   'wss://relay.primal.net',
-  ensureWss(APPWEAVER_RELAY),
 ];
+
+export function normalizeRelay(raw: string): string | null {
+  const trimmed = raw.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const withProtocol = /^wss?:\/\//i.test(trimmed)
+    ? trimmed
+    : `wss://${trimmed}`;
+
+  try {
+    const url = new URL(withProtocol);
+
+    if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function uniqueRelays(relays: readonly string[]): string[] {
+  return [
+    ...new Set(
+      relays
+        .map((relay) => normalizeRelay(relay))
+        .filter((relay): relay is string => relay !== null),
+    ),
+  ];
+}
 
 export function parseNip65RelayTags(tags: string[][]): {
   readRelays: string[];
@@ -28,11 +61,13 @@ export function parseNip65RelayTags(tags: string[][]): {
 
   const readRelays = relayTags
     .filter((tag) => tag[2] === 'read' || !tag[2])
-    .map((tag) => ensureWss(tag[1]));
+    .map((tag) => normalizeRelay(tag[1]))
+    .filter((relay): relay is string => relay !== null);
 
   const writeRelays = relayTags
     .filter((tag) => tag[2] === 'write' || !tag[2])
-    .map((tag) => ensureWss(tag[1]));
+    .map((tag) => normalizeRelay(tag[1]))
+    .filter((relay): relay is string => relay !== null);
 
   return { readRelays, writeRelays };
 }
@@ -48,7 +83,7 @@ type FetchNip65ReadRelaysProps = {
 };
 
 /**
- * Write-capable relays from `authorPubkey`'s kind 10050. Use with `pool.get` when
+ * Write-capable relays from `authorPubkey`'s kind 10002. Use with `pool.get` when
  * fetching other events (e.g. kind 10063 for `userPubkey`). Falls back to
  * {@link PROFILE_RELAYS_FOR_QUERY} if no event or no `r` tags.
  */
@@ -63,19 +98,19 @@ export async function fetchNip65WriteRelays({
   });
 
   if (!nip65Event) {
-    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+    return uniqueRelays(PROFILE_RELAYS_FOR_QUERY);
   }
 
   const { writeRelays } = parseNip65RelayTags(nip65Event.tags);
 
   if (writeRelays.length === 0) {
-    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+    return uniqueRelays(PROFILE_RELAYS_FOR_QUERY);
   }
 
-  return [...new Set(writeRelays)];
+  return uniqueRelays(writeRelays);
 }
 
-/** Read-capable relays from `authorPubkey`'s kind 10050. Falls back to profile relays. */
+/** Read-capable relays from `authorPubkey`'s kind 10002. Falls back to profile relays. */
 export async function fetchNip65ReadRelays({
   pool,
   authorPubkey,
@@ -87,16 +122,16 @@ export async function fetchNip65ReadRelays({
   });
 
   if (!nip65Event) {
-    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+    return uniqueRelays(PROFILE_RELAYS_FOR_QUERY);
   }
 
   const { readRelays } = parseNip65RelayTags(nip65Event.tags);
 
   if (readRelays.length === 0) {
-    return [...new Set(PROFILE_RELAYS_FOR_QUERY.map(ensureWss))];
+    return uniqueRelays(PROFILE_RELAYS_FOR_QUERY);
   }
 
-  return [...new Set(readRelays)];
+  return uniqueRelays(readRelays);
 }
 
 type FetchNip65RelaySetProps = {
@@ -115,9 +150,8 @@ export async function fetchNip65RelaySet({
 }> {
   const fallback = [
     ...new Set([
-      ...PROFILE_RELAYS_FOR_QUERY.map(ensureWss),
-      ...fallbackRelays.map(ensureWss),
-      ensureWss(APPWEAVER_RELAY),
+      ...uniqueRelays(PROFILE_RELAYS_FOR_QUERY),
+      ...uniqueRelays(fallbackRelays),
     ]),
   ];
 
@@ -135,12 +169,10 @@ export async function fetchNip65RelaySet({
 
   return {
     readRelays:
-      parsed.readRelays.length > 0
-        ? [...new Set([...parsed.readRelays, ensureWss(APPWEAVER_RELAY)])]
-        : fallback,
+      parsed.readRelays.length > 0 ? uniqueRelays(parsed.readRelays) : fallback,
     writeRelays:
       parsed.writeRelays.length > 0
-        ? [...new Set([...parsed.writeRelays, ensureWss(APPWEAVER_RELAY)])]
+        ? uniqueRelays(parsed.writeRelays)
         : fallback,
   };
 }

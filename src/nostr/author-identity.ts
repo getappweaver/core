@@ -1,5 +1,7 @@
 import { nip19 } from 'nostr-tools';
 
+import { uniqueRelays } from './nip65';
+
 const NIP05_VERIFY_MAX_WAIT_MS = 3_000;
 
 export type AuthorIdentity = {
@@ -110,6 +112,66 @@ export async function verifyNip05({
     return typeof pubkey === 'string' && pubkey === expectedPubkey;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export type Nip05Identity = {
+  pubkey: string;
+  relays: string[];
+};
+
+export async function resolveNip05Identity(
+  nip05: string,
+): Promise<Nip05Identity | null> {
+  const normalized = normalizeNip05(nip05);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const [name, domain] = normalized.split('@');
+
+  if (!name || !domain) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NIP05_VERIFY_MAX_WAIT_MS);
+
+  try {
+    const url = `https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(name)}`;
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      names?: Record<string, unknown>;
+      relays?: Record<string, unknown>;
+    };
+
+    const pubkey = data.names?.[name];
+
+    if (typeof pubkey !== 'string') {
+      return null;
+    }
+
+    const relayHints = data.relays?.[pubkey];
+
+    const relays = Array.isArray(relayHints)
+      ? uniqueRelays(
+          relayHints.filter(
+            (relay): relay is string => typeof relay === 'string',
+          ),
+        )
+      : [];
+
+    return { pubkey, relays };
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }

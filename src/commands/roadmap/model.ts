@@ -6,6 +6,11 @@ import {
   normalizeNip05,
   type AuthorIdentity,
 } from '@src/nostr/author-identity';
+import {
+  NIP65_RELAY_LIST_KIND,
+  parseNip65RelayTags,
+  PROFILE_RELAYS_FOR_QUERY,
+} from '@src/nostr/nip65';
 
 export const PROFILE_KIND = 0;
 export const PROJECT_KIND = 30617;
@@ -20,25 +25,12 @@ export const PLUGIN_KIND = 32107;
 export const WORKFLOW_KIND = 39010;
 export const TRACKER_KIND = 39011;
 export const ZAP_KIND = 9735;
-export const ROADMAP_DEV_MODE = true;
-export const DEV_ROADMAP_RELAYS = ['ws://localhost:10547'] as const;
-export const DEFAULT_ROADMAP_RELAYS = [
-  'wss://relay.damus.io',
-  'wss://relay.primal.net',
-  'wss://relay.snort.social',
-  'wss://nostr.mom',
-  'wss://nos.lol',
-] as const;
-
-export function activeRoadmapRelays(): string[] {
-  return ROADMAP_DEV_MODE
-    ? [...DEV_ROADMAP_RELAYS]
-    : [...DEFAULT_ROADMAP_RELAYS];
-}
+export const ROADMAP_RELAY_DISCOVERY_RELAYS = PROFILE_RELAYS_FOR_QUERY;
 
 export const ROADMAP_EVENT_KINDS = [
   PROJECT_KIND,
   PROFILE_KIND,
+  NIP65_RELAY_LIST_KIND,
   DELETE_KIND,
   ISSUE_KIND,
   STATUS_OPEN_KIND,
@@ -58,6 +50,7 @@ export type IssueView = {
   id: string;
   project: string;
   projectAddress: string;
+  repoRelays: string[];
   authorPubkey: string;
   repoMaintainers: string[];
   subject: string;
@@ -85,14 +78,26 @@ export type WorkflowView = {
   title: string;
   projectName: string;
   projectAddress: string;
+  repoRelays: string[];
   columns: { id: string; label: string; issues: IssueView[] }[];
+};
+
+export type RoadmapProjectView = {
+  address: string;
+  authorPubkey: string;
+  name: string;
+  description: string;
+  repoRelays: string[];
+  ownerWriteRelays: string[];
 };
 
 export type RoadmapView = {
   relay: string;
+  relays: string[];
   mode?: 'overview' | 'board';
   issueCount: number;
   zapCount: number;
+  projects: RoadmapProjectView[];
   workflows: WorkflowView[];
 };
 
@@ -189,22 +194,38 @@ export function uniqueRoadmapRelays(relays: readonly string[]): string[] {
   ];
 }
 
-function projectRelays(event: NostrEvent): string[] {
-  return uniqueRoadmapRelays(
-    tags(event, 'relays')
-      .flatMap((tag) => tag.slice(1))
-      .filter(Boolean),
-  );
-}
-
-export function repoRelaysForProject(event: NostrEvent | null): string[] {
+export function repoRelaysForProject(
+  event: NostrEvent | null,
+  relayListsByPubkey: Map<string, NostrEvent> | null,
+): string[] {
   if (!event) {
-    return activeRoadmapRelays();
+    return [...ROADMAP_RELAY_DISCOVERY_RELAYS];
   }
 
-  const relays = projectRelays(event);
+  const announcementRelays = uniqueRoadmapRelays(
+    tags(event, 'relays').flatMap((tag) => tag.slice(1)),
+  );
 
-  return relays.length > 0 ? relays : activeRoadmapRelays();
+  if (announcementRelays.length > 0) {
+    return announcementRelays;
+  }
+
+  return repoNip65RelaysForProject(event, relayListsByPubkey);
+}
+
+export function repoNip65RelaysForProject(
+  event: NostrEvent | null,
+  relayListsByPubkey: Map<string, NostrEvent> | null,
+): string[] {
+  if (!event) {
+    return [...ROADMAP_RELAY_DISCOVERY_RELAYS];
+  }
+
+  const relays = parseNip65RelayTags(
+    relayListsByPubkey?.get(event.pubkey)?.tags ?? [],
+  ).writeRelays;
+
+  return relays.length > 0 ? relays : [...ROADMAP_RELAY_DISCOVERY_RELAYS];
 }
 
 function workflowProjectAddress(event: NostrEvent): string {
@@ -277,6 +298,7 @@ function issueView({
   commentsByIssue,
   statusByIssue,
   ownerByProject,
+  repoRelaysByProject,
 }: {
   issue: NostrEvent;
   projectName: string;
@@ -286,11 +308,15 @@ function issueView({
   commentsByIssue: Map<string, NostrEvent[]>;
   statusByIssue: Map<string, string>;
   ownerByProject: Map<string, string>;
+  repoRelaysByProject: Map<string, string[]>;
 }): IssueView {
+  const address = tagValue(issue, 'a');
+
   return {
     id: issue.id,
     project: projectName,
-    projectAddress: tagValue(issue, 'a'),
+    projectAddress: address,
+    repoRelays: repoRelaysByProject.get(address) ?? [],
     authorPubkey: issue.pubkey,
     repoMaintainers: [ownerByProject.get(tagValue(issue, 'a')) ?? ''].filter(
       Boolean,
@@ -339,6 +365,11 @@ export function materializeRoadmap({
     (event) => event.pubkey,
   );
 
+  const relayListsByPubkey = latestByKey(
+    events.filter((event) => event.kind === NIP65_RELAY_LIST_KIND),
+    (event) => event.pubkey,
+  );
+
   const authorIdentityByPubkey = new Map(
     [...profilesByPubkey].map(([pubkey, event]) => [
       pubkey,
@@ -381,6 +412,26 @@ export function materializeRoadmap({
       event.pubkey,
     ]),
   );
+
+  const repoRelaysByProject = new Map(
+    [...projectEventsByAddress].map(([address, event]) => [
+      address,
+      repoRelaysForProject(event, relayListsByPubkey),
+    ]),
+  );
+
+  const projectViews = [...projectEventsByAddress]
+    .map(([address, event]) => ({
+      address,
+      authorPubkey: event.pubkey,
+      name: tagValue(event, 'name') || tagValue(event, 'd') || address,
+      description: tagValue(event, 'description'),
+      repoRelays: repoRelaysByProject.get(address) ?? [],
+      ownerWriteRelays: parseNip65RelayTags(
+        relayListsByPubkey.get(event.pubkey)?.tags ?? [],
+      ).writeRelays,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const rawIssues = events
     .filter((event) => event.kind === ISSUE_KIND)
@@ -613,6 +664,7 @@ export function materializeRoadmap({
       commentsByIssue,
       statusByIssue,
       ownerByProject,
+      repoRelaysByProject,
     });
   };
 
@@ -668,6 +720,7 @@ export function materializeRoadmap({
         authorIdentityByPubkey.get(workflow.pubkey) ??
         fallbackAuthorIdentity(workflow.pubkey),
       projectAddress: workflowProject,
+      repoRelays: repoRelaysByProject.get(workflowProject) ?? [],
       projectName: projectNameByAddress.get(workflowProject) ?? workflowProject,
       title:
         tagValue(workflow, 'title') ||
@@ -679,8 +732,10 @@ export function materializeRoadmap({
 
   return {
     relay,
+    relays: [relay].filter(Boolean),
     issueCount: issues.length,
     zapCount: verifiedZapCount,
+    projects: projectViews,
     workflows: workflowViews,
   };
 }

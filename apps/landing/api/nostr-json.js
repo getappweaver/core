@@ -2,7 +2,24 @@ import { URL } from 'node:url';
 
 const NAMES = Object.freeze({
   _: '721e69c3f3f4e094a90ac00c3a4900c36271ee63aeebe67fbeedc112c31fb298',
-  "dhalsim": "6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8"
+  dhalsim: '6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8',
+});
+
+const RELAYS = Object.freeze({
+  '6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8': [
+    'wss://relay.primal.net',
+    'wss://relay.damus.io',
+    'wss://nostr.mom',
+    'wss://nos.lol',
+    'wss://bitcoiner.social',
+  ],
+  '721e69c3f3f4e094a90ac00c3a4900c36271ee63aeebe67fbeedc112c31fb298': [
+    'wss://relay.primal.net',
+    'wss://relay.damus.io',
+    'wss://nostr.mom',
+    'wss://nos.lol',
+    'wss://bitcoiner.social',
+  ],
 });
 
 const CORS_HEADERS = Object.freeze({
@@ -24,6 +41,14 @@ function sendJson(response, statusCode, body) {
   setCommonHeaders(response);
   response.statusCode = statusCode;
   response.end(JSON.stringify(body, null, 2));
+}
+
+function relaysForNames(names) {
+  return Object.fromEntries(
+    Object.values(names)
+      .filter((pubkey) => Object.prototype.hasOwnProperty.call(RELAYS, pubkey))
+      .map((pubkey) => [pubkey, RELAYS[pubkey]]),
+  );
 }
 
 export default function handler(request, response) {
@@ -57,5 +82,5 @@ export default function handler(request, response) {
         ? { [requestedName]: NAMES[requestedName] }
         : {};
 
-  sendJson(response, 200, { names });
+  sendJson(response, 200, { names, relays: relaysForNames(names) });
 }
