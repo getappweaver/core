@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.47.0] - 2026-06-28
+
+- feat: new nostr supported blog engine for landing app (0546bbf)
+
 ## [v9.46.3] - 2026-06-28
 
-- fix: fetch zapped profile with query relays (ba47573)
+- fix: fetch zapped profile with query relays (744e2bb)
 
 ## [v9.46.2] - 2026-06-27
 

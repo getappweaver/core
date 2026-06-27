@@ -37,6 +37,18 @@ function landingRoutesPlugin(): Plugin {
       return;
     }
 
+    if (url === '/blog') {
+      res.statusCode = 302;
+      res.setHeader('Location', '/blog/');
+      res.end();
+
+      return;
+    }
+
+    if (url?.startsWith('/blog/') && !url.split('/').at(-1)?.includes('.')) {
+      req.url = url.endsWith('/') ? `${url}index.html` : `${url}/index.html`;
+    }
+
     if (url && appRoutes.has(url)) {
       req.url = '/index.html';
     }

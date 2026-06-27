@@ -48,9 +48,9 @@ export async function publishSignedEventToRelays(
     relays.map(async (relay) => {
       const r = new Relay(relay);
 
-      await r.connect();
-
       try {
+        await r.connect();
+
         const result = await r.publish(signed);
 
         return {
@@ -68,6 +68,8 @@ export async function publishSignedEventToRelays(
             message: err instanceof Error ? err.message : String(err),
           },
         };
+      } finally {
+        r.close();
       }
     }),
   );

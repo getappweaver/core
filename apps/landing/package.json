@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "bun run blog:build && vite build",
+    "blog:build": "bun run scripts/blog.ts build",
+    "blog:publish": "bun run scripts/blog.ts publish",
+    "blog:sync": "bun run scripts/blog.ts sync",
     "preview": "vite preview"
   },
   "dependencies": {

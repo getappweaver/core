@@ -408,6 +408,14 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
         return;
       }
 
+      if (loadedEvents.length === 0) {
+        setError(
+          `No roadmap events found. Checked relays: ${queriedRelays.join(', ')}`,
+        );
+
+        return;
+      }
+
       logRoadmapDebug('relay events fetched', {
         bootstrapRelays,
         directRepoRelays: repoTarget?.relays ?? [],
@@ -708,6 +716,34 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
         setChromeError: setPaymentError,
         setChromeLoading: setPaymentLoading,
       });
+
+      return;
+    }
+
+    if (action.type === 'clientAction' && action.action === 'roadmap.openFund') {
+      const issueId = action.payload.issueId;
+      const title = action.payload.title;
+      const sats = action.payload.sats;
+      const actionRelay = action.payload.relay;
+      const actionRelays = action.payload.relays;
+
+      setPaymentError(null);
+      setPaymentText(null);
+      setModalTitle('Roadmap payment');
+      setPaymentRoot(
+        renderRoadmapFundWeb({
+          issueId: typeof issueId === 'string' ? issueId : '',
+          title: typeof title === 'string' ? title : 'roadmap issue',
+          sats: typeof sats === 'number' ? sats : 0,
+          relay:
+            typeof actionRelay === 'string'
+              ? (normalizeRoadmapRelay(actionRelay) ?? relay())
+              : relay(),
+          relays: Array.isArray(actionRelays)
+            ? actionRelays.filter((entry): entry is string => typeof entry === 'string')
+            : activeRelays(),
+        }),
+      );
 
       return;
     }

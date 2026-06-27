@@ -9,12 +9,13 @@ import {
 } from 'solid-js';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
+import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, officialAuthor, socialLinks } from './landing-data';
 import { OfficialAppGrid, pluginIconSrcForSlug } from './official-app-grid';
 import { RoadmapPanel } from './roadmap-panel';
 
-type PluginPageSectionId = 'features' | 'demo' | 'roadmap' | 'install' | 'apps';
+type PluginPageSectionId = 'features' | 'demo' | 'install' | 'apps' | 'more';
 
 type PluginPage = {
   routeSlug: string;
@@ -349,9 +350,9 @@ function hasDemoGifsForView(
 const pluginPageSections: PluginPageSectionId[] = [
   'features',
   'demo',
-  'roadmap',
   'install',
   'apps',
+  'more',
 ];
 
 function routeSlugForPath(pathname: string): string {
@@ -377,9 +378,9 @@ export function pluginNavItemsForPath(_pathname: string): PluginNavItem[] {
       label: `Demo`,
       href: '#demo',
     },
-    { sectionId: 'roadmap', label: 'Roadmap', href: '#roadmap' },
     { sectionId: 'install', label: 'Install', href: '#install' },
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
+    { sectionId: 'more', label: 'More', href: '#more' },
   ];
 }
 
@@ -834,6 +835,20 @@ function SiteFooter() {
   );
 }
 
+function PluginMoreSection(props: { page: PluginPage }) {
+  return (
+    <div class="more-section-stack">
+      <RoadmapPanel
+        title={`${props.page.shortName} Roadmap`}
+        boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
+        repo={pluginRoadmapRepos[props.page.command]}
+      />
+      <BlogPostsSection />
+      <SiteFooter />
+    </div>
+  );
+}
+
 function PluginLandingPage(props: {
   page: PluginPage;
   onActiveSectionChange: (sectionId: PluginPageSectionId) => void;
@@ -918,19 +933,14 @@ function PluginLandingPage(props: {
       >
         <PluginDemoSection page={props.page} />
       </section>
-      <section id="roadmap" class="plugin-page-section plugin-page-section--roadmap">
-        <RoadmapPanel
-          title={`${props.page.shortName} Roadmap`}
-          boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
-          repo={pluginRoadmapRepos[props.page.command]}
-        />
-      </section>
       <section id="install" class="plugin-page-section plugin-page-section--install">
         <PluginInstallPreview page={props.page} />
       </section>
       <section id="apps" class="plugin-page-section plugin-page-section--apps">
         <PluginAppsSection page={props.page} />
-        <SiteFooter />
+      </section>
+      <section id="more" class="plugin-page-section plugin-page-section--more">
+        <PluginMoreSection page={props.page} />
       </section>
     </div>
   );

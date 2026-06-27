@@ -4,6 +4,7 @@ import { render } from 'solid-js/web';
 import { NostrAuthProvider } from '@web/src/contexts/NostrAuthContext';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
+import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, socialLinks } from './landing-data';
 import { OfficialAppGrid } from './official-app-grid';
@@ -24,7 +25,7 @@ type NavItem = {
   href: string;
 };
 
-type OnePageSectionId = 'intro' | 'features' | 'demo' | 'roadmap' | 'apps';
+type OnePageSectionId = 'intro' | 'features' | 'demo' | 'apps' | 'more';
 
 type HeaderProps = {
   activeSection: string | null;
@@ -46,8 +47,8 @@ const onePageNavItems: NavItem[] = [
   { sectionId: 'intro', label: 'Intro', href: '#intro' },
   { sectionId: 'features', label: 'Features', href: '#features' },
   { sectionId: 'demo', label: 'Demo', href: '#demo' },
-  { sectionId: 'roadmap', label: 'Roadmap', href: '#roadmap' },
   { sectionId: 'apps', label: 'Apps', href: '#apps' },
+  { sectionId: 'more', label: 'More', href: '#more' },
 ];
 
 const features: Feature[] = [
@@ -272,6 +273,20 @@ function SiteFooter() {
   );
 }
 
+function MoreSection() {
+  return (
+    <div class="more-section-stack">
+      <RoadmapPanel
+        title="Core Roadmap"
+        boardKey="appweaver-roadmap"
+        repo="nostr://_@getappweaver.com/relay.ngit.dev/core"
+      />
+      <BlogPostsSection />
+      <SiteFooter />
+    </div>
+  );
+}
+
 function OnePage(props: {
   onActiveSectionChange: (sectionId: OnePageSectionId) => void;
   onHeroTitleReachedChange: (reached: boolean) => void;
@@ -292,8 +307,8 @@ function OnePage(props: {
       'intro',
       'features',
       'demo',
-      'roadmap',
       'apps',
+      'more',
     ];
     let frameId: number | null = null;
 
@@ -397,16 +412,11 @@ function OnePage(props: {
           classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
         />
       </section>
-      <section id="roadmap" class="one-page-section one-page-section--roadmap">
-        <RoadmapPanel
-          title="Core Roadmap"
-          boardKey="appweaver-roadmap"
-          repo="nostr://_@getappweaver.com/relay.ngit.dev/core"
-        />
-      </section>
       <section id="apps" class="one-page-section one-page-section--apps">
         <OfficialAppsSection />
-        <SiteFooter />
+      </section>
+      <section id="more" class="one-page-section one-page-section--more">
+        <MoreSection />
       </section>
     </div>
   );

@@ -1,0 +1,64 @@
+{
+  "relays": [
+    "wss://relay.damus.io/",
+    "wss://relay.primal.net/",
+    "wss://relay.snort.social/",
+    "wss://nostr.mom/",
+    "wss://nostr.bitcoiner.social/",
+    "wss://purplepag.es/",
+    "wss://nostr-pub.wellorder.net/",
+    "wss://relay.ditto.pub/",
+    "wss://relay.nos.social/"
+  ],
+  "markdown": "./the-power-of-todo-app.md",
+  "event": {
+    "pubkey": "6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8",
+    "kind": 30023,
+    "tags": [
+      [
+        "d",
+        "the-power-of-todo-app"
+      ],
+      [
+        "title",
+        "Todo App in essence"
+      ],
+      [
+        "summary",
+        "How AppWeaver's local-first Todo App grew from markdown-style lists into a powerful Nostr-native task system with drafts, focus mode, prioritization, filtering, and folding."
+      ],
+      [
+        "image",
+        "https://getappweaver.com/screenshots/todo.png"
+      ],
+      [
+        "published_at",
+        "1782585752"
+      ],
+      [
+        "t",
+        "appweaver"
+      ],
+      [
+        "t",
+        "todo"
+      ],
+      [
+        "t",
+        "nostr"
+      ],
+      [
+        "t",
+        "local-first"
+      ],
+      [
+        "t",
+        "productivity"
+      ]
+    ],
+    "content": "A local, database based, backend application that AppWeaver helps you to use it from a NOSTR chat application via text commands, or use it from the AppWeaver web UI  \n\nThese features are not specific to the Todo App, but it definetely helped shaping AppWeaver what it is today.\n\nI decided to design the todo app to be very close to regular markdown lists. In fact if you use Todo App using NOSTR chat, you view the items in markdown format.\n\nBut markdown as it turns is not exactly the best way to work with todos if you're constantly editing them. Some of the downsides:\n\n- Hard to edit with your phone\n- You need to either delete done items, or move them into a separate list\n- You can be lost in huge lists\n- Can't reliably reference them because lack of persistant IDs\n- Hard to sort/order\n- Hard to filter by status\n\nand so on. I have built solutions to all of these problems while constantly using and testing it. It's very useful to me and I believe it would be to others as well.\n\n# What else I provide with the Todo App\n\n## AI drafts\n\nAI modifications are still possible -maybe you want to mass edit it-, but with using drafts. AI can't directly modify your todo lists, instead it creates draft actions (add, edit, delete). You can review the drafts to reject or accept, and even revise the draft.\n\n## Focus mode\n\nYou have a lot of items but you want to focus on a specific branch of the tree. It reduces the clutter.\n\n## Prioritization\n\nIt's hard to understand which item is the most important one, especially when it's deep in the tree. App helps you define \"champions\" within each branch, and let you do a tournament style match sessions between each other to have a clear \"winner\" 🏆. Nowadays this is my favourite feature, it helps me to see the all the important tasks and the most important one, so I don't get lost.\n\n## Advanced filter\n\nUse the checkmark toolbar button to filter items by their status. You can find the item you accidentally marked it as done and bring it back, or maybe you want to see your achievements and filter \"done\" items. Or sometimes just want to see what you are working at the moment by filtering only \"In Progress\" items. Now I added \"flat\" and \"champions only\" view options there. It's a powerful combination, I might say.\n\n## Folding\n\nEasily expand, collapse all items. Another little utility from the toolbar. Also check the filter when you need to find a specific item. It's powerful, too.\n\n# Thanks for reading so far\n\nIt's really hard to explain all the features. It's simple yet a powerful tool. \n\nUse [demo](https://getappweaver.com/todo-app#demo) to watch the story gifs, or use the interactive demo to see yourself. And don't forget to [install](https://getappweaver.com/todo-app#install)!\n",
+    "created_at": 1782587916,
+    "id": "157d24dd4dd61bd3e2dde4840ee15d1c139e2a17755e5245539356e9d6c4f970",
+    "sig": "13698214a4cedaff4aad48a691938c8f0c18fcf5dfd5e9c40bb30fa9721b02607c72a449bdc8ee44cb1870c951ccdf7f3f79bc318841896fe6f836597c0d8fd1"
+  }
+}
