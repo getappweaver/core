@@ -478,7 +478,6 @@ export function materializeRoadmap({
   const issuesById = new Map(issues.map((event) => [event.id, event]));
   const fundingByIssue = new Map<string, number>();
   const zapCountByIssue = new Map<string, number>();
-  let verifiedZapCount = 0;
 
   for (const zap of zaps) {
     const issueId = eventReference(zap, 'e');
@@ -515,7 +514,6 @@ export function materializeRoadmap({
     fundingByIssue.set(issueId, (fundingByIssue.get(issueId) ?? 0) + sats);
 
     zapCountByIssue.set(issueId, (zapCountByIssue.get(issueId) ?? 0) + 1);
-    verifiedZapCount += 1;
   }
 
   const commentCountByIssue = new Map<string, number>();
@@ -730,11 +728,24 @@ export function materializeRoadmap({
     };
   });
 
+  const visibleIssueIds = new Set(
+    workflowViews.flatMap((workflow) =>
+      workflow.columns.flatMap((column) =>
+        column.issues.map((issue) => issue.id),
+      ),
+    ),
+  );
+
+  const visibleZapCount = [...visibleIssueIds].reduce(
+    (total, issueId) => total + (zapCountByIssue.get(issueId) ?? 0),
+    0,
+  );
+
   return {
     relay,
     relays: [relay].filter(Boolean),
-    issueCount: issues.length,
-    zapCount: verifiedZapCount,
+    issueCount: visibleIssueIds.size,
+    zapCount: visibleZapCount,
     projects: projectViews,
     workflows: workflowViews,
   };

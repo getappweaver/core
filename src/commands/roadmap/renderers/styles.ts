@@ -192,6 +192,25 @@ export const roadmapWebCss = `
     transition: color 120ms ease, background 120ms ease;
   }
 
+  .web-row.roadmap-issue-summary {
+    width: 100%;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .web-row.roadmap-issue-summary > .roadmap-issue-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .web-row.roadmap-issue-summary-actions {
+    margin-left: auto;
+    flex: 0 0 auto;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
   .web-button.roadmap-issue-title:hover,
   .web-button.roadmap-issue-title:focus-visible {
     color: var(--color-warning, currentColor);
@@ -208,6 +227,25 @@ export const roadmapWebCss = `
   .web-row.roadmap-section-title-row {
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .web-row.roadmap-issue-modal-title-row {
+    width: 100%;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .web-row.roadmap-issue-modal-title-row > .roadmap-section-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .web-row.roadmap-issue-modal-actions {
+    margin-left: auto;
+    flex: 0 0 auto;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
   .web-link.roadmap-board-author {
@@ -244,6 +282,14 @@ export const roadmapWebCss = `
   .web-button.roadmap-money-button:hover {
     color: #000;
     background: var(--color-warning);
+  }
+
+  .web-button.roadmap-money-button-summary {
+    padding-inline: 0.45rem;
+  }
+
+  .web-button.roadmap-money-button-modal {
+    padding-inline: 0.5rem;
   }
 
   .web-button.roadmap-new-issue-button {

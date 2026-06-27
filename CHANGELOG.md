@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.46.2] - 2026-06-27
+
+- fix: moved zap count into issue summary, fixed filter (1510ad6)
+
 ## [v9.46.1] - 2026-06-26
 
-- docs: update roadmap and blog drafts (b6a9262)
+- docs: update roadmap and blog drafts (a58352e)
 
 ## [v9.46.0] - 2026-06-26
 

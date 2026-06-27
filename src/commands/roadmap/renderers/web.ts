@@ -35,21 +35,15 @@ function boardAction(workflow: WorkflowView, relay: string): WebAction {
 
 function fundIssueAction(issue: IssueView, relay: string): WebAction {
   return {
-    type: 'command',
-    command: 'roadmap',
-    subcommand: 'fund',
-    arguments: {
+    type: 'clientAction',
+    action: 'roadmap.openFund',
+    payload: {
       issueId: issue.id,
-    },
-    options: {
       title: issue.subject,
       sats: issue.fundingSats,
       relay,
       relays: issue.repoRelays,
     },
-    surface: 'modal',
-    modalTitle: `Fund "${issue.subject}"`,
-    recordInTimeline: false,
   };
 }
 
@@ -397,6 +391,102 @@ function issueTitleButton({
   };
 }
 
+type IssueMoneyButtonProps = {
+  issue: IssueView;
+  relay: string;
+  className: string | null;
+};
+
+function issueMoneyButton({
+  issue,
+  relay,
+  className,
+}: IssueMoneyButtonProps): WebElementNode {
+  return {
+    type: 'element',
+    tag: 'button',
+    props: {
+      label: formatSats(issue.fundingSats),
+      className: ['roadmap-money-button', className].filter(Boolean).join(' '),
+      stopPropagation: true,
+      action: fundIssueAction(issue, relay),
+    },
+  };
+}
+
+type IssueSummaryContentProps = {
+  issue: IssueView;
+  workflow: WorkflowView | null;
+  relay: string;
+  boardKey: string | null;
+  columnId: string | null;
+};
+
+function issueSummaryContent({
+  issue,
+  workflow,
+  relay,
+  boardKey,
+  columnId,
+}: IssueSummaryContentProps): WebElementNode {
+  return {
+    type: 'element',
+    tag: 'row',
+    props: { gap: 'xs', className: 'roadmap-issue-summary' },
+    children: [
+      issueTitleButton({ issue, workflow, relay, boardKey, columnId }),
+      {
+        type: 'element',
+        tag: 'row',
+        props: { gap: 'xs', className: 'roadmap-issue-summary-actions' },
+        children: [
+          issueMoneyButton({
+            issue,
+            relay,
+            className: 'roadmap-money-button-summary',
+          }),
+        ],
+      },
+    ],
+  };
+}
+
+type IssueModalTitleProps = {
+  issue: IssueView;
+  relay: string;
+};
+
+function issueModalTitle({
+  issue,
+  relay,
+}: IssueModalTitleProps): WebElementNode {
+  return {
+    type: 'element',
+    tag: 'row',
+    props: { gap: 'sm', className: 'roadmap-issue-modal-title-row' },
+    children: [
+      {
+        type: 'element',
+        tag: 'text',
+        props: { weight: 'bold', className: 'roadmap-section-title' },
+        children: [textNode(issue.subject)],
+      },
+      {
+        type: 'element',
+        tag: 'row',
+        props: { gap: 'xs', className: 'roadmap-issue-modal-actions' },
+        children: [
+          issueMoneyButton({
+            issue,
+            relay,
+            className: 'roadmap-money-button-modal',
+          }),
+        ],
+      },
+    ],
+  };
+}
+
 function issueDetailsContent(
   issue: IssueView,
   showProject: boolean,
@@ -468,16 +558,6 @@ function issueDetailsContent(
                 columnId,
                 focus: 'comments',
               }),
-            },
-          },
-          textNode('·'),
-          {
-            type: 'element',
-            tag: 'button',
-            props: {
-              label: formatSats(issue.fundingSats),
-              className: 'roadmap-money-button',
-              action: fundIssueAction(issue, relay),
             },
           },
         ],
@@ -821,16 +901,10 @@ export function renderRoadmapIssueModalWeb({
     meta: { command: 'roadmap', subcommand: 'issue' },
     tree: stack(
       [
-        {
-          type: 'element',
-          tag: 'text',
-          props: { weight: 'bold', className: 'roadmap-section-title' },
-          children: [textNode(issue.subject)],
-        },
+        issueModalTitle({ issue, relay }),
         metaBadges([
           issue.project,
           issue.status ?? 'open',
-          formatSats(issue.fundingSats),
           `${issue.commentCount} comment${issue.commentCount === 1 ? '' : 's'}`,
         ]),
         ...(issue.content.trim().length > 0
@@ -1276,7 +1350,7 @@ function issueList(
       defaultExpanded: false,
       className: 'roadmap-issue-item',
     },
-    summary: issueTitleButton({
+    summary: issueSummaryContent({
       issue,
       workflow: options.workflow,
       relay: options.relay,
@@ -1507,9 +1581,38 @@ function workflowAuthor(workflow: WorkflowView): WebNode {
   };
 }
 
+function hashString(value: string): string {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash.toString(36);
+}
+
+function workflowFilterIndexKey(workflow: WorkflowView): string {
+  const signature = workflow.columns
+    .flatMap((column) =>
+      column.issues.map((issue) =>
+        [
+          column.id,
+          issue.id,
+          issue.subject,
+          issue.content,
+          issue.status ?? '',
+          issue.labels.join(','),
+        ].join('\u001f'),
+      ),
+    )
+    .join('\u001e');
+
+  return `roadmap:${workflow.key}:${hashString(signature)}`;
+}
+
 function workflowSummaryCard(workflow: WorkflowView, relay: string): WebNode {
   const issues = workflow.columns.flatMap((column) => column.issues);
-  const pendingCount = workflow.columns[0]?.issues.length ?? 0;
+  const unassignedCount = workflow.columns[0]?.issues.length ?? 0;
   const funding = issues.reduce((total, issue) => total + issue.fundingSats, 0);
 
   return {
@@ -1534,7 +1637,7 @@ function workflowSummaryCard(workflow: WorkflowView, relay: string): WebNode {
                 children: [textNode(workflow.title)],
               },
               readableMuted(
-                `${pendingCount} pending · ${issues.length} total issue${issues.length === 1 ? '' : 's'} · ${formatSats(funding)}`,
+                `${unassignedCount} unassigned · ${issues.length} total issue${issues.length === 1 ? '' : 's'} · ${formatSats(funding)}`,
               ),
             ],
           },
@@ -1578,7 +1681,9 @@ export function renderRoadmapWeb(view: RoadmapView): WebNodeRoot {
           ? {
               filterable: true as const,
               filterPlaceholder: 'Filter by title, description, status, label',
-              filterIndexKey: `roadmap:${activeWorkflow?.key ?? 'overview'}`,
+              filterIndexKey: activeWorkflow
+                ? workflowFilterIndexKey(activeWorkflow)
+                : 'roadmap:overview',
             }
           : {}),
         ...(activeWorkflow

@@ -1,4 +1,5 @@
 import {
+  renderRoadmapFundWeb,
   renderRoadmapIssueModalWeb,
   renderRoadmapNewIssueWeb,
   renderRoadmapNewWorkflowWeb,
@@ -475,7 +476,34 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           .catch(() => {});
       };
 
-      if (clientActionName === 'roadmap.lightningZap') {
+      if (clientActionName === 'roadmap.openFund') {
+        const payload = action.payload;
+        const title = typeof payload.title === 'string' ? payload.title : '';
+
+        adapters.setChromeModal({
+          command: 'roadmap',
+          subcommand: 'fund',
+          title: title ? `Fund "${title}"` : 'Fund roadmap issue',
+          iconUrl:
+            '/builtin-icons/src__commands__roadmap__renderers__roadmap.svg',
+        });
+
+        adapters.setChromeLoading(false);
+        adapters.setChromeError(null);
+        adapters.setChromeText(null);
+
+        adapters.setChromeWeb(
+          renderRoadmapFundWeb({
+            issueId: typeof payload.issueId === 'string' ? payload.issueId : '',
+            title,
+            sats: typeof payload.sats === 'number' ? payload.sats : 0,
+            relay: typeof payload.relay === 'string' ? payload.relay : '',
+            relays: Array.isArray(payload.relays)
+              ? payload.relays.filter((relay) => typeof relay === 'string')
+              : [],
+          }),
+        );
+      } else if (clientActionName === 'roadmap.lightningZap') {
         runClientAction(
           handleRoadmapLightningZap({
             action,
