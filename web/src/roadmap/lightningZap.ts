@@ -4,6 +4,7 @@ import { SimplePool } from 'nostr-tools/pool';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 
+import { PROFILE_RELAYS_FOR_QUERY } from '@src/nostr/nip65';
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
 const ISSUE_KIND = 1621;
@@ -32,6 +33,7 @@ const LnUrlpResponseSchema = z.object({
 });
 
 type LightningProfile = {
+  lud06?: string;
   lud16?: string;
 };
 
@@ -99,6 +101,95 @@ function lightningAddressUrl(lud16: string): string | null {
   }
 
   return `https://${domain}/.well-known/lnurlp/${name}`;
+}
+
+function bech32DecodeWords(value: string): number[] | null {
+  const charset = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+  const lowered = value.toLowerCase();
+  const separatorIndex = lowered.lastIndexOf('1');
+
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const data = lowered.slice(separatorIndex + 1);
+
+  if (data.length <= 6) {
+    return null;
+  }
+
+  const words = [...data].map((char) => charset.indexOf(char));
+
+  if (words.some((word) => word < 0)) {
+    return null;
+  }
+
+  return words.slice(0, -6);
+}
+
+function convertBits({
+  data,
+  fromBits,
+  toBits,
+}: {
+  data: number[];
+  fromBits: number;
+  toBits: number;
+}): number[] | null {
+  let accumulator = 0;
+  let bits = 0;
+  const maxValue = (1 << toBits) - 1;
+  const result: number[] = [];
+
+  for (const value of data) {
+    if (value < 0 || value >> fromBits !== 0) {
+      return null;
+    }
+
+    accumulator = (accumulator << fromBits) | value;
+    bits += fromBits;
+
+    while (bits >= toBits) {
+      bits -= toBits;
+      result.push((accumulator >> bits) & maxValue);
+    }
+  }
+
+  return result;
+}
+
+function lnurlFromLud06(lud06: string): string | null {
+  const words = bech32DecodeWords(lud06.trim());
+
+  if (!words) {
+    return null;
+  }
+
+  const bytes = convertBits({ data: words, fromBits: 5, toBits: 8 });
+
+  if (!bytes) {
+    return null;
+  }
+
+  const decoded = new TextDecoder()
+    .decode(new Uint8Array(bytes))
+    .replace(/\0+$/, '');
+
+  return decoded.startsWith('https://') || decoded.startsWith('http://')
+    ? decoded
+    : null;
+}
+
+function lightningProfileUrl(profile: LightningProfile | null): string | null {
+  if (profile?.lud16) {
+    return lightningAddressUrl(profile.lud16);
+  }
+
+  if (profile?.lud06) {
+    return lnurlFromLud06(profile.lud06);
+  }
+
+  return null;
 }
 
 function parseProfile(content: string | undefined): LightningProfile | null {
@@ -233,6 +324,10 @@ export async function handleRoadmapLightningZap({
       new Set([payload.relay, ...(payload.relays ?? [])]),
     );
 
+    if (relays.length === 0) {
+      throw new Error('No relays available to load roadmap issue data.');
+    }
+
     let issue: NostrEvent | null = null;
     let profileEvent: NostrEvent | null = null;
     let repoOwner = '';
@@ -255,7 +350,9 @@ export async function handleRoadmapLightningZap({
       });
 
       if (!issue) {
-        throw new Error('Issue event could not be loaded.');
+        throw new Error(
+          `Issue event could not be loaded from relays: ${relays.join(', ')}`,
+        );
       }
 
       repoOwner = parseRepoOwner(tagValue(issue, 'a'));
@@ -275,7 +372,7 @@ export async function handleRoadmapLightningZap({
         relays,
       });
 
-      profileEvent = await pool.get(relays, {
+      profileEvent = await pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
         kinds: [PROFILE_KIND],
         authors: [repoOwner],
       });
@@ -288,18 +385,25 @@ export async function handleRoadmapLightningZap({
       pool.close(relays);
     }
 
-    const profile = parseProfile(profileEvent?.content);
+    if (!profileEvent) {
+      throw new Error(
+        `Repository author profile could not be loaded for ${repoOwner}`,
+      );
+    }
+
+    const profile = parseProfile(profileEvent.content);
 
     console.info(LOG_PREFIX, 'parsed profile lightning fields', {
       profile,
+      lud06: profile?.lud06 ?? null,
       lud16: profile?.lud16 ?? null,
     });
 
-    const lnurl = profile?.lud16 ? lightningAddressUrl(profile.lud16) : null;
+    const lnurl = lightningProfileUrl(profile);
 
     if (!lnurl) {
       throw new Error(
-        'Repository author does not have a lud16 Lightning address.',
+        'Repository author does not have a supported Lightning address (lud16 or lud06).',
       );
     }
 

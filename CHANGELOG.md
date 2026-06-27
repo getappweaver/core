@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.46.3] - 2026-06-28
+
+- fix: fetch zapped profile with query relays (ba47573)
+
 ## [v9.46.2] - 2026-06-27
 
-- fix: moved zap count into issue summary, fixed filter (1510ad6)
+- fix: moved zap count into issue summary, fixed filter (90bba8a)
 
 ## [v9.46.1] - 2026-06-26
 
