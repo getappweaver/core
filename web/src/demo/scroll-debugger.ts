@@ -58,14 +58,17 @@ class ScrollDebugger {
     const record = (props: Parameters<ScrollDebugger['record']>[0]) =>
       this.record(props);
 
-    window[methodName] = function wrappedWindowScrollMethod(...args: never[]) {
+    window[methodName] = function wrappedWindowScrollMethod(
+      this: Window,
+      ...args: unknown[]
+    ) {
       if (!isEnabled()) {
-        return original.apply(this, args);
+        return Reflect.apply(original, this, args) as unknown;
       }
 
       record({ methodName, target: 'window', args, element: window });
 
-      return original.apply(this, args);
+      return Reflect.apply(original, this, args) as unknown;
     } as typeof original;
   }
 
@@ -84,12 +87,12 @@ class ScrollDebugger {
     Object.defineProperty(Element.prototype, methodName, {
       value(this: Element, ...args: unknown[]) {
         if (!isEnabled()) {
-          return original.apply(this, args as never[]);
+          return Reflect.apply(original, this, args) as unknown;
         }
 
         record({ methodName, target: 'element', args, element: this });
 
-        return original.apply(this, args as never[]);
+        return Reflect.apply(original, this, args) as unknown;
       },
       writable: true,
       configurable: true,
@@ -111,7 +114,7 @@ class ScrollDebugger {
     Object.defineProperty(HTMLElement.prototype, 'focus', {
       value(this: HTMLElement, ...args: unknown[]) {
         if (!isEnabled()) {
-          return original.apply(this, args as never[]);
+          return Reflect.apply(original, this, args) as unknown;
         }
 
         record({
@@ -121,7 +124,7 @@ class ScrollDebugger {
           element: this,
         });
 
-        return original.apply(this, args as never[]);
+        return Reflect.apply(original, this, args) as unknown;
       },
       writable: true,
       configurable: true,

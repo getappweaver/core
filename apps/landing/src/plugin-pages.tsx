@@ -574,19 +574,19 @@ function PluginInstallPreview(props: { page: PluginPage }) {
       </div>
       <Show when={fullscreenScreenshot()}>
         {(screenshot) => (
-          <div class="plugin-demo-lightbox" role="dialog" aria-modal="true">
+          <div class="lightbox" role="dialog" aria-modal="true">
             <button
               type="button"
-              class="plugin-demo-lightbox-backdrop"
+              class="lightbox__backdrop"
               aria-label="Close fullscreen screenshot"
               onClick={() => setFullscreenScreenshot(null)}
             />
-            <figure class="plugin-demo-lightbox-card plugin-demo-lightbox-card--screenshot">
-              <div class="plugin-demo-lightbox-head">
+            <figure class="lightbox__card lightbox__card--screenshot">
+              <div class="lightbox__head">
                 <div>{screenshot().label}</div>
                 <button
                   type="button"
-                  class="plugin-demo-lightbox-close"
+                  class="lightbox__close"
                   onClick={() => setFullscreenScreenshot(null)}
                   aria-label="Close fullscreen screenshot"
                 >
@@ -594,7 +594,7 @@ function PluginInstallPreview(props: { page: PluginPage }) {
                 </button>
               </div>
               <img
-                class="plugin-demo-lightbox-gif plugin-demo-lightbox-gif--screenshot"
+                class="lightbox__media lightbox__media--screenshot"
                 src={screenshot().src}
                 alt={screenshot().alt}
               />
@@ -748,26 +748,26 @@ function PluginDemoSection(props: { page: PluginPage }) {
       </Show>
       <Show when={fullscreenGif()}>
         {(gif) => (
-          <div class="plugin-demo-lightbox" role="dialog" aria-modal="true">
+          <div class="lightbox" role="dialog" aria-modal="true">
             <button
               type="button"
-              class="plugin-demo-lightbox-backdrop"
+              class="lightbox__backdrop"
               aria-label="Close fullscreen GIF"
               onClick={() => setFullscreenGif(null)}
             />
-            <figure class="plugin-demo-lightbox-card">
-              <div class="plugin-demo-lightbox-head">
+            <figure class="lightbox__card">
+              <div class="lightbox__head">
                 <div>{gif().label}</div>
                 <button
                   type="button"
-                  class="plugin-demo-lightbox-close"
+                  class="lightbox__close"
                   onClick={() => setFullscreenGif(null)}
                   aria-label="Close fullscreen GIF"
                 >
                   x
                 </button>
               </div>
-              <img class="plugin-demo-lightbox-gif" src={gif().src} alt={gif().alt} />
+              <img class="lightbox__media" src={gif().src} alt={gif().alt} />
             </figure>
           </div>
         )}

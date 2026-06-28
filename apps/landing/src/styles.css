@@ -1153,8 +1153,7 @@ a {
 }
 
 .plugin-demo-view-button,
-.plugin-demo-thumb,
-.plugin-demo-lightbox-close {
+.plugin-demo-thumb {
   border: 1px solid rgb(250 204 21 / 75%);
   border-radius: 0;
   background: #0a0d14;
@@ -1231,72 +1230,9 @@ a {
 .plugin-demo-view-button--active,
 .plugin-demo-thumb--active,
 .plugin-demo-view-button:not(:disabled):hover,
-.plugin-demo-thumb:not(:disabled):hover,
-.plugin-demo-lightbox-close:hover {
+.plugin-demo-thumb:not(:disabled):hover {
   background: rgb(250 204 21);
   color: #0a0d14;
-}
-
-.plugin-demo-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-}
-
-.plugin-demo-lightbox-backdrop {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  background: rgb(0 0 0 / 82%);
-  cursor: zoom-out;
-}
-
-.plugin-demo-lightbox-card {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  max-width: min(96vw, 90rem);
-  max-height: 94vh;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid rgb(250 204 21 / 65%);
-  background: #050608;
-}
-
-.plugin-demo-lightbox-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid rgb(255 255 255 / 10%);
-  color: rgb(244 244 245);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.plugin-demo-lightbox-close {
-  padding: 0.25rem 0.5rem;
-}
-
-.plugin-demo-lightbox-gif {
-  display: block;
-  max-width: 100%;
-  max-height: calc(94vh - 2.6rem);
-  object-fit: contain;
-}
-
-.plugin-demo-lightbox-card--screenshot {
-  max-width: min(96vw, 76rem);
-}
-
-.plugin-demo-lightbox-gif--screenshot {
-  width: auto;
-  height: auto;
 }
 
 .plugin-page-section--install {

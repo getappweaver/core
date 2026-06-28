@@ -21,8 +21,11 @@ import {
 const LANDING_ROOT = resolve(import.meta.dirname, '..');
 const BLOG_ROOT = join(LANDING_ROOT, 'blog');
 const BLOG_CSS_PATH = join(LANDING_ROOT, 'src', 'blog.css');
+const LIGHTBOX_CSS_PATH = join(LANDING_ROOT, 'src', 'lightbox.css');
 const PUBLIC_BLOG_ROOT = join(LANDING_ROOT, 'public', 'blog');
 const NIP23_LONG_FORM_KIND = 30023;
+const SITE_ORIGIN = 'https://getappweaver.com';
+const DEFAULT_BLOG_IMAGE = `${SITE_ORIGIN}/appweaver-logo.png`;
 
 const EventSchema = z.object({
   id: z.string().length(64).optional(),
@@ -68,6 +71,8 @@ type RenderPageProps = {
   description: string;
   body: string;
   canonicalPath: string;
+  image: string | null;
+  pageType: 'article' | 'website';
   stylesheet: string;
 };
 
@@ -201,6 +206,32 @@ function slugToPath(slug: string): string {
   return `/blog/${encodeURIComponent(slug)}/`;
 }
 
+function tagToPath(tag: string): string {
+  return `/blog/tag/${encodeURIComponent(tag)}/`;
+}
+
+function renderPostList(posts: BlogPost[]): string {
+  return `<ul class="blog-post-list">
+    ${posts
+      .map(
+        (post) => `<li class="blog-post-card">
+      <a class="blog-post-card-title" href="${slugToPath(post.slug)}">${escapeHtml(post.title)}</a>
+      <div class="blog-post-card-meta">${escapeHtml(formatDate(post.publishedAt))}</div>
+      <p>${escapeHtml(post.summary)}</p>
+    </li>`,
+      )
+      .join('\n')}
+  </ul>`;
+}
+
+function renderTagLinks(tags: string[]): string {
+  return tags
+    .map(
+      (tag) => `<a class="tag" href="${tagToPath(tag)}">#${escapeHtml(tag)}</a>`,
+    )
+    .join('');
+}
+
 function inlineMarkdown(value: string): string {
   let html = escapeHtml(value);
 
@@ -275,7 +306,7 @@ function markdownToHtml(markdown: string): string {
       flushParagraph();
       flushList();
 
-      const level = heading[1].length + 1;
+      const level = heading[1].length;
 
       blocks.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
 
@@ -342,7 +373,22 @@ function postFromLoaded(loaded: LoadedPost): BlogPost {
   };
 }
 
-function renderPage({ title, description, body, canonicalPath, stylesheet }: RenderPageProps): string {
+function absoluteSiteUrl(path: string): string {
+  return new URL(path, SITE_ORIGIN).toString();
+}
+
+function renderPage({
+  title,
+  description,
+  body,
+  canonicalPath,
+  image,
+  pageType,
+  stylesheet,
+}: RenderPageProps): string {
+  const canonicalUrl = absoluteSiteUrl(canonicalPath);
+  const socialImage = image ?? DEFAULT_BLOG_IMAGE;
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -350,7 +396,17 @@ function renderPage({ title, description, body, canonicalPath, stylesheet }: Ren
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeAttribute(description)}">
-    <link rel="canonical" href="${canonicalPath}">
+    <link rel="canonical" href="${escapeAttribute(canonicalUrl)}">
+    <meta property="og:site_name" content="AppWeaver">
+    <meta property="og:type" content="${pageType}">
+    <meta property="og:title" content="${escapeAttribute(title)}">
+    <meta property="og:description" content="${escapeAttribute(description)}">
+    <meta property="og:url" content="${escapeAttribute(canonicalUrl)}">
+    <meta property="og:image" content="${escapeAttribute(socialImage)}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escapeAttribute(title)}">
+    <meta name="twitter:description" content="${escapeAttribute(description)}">
+    <meta name="twitter:image" content="${escapeAttribute(socialImage)}">
     <style>${stylesheet}</style>
   </head>
   <body class="blog-static-page">
@@ -360,7 +416,74 @@ function renderPage({ title, description, body, canonicalPath, stylesheet }: Ren
         <nav class="nav"><a href="/blog/">Blog</a><a href="/">Home</a></nav>
       </header>
       ${body}
+      <footer class="bottom">
+        <a class="brand" href="/">AppWeaver</a>
+        <nav class="nav"><a href="/blog/">Blog</a><a href="/">Home</a></nav>
+      </footer>
     </div>
+    <script>
+      (() => {
+        const imageSelector = '.blog-static-page article .cover, .blog-static-page article .content img';
+        const images = [...document.querySelectorAll(imageSelector)];
+
+        if (images.length === 0) {
+          return;
+        }
+
+        let lightbox = null;
+
+        function closeLightbox() {
+          lightbox?.remove();
+          lightbox = null;
+          document.body.classList.remove('blog-lightbox-open');
+        }
+
+        function openLightbox(image) {
+          closeLightbox();
+
+          const src = image.currentSrc || image.src;
+          const alt = image.alt || 'Blog image';
+
+          lightbox = document.createElement('div');
+          lightbox.className = 'lightbox blog-image-lightbox';
+          lightbox.setAttribute('role', 'dialog');
+          lightbox.setAttribute('aria-modal', 'true');
+          lightbox.innerHTML = '<button type="button" class="lightbox__backdrop" aria-label="Close image"></button><figure class="lightbox__card lightbox__card--screenshot"><div class="lightbox__head"><figcaption></figcaption><button type="button" class="lightbox__close" aria-label="Close">✕</button></div><img class="lightbox__media lightbox__media--screenshot" alt=""></figure>';
+
+          const preview = lightbox.querySelector('img');
+          const caption = lightbox.querySelector('figcaption');
+          const closeButton = lightbox.querySelector('.lightbox__close');
+
+          preview.src = src;
+          preview.alt = alt;
+          caption.textContent = alt;
+          lightbox.querySelector('.lightbox__backdrop')?.addEventListener('click', closeLightbox);
+          closeButton?.addEventListener('click', closeLightbox);
+          document.body.append(lightbox);
+          document.body.classList.add('blog-lightbox-open');
+          closeButton?.focus();
+        }
+
+        for (const image of images) {
+          image.tabIndex = 0;
+          image.setAttribute('role', 'button');
+          image.setAttribute('aria-label', image.alt ? 'Open image: ' + image.alt : 'Open image');
+          image.addEventListener('click', () => openLightbox(image));
+          image.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openLightbox(image);
+            }
+          });
+        }
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            closeLightbox();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>`;
 }
@@ -392,7 +515,11 @@ async function writeTextFile(path: string, content: string): Promise<void> {
 }
 
 async function buildBlog(): Promise<void> {
-  const stylesheet = await readFile(BLOG_CSS_PATH, 'utf8');
+  const [blogStylesheet, lightboxStylesheet] = await Promise.all([
+    readFile(BLOG_CSS_PATH, 'utf8'),
+    readFile(LIGHTBOX_CSS_PATH, 'utf8'),
+  ]);
+  const stylesheet = `${blogStylesheet}\n${lightboxStylesheet}`;
   const posts = (await loadPosts())
     .map(postFromLoaded)
     .sort((a, b) => (b.publishedAt ?? b.event.created_at ?? 0) - (a.publishedAt ?? a.event.created_at ?? 0));
@@ -401,28 +528,54 @@ async function buildBlog(): Promise<void> {
 
   const indexBody = `<main>
   <h1>Blog</h1>
-  <p class="summary">NIP-23 long-form posts published by AppWeaver.</p>
-  <ul class="blog-post-list">
-    ${posts
-      .map(
-        (post) => `<li class="blog-post-card">
-      <a class="blog-post-card-title" href="${slugToPath(post.slug)}">${escapeHtml(post.title)}</a>
-      <div class="blog-post-card-meta">${escapeHtml(formatDate(post.publishedAt))}</div>
-      <p>${escapeHtml(post.summary)}</p>
-    </li>`,
-      )
-      .join('\n')}
-  </ul>
+  ${renderPostList(posts)}
 </main>`;
 
   await writeTextFile(
     join(PUBLIC_BLOG_ROOT, 'index.html'),
     renderPage({
       title: 'AppWeaver Blog',
-      description: 'NIP-23 long-form posts from AppWeaver.',
+      description:
+        'Long-form AppWeaver posts about local-first apps, AI tools, Nostr-native workflows, and building focused plugins for your workspace.',
       body: indexBody,
       canonicalPath: '/blog/',
+      image: null,
+      pageType: 'website',
       stylesheet,
+    }),
+  );
+
+  const postsByTag = new Map<string, BlogPost[]>();
+
+  for (const post of posts) {
+    for (const tag of post.tags) {
+      const taggedPosts = postsByTag.get(tag) ?? [];
+
+      taggedPosts.push(post);
+      postsByTag.set(tag, taggedPosts);
+    }
+  }
+
+  await Promise.all(
+    [...postsByTag.entries()].map(async ([tag, taggedPosts]) => {
+      const tagBody = `<main>
+  <h1>#${escapeHtml(tag)}</h1>
+  <p class="summary">Posts tagged #${escapeHtml(tag)}.</p>
+  ${renderPostList(taggedPosts)}
+</main>`;
+
+      await writeTextFile(
+        join(PUBLIC_BLOG_ROOT, 'tag', encodeURIComponent(tag), 'index.html'),
+        renderPage({
+          title: `#${tag} · AppWeaver Blog`,
+          description: `AppWeaver blog posts tagged #${tag}, covering local-first apps, AI tools, Nostr workflows, and plugin development.`,
+          body: tagBody,
+          canonicalPath: tagToPath(tag),
+          image: taggedPosts[0]?.image ?? null,
+          pageType: 'website',
+          stylesheet,
+        }),
+      );
     }),
   );
 
@@ -434,7 +587,7 @@ async function buildBlog(): Promise<void> {
     <h1>${escapeHtml(post.title)}</h1>
     ${post.summary ? `<p class="summary">${escapeHtml(post.summary)}</p>` : ''}
     ${post.image ? `<img class="cover" src="${escapeAttribute(post.image)}" alt="">` : ''}
-    ${post.tags.length > 0 ? `<div class="tags">${post.tags.map((tag) => `<span>#${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+    ${post.tags.length > 0 ? `<div class="tags">${renderTagLinks(post.tags)}</div>` : ''}
     <div class="content">${markdownToHtml(post.markdown)}</div>
     <a class="nostr-link" href="nostr:${post.naddr}">Open as Nostr article</a>
   </article>
@@ -447,6 +600,8 @@ async function buildBlog(): Promise<void> {
           description: post.summary,
           body: postBody,
           canonicalPath: slugToPath(post.slug),
+          image: post.image,
+          pageType: 'article',
           stylesheet,
         }),
       );

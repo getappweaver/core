@@ -83,14 +83,24 @@
   padding: 2rem 0 4rem;
 }
 
-.blog-static-page .top {
+.blog-static-page .top,
+.blog-static-page .bottom {
   display: flex;
   gap: 1rem;
   justify-content: space-between;
   align-items: center;
+}
+
+.blog-static-page .top {
   border-bottom: 1px solid rgb(255 255 255 / 12%);
   padding-bottom: 0.75rem;
   margin-bottom: 2rem;
+}
+
+.blog-static-page .bottom {
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  padding-top: 0.75rem;
+  margin-top: 3rem;
 }
 
 .blog-static-page .brand {
@@ -121,17 +131,22 @@
 
 .blog-static-page h2 {
   margin-top: 2rem;
-  color: rgb(250 204 21);
+  color: rgb(215 178 178);
 }
 
 .blog-static-page h3 {
   margin-top: 1.6rem;
-  color: rgb(165 243 252);
+  color: rgb(147 210 218);
 }
 
-.blog-static-page .summary,
-.blog-static-page .meta {
+.blog-static-page h4 {
+  margin-top: 1.35rem;
+  color: rgb(182, 204, 207);
+}
+
+.blog-static-page .summary {
   color: rgb(161 161 170);
+  text-align: justify;
 }
 
 .blog-static-page .cover {
@@ -145,6 +160,17 @@
 .blog-static-page .content img {
   max-width: 100%;
   height: auto;
+  cursor: zoom-in;
+}
+
+.blog-static-page .cover {
+  cursor: zoom-in;
+}
+
+.blog-static-page .content img:focus-visible,
+.blog-static-page .cover:focus-visible {
+  outline: 2px solid rgb(250 204 21);
+  outline-offset: 3px;
 }
 
 .blog-static-page pre {
@@ -168,11 +194,24 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 2rem;
+  justify-content: center;
   color: rgb(161 161 170);
+}
+
+.blog-static-page .tag {
+  color: rgb(161 161 170);
+  text-decoration: none;
+}
+
+.blog-static-page .tag:hover {
+  color: rgb(250 204 21);
 }
 
 .blog-static-page .nostr-link {
   display: inline-block;
   margin-top: 1rem;
+}
+
+.blog-lightbox-open {
+  overflow: hidden;
 }

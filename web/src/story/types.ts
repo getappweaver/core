@@ -103,9 +103,17 @@ export function storyActionMatches(
   }
 
   if (event.type === 'widget_opened') {
+    if (match.type !== 'widget_opened') {
+      return false;
+    }
+
     return (
       match.command === event.command && match.subcommand === event.subcommand
     );
+  }
+
+  if (match.type !== 'target_hovered') {
+    return false;
   }
 
   return match.targetId === event.targetId;

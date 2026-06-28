@@ -15,6 +15,7 @@ import {
 } from './plugin-pages';
 import { RoadmapPanel } from './roadmap-panel';
 
+import './lightbox.css';
 import './styles.css';
 
 const logoUrl = '/appweaver-logo-accent.svg';

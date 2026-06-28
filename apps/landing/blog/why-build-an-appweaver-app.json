@@ -1,0 +1,56 @@
+{
+  "relays": [
+    "wss://relay.damus.io/",
+    "wss://relay.primal.net/",
+    "wss://relay.snort.social/",
+    "wss://nostr.mom/",
+    "wss://nostr.bitcoiner.social/",
+    "wss://nostr-pub.wellorder.net/",
+    "wss://relay.ditto.pub/",
+    "wss://relay.nos.social/"
+  ],
+  "markdown": "./why-build-an-appweaver-app.md",
+  "event": {
+    "pubkey": "6e64b83c1f674fb00a5f19816c297b6414bf67f015894e04dd4c657e94102ee8",
+    "kind": 30023,
+    "tags": [
+      [
+        "d",
+        "why-build-an-appweaver-app"
+      ],
+      [
+        "title",
+        "Why build an AppWeaver app?"
+      ],
+      [
+        "summary",
+        "How AppWeaver apps turn focused local workflows into commands, widgets, AI tools, prompts, scheduled automation, and Nostr-native capabilities."
+      ],
+      [
+        "image",
+        "https://getappweaver.com/screenshots/bookmark-manager.png"
+      ],
+      [
+        "t",
+        "appweaver"
+      ],
+      [
+        "t",
+        "plugins"
+      ],
+      [
+        "t",
+        "local-first"
+      ],
+      [
+        "t",
+        "ai-tools"
+      ],
+      [
+        "t",
+        "nostr"
+      ]
+    ],
+    "content": ""
+  }
+}

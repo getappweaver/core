@@ -106,6 +106,7 @@ export type CommandsHook = {
     command: string;
     subcommand: string;
     title: string;
+    iconUrl?: string | null;
   }) => void;
   refreshComposerAiState: () => Promise<void>;
   requestChromeCommand: (props: RequestChromeCommandProps) => void;
