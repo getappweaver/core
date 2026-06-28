@@ -19,6 +19,7 @@ type PluginPageSectionId = 'features' | 'demo' | 'install' | 'apps' | 'more';
 
 type PluginPage = {
   routeSlug: string;
+  installScreenshotSlug: string;
   command: string;
   subcommand: string;
   label: string;
@@ -88,11 +89,19 @@ type DemoSubcommand = {
 };
 
 const pluginRouteAliases: Record<string, string> = {
-  'bookmark-manager': 'bm',
-  'captains-log': 'journal',
-  'file-manager': 'file',
-  'job-scheduler': 'job',
-  'todo-app': 'todo',
+  'apps/bookmark-manager': 'bm',
+  'apps/captains-log': 'journal',
+  'apps/file-manager': 'file',
+  'apps/job-scheduler': 'job',
+  'apps/todo': 'todo',
+};
+
+const pluginInstallScreenshotSlugs: Record<string, string> = {
+  bm: 'bookmark-manager',
+  file: 'file-manager',
+  job: 'job-scheduler',
+  journal: 'captains-log',
+  todo: 'todo-app',
 };
 
 const pluginFeatures: Record<string, string[]> = {
@@ -425,6 +434,7 @@ function pluginPageForPath(
 
   return {
     routeSlug: slug,
+    installScreenshotSlug: pluginInstallScreenshotSlugs[command.name] ?? slug,
     command: command.name,
     subcommand: subcommand.name,
     label: officialApp?.label ?? `/${command.name}`,
@@ -447,8 +457,8 @@ function demoAppSrc(query: string): string {
   return `/demo/app/index.html?${query}`;
 }
 
-function installScreenshotSrc(routeSlug: string): string {
-  return `/plugin-install/${routeSlug}.png`;
+function installScreenshotSrc(screenshotSlug: string): string {
+  return `/plugin-install/${screenshotSlug}.png`;
 }
 
 function ScreenshotCard(props: {
@@ -513,7 +523,7 @@ function PluginFeatures(props: { page: PluginPage }) {
 }
 
 function PluginInstallPreview(props: { page: PluginPage }) {
-  const screenshotSrc = () => installScreenshotSrc(props.page.routeSlug);
+  const screenshotSrc = () => installScreenshotSrc(props.page.installScreenshotSlug);
   const [fullscreenScreenshot, setFullscreenScreenshot] = createSignal<{
     src: string;
     alt: string;

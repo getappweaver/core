@@ -65,10 +65,11 @@ const features: Feature[] = [
     points: [
       'Browse apps in the plugin manager, then download and use the ones that belong in your hub.',
       <>
-        Install focused apps like <a href="/todo-app">todos</a>,{' '}
-        <a href="/bookmark-manager">bookmarks</a>,{' '}
-        <a href="/job-scheduler">jobs</a>, <a href="/file-manager">files</a>,
-        browser actions, <a href="/captains-log">journals</a>, and publishing.
+        Install focused apps like <a href="/apps/todo">todos</a>,{' '}
+        <a href="/apps/bookmark-manager">bookmarks</a>,{' '}
+        <a href="/apps/job-scheduler">jobs</a>,{' '}
+        <a href="/apps/file-manager">files</a>, browser actions,{' '}
+        <a href="/apps/captains-log">journals</a>, and publishing.
       </>,
       'Anyone can publish an app into the ecosystem.',
       'Apps expose commands, widgets, AI skills, and promptable tools.',

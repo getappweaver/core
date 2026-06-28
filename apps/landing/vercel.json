@@ -49,23 +49,23 @@
       "destination": "/index.html"
     },
     {
-      "source": "/todo-app",
+      "source": "/apps/todo",
       "destination": "/index.html"
     },
     {
-      "source": "/bookmark-manager",
+      "source": "/apps/bookmark-manager",
       "destination": "/index.html"
     },
     {
-      "source": "/job-scheduler",
+      "source": "/apps/job-scheduler",
       "destination": "/index.html"
     },
     {
-      "source": "/file-manager",
+      "source": "/apps/file-manager",
       "destination": "/index.html"
     },
     {
-      "source": "/captains-log",
+      "source": "/apps/captains-log",
       "destination": "/index.html"
     }
   ],

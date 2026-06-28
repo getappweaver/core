@@ -17,12 +17,12 @@ type LandingRouteRequestProps = {
 function landingRoutesPlugin(): Plugin {
   const redirects = new Map([['/demo/app', '/demo/app/']]);
   const appRoutes = new Set([
+    '/apps/bookmark-manager',
+    '/apps/captains-log',
+    '/apps/file-manager',
+    '/apps/job-scheduler',
+    '/apps/todo',
     '/one-page',
-    '/todo-app',
-    '/bookmark-manager',
-    '/job-scheduler',
-    '/file-manager',
-    '/captains-log',
   ]);
 
   function handleRequest({ req, res, next }: LandingRouteRequestProps): void {

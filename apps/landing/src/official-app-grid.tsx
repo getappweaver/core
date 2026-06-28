@@ -2,12 +2,20 @@ import { For, Show } from 'solid-js';
 
 import type { OfficialApp } from './landing-data';
 
+const pluginRouteIconAliases: Record<string, string> = {
+  'apps/bookmark-manager': 'bm',
+  'apps/captains-log': 'journal',
+  'apps/file-manager': 'file',
+  'apps/job-scheduler': 'job',
+  'apps/todo': 'todo',
+};
+
 const pluginRouteIcons: Record<string, string> = {
-  'bookmark-manager': 'bm/commands__list__renderers__list.svg',
-  'captains-log': 'journal/commands__today__renderers__captains-log.svg',
-  'file-manager': 'file/commands__tree__renderers__tree.svg',
-  'job-scheduler': 'job/commands__list__renderers__clock.svg',
-  'todo-app': 'todo/commands__list__renderers__list.svg',
+  bm: 'bm/commands__list__renderers__list.svg',
+  file: 'file/commands__tree__renderers__tree.svg',
+  job: 'job/commands__list__renderers__clock.svg',
+  journal: 'journal/commands__today__renderers__captains-log.svg',
+  todo: 'todo/commands__list__renderers__list.svg',
 };
 
 type OfficialAppGridProps = {
@@ -15,7 +23,7 @@ type OfficialAppGridProps = {
 };
 
 export function pluginIconSrcForSlug(slug: string): string | null {
-  const iconPath = pluginRouteIcons[slug];
+  const iconPath = pluginRouteIcons[pluginRouteIconAliases[slug] ?? slug];
 
   return iconPath ? `/plugin-icons/${iconPath}` : null;
 }

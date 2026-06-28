@@ -43,4 +43,4 @@ Easily expand, collapse all items. Another little utility from the toolbar. Also
 
 It's really hard to explain all the features. It's simple yet a powerful tool. 
 
-Use [demo](https://getappweaver.com/todo-app#demo) to watch the story gifs, or use the interactive demo to see yourself. And don't forget to [install](https://getappweaver.com/todo-app#install)!
+Use [demo](https://getappweaver.com/apps/todo#demo) to watch the story gifs, or use the interactive demo to see yourself. And don't forget to [install](https://getappweaver.com/apps/todo#install)!
