@@ -12,6 +12,7 @@
     "blog:build": "bun run scripts/blog.ts build",
     "blog:publish": "bun run scripts/blog.ts publish",
     "blog:sync": "bun run scripts/blog.ts sync",
+    "indexnow:submit": "bun run scripts/indexnow.ts",
     "preview": "vite preview",
     "record:story": "bun run ../../scripts/record-landing-story.ts"
   },

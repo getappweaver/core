@@ -3,11 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AppWeaver</title>
+    <title>AppWeaver · AI-powered app hub</title>
     <meta
       name="description"
-      content="Your data stays local-first, you choose which apps belong in your hub. Use them through web/mobile interfaces and prompts, local terminal input, or your favourite Nostr chat app."
+      content="AppWeaver is an open-source app hub for running AI-powered tools from a project or workspace folder you control. Use apps through chat, the web UI, or AI prompts."
     />
+    <meta
+      name="keywords"
+      content="appweaver, ai, agents, app-hub, ai-tools, local-first, self-hosted, nostr, opencode, plugins, automation, open-source"
+    />
+    <link rel="canonical" href="https://getappweaver.com/" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+    <meta property="og:site_name" content="AppWeaver" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AppWeaver · AI-powered app hub" />
+    <meta
+      property="og:description"
+      content="Open-source app hub for running AI-powered tools from a project or workspace folder you control."
+    />
+    <meta property="og:url" content="https://getappweaver.com/" />
+    <meta property="og:image" content="https://getappweaver.com/favicon/android-chrome-512x512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AppWeaver · AI-powered app hub" />
+    <meta
+      name="twitter:description"
+      content="Open-source app hub for running AI-powered tools from a project or workspace folder you control."
+    />
+    <meta name="twitter:image" content="https://getappweaver.com/favicon/android-chrome-512x512.png" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
@@ -27,8 +49,45 @@
     />
     <link rel="shortcut icon" href="/favicon/favicon.ico" />
     <link rel="manifest" href="/favicon/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "AppWeaver",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Linux, Windows",
+        "url": "https://getappweaver.com/",
+        "codeRepository": "https://github.com/getappweaver/core",
+        "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
+        "keywords": [
+          "appweaver",
+          "ai",
+          "agents",
+          "app-hub",
+          "ai-tools",
+          "local-first",
+          "self-hosted",
+          "nostr",
+          "plugins",
+          "automation",
+          "open-source"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </head>
   <body>
+    <main id="static-seo-fallback" style="padding: 2rem; font-family: system-ui, sans-serif; color: #f5f5f5; background: #0a0d14; min-height: 100vh;">
+      <h1>AppWeaver: AI-powered app hub</h1>
+      <p>
+        AppWeaver is an open-source app hub for running AI-powered tools from a
+        project or workspace folder you control.
+      </p>
+    </main>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

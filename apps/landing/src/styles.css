@@ -623,6 +623,12 @@ a {
   background: #111;
 }
 
+.one-page-demo-frame--placeholder {
+  background:
+    linear-gradient(135deg, rgb(97 190 190 / 12%), transparent 42%),
+    #111;
+}
+
 .one-page-demo-frame--mobile {
   width: min(100%, 390px);
 }

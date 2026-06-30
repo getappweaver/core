@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.47.5] - 2026-07-01
+
+- fix: apps/landing SEO improvements (001c43e)
+
 ## [v9.47.4] - 2026-06-30
 
-- fix: added footer support for nostr posts (a54ff7d)
+- fix: added footer support for nostr posts (7388859)
 
 ## [v9.47.3] - 2026-06-28
 

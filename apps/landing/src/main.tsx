@@ -1,4 +1,4 @@
-import { For, createSignal, onCleanup, onMount } from 'solid-js';
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { render } from 'solid-js/web';
 import { NostrAuthProvider } from '@web/src/contexts/NostrAuthContext';
@@ -297,6 +297,7 @@ function OnePage(props: {
   const [demoViewMode, setDemoViewMode] = createSignal<'desktop' | 'mobile'>(
     'desktop',
   );
+  const [shouldLoadDemo, setShouldLoadDemo] = createSignal(false);
 
   onMount(() => {
     const root = document.querySelector('.one-page-stage');
@@ -313,6 +314,7 @@ function OnePage(props: {
       'more',
     ];
     let frameId: number | null = null;
+    let demoObserver: IntersectionObserver | null = null;
 
     const updateActiveSection = () => {
       frameId = null;
@@ -334,6 +336,14 @@ function OnePage(props: {
       }
 
       props.onActiveSectionChange(activeSection);
+
+      if (
+        activeSection === 'demo' ||
+        activeSection === 'apps' ||
+        activeSection === 'more'
+      ) {
+        setShouldLoadDemo(true);
+      }
 
       props.onHeroTitleReachedChange(
         heroTitle instanceof HTMLElement &&
@@ -360,6 +370,26 @@ function OnePage(props: {
 
     const cancelInitialHashScroll = scheduleStageHashScroll(root, scheduleUpdate);
 
+    const demoSection = document.getElementById('demo');
+
+    if (window.location.hash === '#demo') {
+      setShouldLoadDemo(true);
+    }
+
+    if (demoSection && 'IntersectionObserver' in window) {
+      demoObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setShouldLoadDemo(true);
+            demoObserver?.disconnect();
+            demoObserver = null;
+          }
+        },
+        { root, rootMargin: '100% 0px', threshold: 0 },
+      );
+      demoObserver.observe(demoSection);
+    }
+
     root.addEventListener('scroll', scheduleUpdate, { passive: true });
     window.addEventListener('hashchange', handleHashChange);
     updateActiveSection();
@@ -368,6 +398,7 @@ function OnePage(props: {
       root.removeEventListener('scroll', scheduleUpdate);
       window.removeEventListener('hashchange', handleHashChange);
       cancelInitialHashScroll();
+      demoObserver?.disconnect();
 
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId);
@@ -407,12 +438,23 @@ function OnePage(props: {
             Mobile
           </button>
         </div>
-        <iframe
-          title="AppWeaver interactive demo"
-          src="/demo/app/index.html"
-          class="one-page-demo-frame"
-          classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
-        />
+        <Show
+          when={shouldLoadDemo()}
+          fallback={
+            <div
+              class="one-page-demo-frame one-page-demo-frame--placeholder"
+              aria-hidden="true"
+            />
+          }
+        >
+          <iframe
+            title="AppWeaver interactive demo"
+            src="/demo/app/index.html"
+            loading="lazy"
+            class="one-page-demo-frame"
+            classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
+          />
+        </Show>
       </section>
       <section id="apps" class="one-page-section one-page-section--apps">
         <OfficialAppsSection />
@@ -477,6 +519,8 @@ function App() {
     </div>
   );
 }
+
+document.getElementById('static-seo-fallback')?.remove();
 
 render(
   () => (

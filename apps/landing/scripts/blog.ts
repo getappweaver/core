@@ -23,9 +23,19 @@ const BLOG_ROOT = join(LANDING_ROOT, 'blog');
 const BLOG_CSS_PATH = join(LANDING_ROOT, 'src', 'blog.css');
 const LIGHTBOX_CSS_PATH = join(LANDING_ROOT, 'src', 'lightbox.css');
 const PUBLIC_BLOG_ROOT = join(LANDING_ROOT, 'public', 'blog');
+const PUBLIC_ROOT = join(LANDING_ROOT, 'public');
 const NIP23_LONG_FORM_KIND = 30023;
 const SITE_ORIGIN = 'https://getappweaver.com';
-const DEFAULT_BLOG_IMAGE = `${SITE_ORIGIN}/appweaver-logo.png`;
+const DEFAULT_BLOG_IMAGE = `${SITE_ORIGIN}/favicon/android-chrome-512x512.png`;
+const STATIC_SITEMAP_PATHS = [
+  { path: '/', priority: '1.0', changefreq: 'weekly' },
+  { path: '/apps/todo', priority: '0.8', changefreq: 'monthly' },
+  { path: '/apps/bookmark-manager', priority: '0.8', changefreq: 'monthly' },
+  { path: '/apps/captains-log', priority: '0.8', changefreq: 'monthly' },
+  { path: '/apps/job-scheduler', priority: '0.8', changefreq: 'monthly' },
+  { path: '/apps/file-manager', priority: '0.8', changefreq: 'monthly' },
+  { path: '/blog/', priority: '0.7', changefreq: 'weekly' },
+] as const;
 
 const EventSchema = z.object({
   id: z.string().length(64).optional(),
@@ -90,6 +100,12 @@ type SignPostProps = {
   pool: SimplePool;
   connection: ConnectionRow;
   createdAt: number;
+};
+
+type SitemapEntry = {
+  path: string;
+  priority: string;
+  changefreq: string;
 };
 
 function usage(): string {
@@ -380,6 +396,57 @@ function absoluteSiteUrl(path: string): string {
   return new URL(path, SITE_ORIGIN).toString();
 }
 
+function renderSitemapUrl({ path, priority, changefreq }: SitemapEntry): string {
+  return `  <url>
+    <loc>${escapeHtml(absoluteSiteUrl(path))}</loc>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`;
+}
+
+function renderSitemap(posts: BlogPost[], tags: string[]): string {
+  const urls = [
+    ...STATIC_SITEMAP_PATHS.map((entry) =>
+      renderSitemapUrl(entry),
+    ),
+    ...posts.map((post) =>
+      renderSitemapUrl({
+        path: slugToPath(post.slug),
+        priority: '0.6',
+        changefreq: 'monthly',
+      }),
+    ),
+    ...tags.map((tag) =>
+      renderSitemapUrl({
+        path: tagToPath(tag),
+        priority: '0.4',
+        changefreq: 'monthly',
+      }),
+    ),
+  ];
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>
+`;
+}
+
+async function writeSeoDiscoveryFiles(
+  posts: BlogPost[],
+  tags: string[],
+): Promise<void> {
+  await writeTextFile(join(PUBLIC_ROOT, 'sitemap.xml'), renderSitemap(posts, tags));
+  await writeTextFile(
+    join(PUBLIC_ROOT, 'robots.txt'),
+    `User-agent: *
+Allow: /
+
+Sitemap: ${absoluteSiteUrl('/sitemap.xml')}
+`,
+  );
+}
+
 function renderPage({
   title,
   description,
@@ -626,6 +693,8 @@ async function buildBlog(): Promise<void> {
       );
     }),
   );
+
+  await writeSeoDiscoveryFiles(posts, [...postsByTag.keys()].sort());
 
   await Promise.all(
     posts.map(async (post) => {
