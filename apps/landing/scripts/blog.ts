@@ -40,6 +40,7 @@ const EventSchema = z.object({
 const BlogWrapperSchema = z.object({
   relays: z.array(z.string().url()).min(1),
   markdown: z.string().min(1),
+  'nostr-footer': z.string().min(1).optional(),
   event: EventSchema,
 });
 
@@ -78,12 +79,14 @@ type RenderPageProps = {
 
 type PublishPostProps = {
   loaded: LoadedPost;
+  publishContent: string;
   pool: SimplePool;
   connections: ConnectionRow[];
 };
 
 type SignPostProps = {
   loaded: LoadedPost;
+  publishContent: string;
   pool: SimplePool;
   connection: ConnectionRow;
   createdAt: number;
@@ -407,6 +410,25 @@ function renderPage({
     <meta name="twitter:title" content="${escapeAttribute(title)}">
     <meta name="twitter:description" content="${escapeAttribute(description)}">
     <meta name="twitter:image" content="${escapeAttribute(socialImage)}">
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="${escapeAttribute(absoluteSiteUrl('/favicon/apple-touch-icon.png'))}"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="${escapeAttribute(absoluteSiteUrl('/favicon/favicon-32x32.png'))}"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="${escapeAttribute(absoluteSiteUrl('/favicon/favicon-16x16.png'))}"
+    />
+    <link rel="shortcut icon" href="${escapeAttribute(absoluteSiteUrl('/favicon/favicon.ico'))}" />
+    <link rel="manifest" href="${escapeAttribute(absoluteSiteUrl('/favicon/site.webmanifest'))}" />
     <style>${stylesheet}</style>
   </head>
   <body class="blog-static-page">
@@ -514,6 +536,32 @@ async function writeTextFile(path: string, content: string): Promise<void> {
   await writeFile(path, content);
 }
 
+async function readNostrFooter(loaded: LoadedPost): Promise<string> {
+  const footerPath = loaded.wrapper['nostr-footer'];
+
+  if (!footerPath) {
+    return '';
+  }
+
+  const resolvedPath = resolve(dirname(loaded.wrapperPath), footerPath);
+
+  if (!existsSync(resolvedPath)) {
+    return '';
+  }
+
+  return (await readFile(resolvedPath, 'utf8')).trim();
+}
+
+function composeNostrContent(markdown: string, footer: string): string {
+  const body = markdown.trim();
+
+  if (!footer) {
+    return `${body}\n`;
+  }
+
+  return `${body}\n\n${footer}\n`;
+}
+
 async function buildBlog(): Promise<void> {
   const [blogStylesheet, lightboxStylesheet] = await Promise.all([
     readFile(BLOG_CSS_PATH, 'utf8'),
@@ -611,13 +659,19 @@ async function buildBlog(): Promise<void> {
   console.log(`Generated ${posts.length} blog post page(s) in ${PUBLIC_BLOG_ROOT}`);
 }
 
-async function signPost({ loaded, pool, connection, createdAt }: SignPostProps): Promise<VerifiedEvent> {
+async function signPost({
+  loaded,
+  publishContent,
+  pool,
+  connection,
+  createdAt,
+}: SignPostProps): Promise<VerifiedEvent> {
   const { wrapper } = loaded;
   const template: EventTemplate = {
     kind: NIP23_LONG_FORM_KIND,
     created_at: createdAt,
     tags: wrapper.event.tags,
-    content: loaded.markdown,
+    content: publishContent,
   };
 
   const signed = await bunkerSignEvent(pool, connection.data, template);
@@ -638,12 +692,17 @@ async function signPost({ loaded, pool, connection, createdAt }: SignPostProps):
   return signed;
 }
 
-async function publishPost({ loaded, pool, connections }: PublishPostProps): Promise<void> {
+async function publishPost({
+  loaded,
+  publishContent,
+  pool,
+  connections,
+}: PublishPostProps): Promise<void> {
   const { wrapper, wrapperPath } = loaded;
   requireIdentifier(wrapper.event, wrapperPath);
 
   wrapper.event.kind = NIP23_LONG_FORM_KIND;
-  wrapper.event.content = loaded.markdown;
+  wrapper.event.content = publishContent;
 
   let signed: VerifiedEvent;
 
@@ -658,6 +717,7 @@ async function publishPost({ loaded, pool, connections }: PublishPostProps): Pro
 
     signed = await signPost({
       loaded,
+      publishContent,
       pool,
       connection,
       createdAt: Math.floor(Date.now() / 1000),
@@ -705,7 +765,14 @@ async function publishBlog(): Promise<void> {
 
   try {
     for (const loaded of posts) {
-      await publishPost({ loaded, pool, connections });
+      const nostrFooter = await readNostrFooter(loaded);
+
+      await publishPost({
+        loaded,
+        publishContent: composeNostrContent(loaded.markdown, nostrFooter),
+        pool,
+        connections,
+      });
     }
   } finally {
     pool.close(poolRelays);

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.47.4] - 2026-06-30
+
+- fix: added footer support for nostr posts (a54ff7d)
+
 ## [v9.47.3] - 2026-06-28
 
-- blog: new post: "Why build an AppWeaver app?" (4db41b6)
+- blog: new post: "Why build an AppWeaver app?" (a8cb94b)
 
 ## [v9.47.2] - 2026-06-28
 

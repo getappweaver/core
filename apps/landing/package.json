@@ -6,10 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "bun run blog:build && vite build",
+    "deploy": "bun run build && vercel --prod",
+    "demo:build": "bun run build && bun run demo:copy",
+    "demo:copy": "bun run ../../scripts/copy-web-demo-to-landing.ts",
     "blog:build": "bun run scripts/blog.ts build",
     "blog:publish": "bun run scripts/blog.ts publish",
     "blog:sync": "bun run scripts/blog.ts sync",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "record:story": "bun run ../../scripts/record-landing-story.ts"
   },
   "dependencies": {
     "solid-js": "^1.9.9"

@@ -155,6 +155,13 @@ export function detectBrowserEnvironment(): BrowserEnvironment {
 export function nostrToolRecommendations(
   environment: BrowserEnvironment,
 ): NostrToolRecommendation[] {
+  const nak = {
+    name: 'nak bunker',
+    detail:
+      'Advanced local option: run nak bunker yourself, then connect AppWeaver with the bunker URL.',
+    href: 'https://github.com/fiatjaf/nak',
+  };
+
   if (environment.nip07Available) {
     return [
       {
@@ -174,29 +181,17 @@ export function nostrToolRecommendations(
           'Recommended Android signer. Use the Amber tab in Connect Nostr.',
         href: 'https://github.com/greenart7c3/Amber',
       },
-      {
-        name: 'Nostr Connect',
-        detail:
-          'Use a mobile signer that handles nostrconnect:// links if you prefer relay-based approval.',
-        href: null,
-      },
     ];
   }
 
   if (environment.os === 'iOS') {
     return [
       {
-        name: 'NostrKey Safari extension',
-        detail:
-          'Possible iPhone/iPad NIP-07 option. This path may need manual testing on iOS.',
-        href: 'https://apps.apple.com/ca/app/nostrkey-web-extension/id6759624317',
+        name: 'Clave',
+        detail: 'Recommended iOS signer. Use nostrconnect or bunker tabs.',
+        href: 'https://clave.casa/',
       },
-      {
-        name: 'nak bunker',
-        detail:
-          'Advanced fallback: run a local nak bunker yourself and paste the bunker URL. This keeps the user private key outside AppWeaver.',
-        href: null,
-      },
+      nak,
     ];
   }
 
@@ -224,24 +219,5 @@ export function nostrToolRecommendations(
     ];
   }
 
-  return [
-    {
-      name: 'Nostr Connect',
-      detail:
-        'Recommended for this browser if a NIP-07 extension is unavailable or unsupported.',
-      href: null,
-    },
-    {
-      name: 'nak bunker',
-      detail:
-        'Advanced local option: run nak bunker yourself, then connect AppWeaver with the bunker URL.',
-      href: null,
-    },
-    {
-      name: 'Bunker URL',
-      detail:
-        'Use an existing NIP-46 bunker connection when you already have one.',
-      href: null,
-    },
-  ];
+  return [nak];
 }
