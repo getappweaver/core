@@ -10,11 +10,24 @@ export type RegisterWebPushOutcome =
   | { status: 'denied' }
   | { status: 'unsupported' }
   | { status: 'bad_payload' }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; stage: RegisterWebPushStage };
+
+export type RegisterWebPushStage =
+  | 'vapid_key'
+  | 'permission'
+  | 'service_worker'
+  | 'existing_subscription'
+  | 'browser_push_service'
+  | 'save_subscription';
+
+type RegisterWebPushErrorOutcome = Extract<
+  RegisterWebPushOutcome,
+  { status: 'error' }
+>;
 
 const SW_READY_TIMEOUT_MS = 10_000;
 
-function decodeBase64UrlToArrayBuffer(value: string): ArrayBuffer {
+function decodeBase64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replaceAll('-', '+').replaceAll('_', '/');
   const raw = atob(base64);
@@ -25,7 +38,7 @@ function decodeBase64UrlToArrayBuffer(value: string): ArrayBuffer {
     out[i] = raw.charCodeAt(i);
   }
 
-  return buffer;
+  return out;
 }
 
 function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
@@ -62,6 +75,26 @@ function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
   });
 }
 
+function errorOutcome(
+  stage: RegisterWebPushStage,
+  err: unknown,
+): RegisterWebPushErrorOutcome {
+  return {
+    status: 'error',
+    stage,
+    message: err instanceof Error ? err.message : String(err),
+  };
+}
+
+function isErrorOutcome(value: unknown): value is RegisterWebPushErrorOutcome {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'status' in value &&
+    value.status === 'error'
+  );
+}
+
 export async function registerWebPushNotifications(): Promise<RegisterWebPushOutcome> {
   if (
     typeof window === 'undefined' ||
@@ -71,49 +104,85 @@ export async function registerWebPushNotifications(): Promise<RegisterWebPushOut
     return { status: 'unsupported' };
   }
 
-  try {
-    const vapid = await fetchJsonPublic<{
-      enabled: boolean;
-      publicKey: string | null;
-    }>('/api/push/vapid-key');
+  const vapid = await fetchJsonPublic<{
+    enabled: boolean;
+    publicKey: string | null;
+  }>('/api/push/vapid-key').catch((err: unknown) =>
+    errorOutcome('vapid_key', err),
+  );
 
-    if (!vapid.enabled || !vapid.publicKey) {
-      return { status: 'disabled' };
-    }
-
-    const permission = await Notification.requestPermission();
-
-    if (permission !== 'granted') {
-      return { status: 'denied' };
-    }
-
-    const registration = await ensureServiceWorker();
-
-    const existing = await registration.pushManager.getSubscription();
-
-    if (existing) {
-      await existing.unsubscribe();
-    }
-
-    const sub = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: decodeBase64UrlToArrayBuffer(vapid.publicKey),
-    });
-
-    const json = sub.toJSON();
-
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-      return { status: 'bad_payload' };
-    }
-
-    await postJson<{ ok: true }>('/api/push/subscribe', json);
-
-    return { status: 'ok' };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-
-    return { status: 'error', message };
+  if (isErrorOutcome(vapid)) {
+    return vapid;
   }
+
+  if (!vapid.enabled || !vapid.publicKey) {
+    return { status: 'disabled' };
+  }
+
+  const permission = await Notification.requestPermission().catch(
+    (err: unknown) => errorOutcome('permission', err),
+  );
+
+  if (isErrorOutcome(permission)) {
+    return permission;
+  }
+
+  if (permission !== 'granted') {
+    return { status: 'denied' };
+  }
+
+  const registration = await ensureServiceWorker().catch((err: unknown) =>
+    errorOutcome('service_worker', err),
+  );
+
+  if (isErrorOutcome(registration)) {
+    return registration;
+  }
+
+  const existing = await registration.pushManager
+    .getSubscription()
+    .catch((err: unknown) => errorOutcome('existing_subscription', err));
+
+  if (isErrorOutcome(existing)) {
+    return existing;
+  }
+
+  if (existing) {
+    const unsubscribed = await existing
+      .unsubscribe()
+      .catch((err: unknown) => errorOutcome('existing_subscription', err));
+
+    if (isErrorOutcome(unsubscribed)) {
+      return unsubscribed;
+    }
+  }
+
+  const sub = await registration.pushManager
+    .subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: decodeBase64UrlToUint8Array(vapid.publicKey),
+    })
+    .catch((err: unknown) => errorOutcome('browser_push_service', err));
+
+  if (isErrorOutcome(sub)) {
+    return sub;
+  }
+
+  const json = sub.toJSON();
+
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    return { status: 'bad_payload' };
+  }
+
+  const saved = await postJson<{ ok: true }>('/api/push/subscribe', json).catch(
+    (err: unknown) => errorOutcome('save_subscription', err),
+  );
+
+  if (isErrorOutcome(saved)) {
+    return saved;
+  }
+
+  return { status: 'ok' };
 }
 
 export async function unregisterWebPushNotifications(

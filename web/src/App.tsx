@@ -2515,9 +2515,17 @@ function AppInner(): JSX.Element {
         appendSystemMessage(
           'Push: browser returned an invalid subscription object (missing endpoint or keys).',
         );
+      } else if (result.stage === 'browser_push_service') {
+        appendSystemMessage(
+          `Push: browser push service registration failed before AppWeaver could save a subscription — ${result.message}. No /api/push/subscribe request is expected for this failure; check browser notification/site settings and whether this desktop browser supports Web Push with its push service.`,
+        );
+      } else if (result.stage === 'save_subscription') {
+        appendSystemMessage(
+          `Push: failed while saving the browser subscription — ${result.message}. Open DevTools → Network, find POST /api/push/subscribe (NIP-98 must be 200).`,
+        );
       } else {
         appendSystemMessage(
-          `Push: failed — ${result.message}. Open DevTools → Network, find POST /api/push/subscribe (NIP-98 must be 200).`,
+          `Push: failed during ${result.stage} — ${result.message}.`,
         );
       }
     } finally {
