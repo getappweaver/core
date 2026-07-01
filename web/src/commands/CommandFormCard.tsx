@@ -3,6 +3,7 @@ import { createEffect, For, Show } from 'solid-js';
 import { OpenCodeModelField } from '../components/OpenCodeModelField';
 import { TimelineCollapsibleCard } from '../components/timeline/TimelineCollapsibleCard';
 import type { TimelineViewProps } from '../components/timeline/types';
+import { resizeAutoGrowTextArea } from '../components/web-node/WebFormElement';
 import { WebButton } from '../components/WebButton';
 import type { CommandField, TimelineItem } from '../types';
 import { formatFieldLabel, formatWebFormOptionHint } from '../utils';
@@ -43,6 +44,53 @@ function OptionHintLine(props: {
   });
 
   return <small class="field-option-hint muted">{line}</small>;
+}
+
+function shouldUseTextarea(field: CommandField): boolean {
+  return field.kind === 'string' && field.webInput === 'textarea';
+}
+
+type AutoGrowTextareaProps = {
+  value: string;
+  onInput: (value: string) => void;
+};
+
+function AutoGrowTextarea(props: AutoGrowTextareaProps) {
+  let textareaEl: HTMLTextAreaElement | undefined;
+
+  const resize = () => {
+    if (!textareaEl) {
+      return;
+    }
+
+    resizeAutoGrowTextArea(textareaEl, 8);
+  };
+
+  createEffect(() => {
+    const value = props.value;
+
+    if (!textareaEl || textareaEl.value === value) {
+      return;
+    }
+
+    textareaEl.value = value;
+    queueMicrotask(resize);
+  });
+
+  return (
+    <textarea
+      ref={(el) => {
+        textareaEl = el;
+        queueMicrotask(resize);
+      }}
+      rows={1}
+      value={props.value}
+      onInput={(event) => {
+        props.onInput(event.currentTarget.value);
+        queueMicrotask(resize);
+      }}
+    />
+  );
 }
 
 export function CommandFormCard(props: CommandFormCardProps) {
@@ -143,23 +191,48 @@ export function CommandFormCard(props: CommandFormCardProps) {
                           0) > 0
                       }
                       fallback={
-                        <input
-                          type={field.kind === 'integer' ? 'number' : 'text'}
-                          enterkeyhint={inputEnterKeyHint(argIndex())}
-                          value={String(
-                            props.formItem.values.arguments[field.name] ?? '',
-                          )}
-                          onInput={(event) =>
-                            props.onUpdateFormValue(
-                              props.formItem.id,
-                              'arguments',
-                              field.name,
-                              field.kind === 'integer'
-                                ? Number.parseInt(event.currentTarget.value, 10)
-                                : event.currentTarget.value,
-                            )
+                        <Show
+                          when={shouldUseTextarea(field)}
+                          fallback={
+                            <input
+                              type={
+                                field.kind === 'integer' ? 'number' : 'text'
+                              }
+                              enterkeyhint={inputEnterKeyHint(argIndex())}
+                              value={String(
+                                props.formItem.values.arguments[field.name] ??
+                                  '',
+                              )}
+                              onInput={(event) =>
+                                props.onUpdateFormValue(
+                                  props.formItem.id,
+                                  'arguments',
+                                  field.name,
+                                  field.kind === 'integer'
+                                    ? Number.parseInt(
+                                        event.currentTarget.value,
+                                        10,
+                                      )
+                                    : event.currentTarget.value,
+                                )
+                              }
+                            />
                           }
-                        />
+                        >
+                          <AutoGrowTextarea
+                            value={String(
+                              props.formItem.values.arguments[field.name] ?? '',
+                            )}
+                            onInput={(value) =>
+                              props.onUpdateFormValue(
+                                props.formItem.id,
+                                'arguments',
+                                field.name,
+                                value,
+                              )
+                            }
+                          />
+                        </Show>
                       }
                     >
                       <OpenCodeModelField
@@ -213,31 +286,53 @@ export function CommandFormCard(props: CommandFormCardProps) {
                           (field.choices?.length ?? 0) > 0
                         }
                         fallback={
-                          <input
-                            type={field.kind === 'integer' ? 'number' : 'text'}
-                            enterkeyhint={inputEnterKeyHint(
-                              props.formItem.subcommand.arguments.length +
-                                optionInputFields.findIndex(
-                                  (entry) => entry.name === field.name,
-                                ),
-                            )}
-                            value={String(
-                              props.formItem.values.options[field.name] ?? '',
-                            )}
-                            onInput={(event) =>
-                              props.onUpdateFormValue(
-                                props.formItem.id,
-                                'options',
-                                field.name,
-                                field.kind === 'integer'
-                                  ? Number.parseInt(
-                                      event.currentTarget.value,
-                                      10,
-                                    )
-                                  : event.currentTarget.value,
-                              )
+                          <Show
+                            when={shouldUseTextarea(field)}
+                            fallback={
+                              <input
+                                type={
+                                  field.kind === 'integer' ? 'number' : 'text'
+                                }
+                                enterkeyhint={inputEnterKeyHint(
+                                  props.formItem.subcommand.arguments.length +
+                                    optionInputFields.findIndex(
+                                      (entry) => entry.name === field.name,
+                                    ),
+                                )}
+                                value={String(
+                                  props.formItem.values.options[field.name] ??
+                                    '',
+                                )}
+                                onInput={(event) =>
+                                  props.onUpdateFormValue(
+                                    props.formItem.id,
+                                    'options',
+                                    field.name,
+                                    field.kind === 'integer'
+                                      ? Number.parseInt(
+                                          event.currentTarget.value,
+                                          10,
+                                        )
+                                      : event.currentTarget.value,
+                                  )
+                                }
+                              />
                             }
-                          />
+                          >
+                            <AutoGrowTextarea
+                              value={String(
+                                props.formItem.values.options[field.name] ?? '',
+                              )}
+                              onInput={(value) =>
+                                props.onUpdateFormValue(
+                                  props.formItem.id,
+                                  'options',
+                                  field.name,
+                                  value,
+                                )
+                              }
+                            />
+                          </Show>
                         }
                       >
                         <select

@@ -352,7 +352,7 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
   );
 }
 
-function resizeAutoGrowTextArea(
+export function resizeAutoGrowTextArea(
   el: HTMLTextAreaElement,
   maxRows: number,
 ): void {

@@ -20,6 +20,8 @@ export type CommandArgumentDefinition = {
   required?: boolean;
   /** When omitted, treated as false at parse time; prefer writing `false` explicitly. */
   variadic?: boolean;
+  /** Optional web form control hint for long string values. */
+  webInput?: 'text' | 'textarea';
 };
 
 export type CommandOptionDefinition = {
@@ -43,6 +45,8 @@ export type CommandOptionDefinition = {
    * Prefer writing `null` explicitly for new definitions.
    */
   choices?: string[] | null;
+  /** Optional web form control hint for long string values. */
+  webInput?: 'text' | 'textarea';
 };
 
 /** Optional widget metadata for the web UI (discovered via command catalog). */

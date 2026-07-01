@@ -39,6 +39,14 @@ type ParseCliInputProps = {
   rawInput?: string;
 };
 
+type ParseStructuredInputProps = {
+  command: CommandDefinition;
+  subcommand: string;
+  arguments: Record<string, unknown>;
+  options: Record<string, unknown>;
+  rawInput?: string;
+};
+
 function parseValue(
   kind: CommandValueKind,
   raw: string,
@@ -66,6 +74,47 @@ function parseValue(
       }
 
       throw new Error(`Expected boolean but got: ${raw}`);
+    }
+  }
+}
+
+function parseStructuredValue(
+  kind: CommandValueKind,
+  value: unknown,
+): string | number | boolean {
+  switch (kind) {
+    case 'string':
+      if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+      ) {
+        return String(value);
+      }
+
+      throw new Error(`Expected string but got: ${String(value)}`);
+    case 'integer': {
+      if (typeof value === 'number' && Number.isInteger(value)) {
+        return value;
+      }
+
+      if (typeof value === 'string') {
+        return parseValue(kind, value);
+      }
+
+      throw new Error(`Expected integer but got: ${String(value)}`);
+    }
+
+    case 'boolean': {
+      if (typeof value === 'boolean') {
+        return value;
+      }
+
+      if (typeof value === 'string') {
+        return parseValue(kind, value);
+      }
+
+      throw new Error(`Expected boolean but got: ${String(value)}`);
     }
   }
 }
@@ -141,6 +190,140 @@ function assignOptionValue(
     : [existing, value];
 }
 
+function assignStructuredArgument(
+  definition: CommandArgumentDefinition,
+  value: unknown,
+): ParsedCliValue {
+  if (definition.variadic === true) {
+    const values = Array.isArray(value) ? value : [value];
+
+    return values.map((item) => parseStructuredValue(definition.kind, item));
+  }
+
+  return parseStructuredValue(definition.kind, value);
+}
+
+function assignStructuredOption(
+  definition: CommandOptionDefinition,
+  value: unknown,
+): ParsedCliValue {
+  if (definition.multiple === true) {
+    const values = Array.isArray(value) ? value : [value];
+
+    return values.map((item) => parseStructuredValue(definition.kind, item));
+  }
+
+  return parseStructuredValue(definition.kind, value);
+}
+
+function assertKnownKeys(props: {
+  kind: 'argument' | 'option';
+  commandName: string;
+  subcommandName: string;
+  values: Record<string, unknown>;
+  knownNames: Set<string>;
+}): void {
+  for (const key of Object.keys(props.values)) {
+    if (!props.knownNames.has(key)) {
+      throw new Error(
+        `Unknown ${props.kind} for ${props.commandName} ${props.subcommandName}: ${key}`,
+      );
+    }
+  }
+}
+
+function shouldSkipStructuredValue(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
+}
+
+export function parseStructuredInput({
+  command,
+  subcommand: subcommandName,
+  arguments: inputArguments,
+  options: inputOptions,
+  rawInput,
+}: ParseStructuredInputProps): ParsedCliInvocation {
+  const subcommand = getSubcommandDefinition(command, subcommandName);
+
+  if (!subcommand) {
+    throw new Error(
+      `Unknown subcommand for ${command.name}: ${subcommandName}`,
+    );
+  }
+
+  assertKnownKeys({
+    kind: 'argument',
+    commandName: command.name,
+    subcommandName: subcommand.name,
+    values: inputArguments,
+    knownNames: new Set(subcommand.arguments.map((argument) => argument.name)),
+  });
+
+  assertKnownKeys({
+    kind: 'option',
+    commandName: command.name,
+    subcommandName: subcommand.name,
+    values: inputOptions,
+    knownNames: new Set(subcommand.options.map((option) => option.name)),
+  });
+
+  const parsedArguments: Record<string, ParsedCliValue> = {};
+
+  for (const argument of subcommand.arguments) {
+    const value = inputArguments[argument.name];
+
+    if (shouldSkipStructuredValue(value)) {
+      if (argument.required === true) {
+        throw new Error(`Missing required argument: ${argument.name}`);
+      }
+
+      continue;
+    }
+
+    parsedArguments[argument.name] = assignStructuredArgument(argument, value);
+  }
+
+  const parsedOptions: Record<string, ParsedCliValue> = {};
+
+  for (const option of subcommand.options) {
+    const value = inputOptions[option.name];
+
+    if (option.kind === 'boolean') {
+      if (value === true || value === 'true' || value === '1') {
+        parsedOptions[option.name] = true;
+        continue;
+      }
+
+      if (option.required === true) {
+        throw new Error(`Missing required option: ${option.flag}`);
+      }
+
+      continue;
+    }
+
+    if (shouldSkipStructuredValue(value)) {
+      if (option.required === true) {
+        throw new Error(`Missing required option: ${option.flag}`);
+      }
+
+      continue;
+    }
+
+    parsedOptions[option.name] = assignStructuredOption(option, value);
+  }
+
+  return ParsedCliInvocationSchema.parse({
+    command: command.name,
+    subcommand: subcommand.name,
+    arguments: parsedArguments,
+    options: parsedOptions,
+    raw: {
+      input: rawInput ?? `${command.name} ${subcommand.name} (structured)`,
+      tokens: [command.name, subcommand.name],
+    },
+  });
+}
+
 export function parseCliInput({
   command,
   tokens: inputTokens,
@@ -166,6 +349,11 @@ export function parseCliInput({
 
   for (let index = 0; index < subcommandTokens.length; index++) {
     const token = subcommandTokens[index]!;
+
+    if (token === '--') {
+      positionalTokens.push(...subcommandTokens.slice(index + 1));
+      break;
+    }
 
     if (token.startsWith('-')) {
       const option = subcommand.options.find((item) =>
