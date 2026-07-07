@@ -1,13 +1,32 @@
+import { nip19 } from 'nostr-tools';
+import type { Event } from 'nostr-tools/core';
 import type { SimplePool } from 'nostr-tools/pool';
 
 import type { CoreDb } from '@src/db';
-import { getWotRootStats, getWotScoreDetails } from '@src/db';
+import {
+  getWotRootStats,
+  getWotScoreDetails,
+  upsertCachedProfile,
+} from '@src/db';
 import type { BotConfig } from '@src/env';
+import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
 import { crawlWot, normalizePubkeyInput } from '@src/nostr/wot';
 
 function getWotUsage(): string {
-  return 'Usage: !wot crawl [--pubkey <pubkey|npub>] [--depth <n>] | !wot score <pubkey|npub> [of <pubkey|npub>] | !wot stats [<pubkey|npub>]';
+  return 'Usage: !wot crawl [--pubkey <pubkey|npub>] [--depth <n>] | !wot score <pubkey|npub> [of <pubkey|npub>] | !wot stats [<pubkey|npub>] | !wot fetch-profile <npub|nprofile|hex>';
 }
+
+type ProfileTarget = {
+  pubkey: string;
+  relayHints: string[];
+};
+
+type ProfileMetadata = {
+  name: string | null;
+  displayName: string | null;
+  picture: string | null;
+  about: string | null;
+};
 
 function parsePositiveInt(value: string, name: string): number {
   const parsed = Number(value);
@@ -66,6 +85,76 @@ function parseWotCrawlArgs(
     rootPubkey: normalizePubkeyInput(rootPubkey),
     maxDepth,
   };
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function parseProfileMetadata(content: string): ProfileMetadata {
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+
+    return {
+      name: stringField(parsed.name),
+      displayName:
+        stringField(parsed.display_name) ?? stringField(parsed.displayName),
+      picture: stringField(parsed.picture) ?? stringField(parsed.image),
+      about: stringField(parsed.about),
+    };
+  } catch {
+    return { name: null, displayName: null, picture: null, about: null };
+  }
+}
+
+function parseProfileTarget(input: string): ProfileTarget {
+  const trimmed = input.trim();
+
+  try {
+    const decoded = nip19.decode(trimmed);
+
+    if (decoded.type === 'nprofile') {
+      return {
+        pubkey: decoded.data.pubkey.toLowerCase(),
+        relayHints: decoded.data.relays ?? [],
+      };
+    }
+
+    if (decoded.type === 'npub') {
+      return { pubkey: decoded.data.toLowerCase(), relayHints: [] };
+    }
+  } catch {
+    // Fall through to existing hex/npub parser for consistent errors.
+  }
+
+  return { pubkey: normalizePubkeyInput(trimmed), relayHints: [] };
+}
+
+function parseWotFetchProfileArgs(args: string[]): ProfileTarget {
+  const profileIndex = args.findIndex((arg) => arg === '--profile');
+  const value = profileIndex >= 0 ? args[profileIndex + 1] : args[1];
+
+  if (!value) {
+    throw new Error(
+      'Missing profile. Use: wot fetch-profile <npub|nprofile|hex>',
+    );
+  }
+
+  return parseProfileTarget(value);
+}
+
+async function fetchLatestProfile({
+  pool,
+  relays,
+  pubkey,
+}: {
+  pool: SimplePool;
+  relays: string[];
+  pubkey: string;
+}): Promise<Event | null> {
+  return await pool.get(relays, { kinds: [0], authors: [pubkey], limit: 1 });
 }
 
 export type HandleWotProps = {
@@ -144,6 +233,49 @@ Nodes: ${stats.node_count}
 Edges: ${stats.edge_count}
 Max depth: ${stats.max_depth}
 Last fetched at: ${stats.last_fetched_at}`;
+  }
+
+  if (subcmd === 'fetch-profile') {
+    const target = parseWotFetchProfileArgs(args);
+
+    const relays = uniqueRelays([
+      ...PROFILE_RELAYS_FOR_QUERY,
+      ...target.relayHints,
+      ...config.botRelayUrls,
+    ]);
+
+    const latest = await fetchLatestProfile({
+      pool,
+      relays,
+      pubkey: target.pubkey,
+    });
+
+    if (!latest) {
+      return `No kind 0 profile found for ${target.pubkey}.
+Relays queried: ${relays.join(', ')}`;
+    }
+
+    const metadata = parseProfileMetadata(latest.content);
+
+    const cached = upsertCachedProfile({
+      db,
+      pubkey: latest.pubkey,
+      eventId: latest.id,
+      createdAt: latest.created_at,
+      name: metadata.name,
+      displayName: metadata.displayName,
+      picture: metadata.picture,
+      about: metadata.about,
+      rawJson: JSON.stringify(latest),
+    });
+
+    const display = metadata.displayName ?? metadata.name ?? '(unnamed)';
+
+    return `Fetched profile: ${display}
+Pubkey: ${cached.pubkey}
+Event: ${cached.eventId}
+Created at: ${new Date(cached.createdAt * 1000).toISOString()}
+Relays queried: ${relays.join(', ')}`;
   }
 
   if (subcmd !== 'crawl') {

@@ -112,6 +112,328 @@ export function createWotTables(db: CoreDb): void {
   db.run(
     'CREATE INDEX IF NOT EXISTS idx_wot_edges_root_follower ON wot_edges (root_pubkey, follower_pubkey)',
   );
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wot_contact_list_cache (
+      pubkey     TEXT PRIMARY KEY,
+      event_id   TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      follows    TEXT NOT NULL,
+      raw_json   TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wot_relay_list_cache (
+      pubkey       TEXT PRIMARY KEY,
+      event_id     TEXT NOT NULL,
+      created_at   INTEGER NOT NULL,
+      read_relays  TEXT NOT NULL,
+      write_relays TEXT NOT NULL,
+      raw_json     TEXT NOT NULL,
+      fetched_at   INTEGER NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wot_profile_cache (
+      pubkey       TEXT PRIMARY KEY,
+      event_id     TEXT NOT NULL,
+      created_at   INTEGER NOT NULL,
+      name         TEXT,
+      display_name TEXT,
+      picture      TEXT,
+      about        TEXT,
+      raw_json     TEXT NOT NULL,
+      fetched_at   INTEGER NOT NULL
+    )
+  `);
+}
+
+export type CachedContactList = {
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  follows: string[];
+  fetchedAt: number;
+};
+
+export type CachedRelayList = {
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  readRelays: string[];
+  writeRelays: string[];
+  fetchedAt: number;
+};
+
+export type CachedProfile = {
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  name: string | null;
+  displayName: string | null;
+  picture: string | null;
+  about: string | null;
+  fetchedAt: number;
+};
+
+export function getCachedContactList(
+  db: CoreDb,
+  pubkey: string,
+): CachedContactList | null {
+  const row = db
+    .prepare('SELECT * FROM wot_contact_list_cache WHERE pubkey = ?')
+    .get(pubkey.toLowerCase()) as
+    | {
+        pubkey: string;
+        event_id: string;
+        created_at: number;
+        follows: string;
+        fetched_at: number;
+      }
+    | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    pubkey: row.pubkey,
+    eventId: row.event_id,
+    createdAt: row.created_at,
+    follows: JSON.parse(row.follows) as string[],
+    fetchedAt: row.fetched_at,
+  };
+}
+
+export function upsertCachedContactList({
+  db,
+  pubkey,
+  eventId,
+  createdAt,
+  follows,
+  rawJson,
+}: {
+  db: CoreDb;
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  follows: string[];
+  rawJson: string;
+}): CachedContactList {
+  const normalizedPubkey = pubkey.toLowerCase();
+  const fetchedAt = Math.floor(Date.now() / 1000);
+
+  db.run(
+    `
+    INSERT OR REPLACE INTO wot_contact_list_cache
+      (pubkey, event_id, created_at, follows, raw_json, fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `,
+    [
+      normalizedPubkey,
+      eventId,
+      createdAt,
+      JSON.stringify(follows),
+      rawJson,
+      fetchedAt,
+    ],
+  );
+
+  return {
+    pubkey: normalizedPubkey,
+    eventId,
+    createdAt,
+    follows,
+    fetchedAt,
+  };
+}
+
+export function getCachedRelayList(
+  db: CoreDb,
+  pubkey: string,
+): CachedRelayList | null {
+  const row = db
+    .prepare('SELECT * FROM wot_relay_list_cache WHERE pubkey = ?')
+    .get(pubkey.toLowerCase()) as
+    | {
+        pubkey: string;
+        event_id: string;
+        created_at: number;
+        read_relays: string;
+        write_relays: string;
+        fetched_at: number;
+      }
+    | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    pubkey: row.pubkey,
+    eventId: row.event_id,
+    createdAt: row.created_at,
+    readRelays: JSON.parse(row.read_relays) as string[],
+    writeRelays: JSON.parse(row.write_relays) as string[],
+    fetchedAt: row.fetched_at,
+  };
+}
+
+export function upsertCachedRelayList({
+  db,
+  pubkey,
+  eventId,
+  createdAt,
+  readRelays,
+  writeRelays,
+  rawJson,
+}: {
+  db: CoreDb;
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  readRelays: string[];
+  writeRelays: string[];
+  rawJson: string;
+}): CachedRelayList {
+  const normalizedPubkey = pubkey.toLowerCase();
+  const fetchedAt = Math.floor(Date.now() / 1000);
+
+  db.run(
+    `
+    INSERT OR REPLACE INTO wot_relay_list_cache
+      (pubkey, event_id, created_at, read_relays, write_relays, raw_json, fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `,
+    [
+      normalizedPubkey,
+      eventId,
+      createdAt,
+      JSON.stringify(readRelays),
+      JSON.stringify(writeRelays),
+      rawJson,
+      fetchedAt,
+    ],
+  );
+
+  return {
+    pubkey: normalizedPubkey,
+    eventId,
+    createdAt,
+    readRelays,
+    writeRelays,
+    fetchedAt,
+  };
+}
+
+export function getCachedProfile(
+  db: CoreDb,
+  pubkey: string,
+): CachedProfile | null {
+  const row = db
+    .prepare('SELECT * FROM wot_profile_cache WHERE pubkey = ?')
+    .get(pubkey.toLowerCase()) as
+    | {
+        pubkey: string;
+        event_id: string;
+        created_at: number;
+        name: string | null;
+        display_name: string | null;
+        picture: string | null;
+        about: string | null;
+        fetched_at: number;
+      }
+    | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    pubkey: row.pubkey,
+    eventId: row.event_id,
+    createdAt: row.created_at,
+    name: row.name,
+    displayName: row.display_name,
+    picture: row.picture,
+    about: row.about,
+    fetchedAt: row.fetched_at,
+  };
+}
+
+export function getCachedProfiles(
+  db: CoreDb,
+  pubkeys: string[],
+): Map<string, CachedProfile> {
+  const profiles = new Map<string, CachedProfile>();
+
+  for (const pubkey of pubkeys) {
+    const profile = getCachedProfile(db, pubkey);
+
+    if (profile) {
+      profiles.set(profile.pubkey, profile);
+    }
+  }
+
+  return profiles;
+}
+
+export function upsertCachedProfile({
+  db,
+  pubkey,
+  eventId,
+  createdAt,
+  name,
+  displayName,
+  picture,
+  about,
+  rawJson,
+}: {
+  db: CoreDb;
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  name: string | null;
+  displayName: string | null;
+  picture: string | null;
+  about: string | null;
+  rawJson: string;
+}): CachedProfile {
+  const normalizedPubkey = pubkey.toLowerCase();
+  const fetchedAt = Math.floor(Date.now() / 1000);
+
+  db.run(
+    `
+    INSERT OR REPLACE INTO wot_profile_cache
+      (pubkey, event_id, created_at, name, display_name, picture, about, raw_json, fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+    [
+      normalizedPubkey,
+      eventId,
+      createdAt,
+      name,
+      displayName,
+      picture,
+      about,
+      rawJson,
+      fetchedAt,
+    ],
+  );
+
+  return {
+    pubkey: normalizedPubkey,
+    eventId,
+    createdAt,
+    name,
+    displayName,
+    picture,
+    about,
+    fetchedAt,
+  };
 }
 
 export function clearWotForRoot(db: CoreDb, rootPubkey: string): void {

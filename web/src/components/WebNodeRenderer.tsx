@@ -1,7 +1,12 @@
 import type { JSX } from 'solid-js';
 import { For, Match, Show, Switch, useContext } from 'solid-js';
 
-import type { WebAction, WebElementNode, WebNode } from '@src/web/ui-schema';
+import type {
+  WebAction,
+  WebElementNode,
+  WebNode,
+  WebNostrPostElement as NostrPostElement,
+} from '@src/web/ui-schema';
 
 import { registerStoryDomTarget } from '../story/dom-targets';
 import {
@@ -31,6 +36,7 @@ import {
 } from './web-node/speech';
 import { runLocalWebAction } from './web-node/tree-state';
 import { WebCheckboxControl } from './web-node/WebCheckboxControl';
+import { WebCommandStatusElement } from './web-node/WebCommandStatusElement';
 import {
   WebChoiceFieldNode,
   WebFormElement,
@@ -38,6 +44,7 @@ import {
   WebTextAreaNode,
   WebTextFieldNode,
 } from './web-node/WebFormElement';
+import { WebNostrPostElement } from './web-node/WebNostrPostElement';
 import { WebTabsElement } from './web-node/WebTabsElement';
 import { WebTreeElement, WebTreeItemElement } from './web-node/WebTreeElement';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
@@ -81,6 +88,12 @@ function isTreeFilterActionActive(
   );
 }
 
+function isNostrPostElement(
+  element: WebElementNode,
+): element is NostrPostElement {
+  return element.tag === 'nostrPost';
+}
+
 function renderElement({
   element,
   props,
@@ -94,6 +107,15 @@ function renderElement({
     <Switch>
       <Match when={element.tag === 'divider'}>
         <hr class={elementClass(element)} data-ui={elementUi(element)} />
+      </Match>
+
+      <Match when={element.tag === 'spacer'}>
+        <div
+          class={elementClass(element)}
+          data-ui={elementUi(element)}
+          style={elementStyle(element)}
+          aria-hidden="true"
+        />
       </Match>
 
       <Match when={element.tag === 'button'}>
@@ -433,6 +455,16 @@ function renderElement({
           alt={element.props?.alt ?? ''}
           aria-hidden={element.props?.alt ? undefined : 'true'}
         />
+      </Match>
+
+      <Match when={element.tag === 'nostrPost'}>
+        {isNostrPostElement(element) ? (
+          <WebNostrPostElement element={element} runAction={runAction} />
+        ) : null}
+      </Match>
+
+      <Match when={element.tag === 'commandStatus'}>
+        <WebCommandStatusElement element={element} />
       </Match>
 
       <Match when={element.tag === 'text'}>

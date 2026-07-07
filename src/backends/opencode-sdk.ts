@@ -1297,17 +1297,21 @@ export function createOpencodeSDKBackend({
         modelOverride,
         onAgentStreamChunk,
         streamAbortSignal,
+        skipRuntimeContext,
       } = props;
 
       const selectedAgentName = opencodeAgentName ?? agentName;
 
-      const runContent = buildOpenCodeRuntimeContent({
-        backendName: 'opencode',
-        agentName: selectedAgentName,
-        dmBotRoot,
-        cwd,
-        content,
-      });
+      const runContent =
+        skipRuntimeContext === true
+          ? content
+          : buildOpenCodeRuntimeContent({
+              backendName: 'opencode',
+              agentName: selectedAgentName,
+              dmBotRoot,
+              cwd,
+              content,
+            });
 
       const { client } = await getOrInitSdk();
 

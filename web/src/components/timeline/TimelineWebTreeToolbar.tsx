@@ -16,6 +16,7 @@ import {
   cardHeadLogIcon,
   cardHeadOpenTimelineIcon,
   cardHeadSaveIcon,
+  cardHeadSettingsIcon,
   cardHeadTreeCollapseAllIcon,
   cardHeadTreeExpandAllIcon,
   cardHeadTreeFilterIcon,
@@ -113,7 +114,9 @@ export function TimelineWebTreeToolbar(
                   ? cardHeadOpenTimelineIcon()
                   : icon === 'save'
                     ? cardHeadSaveIcon()
-                    : label;
+                    : icon === 'settings'
+                      ? cardHeadSettingsIcon()
+                      : label;
 
   /*
    * `when` must be a boolean or data value — never pass `when={() => ...}` here:

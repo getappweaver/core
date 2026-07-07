@@ -43,10 +43,10 @@ export function clearTreeItemExpandedStateForScope(scopeId: string): void {
 
 export function expandTreeItemsForAction(
   action: WebAction,
-  expandedById: Map<string, boolean> | undefined,
-  expandTreeItems: ((ids: string[]) => void) | undefined,
+  expandedById: Map<string, boolean> | null,
+  expandTreeItems: ((ids: string[]) => void) | null,
 ): void {
-  if (expandedById === undefined) {
+  if (expandedById === null) {
     return;
   }
 
@@ -66,7 +66,10 @@ export function expandTreeItemsForAction(
     return;
   }
 
-  const ids = action.refresh?.expandTreeItemIds ?? [];
+  const ids = [
+    ...(action.expandTreeItemIds ?? []),
+    ...(action.refresh?.expandTreeItemIds ?? []),
+  ];
 
   for (const id of ids) {
     expandedById.set(id, true);
@@ -92,11 +95,11 @@ export function expandTreeItemsForAction(
 
 type RunLocalWebActionProps = {
   action: WebAction;
-  expandedById: Map<string, boolean> | undefined;
-  expandTreeItems: ((ids: string[]) => void) | undefined;
-  revealContext: WebRevealContextValue | undefined;
-  toggleContext: WebToggleContextValue | undefined;
-  filterState: TreeFilterState | undefined;
+  expandedById: Map<string, boolean> | null;
+  expandTreeItems: ((ids: string[]) => void) | null;
+  revealContext: WebRevealContextValue | null;
+  toggleContext: WebToggleContextValue | null;
+  filterState: TreeFilterState | null;
 };
 
 export function runLocalWebAction({

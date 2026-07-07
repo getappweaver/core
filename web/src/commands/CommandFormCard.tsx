@@ -160,6 +160,7 @@ export function CommandFormCard(props: CommandFormCardProps) {
         rootEl = el;
       }}
       expandedHead={formHeadTags()}
+      expandedHeadClass="card-head--timeline-sticky"
       collapsedHeadSummary={formHeadTags()}
       onDismiss={() => props.onDeleteTimelineItem(props.formItem.id)}
     >

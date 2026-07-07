@@ -37,6 +37,7 @@ import {
   listAllCommandsDetailForWeb,
 } from './command-catalog';
 import { executeBuiltinCommand } from './execute';
+import { fetchLinkPreview } from './link-preview';
 import { synthesizeNativePiper } from './native-tts';
 import { verifyNip98Authorization } from './nip98-verify';
 import {
@@ -700,6 +701,23 @@ export function createWebFetchHandler(
         ok: true,
         update: ctx.coreUpdateChecker?.getSnapshot() ?? null,
       });
+    }
+
+    if (req.method === 'GET' && path === '/api/link-preview') {
+      const previewUrl = url.searchParams.get('url');
+
+      if (!previewUrl) {
+        return jsonResponse({ error: 'missing_url' }, { status: 400 });
+      }
+
+      return fetchLinkPreview(previewUrl)
+        .then((preview) => jsonResponse({ ok: true, preview }))
+        .catch((err) =>
+          jsonResponse(
+            { error: err instanceof Error ? err.message : String(err) },
+            { status: 400 },
+          ),
+        );
     }
 
     if (req.method === 'POST' && path === '/api/core-update/check') {

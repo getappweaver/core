@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.49.0] - 2026-07-07
+
+- feat: add nostr web primitives and wot services (b6b9192)
+
 ## [v9.48.0] - 2026-07-01
 
-- feat: support structured web command parsing (112361e)
+- feat: support structured web command parsing (a28ed41)
 
 ## [v9.47.6] - 2026-07-01
 

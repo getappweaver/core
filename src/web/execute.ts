@@ -45,6 +45,10 @@ function stringifyScalar(value: unknown): string {
     return String(value);
   }
 
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value);
+  }
+
   throw new Error(`Unsupported scalar value: ${String(value)}`);
 }
 

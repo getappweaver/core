@@ -61,7 +61,6 @@ import {
   getProviderName,
   getDmCommandPrefix,
   getWorkspaceTarget,
-  getWotScore,
   getRoutstrSkKey,
   needsSetupBillboard,
   readSetupConfigurationSnapshot,
@@ -80,7 +79,11 @@ import {
   createSignAuthEvent,
   sendDm,
 } from './nostr/nip17';
-import { normalizePubkeyInput } from './nostr/wot';
+import {
+  allowRelayOperation,
+  installRelayNoticeTracking,
+} from './nostr/relay-notices';
+import { createWotServices } from './nostr/wot-service';
 import {
   dmBotRoot,
   getParentWorkspaceRoot,
@@ -127,7 +130,10 @@ async function startSetupOnlyMode(props: {
   const seenDb = openCoreDb();
   const parentOfBotRoot = getParentWorkspaceRoot();
   const prefix = getDmCommandPrefix(seenDb);
+
   const pool = new SimplePool({ enablePing: false, enableReconnect: false });
+  pool.allowConnectingToRelay = allowRelayOperation;
+  installRelayNoticeTracking(pool);
   const providerDb = asProviderDb(seenDb);
 
   log.warn(
@@ -238,6 +244,8 @@ async function main() {
 
   // --- Databases ---
   const pool = new SimplePool({ enablePing: true, enableReconnect: true });
+  pool.allowConnectingToRelay = allowRelayOperation;
+  installRelayNoticeTracking(pool);
   const seenDb = openCoreDb();
   const providerDb = asProviderDb(seenDb);
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
@@ -420,17 +428,14 @@ async function main() {
         pendingPrompt = resolve;
       });
     },
-    getWotScore: (pubkey: string, rootPubkey = config.masterPubkey) => {
-      try {
-        return getWotScore(
-          seenDb,
-          normalizePubkeyInput(pubkey),
-          normalizePubkeyInput(rootPubkey),
-        );
-      } catch {
-        return null;
-      }
-    },
+    wot: createWotServices({
+      db: seenDb,
+      pool,
+      rootPubkey: config.masterPubkey,
+      fallbackRelays: botRelayUrls,
+    }),
+    getWotScore: (pubkey: string, rootPubkey?: string) =>
+      pluginContext.wot.getWotScore(pubkey, rootPubkey),
     signWithBunker: (eventTemplate, bunkerName) =>
       signWithBunkerInteractive({
         db: seenDb,

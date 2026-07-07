@@ -20,9 +20,9 @@ export type WebRevealContextValue = {
   toggleReveal: (id: string) => void;
 };
 
-export const WebRevealContext = createContext<
-  WebRevealContextValue | undefined
->(undefined);
+export const WebRevealContext = createContext<WebRevealContextValue | null>(
+  null,
+);
 
 // ---------------------------------------------------------------------------
 // Toggle context
@@ -33,9 +33,9 @@ export type WebToggleContextValue = {
   toggle: (key: string) => void;
 };
 
-export const WebToggleContext = createContext<
-  WebToggleContextValue | undefined
->(undefined);
+export const WebToggleContext = createContext<WebToggleContextValue | null>(
+  null,
+);
 
 // ---------------------------------------------------------------------------
 // Tree toolbar registration (hoist into light-DOM slot)
@@ -72,9 +72,10 @@ export const WebTreeHeaderElCallbackContext = createContext<
 // Tree item expanded state
 // ---------------------------------------------------------------------------
 
-export const TreeItemExpandedStateContext = createContext<
-  Map<string, boolean> | undefined
->(undefined);
+export const TreeItemExpandedStateContext = createContext<Map<
+  string,
+  boolean
+> | null>(null);
 
 // ---------------------------------------------------------------------------
 // Tree bulk expand / collapse
@@ -99,13 +100,12 @@ export type TreeExpandRequest = {
   ids: string[];
 };
 
-export const TreeExpandRequestContext = createContext<
-  Accessor<TreeExpandRequest | null> | undefined
->(undefined);
+export const TreeExpandRequestContext =
+  createContext<Accessor<TreeExpandRequest | null> | null>(null);
 
 export const TreeExpandRequestSetterContext = createContext<
-  ((ids: string[]) => void) | undefined
->(undefined);
+  ((ids: string[]) => void) | null
+>(null);
 
 // ---------------------------------------------------------------------------
 // Tree filter state
@@ -117,9 +117,9 @@ export type TreeFilterState = {
   setValue: (value: string) => void;
 };
 
-export const TreeFilterStateContext = createContext<
-  TreeFilterState | undefined
->(undefined);
+export const TreeFilterStateContext = createContext<TreeFilterState | null>(
+  null,
+);
 
 // ---------------------------------------------------------------------------
 // Render meta / surface / user pubkey

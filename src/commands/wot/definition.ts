@@ -21,7 +21,7 @@ export function getWotCommandDefinition({
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'wot', {
         topicArgSummary: 'Optional: crawl, score, stats.',
-        exampleTopics: ['crawl', 'score', 'stats'],
+        exampleTopics: ['crawl', 'score', 'stats', 'fetch-profile'],
       }),
       {
         name: 'crawl',
@@ -70,6 +70,35 @@ export function getWotCommandDefinition({
         ],
         options: [],
         examples: [`${p}wot stats`, `${p}wot stats <npub>`],
+      },
+      {
+        name: 'fetch-profile',
+        summary: 'Fetch and cache a Nostr kind 0 profile.',
+        aliases: [],
+        arguments: [
+          {
+            name: 'profile',
+            summary: 'npub, nprofile, or hex pubkey',
+            kind: 'string',
+            required: false,
+            variadic: false,
+          },
+        ],
+        options: [
+          {
+            name: 'profile',
+            summary: 'npub, nprofile, or hex pubkey',
+            flag: '--profile',
+            shortFlag: null,
+            kind: 'string',
+            required: false,
+            choices: null,
+          },
+        ],
+        examples: [
+          `${p}wot fetch-profile <npub>`,
+          `${p}wot fetch-profile --profile <nprofile>`,
+        ],
       },
     ],
   };

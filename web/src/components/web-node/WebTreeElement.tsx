@@ -82,7 +82,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
   const treeItemId = () => props.element.props?.id ?? null;
 
   const activeFilter = () =>
-    normalizedFilterQuery(filterState !== undefined ? filterState.query() : '');
+    normalizedFilterQuery(filterState !== null ? filterState.query() : '');
 
   const isFilterVisible = () => {
     const visibleIds = filterState?.visibleIds() ?? null;
@@ -419,7 +419,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
         expandTreeItems: requestTreeItemExpansion,
         revealContext,
         toggleContext,
-        filterState: undefined,
+        filterState: null,
       })
     ) {
       return;

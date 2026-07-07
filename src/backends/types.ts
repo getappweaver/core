@@ -50,6 +50,7 @@ export type RunMessageProps = {
   modelOverride: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   streamAbortSignal: AbortSignal | null;
+  skipRuntimeContext?: boolean;
 };
 
 export type AgentBackend = {

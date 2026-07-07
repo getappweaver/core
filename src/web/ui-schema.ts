@@ -43,9 +43,15 @@ export const WebRefreshSchema = z.object({
 });
 
 export const WebCommandStatusSchema = z.object({
+  /** Run without blocking the source widget busy overlay; useful for long commands. */
+  background: z.boolean().optional(),
   pending: z.string().min(1).optional(),
   restarting: z.string().min(1).optional(),
   success: z.string().min(1).optional(),
+  /** Include command text output in the final background completion system message. */
+  successOutput: z.enum(['appendText']).optional(),
+  /** Optional id of a `commandStatus` node to update while this command runs. */
+  statusTargetId: z.string().min(1).optional(),
 });
 
 /** Optional line under a command option in the web form; not sent to the bot. */
@@ -121,6 +127,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     modalTitle: z.string().min(1).optional(),
     /** Reveal these local UI targets after replacing the current web root with this command result. */
     revealIds: z.array(z.string().min(1)).optional(),
+    /** Expand local tree items before running the command action. */
+    expandTreeItemIds: z.array(z.string().min(1)).optional(),
     /** Client-side context values to resolve and include before command execution. */
     clientContext: z.array(z.enum(['nostrSearchRelays'])).optional(),
     /** Optional client-visible lifecycle messages for long-running command actions. */
@@ -160,6 +168,7 @@ export const WebToolbarActionSchema = z.object({
       'log',
       'openTimeline',
       'save',
+      'settings',
     ])
     .optional(),
   activeLabel: z.string().min(1).optional(),
@@ -173,6 +182,7 @@ export const WebToolbarActionSchema = z.object({
       'log',
       'openTimeline',
       'save',
+      'settings',
     ])
     .optional(),
   toggleKey: z.string().min(1).optional(),
@@ -181,6 +191,139 @@ export const WebToolbarActionSchema = z.object({
   storyTargetId: z.string().min(1).optional(),
   action: WebActionSchema,
   activeAction: WebActionSchema.optional(),
+});
+
+export const WebNostrPostReferenceSchema = z.object({
+  type: z.enum(['event', 'profile', 'address', 'unknown']).optional(),
+  id: z.string().min(1).optional(),
+  pubkey: z.string().min(1).optional(),
+  kind: z.number().int().optional(),
+  npub: z.string().min(1).optional(),
+  relayHints: z.array(z.string().min(1)).optional(),
+  authorName: z.string().min(1).optional(),
+  authorUsername: z.string().min(1).optional(),
+  authorPicture: z.string().min(1).optional(),
+  authorAbout: z.string().optional(),
+  createdAt: z.number().int().optional(),
+  content: z.string().optional(),
+  href: z.string().min(1).optional(),
+  label: z.string().min(1).optional(),
+  readAction: WebActionSchema.nullable().optional(),
+  archiveAction: WebActionSchema.nullable().optional(),
+  archived: z.boolean().optional(),
+  likeAction: WebActionSchema.nullable().optional(),
+  replyAction: WebActionSchema.nullable().optional(),
+  repostAction: WebActionSchema.nullable().optional(),
+  liked: z.boolean().optional(),
+  replied: z.boolean().optional(),
+  reposted: z.boolean().optional(),
+  quoted: z.boolean().optional(),
+  showActions: z.boolean().optional(),
+  inlineProfiles: z
+    .record(
+      z.string(),
+      z.object({
+        pubkey: z.string().min(1).optional(),
+        npub: z.string().min(1).optional(),
+        relayHints: z.array(z.string().min(1)).optional(),
+        authorName: z.string().min(1).optional(),
+        authorUsername: z.string().min(1).optional(),
+        authorPicture: z.string().min(1).optional(),
+        authorAbout: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const WebNostrPostMediaSchema = z.object({
+  type: z.literal('image'),
+  url: z.string().min(1),
+  alt: z.string().optional(),
+});
+
+export const WebNostrInlineProfilesSchema = z.record(
+  z.string(),
+  z.object({
+    pubkey: z.string().min(1).optional(),
+    npub: z.string().min(1).optional(),
+    relayHints: z.array(z.string().min(1)).optional(),
+    authorName: z.string().min(1).optional(),
+    authorUsername: z.string().min(1).optional(),
+    authorPicture: z.string().min(1).optional(),
+    authorAbout: z.string().optional(),
+  }),
+);
+
+export const WebNostrPostExtraActionSchema = z.object({
+  label: z.string().min(1),
+  action: WebActionSchema.nullable(),
+  disabled: z.boolean().optional(),
+});
+
+export const WebNostrPostPropsSchema = z.object({
+  /** Raw event id. */
+  nostrEventId: z.string().min(1).optional(),
+  /** Event author pubkey. */
+  nostrPubkey: z.string().min(1).optional(),
+  /** Event created_at unix timestamp in seconds. */
+  nostrCreatedAt: z.number().int().optional(),
+  /** Event content. */
+  nostrContent: z.string().optional(),
+  /** Display name from profile metadata. */
+  nostrAuthorName: z.string().min(1).optional(),
+  /** Username/name fallback from profile metadata. */
+  nostrAuthorUsername: z.string().min(1).optional(),
+  /** Profile image URL. */
+  nostrAuthorPicture: z.string().min(1).optional(),
+  /** Profile about/bio text from metadata. */
+  nostrAuthorAbout: z.string().optional(),
+  /** Encoded npub fallback. */
+  nostrNpub: z.string().min(1).optional(),
+  /** Relay hints for encoding nprofile/opening profile. */
+  nostrRelayHints: z.array(z.string().min(1)).optional(),
+  /** Optional external permalink for clients that have one. */
+  nostrPermalink: z.string().min(1).optional(),
+  /** View-only display count. */
+  nostrLikeCount: z.number().int().nonnegative().optional(),
+  /** View-only display count. */
+  nostrReplyCount: z.number().int().nonnegative().optional(),
+  /** Optional command/client action for plugin-owned read behavior. */
+  nostrReadAction: WebActionSchema.nullable().optional(),
+  /** Additional plugin-owned actions shown after Read. */
+  nostrExtraActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  /** Optional command/client action for plugin-owned archive behavior. */
+  nostrArchiveAction: WebActionSchema.nullable().optional(),
+  /** True when plugin-owned archive state is active. */
+  nostrArchived: z.boolean().optional(),
+  /** Optional command/client action for plugin-owned like behavior. */
+  nostrLikeAction: WebActionSchema.nullable().optional(),
+  /** Optional command/client action for plugin-owned reply behavior. */
+  nostrReplyAction: WebActionSchema.nullable().optional(),
+  /** Optional command/client action for plugin-owned repost/quote behavior. */
+  nostrRepostAction: WebActionSchema.nullable().optional(),
+  /** Known persisted interaction state for current/personal user. */
+  nostrLiked: z.boolean().optional(),
+  nostrReplied: z.boolean().optional(),
+  nostrReposted: z.boolean().optional(),
+  nostrQuoted: z.boolean().optional(),
+  /** Show Like/Reply action row. Defaults to true. */
+  nostrShowActions: z.boolean().optional(),
+  /** NIP-21 references keyed by the exact `nostr:...` token in content. */
+  nostrEmbeds: z.record(z.string(), WebNostrPostReferenceSchema).optional(),
+  /** NIP-21 profile references keyed by the exact `nostr:...` token in content. */
+  nostrInlineProfiles: WebNostrInlineProfilesSchema.optional(),
+  /** NIP-10 reply/root context supplied by the plugin; renderer is view-only. */
+  nostrReplyContext: z.array(WebNostrPostReferenceSchema).optional(),
+  /** Render supplied reply/root context. Defaults to false until compact UX settles. */
+  nostrShowReplyContext: z.boolean().optional(),
+  /** Explicit media attachments supplied by the plugin. */
+  nostrMedia: z.array(WebNostrPostMediaSchema).optional(),
+  /** Show compact media preview toggle when image media exists. Defaults to true. */
+  nostrPreviewImages: z.boolean().optional(),
+  /** Collapsed body length before showing More. Defaults to 420. */
+  nostrCollapsedContentChars: z.number().int().positive().optional(),
+  /** Start expanded instead of collapsed. */
+  nostrInitiallyExpanded: z.boolean().optional(),
 });
 
 export const WebWhiteSpaceSchema = z.enum(['pre-wrap']);
@@ -195,7 +338,7 @@ export const WebItemAlignSchema = z.enum([
 
 export const WebButtonVariantSchema = z.enum(['default', 'icon']);
 
-export const WebPropsSchema = z.object({
+export const WebBasePropsSchema = z.object({
   id: z.string().min(1).optional(),
   className: z.string().min(1).optional(),
   ui: z.string().min(1).optional(),
@@ -306,6 +449,10 @@ export const WebPropsSchema = z.object({
   ttsText: z.string().optional(),
 });
 
+export const WebNostrPostElementPropsSchema = WebBasePropsSchema.extend(
+  WebNostrPostPropsSchema.shape,
+);
+
 export const WebTextNodeSchema = z.object({
   type: z.literal('text'),
   value: z.string(),
@@ -319,9 +466,15 @@ export const WebElementTagSchema = z.enum([
   'link',
   'badge',
   'image',
+  /** Compact, view-only Nostr kind:1 style post renderer. */
+  'nostrPost',
+  /** Local browser-side command progress/status target keyed by `props.id`. */
+  'commandStatus',
   'button',
   'checkbox',
   'divider',
+  /** Invisible spacing row; useful between items in a shared tree context. */
+  'spacer',
   /** Trigger + dropdown; children should be `menuItem` elements. */
   'overflowMenu',
   /** Row in an overflow menu; `label` + `action` required. */
@@ -354,27 +507,77 @@ export const WebElementTagSchema = z.enum([
   'form',
 ]);
 
+export const WebGenericElementTagSchema = z.enum([
+  'stack',
+  'row',
+  'box',
+  'text',
+  'link',
+  'badge',
+  'image',
+  'commandStatus',
+  'button',
+  'checkbox',
+  'divider',
+  'spacer',
+  'overflowMenu',
+  'menuItem',
+  'tree',
+  'treeFilterStatus',
+  'treeItem',
+  'tabs',
+  'tabPanel',
+  'textField',
+  'select',
+  'choiceField',
+  'textArea',
+  'editableText',
+  'form',
+]);
+
 export type WebTextNode = z.infer<typeof WebTextNodeSchema>;
 
-export type WebElementNode = {
+export type WebGenericElementNode = {
   type: 'element';
-  tag: z.infer<typeof WebElementTagSchema>;
-  props?: z.infer<typeof WebPropsSchema>;
+  tag: z.infer<typeof WebGenericElementTagSchema>;
+  props?: z.infer<typeof WebBasePropsSchema>;
   /** Optional tree item summary; if omitted, first child is used for backward compatibility. */
   summary?: WebNode;
   children?: WebNode[];
 };
 
+export type WebBaseProps = z.infer<typeof WebBasePropsSchema>;
+export type WebNostrPostProps = z.infer<typeof WebNostrPostElementPropsSchema>;
+
+export type WebNostrPostElement = {
+  type: 'element';
+  tag: 'nostrPost';
+  props?: WebNostrPostProps;
+  summary?: WebNode;
+  children?: WebNode[];
+};
+
+export type WebElementNode = WebGenericElementNode | WebNostrPostElement;
+
 export type WebNode = WebTextNode | WebElementNode;
 
 export const WebElementNodeSchema: z.ZodType<WebElementNode> = z.lazy(() =>
-  z.object({
-    type: z.literal('element'),
-    tag: WebElementTagSchema,
-    props: WebPropsSchema.optional(),
-    summary: WebNodeSchema.optional(),
-    children: z.array(WebNodeSchema).optional(),
-  }),
+  z.union([
+    z.object({
+      type: z.literal('element'),
+      tag: z.literal('nostrPost'),
+      props: WebNostrPostElementPropsSchema.optional(),
+      summary: WebNodeSchema.optional(),
+      children: z.array(WebNodeSchema).optional(),
+    }),
+    z.object({
+      type: z.literal('element'),
+      tag: WebGenericElementTagSchema,
+      props: WebBasePropsSchema.optional(),
+      summary: WebNodeSchema.optional(),
+      children: z.array(WebNodeSchema).optional(),
+    }),
+  ]),
 );
 
 export const WebNodeSchema: z.ZodType<WebNode> = z.lazy(() =>
@@ -460,7 +663,12 @@ export const TimelineEventOutputSchema = z.object({
 });
 
 export type WebAction = z.infer<typeof WebActionSchema>;
-export type WebProps = z.infer<typeof WebPropsSchema>;
+export type WebNostrPostReference = z.infer<typeof WebNostrPostReferenceSchema>;
+export type WebNostrPostMedia = z.infer<typeof WebNostrPostMediaSchema>;
+export type WebNostrPostExtraAction = z.infer<
+  typeof WebNostrPostExtraActionSchema
+>;
+export type WebProps = WebBaseProps;
 export type WebRenderMeta = z.infer<typeof WebRenderMetaSchema>;
 export type WebNodeRoot = z.infer<typeof WebRenderResultSchema>;
 export type ClientViewRoot = z.infer<typeof ClientViewResultSchema>;

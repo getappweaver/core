@@ -16,6 +16,7 @@ import type {
 } from '@src/db';
 import { log } from '@src/logger';
 import type { MessageSource } from '@src/messaging';
+import type { WotServices } from '@src/nostr/wot-service';
 import type { AiDefinition } from '@src/system/ai-definition';
 import type { CommandDefinition } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
@@ -81,6 +82,8 @@ export type PluginContext = {
   sendReply: SendReplyFn;
   sendDm: SendReplyFn;
   promptFn: PromptFn;
+  wot: WotServices;
+  /** @deprecated Use `wot.getWotScore`. Kept temporarily for older plugins. */
   getWotScore: (pubkey: string, rootPubkey?: string) => number | null;
   signWithBunker: (
     eventTemplate: EventTemplate,

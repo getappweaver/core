@@ -12,7 +12,22 @@ import type {
 } from '@src/web/ui-schema';
 
 import { getEditableTextSnapshot } from '../editableTextRegistry';
+import type { NostrInteractionRecordResult } from '../nostr/interactionState';
+import { handleNostrLikeEventAction } from '../nostr/likeEventAction';
+import {
+  handleNostrFollowProfileAction,
+  handleNostrOpenProfilePanelAction,
+  type WotFetchProfileResult,
+} from '../nostr/profileAction';
 import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
+import {
+  handleNostrOpenReplyPanelAction,
+  handleNostrSendReplyAction,
+} from '../nostr/replyEventAction';
+import {
+  handleNostrOpenRepostPanelAction,
+  handleNostrSendRepostOrQuoteAction,
+} from '../nostr/repostEventAction';
 import { loadSearchRelays } from '../nostr/searchRelays';
 import {
   beginPluginInstallRestartStatus,
@@ -35,6 +50,10 @@ import { emitStoryCommandCompleted } from '../story/events';
 import type { TimelineItem } from '../types';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
 
+import {
+  parseBackgroundCommandStatus,
+  setBackgroundCommandStatus,
+} from './backgroundStatus';
 import type {
   CommandsAdapters,
   CommandsHook,
@@ -206,6 +225,16 @@ function highlightWebRootTargets(
 
 type EditableTextRunCommandAction = Extract<WebAction, { type: 'command' }>;
 
+type RecordNostrInteractionProps = {
+  result: NostrInteractionRecordResult;
+  appendSystemMessage: (message: string) => void;
+  runJsonCommandOutput: (props: {
+    command: string;
+    subcommand: string;
+    payload: unknown;
+  }) => Promise<ReturnType<typeof splitCommandOutput>>;
+};
+
 function isEditableTextRunCommandAction(
   value: unknown,
 ): value is EditableTextRunCommandAction {
@@ -281,6 +310,39 @@ function commandWithEditableText(props: {
             },
           },
   };
+}
+
+async function recordNostrInteraction({
+  result,
+  appendSystemMessage,
+  runJsonCommandOutput,
+}: RecordNostrInteractionProps): Promise<void> {
+  try {
+    const output = await runJsonCommandOutput({
+      command: result.nrAlias,
+      subcommand: 'interaction-record',
+      payload: {
+        arguments: {},
+        options: {
+          target_event_id: result.targetEventId,
+          interaction_event_id: result.interactionEventId,
+          user_pubkey: result.userPubkey,
+          type: result.interactionType,
+          interaction_created_at: result.interactionCreatedAt,
+        },
+      },
+    });
+
+    const text = output.text?.trim() ?? '';
+
+    if (text.startsWith('Missing ') || text.startsWith('Unknown ')) {
+      throw new Error(text);
+    }
+  } catch (err) {
+    appendSystemMessage(
+      `Could not persist Nostr interaction: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 function expandHighlightTargetTemplate(
@@ -444,12 +506,36 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     if (action.type === 'clientAction') {
       const clientActionName = action.action.trim();
 
-      const runClientAction = (actionPromise: Promise<void | false>): void => {
+      const runClientAction = (
+        actionPromise: Promise<
+          void | false | NostrInteractionRecordResult | WotFetchProfileResult
+        >,
+      ): void => {
         void actionPromise
           .then((result) => {
             if (result === false) {
               return;
             }
+
+            const recordPromise =
+              result?.type === 'nostrInteractionRecord'
+                ? recordNostrInteraction({
+                    result,
+                    appendSystemMessage: adapters.appendSystemMessage,
+                    runJsonCommandOutput,
+                  })
+                : result?.type === 'wotFetchProfile'
+                  ? runJsonCommandOutput({
+                      command: 'wot',
+                      subcommand: 'fetch-profile',
+                      payload: {
+                        arguments: { profile: result.profile },
+                        options: {},
+                      },
+                    })
+                      .then(() => undefined)
+                      .catch(() => undefined)
+                  : Promise.resolve();
 
             const refresh = action.refresh;
 
@@ -457,26 +543,54 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               return;
             }
 
-            runWebAction(
-              {
-                type: 'command',
-                command: refresh.command,
-                subcommand: refresh.subcommand,
-                arguments: refresh.arguments ?? {},
-                options: refresh.options ?? {},
-                recordInTimeline: false,
-              },
-              {
-                onReplaceRoot: params.onReplaceRoot,
-                promptRequestId: params.promptRequestId,
-                uiExecutionPolicy: { recordInTimeline: false },
-              },
-            );
+            void recordPromise.finally(() => {
+              runWebAction(
+                {
+                  type: 'command',
+                  command: refresh.command,
+                  subcommand: refresh.subcommand,
+                  arguments: refresh.arguments ?? {},
+                  options: refresh.options ?? {},
+                  recordInTimeline: false,
+                },
+                {
+                  onReplaceRoot: params.onReplaceRoot,
+                  promptRequestId: params.promptRequestId,
+                  uiExecutionPolicy: { recordInTimeline: false },
+                },
+              );
+            });
           })
-          .catch(() => {});
+          .catch((err) => {
+            adapters.setChromeLoading(false);
+
+            adapters.setChromeError(
+              err instanceof Error ? err.message : String(err),
+            );
+          });
       };
 
-      if (clientActionName === 'roadmap.openFund') {
+      if (clientActionName === 'web.openUrl') {
+        const url =
+          typeof action.payload.url === 'string' ? action.payload.url : '';
+
+        if (url.length > 0) {
+          const opened = window.open(url, '_blank', 'noopener,noreferrer');
+
+          if (!opened) {
+            window.location.href = url;
+          }
+        }
+      } else if (clientActionName === 'web.copyText') {
+        const text =
+          typeof action.payload.text === 'string' ? action.payload.text : '';
+
+        if (text.length > 0) {
+          void navigator.clipboard.writeText(text).catch(() => {
+            adapters.appendSystemMessage('Unable to copy text to clipboard.');
+          });
+        }
+      } else if (clientActionName === 'roadmap.openFund') {
         const payload = action.payload;
         const title = typeof payload.title === 'string' ? payload.title : '';
 
@@ -740,6 +854,103 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             },
           );
         });
+      } else if (clientActionName === 'nostr.likeEvent') {
+        runClientAction(
+          handleNostrLikeEventAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.openProfilePanel') {
+        runClientAction(
+          handleNostrOpenProfilePanelAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.followProfile') {
+        runClientAction(
+          handleNostrFollowProfileAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.openReplyPanel') {
+        runClientAction(
+          handleNostrOpenReplyPanelAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.sendReply') {
+        runClientAction(
+          handleNostrSendReplyAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.openRepostPanel') {
+        runClientAction(
+          handleNostrOpenRepostPanelAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
+      } else if (clientActionName === 'nostr.sendRepostOrQuote') {
+        runClientAction(
+          handleNostrSendRepostOrQuoteAction({
+            action,
+            currentUserPubkey: adapters.currentUserPubkey(),
+            signEvent: adapters.signEvent,
+            setChromeWeb: adapters.setChromeWeb,
+            setChromeText: adapters.setChromeText,
+            setChromeModal: adapters.setChromeModal,
+            setChromeError: adapters.setChromeError,
+            setChromeLoading: adapters.setChromeLoading,
+            appendSystemMessage: adapters.appendSystemMessage,
+          }),
+        );
       } else if (clientActionName === 'wallet.payInvoice') {
         runClientAction(
           (async () => {
@@ -937,7 +1148,9 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const uiExecutionPolicy = params?.uiExecutionPolicy;
 
     if (commandAction.clientStatus?.pending) {
-      adapters.appendSystemMessage(commandAction.clientStatus.pending);
+      if (!commandAction.clientStatus.statusTargetId) {
+        adapters.appendSystemMessage(commandAction.clientStatus.pending);
+      }
     }
 
     if (
@@ -970,17 +1183,31 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const suppressSystemMessage =
       uiExecutionPolicy?.suppressSystemMessage ?? false;
 
+    const statusTargetId = commandAction.clientStatus?.statusTargetId;
+
     const shouldRefreshComposerAiStateAfterDone = shouldRefreshComposerAiState(
       commandAction.command,
       commandAction.subcommand,
     );
 
     const sourceId = params?.webCommandSourceId;
+    const runsInBackground = commandAction.clientStatus?.background === true;
+
+    if (statusTargetId && commandAction.clientStatus?.pending) {
+      setBackgroundCommandStatus({
+        id: statusTargetId,
+        state: 'pending',
+        message: commandAction.clientStatus.pending,
+        output: null,
+        progress: null,
+      });
+    }
 
     let refreshChildInFlight = false;
     let promptRefreshDispatchAttempted = false;
     let finalRefreshDispatchAttempted = false;
     let userBusyEnded = false;
+    let backgroundOutputText: string | null = null;
 
     const refreshHighlightTargetIds = [
       ...(commandAction.refresh?.highlightTargetIds ?? []),
@@ -1139,8 +1366,22 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.pendingRequests.set(requestId, {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
+        if (typeof message.output === 'string') {
+          const statusUpdate = parseBackgroundCommandStatus(message.output);
+
+          if (statusUpdate) {
+            setBackgroundCommandStatus(statusUpdate);
+
+            return;
+          }
+        }
+
         const output = splitCommandOutput(message.output);
         collectRefreshHighlightTargets(output.text);
+
+        if (runsInBackground && output.text) {
+          backgroundOutputText = output.text;
+        }
 
         const timelineEventItem = output.timelineEvent
           ? timelineEventOutputToItem(output.timelineEvent, adapters.createId())
@@ -1204,7 +1445,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         } else if (
           output.text &&
           !suppressSystemMessage &&
-          !commandAction.refresh
+          !commandAction.refresh &&
+          !runsInBackground
         ) {
           adapters.appendSystemMessage(output.text);
         }
@@ -1274,6 +1516,31 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         dispatchRefreshOnce('final');
 
+        if (runsInBackground && commandAction.clientStatus?.success) {
+          const successText = commandAction.clientStatus.success;
+
+          const outputText =
+            commandAction.clientStatus.successOutput === 'appendText'
+              ? backgroundOutputText
+              : null;
+
+          if (statusTargetId) {
+            setBackgroundCommandStatus({
+              id: statusTargetId,
+              state: 'success',
+              message: successText,
+              output: outputText,
+              progress: 1,
+            });
+          }
+
+          if (!statusTargetId) {
+            adapters.appendSystemMessage(
+              outputText ? `${successText}\n\n${outputText}` : successText,
+            );
+          }
+        }
+
         if (!refreshChildInFlight) {
           endUserWebUiBusyOnce();
         }
@@ -1287,6 +1554,16 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onError: () => {
+        if (statusTargetId) {
+          setBackgroundCommandStatus({
+            id: statusTargetId,
+            state: 'error',
+            message: 'Background command failed.',
+            output: null,
+            progress: null,
+          });
+        }
+
         if (!refreshChildInFlight) {
           endUserWebUiBusyOnce();
         }
@@ -1302,7 +1579,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     });
 
     try {
-      if (sourceId) {
+      if (sourceId && !runsInBackground) {
         adapters.beginWebUiBusy(sourceId);
       }
 
