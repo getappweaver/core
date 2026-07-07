@@ -38,10 +38,43 @@ function isWebUiEnabled(): boolean {
   return (process.env.WATCH_WEB_UI ?? '1') !== '0';
 }
 
-function resolveWebUiHost(): string {
-  const host = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
+function readArgValue(name: string): string | null {
+  const args = process.argv.slice(2);
+  const inlinePrefix = `${name}=`;
 
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (arg.startsWith(inlinePrefix)) {
+      return arg.slice(inlinePrefix.length).trim() || null;
+    }
+
+    if (arg === name) {
+      const value = args[i + 1];
+
+      if (!value || value.startsWith('--')) {
+        return null;
+      }
+
+      return value.trim() || null;
+    }
+  }
+
+  return null;
+}
+
+function resolveBindHost(): string {
+  return (
+    readArgValue('--host') || process.env.BOT_WEB_HOST?.trim() || '127.0.0.1'
+  );
+}
+
+function displayUrlHost(host: string): string {
   return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+}
+
+function resolveWebUiHost(): string {
+  return displayUrlHost(resolveBindHost());
 }
 
 function resolveWebUiPort(): string {
@@ -49,9 +82,7 @@ function resolveWebUiPort(): string {
 }
 
 function resolveBotWebHost(): string {
-  const host = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
-
-  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+  return displayUrlHost(resolveBindHost());
 }
 
 function resolveBotWebPort(): string {
@@ -108,6 +139,7 @@ function botEnv(): NodeJS.ProcessEnv {
     return {
       ...process.env,
       ...setupEnv,
+      BOT_WEB_HOST: resolveBindHost(),
       BOT_WEB_STATIC: '0',
     };
   }
@@ -115,6 +147,7 @@ function botEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     ...setupEnv,
+    BOT_WEB_HOST: resolveBindHost(),
     BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
     BOT_WEB_STATIC: '1',
   };
@@ -140,6 +173,7 @@ function runWebUi(): ReturnType<typeof spawn> {
     stderr: 'pipe',
     env: {
       ...process.env,
+      BOT_WEB_HOST: resolveBindHost(),
       APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
     },
   });
