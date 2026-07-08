@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.2] - 2026-07-08
+
+- fix: correct nr icon path for landing grid (ad3bdda)
+
 ## [v9.51.1] - 2026-07-08
 
-- build: update demo and landing assets (7c540d0)
+- build: update demo and landing assets (a7b0e4d)
 
 ## [v9.51.0] - 2026-07-08
 

@@ -16,9 +16,13 @@ const pluginRouteIcons: Record<string, string> = {
   file: 'file/commands__tree__renderers__tree.svg',
   job: 'job/commands__list__renderers__clock.svg',
   journal: 'journal/commands__today__renderers__captains-log.svg',
-  nr: 'nr/commands__list__renderers__list.svg',
+  nr: 'nr/commands__list__renderers__nostr-radar.svg',
   todo: 'todo/commands__list__renderers__list.svg',
 };
+
+// Note: HeaderChrome resolves plugin icons from /plugins/... paths differently.
+// The icon in web/src/chrome/HeaderChrome.tsx uses the raw icon path from definition.
+// For the official app grid, we use the landing public folder structure.
 
 type OfficialAppGridProps = {
   apps: OfficialApp[];
