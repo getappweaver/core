@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.5] - 2026-07-08
+
+- fix: right widgets on left, header widgets on right, proper icon path (7c3c0b4)
+
 ## [v9.51.4] - 2026-07-08
 
-- chore: cleanup stale nr icon file (f8ddd48)
+- chore: cleanup stale nr icon file (1af9bad)
 
 ## [v9.51.3] - 2026-07-08
 

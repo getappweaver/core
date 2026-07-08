@@ -100,7 +100,7 @@ function resolveWidgetIconUrl(widget: {
       return asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`);
     }
 
-    const rel = raw.startsWith('/') ? raw.slice(1) : raw;
+    const rel = raw.replace(/^[./]+/, '');
 
     return asset(`plugin-icons/${alias}/${flatten(rel)}`);
   }
@@ -282,6 +282,34 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
         </a>
       </h1>
       <div class="topbar-actions">
+        <For each={props.rightWidgets()}>
+          {(widget) => (
+            <WebButton
+              type="button"
+              class="connect-btn topbar-menu-btn topbar-icon-btn topbar-widget-right"
+              data-story-target={`header-widget:${widgetKey(widget)}`}
+              ref={(el) => props.onWidgetElement?.(widget, el)}
+              classList={{
+                'topbar-widget-active': props.isWidgetActive(widget),
+              }}
+              disabled={!props.wsConnected()}
+              onClick={() => openWidget(widget)}
+              title={
+                props.wsConnected()
+                  ? `${widget.label} (/${widget.command} ${widget.subcommand})`
+                  : 'Connect Nostr first — waiting for WebSocket'
+              }
+              aria-label={widget.label}
+            >
+              <IconGlyph
+                icon={widget.icon}
+                source={widget.source}
+                pluginAlias={widget.pluginAlias}
+                fallback="widget"
+              />
+            </WebButton>
+          )}
+        </For>
         <For each={sortedWidgets()}>
           {(widget) => (
             <WebButton
@@ -327,34 +355,6 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
             </WebButton>
           )}
         </Show>
-        <For each={props.rightWidgets()}>
-          {(widget) => (
-            <WebButton
-              type="button"
-              class="connect-btn topbar-menu-btn topbar-icon-btn topbar-widget-right"
-              data-story-target={`header-widget:${widgetKey(widget)}`}
-              ref={(el) => props.onWidgetElement?.(widget, el)}
-              classList={{
-                'topbar-widget-active': props.isWidgetActive(widget),
-              }}
-              disabled={!props.wsConnected()}
-              onClick={() => openWidget(widget)}
-              title={
-                props.wsConnected()
-                  ? `${widget.label} (/${widget.command} ${widget.subcommand})`
-                  : 'Connect Nostr first — waiting for WebSocket'
-              }
-              aria-label={widget.label}
-            >
-              <IconGlyph
-                icon={widget.icon}
-                source={widget.source}
-                pluginAlias={widget.pluginAlias}
-                fallback="widget"
-              />
-            </WebButton>
-          )}
-        </For>
         <WebButton
           type="button"
           class="connect-btn topbar-menu-btn topbar-icon-btn"

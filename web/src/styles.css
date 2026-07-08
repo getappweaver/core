@@ -989,14 +989,13 @@ pre {
   background: var(--color-success);
 }
 
-/* Right-side header widgets (appear before account button) */
-.connect-btn.topbar-widget-right {
-  margin-left: auto;
+/* Left widgets pushed to the left, right widgets stay on the right */
+.topbar-widgets-left {
+  margin-right: auto;
 }
 
-.connect-btn.topbar-widget-right:not(:last-child) {
-  margin-right: 0.25rem;
-}
+.connect-btn.topbar-widget-right {
+  margin-left: 0.25rem;
 }
 
 .story-walkthrough {
