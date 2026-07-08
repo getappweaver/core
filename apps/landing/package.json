@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "bun run blog:build && vite build",
+    "build": "bun run blog:build && vite build && bun run apps:build",
+    "apps:build": "bun run scripts/generate-plugin-pages.ts",
     "deploy": "bun run build && vercel --prod",
     "demo:build": "bun run build && bun run demo:copy",
     "demo:copy": "bun run ../../scripts/copy-web-demo-to-landing.ts",
