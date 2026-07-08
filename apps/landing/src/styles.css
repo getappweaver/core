@@ -1646,7 +1646,7 @@ a {
   opacity: 0;
   transform: translateY(-115%) rotateX(72deg);
   transform-origin: 50% 100%;
-  animation: hero-apps-flip 7.5s ease-in-out infinite;
+  animation: hero-apps-flip 9s ease-in-out infinite;
   filter: drop-shadow(0 0 0.55rem rgb(250 204 21 / 52%));
 }
 

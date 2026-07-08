@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.12] - 2026-07-08
+
+- fix: landing page hero apps icon fix for nr (d030c50)
+
 ## [v9.51.11] - 2026-07-08
 
-- build: final demo refresh (2879b58)
+- build: final demo refresh (e65a215)
 
 ## [v9.51.10] - 2026-07-08
 
