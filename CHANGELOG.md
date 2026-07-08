@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.50.1] - 2026-07-08
+
+- fix: restore missing apps and add nostr radar branding (f318f4e)
+
 ## [v9.50.0] - 2026-07-08
 
-- feat: add nostr radar landing page (1195eb1)
+- feat: add nostr radar landing page (d1dda25)
 
 ## [v9.49.1] - 2026-07-07
 
