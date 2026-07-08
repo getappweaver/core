@@ -535,6 +535,37 @@ function AppInner(): JSX.Element {
     return out.sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
   });
 
+  const rightChromeWidgets = createMemo<HeaderWidget[]>(() => {
+    const out: HeaderWidget[] = [];
+
+    for (const cmd of commands()) {
+      for (const sub of cmd.subcommands) {
+        const w = sub.webWidget;
+
+        if (
+          w?.placement === 'right' &&
+          w.label &&
+          (!isWebDemoMode() ||
+            !demoHiddenHeaderWidgets.has(`${cmd.name}:${sub.name}`))
+        ) {
+          out.push({
+            command: cmd.name,
+            subcommand: sub.name,
+            source: cmd.source ?? 'builtin',
+            pluginAlias: cmd.pluginAlias,
+            surface: w.surface,
+            label: w.label,
+            modalTitle: w.modalTitle,
+            icon: w.icon,
+            order: w.order,
+          });
+        }
+      }
+    }
+
+    return out.sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
+  });
+
   const visibleHeaderChromeWidgets = createMemo(() =>
     dockVisible()
       ? headerChromeWidgets().filter((w) => !isDockRoutedWidget(w))
@@ -2649,6 +2680,7 @@ function AppInner(): JSX.Element {
         <div class="workspace-main">
           <HeaderChrome
             widgets={visibleHeaderChromeWidgets}
+            rightWidgets={rightChromeWidgets}
             isWidgetActive={isHeaderWidgetActive}
             wsConnected={wsConnected}
             isConnected={isConnected}

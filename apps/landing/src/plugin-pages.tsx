@@ -82,7 +82,7 @@ type DemoSubcommand = {
   name: string;
   aliases?: string[];
   webWidget?: {
-    placement: 'header' | 'fixed';
+    placement: 'header' | 'fixed' | 'right';
     label?: string;
     modalTitle: string;
   };
@@ -430,8 +430,11 @@ function pluginPageForPath(
       entry.aliases?.includes(commandToken),
   );
 
-  const subcommand = command?.subcommands.find(
-    (entry) => entry.webWidget?.placement === 'header' && entry.webWidget.label,
+const subcommand = command?.subcommands.find(
+    (entry) =>
+      (entry.webWidget?.placement === 'header' ||
+        entry.webWidget?.placement === 'right') &&
+      entry.webWidget?.label,
   );
 
   if (!command || !subcommand?.webWidget) {

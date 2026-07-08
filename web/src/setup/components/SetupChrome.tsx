@@ -13,6 +13,7 @@ export function SetupChrome(props: { children: JSX.Element }): JSX.Element {
     <div class="app-shell setup-app-shell">
       <HeaderChrome
         widgets={() => []}
+        rightWidgets={() => []}
         isWidgetActive={() => false}
         wsConnected={() => false}
         isConnected={connect.isConnected}

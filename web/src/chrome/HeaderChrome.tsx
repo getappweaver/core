@@ -25,6 +25,7 @@ type HeaderChromeWidget = {
 
 type HeaderChromeProps = {
   widgets: Accessor<HeaderChromeWidget[]>;
+  rightWidgets: Accessor<HeaderChromeWidget[]>;
   isWidgetActive: (widget: HeaderChromeWidget) => boolean;
   wsConnected: Accessor<boolean>;
   isConnected: Accessor<boolean>;
@@ -326,6 +327,34 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
             </WebButton>
           )}
         </Show>
+        <For each={props.rightWidgets()}>
+          {(widget) => (
+            <WebButton
+              type="button"
+              class="connect-btn topbar-menu-btn topbar-icon-btn topbar-widget-right"
+              data-story-target={`header-widget:${widgetKey(widget)}`}
+              ref={(el) => props.onWidgetElement?.(widget, el)}
+              classList={{
+                'topbar-widget-active': props.isWidgetActive(widget),
+              }}
+              disabled={!props.wsConnected()}
+              onClick={() => openWidget(widget)}
+              title={
+                props.wsConnected()
+                  ? `${widget.label} (/${widget.command} ${widget.subcommand})`
+                  : 'Connect Nostr first — waiting for WebSocket'
+              }
+              aria-label={widget.label}
+            >
+              <IconGlyph
+                icon={widget.icon}
+                source={widget.source}
+                pluginAlias={widget.pluginAlias}
+                fallback="widget"
+              />
+            </WebButton>
+          )}
+        </For>
         <WebButton
           type="button"
           class="connect-btn topbar-menu-btn topbar-icon-btn"

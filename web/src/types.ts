@@ -29,7 +29,7 @@ export type CommandField = {
 };
 
 export type WebWidget = {
-  placement: 'header' | 'fixed';
+  placement: 'header' | 'fixed' | 'right';
   surface: 'modal' | 'timeline_singleton';
   label?: string;
   modalTitle: string;

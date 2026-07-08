@@ -989,6 +989,16 @@ pre {
   background: var(--color-success);
 }
 
+/* Right-side header widgets (appear before account button) */
+.connect-btn.topbar-widget-right {
+  margin-left: auto;
+}
+
+.connect-btn.topbar-widget-right:not(:last-child) {
+  margin-right: 0.25rem;
+}
+}
+
 .story-walkthrough {
   position: fixed;
   inset: 0;

@@ -24,7 +24,7 @@ const CommandPayloadSchema = z.object({
 });
 
 const WebWidgetSchema = z.object({
-  placement: z.enum(['header', 'fixed']),
+  placement: z.enum(['header', 'fixed', 'right']),
   surface: z.enum(['modal', 'timeline_singleton']),
   label: z.string().min(1).optional(),
   modalTitle: z.string().min(1),

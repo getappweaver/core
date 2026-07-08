@@ -51,7 +51,7 @@ export type CommandOptionDefinition = {
 
 /** Optional widget metadata for the web UI (discovered via command catalog). */
 export type WebWidget = {
-  placement: 'header' | 'fixed';
+  placement: 'header' | 'fixed' | 'right';
   surface: 'modal' | 'timeline_singleton';
   label?: string;
   modalTitle: string;
