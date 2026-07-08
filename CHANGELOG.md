@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.10] - 2026-07-08
+
+- build: refresh demo and landing source (d1b7297)
+
 ## [v9.51.9] - 2026-07-08
 
-- style: add nostr radar to hero animation with reduced-motion support (db614fd)
+- style: add nostr radar to hero animation with reduced-motion support (660c415)
 
 ## [v9.51.8] - 2026-07-08
 

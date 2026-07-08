@@ -189,6 +189,7 @@ function HomePage(props: HomePageProps) {
               <span class="hero-apps-icon-frame hero-apps-icon-frame--jobs" />
               <span class="hero-apps-icon-frame hero-apps-icon-frame--file" />
               <span class="hero-apps-icon-frame hero-apps-icon-frame--journal" />
+              <span class="hero-apps-icon-frame hero-apps-icon-frame--nostr-radar" />
             </span>
             <span class="hero-apps-text">apps</span>
           </a>{' '}
