@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.8] - 2026-07-08
+
+- refactor: use topbar-actions-left container for right-placement widgets (0d85259)
+
 ## [v9.51.7] - 2026-07-08
 
-- build: finalize demo assets (2c5763e)
+- build: finalize demo assets (df342c7)
 
 ## [v9.51.6] - 2026-07-08
 

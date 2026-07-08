@@ -989,13 +989,15 @@ pre {
   background: var(--color-success);
 }
 
-/* Left widgets pushed to the left, right widgets stay on the right */
-.topbar-widgets-left {
+/* Left container for right-placement widgets pushes other actions to the right */
+.topbar-actions-left {
   margin-right: auto;
+  display: flex;
+  align-items: center;
 }
 
 .connect-btn.topbar-widget-right {
-  margin-left: 0.25rem;
+  margin-right: 0.25rem;
 }
 
 .story-walkthrough {
