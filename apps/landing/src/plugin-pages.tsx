@@ -575,7 +575,7 @@ function PluginInstallPreview(props: { page: PluginPage }) {
         <ScreenshotCard
           src={screenshotSrc()}
           alt={`AppWeaver Plugin Manager showing ${props.page.eyebrow}`}
-          label={`Install ${props.page.shortName}`}
+          label={`Install ${props.page.eyebrow}`}
           onOpenFullscreen={() =>
             setFullscreenScreenshot({
               src: screenshotSrc(),
@@ -862,7 +862,7 @@ function PluginMoreSection(props: { page: PluginPage }) {
   return (
     <div class="more-section-stack">
       <RoadmapPanel
-        title={`${props.page.shortName} Roadmap`}
+        title={`${props.page.eyebrow} Roadmap`}
         boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
         repo={pluginRoadmapRepos[props.page.command]}
       />
