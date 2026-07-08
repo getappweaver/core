@@ -7,6 +7,7 @@ const pluginRouteIconAliases: Record<string, string> = {
   'apps/captains-log': 'journal',
   'apps/file-manager': 'file',
   'apps/job-scheduler': 'job',
+  'apps/nostr-radar': 'nr',
   'apps/todo': 'todo',
 };
 
@@ -15,6 +16,7 @@ const pluginRouteIcons: Record<string, string> = {
   file: 'file/commands__tree__renderers__tree.svg',
   job: 'job/commands__list__renderers__clock.svg',
   journal: 'journal/commands__today__renderers__captains-log.svg',
+  nr: 'nr/commands__list__renderers__nostr-radar.svg',
   todo: 'todo/commands__list__renderers__list.svg',
 };
 

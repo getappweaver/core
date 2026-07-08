@@ -93,6 +93,7 @@ const pluginRouteAliases: Record<string, string> = {
   'apps/captains-log': 'journal',
   'apps/file-manager': 'file',
   'apps/job-scheduler': 'job',
+  'apps/nostr-radar': 'nr',
   'apps/todo': 'todo',
 };
 
@@ -101,6 +102,7 @@ const pluginInstallScreenshotSlugs: Record<string, string> = {
   file: 'file-manager',
   job: 'job-scheduler',
   journal: 'captains-log',
+  nr: 'nostr-radar',
   todo: 'todo-app',
 };
 
@@ -117,13 +119,19 @@ const pluginFeatures: Record<string, string[]> = {
   ],
   job: [
     'Schedule one-off or recurring prompts from the same app hub.',
-    'Use natural language like “Run X each Monday at 8am” and AppWeaver creates the job in your timezone.',
+    'Use natural language like "Run X each Monday at 8am" and AppWeaver creates the job in your timezone.',
     'Automate checks, reminders, publishing, and maintenance without leaving your workspace.',
   ],
   journal: [
     'Capture private workspace notes as a local Captain\'s Log.',
     'Stroll through entries like a real notepad instead of treating every note as a search result.',
     'Publish selected logs only after reviewing the exact draft.',
+  ],
+  nr: [
+    'Fetch recent posts from your Nostr follows without turning your reader into an infinite feed.',
+    'Let AI classify complete conversations into topics, moods, summaries, and skip decisions.',
+    'Read by topic, mood, timeline, or archive while keeping replies, quotes, mentions, and profiles in context.',
+    'Mark posts read or archived so your reading queue stays intentional.',
   ],
   todo: [
     'Create structured tasks from chat, web UI actions, or AI prompts.',
@@ -139,6 +147,7 @@ const pluginRoadmapBoardKeys: Record<string, string> = {
   file: 'appweaver-plugin-file-roadmap',
   job: 'appweaver-plugin-job-roadmap',
   journal: 'appweaver-plugin-journal-roadmap',
+  nr: 'appweaver-plugin-nostr-radar-roadmap',
   todo: 'appweaver-plugin-todo-roadmap',
 };
 
@@ -147,6 +156,7 @@ const pluginRoadmapRepos: Record<string, string> = {
   file: 'nostr://_@getappweaver.com/relay.ngit.dev/file',
   job: 'nostr://_@getappweaver.com/relay.ngit.dev/job',
   journal: 'nostr://_@getappweaver.com/relay.ngit.dev/journal',
+  nr: 'nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar',
   todo: 'nostr://_@getappweaver.com/relay.ngit.dev/todo',
 };
 
