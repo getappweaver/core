@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.4] - 2026-07-08
+
+- chore: cleanup stale nr icon file (f8ddd48)
+
 ## [v9.51.3] - 2026-07-08
 
-- chore: include nr icon for landing grid (6c6ca68)
+- chore: include nr icon for landing grid (30b59f2)
 
 ## [v9.51.2] - 2026-07-08
 
