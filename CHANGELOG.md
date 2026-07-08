@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.7] - 2026-07-08
+
+- build: finalize demo assets (2c5763e)
+
 ## [v9.51.6] - 2026-07-08
 
-- build: refresh demo with nr widget (c2370bc)
+- build: refresh demo with nr widget (3865835)
 
 ## [v9.51.5] - 2026-07-08
 

@@ -685,8 +685,8 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
               >
                 Client-initiated NIP-46: we generate a{' '}
                 <code>nostrconnect://</code> link. Open it in your remote signer
-                (e.g. Amber, Clave), then approve the
-                connection. Same session storage as Bunker URL after success.
+                (e.g. Amber, Clave), then approve the connection. Same session
+                storage as Bunker URL after success.
               </p>
               <div class="field-row">
                 <textarea
@@ -824,8 +824,8 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                 class="muted"
                 style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}
               >
-                Paste the <code>bunker://</code> URL from your NIP-46 remote signer
-                (Amber, Clave).
+                Paste the <code>bunker://</code> URL from your NIP-46 remote
+                signer (Amber, Clave).
               </p>
               <div class="field-row">
                 <textarea
