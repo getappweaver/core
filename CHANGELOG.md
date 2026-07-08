@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.6] - 2026-07-08
+
+- build: refresh demo with nr widget (c2370bc)
+
 ## [v9.51.5] - 2026-07-08
 
-- fix: right widgets on left, header widgets on right, proper icon path (7c3c0b4)
+- fix: right widgets on left, header widgets on right, proper icon path (e9cc130)
 
 ## [v9.51.4] - 2026-07-08
 

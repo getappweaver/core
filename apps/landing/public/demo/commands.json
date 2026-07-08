@@ -5234,12 +5234,12 @@
           "executionMode": "runnable_customizable"
         },
         "webWidget": {
-          "placement": "header",
+          "placement": "right",
           "surface": "timeline_singleton",
           "label": "Nostr Radar",
           "modalTitle": "Nostr Radar",
-          "icon": "/plugins/nr/commands/list/renderers/list.svg",
-          "order": 25
+          "icon": "./commands/list/renderers/nostr-radar.svg",
+          "order": 10
         }
       }
     ]
