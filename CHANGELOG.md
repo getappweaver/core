@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.9] - 2026-07-08
+
+- style: add nostr radar to hero animation with reduced-motion support (db614fd)
+
 ## [v9.51.8] - 2026-07-08
 
-- refactor: use topbar-actions-left container for right-placement widgets (0d85259)
+- refactor: use topbar-actions-left container for right-placement widgets (4bf53d1)
 
 ## [v9.51.7] - 2026-07-08
 

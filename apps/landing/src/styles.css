@@ -1675,12 +1675,22 @@ a {
   mask: url('/plugin-icons/journal/commands__today__renderers__captains-log.svg') center / contain no-repeat;
 }
 
+.hero-apps-icon-frame--nostr-radar {
+  animation-delay: 7.5s;
+  mask: url('/plugin-icons/nr/commands__list__renderers__nostr-radar.svg') center / contain no-repeat;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-apps-icon-frame {
     animation: none;
   }
 
   .hero-apps-icon-frame--todo {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
+
+  .hero-apps-icon-frame--nostr-radar {
     opacity: 1;
     transform: translateY(0) rotateX(0deg);
   }
