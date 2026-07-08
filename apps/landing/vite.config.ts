@@ -21,6 +21,7 @@ function landingRoutesPlugin(): Plugin {
     '/apps/captains-log',
     '/apps/file-manager',
     '/apps/job-scheduler',
+    '/apps/nostr-radar',
     '/apps/todo',
     '/one-page',
   ]);
