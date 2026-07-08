@@ -691,24 +691,22 @@
     "subcommands": [
       {
         "name": "list",
-        "summary": "Read roadmap issues from repo/default roadmap relays.",
+        "summary": "Read roadmap issues from repository owner NIP-65 relays.",
         "usage": "list [--relay <relay>]",
         "aliases": [],
         "arguments": [],
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL or comma-separated relay URLs to read from.",
+            "summary": "Bootstrap relay URL or comma-separated relay URLs to discover repository events.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
-            "required": false,
-            "webDefaultValue": "ws://localhost:10547"
+            "required": false
           }
         ],
         "examples": [
-          "/roadmap list",
-          "/roadmap list --relay ws://localhost:10547"
+          "/roadmap list"
         ],
         "inferredWeb": {
           "generated": true,
@@ -768,12 +766,11 @@
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL or comma-separated relay URLs to publish to.",
+            "summary": "Bootstrap relay URL or comma-separated relay URLs to discover repository events.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
-            "required": false,
-            "webDefaultValue": "ws://localhost:10547"
+            "required": false
           }
         ],
         "examples": [
@@ -823,8 +820,7 @@
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
-            "required": false,
-            "webDefaultValue": "ws://localhost:10547"
+            "required": false
           }
         ],
         "examples": [
@@ -852,12 +848,11 @@
         "options": [
           {
             "name": "relay",
-            "summary": "Relay URL or comma-separated relay URLs to read from.",
+            "summary": "Bootstrap relay URL or comma-separated relay URLs to discover repository events.",
             "flag": "--relay",
             "shortFlag": null,
             "kind": "string",
-            "required": false,
-            "webDefaultValue": "ws://localhost:10547"
+            "required": false
           }
         ],
         "examples": [
@@ -2400,7 +2395,8 @@
           "/wot help",
           "/wot help crawl",
           "/wot help score",
-          "/wot help stats"
+          "/wot help stats",
+          "/wot help fetch-profile"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2472,6 +2468,40 @@
         "examples": [
           "/wot stats",
           "/wot stats <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "fetch-profile",
+        "summary": "Fetch and cache a Nostr kind 0 profile.",
+        "usage": "fetch-profile [<profile>] [--profile <profile>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "profile",
+            "summary": "npub, nprofile, or hex pubkey",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "profile",
+            "summary": "npub, nprofile, or hex pubkey",
+            "flag": "--profile",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/wot fetch-profile <npub>",
+          "/wot fetch-profile --profile <nprofile>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -4704,6 +4734,512 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nr",
+    "summary": "Nostr radar: parse Nostr events, classify them, and mark read/archive state.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "nr",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for nr or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: list, fetch-latest, parse, mark, reevaluate, settings, context, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nr help",
+          "/nr help parse",
+          "/nr help list",
+          "/nr help mark"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "parse",
+        "summary": "Parse one raw Nostr event JSON, classify it, and cache it unread.",
+        "usage": "parse <event_json...> [--force-reclassify] [--instructions <instructions>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "event_json",
+            "summary": "Raw Nostr event JSON.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "force_reclassify",
+            "flag": "--force-reclassify",
+            "summary": "Re-run classification even if the event is already cached.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "instructions",
+            "flag": "--instructions",
+            "summary": "One-off classification instructions for this event.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea",
+            "webDefaultValue": "Classify this Nostr event for a personal unread radar.\n\nExisting taxonomy context:\n$NR_CONTEXT\n\nReturn ONLY JSON with this shape:\n{\n  \"topics\": [\"short-topic-tags\"],\n  \"moods\": [\"short-mood-tags\"],\n  \"summary\": \"one concise sentence\",\n  \"confidence\": 0.0,\n  \"skip\": boolean,\n  \"skipReason\": string | null\n}\n\nGuidelines:\n- Use lowercase, compact tags.\n- Topics describe what the event is about.\n- Moods describe tone or intent.\n- Reuse existing topic and mood tags from the context when they match.\n- Consolidate similar concepts into the existing tags instead of creating near-duplicates.\n- Prefer 1-5 topics and 1-3 moods.\n- If unsure, use topic \"general\" and mood \"neutral\".\n- Set \"skip\": true only when the event is not useful for this user's unread radar, only if the user is defined that below.\n- If \"skip\": true, explain briefly in \"skipReason\".\n- If \"skip\": false, use \"skipReason\": null.\n- Still fill topics, moods, summary, and confidence even when \"skip\": true."
+          }
+        ],
+        "examples": [
+          "/nr parse '{\"id\":\"...\",\"kind\":1,...}'"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "mark",
+        "summary": "Mark a cached event or every matching topic/mood as read, unread, archived, or unarchived.",
+        "usage": "mark [<event_id>] [--id <id>] [--read] [--unread] [--archived] [--unarchived] [--type <type>] [--tag <tag>] [--event-json <event_json>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "event_id",
+            "summary": "Nostr event id. Can also be provided with --id.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "id",
+            "flag": "--id",
+            "summary": "Nostr event id to mark.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "read",
+            "flag": "--read",
+            "summary": "Mark as read.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "unread",
+            "flag": "--unread",
+            "summary": "Mark as unread.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "archived",
+            "flag": "--archived",
+            "summary": "Mark as archived.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "unarchived",
+            "flag": "--unarchived",
+            "summary": "Mark as unarchived.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "type",
+            "flag": "--type",
+            "summary": "Tag type to bulk mark: topic or mood.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "topic",
+              "mood"
+            ]
+          },
+          {
+            "name": "tag",
+            "flag": "--tag",
+            "summary": "Topic or mood tag to bulk mark.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "event_json",
+            "flag": "--event-json",
+            "summary": "Internal raw Nostr event JSON to cache before marking.",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/nr mark <event_id> --read",
+          "/nr mark <event_id> --archived",
+          "/nr mark --id <event_id> --unarchived",
+          "/nr mark --type topic --tag meme --read",
+          "/nr mark --type mood --tag funny --archived"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "reevaluate",
+        "summary": "Re-run classification for one cached event.",
+        "usage": "reevaluate <event_id>",
+        "aliases": [
+          "reclassify"
+        ],
+        "arguments": [
+          {
+            "name": "event_id",
+            "summary": "Nostr event id.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nr reevaluate <event_id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "settings",
+        "summary": "Show or update AI settings used by nr parse.",
+        "usage": "settings [--backend <backend>] [--model <model>] [--instructions <instructions>] [--reset]",
+        "aliases": [
+          "config"
+        ],
+        "arguments": [],
+        "options": [
+          {
+            "name": "backend",
+            "flag": "--backend",
+            "summary": "Backend for nr parse AI classification.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "cursor",
+              "opencode"
+            ]
+          },
+          {
+            "name": "model",
+            "flag": "--model",
+            "summary": "Model override for nr parse AI classification.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "instructions",
+            "flag": "--instructions",
+            "summary": "Classification instructions for nr parse.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea",
+            "webDefaultValue": "Classify this Nostr event for a personal unread radar.\n\nExisting taxonomy context:\n$NR_CONTEXT\n\nReturn ONLY JSON with this shape:\n{\n  \"topics\": [\"short-topic-tags\"],\n  \"moods\": [\"short-mood-tags\"],\n  \"summary\": \"one concise sentence\",\n  \"confidence\": 0.0,\n  \"skip\": boolean,\n  \"skipReason\": string | null\n}\n\nGuidelines:\n- Use lowercase, compact tags.\n- Topics describe what the event is about.\n- Moods describe tone or intent.\n- Reuse existing topic and mood tags from the context when they match.\n- Consolidate similar concepts into the existing tags instead of creating near-duplicates.\n- Prefer 1-5 topics and 1-3 moods.\n- If unsure, use topic \"general\" and mood \"neutral\".\n- Set \"skip\": true only when the event is not useful for this user's unread radar, only if the user is defined that below.\n- If \"skip\": true, explain briefly in \"skipReason\".\n- If \"skip\": false, use \"skipReason\": null.\n- Still fill topics, moods, summary, and confidence even when \"skip\": true."
+          },
+          {
+            "name": "reset",
+            "flag": "--reset",
+            "summary": "Clear backend, model, and instructions overrides.",
+            "kind": "boolean",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/nr settings",
+          "/nr settings --backend opencode --model openrouter/google/gemini-2.0-flash-exp:free",
+          "/nr settings --reset"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "context",
+        "summary": "Show existing topic and mood tags for AI classification context.",
+        "usage": "context",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/nr context"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "taxonomy",
+        "summary": "Manage manually preferred topic/mood terms for classification.",
+        "usage": "taxonomy --type <type> [--mode <mode>] [--active-tags <active_tags>] [--new-tag <new_tag>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "type",
+            "flag": "--type",
+            "summary": "Term type to edit: topic or mood.",
+            "kind": "string",
+            "required": true,
+            "choices": [
+              "topic",
+              "mood"
+            ]
+          },
+          {
+            "name": "mode",
+            "flag": "--mode",
+            "summary": "Editor mode: edit or save.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "edit",
+              "save"
+            ]
+          },
+          {
+            "name": "active_tags",
+            "flag": "--active-tags",
+            "summary": "Active manual tags to keep enabled.",
+            "kind": "string",
+            "required": false,
+            "multiple": true
+          },
+          {
+            "name": "new_tag",
+            "flag": "--new-tag",
+            "summary": "Optional new manual tag to add.",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/nr taxonomy --type topic",
+          "/nr taxonomy --type mood --mode save --active-tags funny --new-tag serious"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "fetch-latest",
+        "summary": "Fetch kind 1 notes from your follows and classify them.",
+        "usage": "fetch-latest [--people <people>] [--since-hours <since_hours>] [--since <since>] [--until <until>] [--limit <limit>] [--instructions <instructions>]",
+        "aliases": [
+          "latest",
+          "fetch"
+        ],
+        "arguments": [],
+        "options": [
+          {
+            "name": "people",
+            "flag": "--people",
+            "summary": "Optional maximum followed pubkeys to use. Omit for all follows.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "since_hours",
+            "flag": "--since-hours",
+            "summary": "How far back to fetch notes when --since is omitted.",
+            "kind": "integer",
+            "required": false,
+            "webDefaultValue": 1
+          },
+          {
+            "name": "since",
+            "flag": "--since",
+            "summary": "Unix timestamp in seconds for the start of the fetch window.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "until",
+            "flag": "--until",
+            "summary": "Unix timestamp in seconds for the end of the fetch window.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "summary": "Maximum fetched events to inspect before skipping cached ones.",
+            "kind": "integer",
+            "required": false,
+            "webDefaultValue": 50
+          },
+          {
+            "name": "instructions",
+            "flag": "--instructions",
+            "summary": "One-off classification instructions for fetched events.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea",
+            "webDefaultValue": "Classify this Nostr event for a personal unread radar.\n\nExisting taxonomy context:\n$NR_CONTEXT\n\nReturn ONLY JSON with this shape:\n{\n  \"topics\": [\"short-topic-tags\"],\n  \"moods\": [\"short-mood-tags\"],\n  \"summary\": \"one concise sentence\",\n  \"confidence\": 0.0,\n  \"skip\": boolean,\n  \"skipReason\": string | null\n}\n\nGuidelines:\n- Use lowercase, compact tags.\n- Topics describe what the event is about.\n- Moods describe tone or intent.\n- Reuse existing topic and mood tags from the context when they match.\n- Consolidate similar concepts into the existing tags instead of creating near-duplicates.\n- Prefer 1-5 topics and 1-3 moods.\n- If unsure, use topic \"general\" and mood \"neutral\".\n- Set \"skip\": true only when the event is not useful for this user's unread radar, only if the user is defined that below.\n- If \"skip\": true, explain briefly in \"skipReason\".\n- If \"skip\": false, use \"skipReason\": null.\n- Still fill topics, moods, summary, and confidence even when \"skip\": true."
+          }
+        ],
+        "examples": [
+          "/nr fetch-latest --since-hours 1",
+          "/nr fetch --since 1783090800 --until 1783094400"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "interaction-record",
+        "summary": "Record a Nostr interaction published from the web client.",
+        "usage": "interaction-record --target-event-id <target_event_id> --interaction-event-id <interaction_event_id> --user-pubkey <user_pubkey> --type <type> --interaction-created-at <interaction_created_at>",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "target_event_id",
+            "flag": "--target-event-id",
+            "summary": "Target Nostr event id.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "interaction_event_id",
+            "flag": "--interaction-event-id",
+            "summary": "Published interaction event id.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "user_pubkey",
+            "flag": "--user-pubkey",
+            "summary": "Signer pubkey that published the interaction.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "type",
+            "flag": "--type",
+            "summary": "Interaction type: liked, replied, reposted, or quoted.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "interaction_created_at",
+            "flag": "--interaction-created-at",
+            "summary": "Interaction event created_at unix timestamp.",
+            "kind": "integer",
+            "required": true
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "debug",
+        "summary": "Show a list-style parser for one pasted event JSON and its related context.",
+        "usage": "debug [<event_json...>] [--force-reclassify] [--instructions <instructions>]",
+        "aliases": [
+          "list-parse-single"
+        ],
+        "arguments": [
+          {
+            "name": "event_json",
+            "summary": "Raw Nostr event JSON to parse.",
+            "kind": "string",
+            "required": false,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "force_reclassify",
+            "flag": "--force-reclassify",
+            "summary": "Re-run classification even if the event is already cached.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "instructions",
+            "flag": "--instructions",
+            "summary": "One-off classification instructions for this event.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea",
+            "webDefaultValue": "Classify this Nostr event for a personal unread radar.\n\nExisting taxonomy context:\n$NR_CONTEXT\n\nReturn ONLY JSON with this shape:\n{\n  \"topics\": [\"short-topic-tags\"],\n  \"moods\": [\"short-mood-tags\"],\n  \"summary\": \"one concise sentence\",\n  \"confidence\": 0.0,\n  \"skip\": boolean,\n  \"skipReason\": string | null\n}\n\nGuidelines:\n- Use lowercase, compact tags.\n- Topics describe what the event is about.\n- Moods describe tone or intent.\n- Reuse existing topic and mood tags from the context when they match.\n- Consolidate similar concepts into the existing tags instead of creating near-duplicates.\n- Prefer 1-5 topics and 1-3 moods.\n- If unsure, use topic \"general\" and mood \"neutral\".\n- Set \"skip\": true only when the event is not useful for this user's unread radar, only if the user is defined that below.\n- If \"skip\": true, explain briefly in \"skipReason\".\n- If \"skip\": false, use \"skipReason\": null.\n- Still fill topics, moods, summary, and confidence even when \"skip\": true."
+          }
+        ],
+        "examples": [
+          "/nr debug"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List timeline or archived cached posts grouped by topic tags and mood tags.",
+        "usage": "list [--mode <mode>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "mode",
+            "flag": "--mode",
+            "summary": "List mode: timeline or archive.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "timeline",
+              "archive"
+            ]
+          }
+        ],
+        "examples": [
+          "/nr list",
+          "/nr list --mode archive"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "timeline_singleton",
+          "label": "Nostr Radar",
+          "modalTitle": "Nostr Radar",
+          "icon": "/plugins/nr/commands/list/renderers/list.svg",
+          "order": 25
         }
       }
     ]

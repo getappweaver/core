@@ -36,6 +36,7 @@ AppWeaver is an open-source app hub for running AI-powered tools from a project 
 
 Use short, predictable names under the `getappweaver` org:
 
+- `getappweaver/nostr-radar`
 - `getappweaver/todo-app`
 - `getappweaver/bookmark-manager`
 - `getappweaver/job-scheduler`
@@ -47,6 +48,7 @@ Recommended official plugin repo descriptions:
 
 | Alias | App name | Repo description |
 |------|----------|------------------|
+| `nr` | Nostr Radar | Official AppWeaver Nostr Radar app. Adds an intentional Nostr reader that fetches posts from your follows, classifies them with AI, and helps you review important conversations by topic, mood, timeline, or archive. |
 | `todo` | Todo app | Official AppWeaver Todo app. Adds focused AI-powered todo tools, commands, and data models to an AppWeaver workspace. |
 | `file` | File manager | Official AppWeaver File manager. Adds focused AI-powered file management tools, commands, and data models to an AppWeaver workspace. |
 | `job` | Job scheduler | Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace. |
@@ -57,6 +59,13 @@ Recommended official plugin repo descriptions:
 ### Official plugin landing features
 
 Use these bullets on the public plugin landing pages. Keep them short enough to scan beside the interactive demo.
+
+#### Nostr Radar
+
+- Fetch recent posts from your Nostr follows without turning your reader into an infinite feed.
+- Let AI classify complete conversations into topics, moods, summaries, and skip decisions.
+- Read by topic, mood, timeline, or archive while keeping replies, quotes, mentions, and profiles in context.
+- Mark posts read or archived so your reading queue stays intentional.
 
 #### Todo app
 

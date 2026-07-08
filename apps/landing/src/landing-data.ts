@@ -75,7 +75,7 @@ export const officialApps: OfficialApp[] = [
     name: 'Nostr Radar',
     label: '/nr',
     description:
-      'An intentional Nostr reader for AppWeaver. Fetch posts from your follows, classify them with AI, and review the important conversations by topic, mood, timeline, or archive.',
+      'Official AppWeaver Nostr Radar app. Adds an intentional Nostr reader that fetches posts from your follows, classifies them with AI, and helps you review important conversations by topic, mood, timeline, or archive.',
     href: '/apps/nostr-radar',
     packageName: 'appweaver-nr-plugin',
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar',

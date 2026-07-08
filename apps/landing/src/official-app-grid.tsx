@@ -16,7 +16,7 @@ const pluginRouteIcons: Record<string, string> = {
   file: 'file/commands__tree__renderers__tree.svg',
   job: 'job/commands__list__renderers__clock.svg',
   journal: 'journal/commands__today__renderers__captains-log.svg',
-  nr: 'nr/commands__list__renderers__nostr-radar.svg',
+  nr: 'nr/commands__list__renderers__list.svg',
   todo: 'todo/commands__list__renderers__list.svg',
 };
 

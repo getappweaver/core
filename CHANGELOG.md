@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.51.1] - 2026-07-08
+
+- build: update demo and landing assets (7c540d0)
+
 ## [v9.51.0] - 2026-07-08
 
-- feat: add right-side header widget placement for Nostr Radar (169398c)
+- feat: add right-side header widget placement for Nostr Radar (175cb32)
 
 ## [v9.50.1] - 2026-07-08
 

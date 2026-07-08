@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-17T17:25:42.221Z",
+  "generatedAt": "2026-07-08T12:26:18.232Z",
   "prefix": "/",
   "widgets": [
     {
@@ -23,7 +23,7 @@
     {
       "alias": "todo",
       "name": "appweaver-todo-plugin",
-      "repo": "nostr://_@getappweaver.com/todo",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/todo",
       "version": "5.5.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
@@ -31,7 +31,7 @@
     {
       "alias": "job",
       "name": "appweaver-job-plugin",
-      "repo": "nostr://_@getappweaver.com/job",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/job",
       "version": "4.1.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
@@ -39,7 +39,7 @@
     {
       "alias": "bm",
       "name": "appweaver-bm-plugin",
-      "repo": "nostr://_@getappweaver.com/bm",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/bm",
       "version": "4.2.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
@@ -47,7 +47,7 @@
     {
       "alias": "file",
       "name": "appweaver-file-plugin",
-      "repo": "nostr://_@getappweaver.com/file",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/file",
       "version": "3.3.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
@@ -55,7 +55,7 @@
     {
       "alias": "browser",
       "name": "appweaver-browser-plugin",
-      "repo": "nostr://_@getappweaver.com/browser",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/browser",
       "version": "1.2.0",
       "commandStoryCount": 0,
       "aiStoryCount": 0
@@ -63,9 +63,17 @@
     {
       "alias": "journal",
       "name": "appweaver-journal-plugin",
-      "repo": "nostr://_@getappweaver.com/journal",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/journal",
       "version": "0.4.0",
       "commandStoryCount": 1,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "nr",
+      "name": "appweaver-nr-plugin",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar",
+      "version": "0.1.1",
+      "commandStoryCount": 0,
       "aiStoryCount": 0
     }
   ]
