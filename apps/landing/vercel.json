@@ -47,26 +47,6 @@
     {
       "source": "/one-page",
       "destination": "/index.html"
-    },
-    {
-      "source": "/apps/todo",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/apps/bookmark-manager",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/apps/job-scheduler",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/apps/file-manager",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/apps/captains-log",
-      "destination": "/index.html"
     }
   ],
   "redirects": [

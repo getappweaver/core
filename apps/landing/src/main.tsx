@@ -69,6 +69,7 @@ const features: Feature[] = [
         Install focused apps like <a href="/apps/todo">todos</a>,{' '}
         <a href="/apps/bookmark-manager">bookmarks</a>,{' '}
         <a href="/apps/job-scheduler">jobs</a>,{' '}
+        <a href="/apps/nostr-radar">social media</a>,{' '}
         <a href="/apps/file-manager">files</a>, browser actions,{' '}
         <a href="/apps/captains-log">journals</a>, and publishing.
       </>,

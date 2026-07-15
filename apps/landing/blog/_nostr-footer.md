@@ -11,6 +11,7 @@ More from AppWeaver:
   - Job Scheduler: https://getappweaver.com/apps/job-scheduler
   - File Manager: https://getappweaver.com/apps/file-manager
   - Captain's Log: https://getappweaver.com/apps/captains-log
+  - Nostr Radar: https://getappweaver.com/apps/nostr-radar
 - Git over Nostr: https://gitworkshop.dev/getappweaver.com/relay.ngit.dev/core
 - GitHub mirror: https://github.com/getappweaver/core
 - Nostr: Follow nostr:nprofile1qqs8y8nfc0elfcy54y9vqrp6fyqvxcn3ae36a6lx07lwmsgjcv0m9xqppamhxue69uhkummnw3ezumt0d5sqd7wd

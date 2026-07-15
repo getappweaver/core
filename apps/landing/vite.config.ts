@@ -12,6 +12,7 @@ type LandingRouteRequestProps = {
     end: () => void;
   };
   next: () => void;
+  appRouteTarget: 'spa' | 'static';
 };
 
 function landingRoutesPlugin(): Plugin {
@@ -26,7 +27,12 @@ function landingRoutesPlugin(): Plugin {
     '/one-page',
   ]);
 
-  function handleRequest({ req, res, next }: LandingRouteRequestProps): void {
+  function handleRequest({
+    req,
+    res,
+    next,
+    appRouteTarget,
+  }: LandingRouteRequestProps): void {
     const url = req.url ? req.url.split('?')[0] : null;
     const target = url ? redirects.get(url) : null;
 
@@ -51,7 +57,7 @@ function landingRoutesPlugin(): Plugin {
     }
 
     if (url && appRoutes.has(url)) {
-      req.url = '/index.html';
+      req.url = appRouteTarget === 'spa' ? '/index.html' : `${url}/index.html`;
     }
 
     next();
@@ -61,12 +67,12 @@ function landingRoutesPlugin(): Plugin {
     name: 'landing-routes',
     configureServer(server) {
       server.middlewares.use((req, res, next) =>
-        handleRequest({ req, res, next }),
+        handleRequest({ req, res, next, appRouteTarget: 'spa' }),
       );
     },
     configurePreviewServer(server) {
       server.middlewares.use((req, res, next) =>
-        handleRequest({ req, res, next }),
+        handleRequest({ req, res, next, appRouteTarget: 'static' }),
       );
     },
   };

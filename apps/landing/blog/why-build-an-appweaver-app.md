@@ -6,7 +6,7 @@ The user decides which apps to install in the current workspace. That also means
 
 ## What is an AppWeaver app?
 
-An AppWeaver app is a focused plugin that adds a capability to the hub. It might manage [todos](https://getappweaver.com/apps/todo), [bookmarks](https://getappweaver.com/apps/bookmark-manager), [scheduled jobs](https://getappweaver.com/apps/job-scheduler), [files](https://getappweaver.com/apps/file-manager), do publishing, browser automation, or something completely different. The app decides what commands to register, what UI is shown, what data is stored, and what tools AI agents are allowed to call.
+An AppWeaver app is a focused plugin that adds a capability to the hub. It might manage [todos](https://getappweaver.com/apps/todo), [bookmarks](https://getappweaver.com/apps/bookmark-manager), [scheduled jobs](https://getappweaver.com/apps/job-scheduler), [files](https://getappweaver.com/apps/file-manager), a [nostr client](https://getappweaver.com/apps/nostr-radar) do publishing, browser automation, or something completely different. The app decides what commands to register, what UI is shown, what data is stored, and what tools AI agents are allowed to call.
 
 Anyone can write their own app. It can be focused on a public use case, or it can be a private tool that only makes sense for your own workflow. If you want others to use it, you can publish it, too. If it is just for you, it can stay local and private.
 
