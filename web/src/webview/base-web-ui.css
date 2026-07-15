@@ -268,7 +268,7 @@ select {
 
 .web-nostrPost {
   display: grid;
-  grid-template-columns: 1.85rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.45rem;
   padding: 0.35rem 0.45rem;
   border-left: 2px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
@@ -276,7 +276,7 @@ select {
 }
 
 .web-nostrPost--nested {
-  grid-template-columns: 1.45rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.35rem;
   padding: 0.3rem 0.4rem;
   border-left-color: color-mix(in srgb, var(--color-accent) 48%, transparent);
@@ -343,6 +343,18 @@ select {
   gap: 0.25rem;
 }
 
+.web-nostrPost__profileHeader {
+  display: grid;
+  grid-template-columns: 1.85rem minmax(0, 1fr);
+  align-items: end;
+  gap: 0.45rem;
+}
+
+.web-nostrPost--nested .web-nostrPost__profileHeader {
+  grid-template-columns: 1.45rem minmax(0, 1fr);
+  gap: 0.35rem;
+}
+
 .web-nostrPost__header,
 .web-nostrPost__author,
 .web-nostrPost__actions {
@@ -350,6 +362,20 @@ select {
   align-items: baseline;
   gap: 0.35rem;
   min-width: 0;
+}
+
+.web-nostrPost__activityHeader {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.web-nostrPost__activityActor {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
 }
 
 .web-nostrPost__header {
@@ -371,6 +397,13 @@ select {
 .web-nostrPost__name {
   color: var(--color-text);
   font-weight: 700;
+}
+
+.web-nostrPost__name.web-nostrPost__authorButton:hover,
+.web-nostrPost__name.web-nostrPost__authorButton:focus-visible {
+  color: #fff;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .web-nostrPost__handle,
@@ -617,6 +650,7 @@ select {
 }
 
 .web-nostrPost__actions {
+  flex-wrap: wrap;
   padding-top: 0.05rem;
 }
 
@@ -629,6 +663,7 @@ select {
   font: inherit;
   font-size: 0.85rem;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .web-nostrPost__actionSeparator {

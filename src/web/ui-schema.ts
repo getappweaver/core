@@ -193,7 +193,8 @@ export const WebToolbarActionSchema = z.object({
   activeAction: WebActionSchema.optional(),
 });
 
-export const WebNostrPostReferenceSchema = z.object({
+const WebNostrPostReferenceBaseSchema = z.object({
+  token: z.string().min(1).optional(),
   type: z.enum(['event', 'profile', 'address', 'unknown']).optional(),
   id: z.string().min(1).optional(),
   pubkey: z.string().min(1).optional(),
@@ -235,6 +236,11 @@ export const WebNostrPostReferenceSchema = z.object({
     .optional(),
 });
 
+export const WebNostrPostReferenceSchema =
+  WebNostrPostReferenceBaseSchema.extend({
+    embeddedReferences: z.array(WebNostrPostReferenceBaseSchema).optional(),
+  });
+
 export const WebNostrPostMediaSchema = z.object({
   type: z.literal('image'),
   url: z.string().min(1),
@@ -256,8 +262,21 @@ export const WebNostrInlineProfilesSchema = z.record(
 
 export const WebNostrPostExtraActionSchema = z.object({
   label: z.string().min(1),
+  ariaLabel: z.string().min(1).optional(),
   action: WebActionSchema.nullable(),
   disabled: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+export const WebNostrPostActivityHeaderSchema = z.object({
+  label: z.string().min(1),
+  actorPubkey: z.string().min(1),
+  actorNpub: z.string().min(1).optional(),
+  actorName: z.string().min(1).optional(),
+  actorUsername: z.string().min(1).optional(),
+  actorPicture: z.string().min(1).optional(),
+  actorAbout: z.string().optional(),
+  createdAt: z.number().int(),
 });
 
 export const WebNostrPostPropsSchema = z.object({
@@ -291,6 +310,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrReadAction: WebActionSchema.nullable().optional(),
   /** Additional plugin-owned actions shown after Read. */
   nostrExtraActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  /** Additional plugin-owned actions shown after public post actions. */
+  nostrTrailingActions: z.array(WebNostrPostExtraActionSchema).optional(),
   /** Optional command/client action for plugin-owned archive behavior. */
   nostrArchiveAction: WebActionSchema.nullable().optional(),
   /** True when plugin-owned archive state is active. */
@@ -306,6 +327,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrReplied: z.boolean().optional(),
   nostrReposted: z.boolean().optional(),
   nostrQuoted: z.boolean().optional(),
+  /** Activity envelopes displayed above this post, such as reposts, reactions, or future zaps. */
+  nostrActivityHeaders: z.array(WebNostrPostActivityHeaderSchema).optional(),
   /** Show Like/Reply action row. Defaults to true. */
   nostrShowActions: z.boolean().optional(),
   /** NIP-21 references keyed by the exact `nostr:...` token in content. */

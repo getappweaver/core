@@ -40,6 +40,13 @@
   margin-bottom: 0.35rem;
 }
 
+.web-overflow-panel.is-flip-right {
+  right: auto;
+  left: 0;
+  margin-right: 0;
+  margin-left: 0.4rem;
+}
+
 .web-overflow-panel .web-button {
   display: block;
   width: 100%;

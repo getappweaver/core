@@ -4,8 +4,17 @@ import { SimplePool } from 'nostr-tools/pool';
 import { createSignal } from 'solid-js';
 import { z } from 'zod';
 
-import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
-import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
+import {
+  fetchNip65WriteRelays,
+  PROFILE_RELAYS_FOR_QUERY,
+  uniqueRelays,
+} from '@src/nostr/nip65';
+import type {
+  WebAction,
+  WebNode,
+  WebNodeRoot,
+  WebNostrPostReference,
+} from '@src/web/ui-schema';
 
 import type { ChromeModalState } from '../chrome/types';
 
@@ -18,6 +27,7 @@ const ProfilePayloadSchema = z.object({
   username: z.string().nullable().default(null),
   picture: z.string().nullable().default(null),
   about: z.string().nullable().default(null),
+  tab: z.enum(['profile', 'latestPosts']).default('profile'),
   relayHints: z.array(z.string().min(1)).default([]),
   fallbackRelays: z
     .array(z.string().min(1))
@@ -53,6 +63,50 @@ type ProfileMetadata = {
   about: string | null;
 };
 
+type ProfileTab = ProfilePayload['tab'];
+
+type LatestProfilePost = {
+  id: string;
+  pubkey: string;
+  kind: number;
+  createdAt: number;
+  content: string;
+  event: NostrEvent;
+  inlineProfiles: Record<string, InlineProfile>;
+  replyContext: LatestProfilePostReference[];
+  embeds: Record<string, WebNostrPostReference>;
+};
+
+type InlineProfile = {
+  pubkey: string;
+  npub: string | undefined;
+  authorName: string | undefined;
+  authorUsername: string | undefined;
+  authorPicture: string | undefined;
+  authorAbout: string | undefined;
+  relayHints: string[];
+};
+
+type LatestProfilePostReference = {
+  type: 'event';
+  id: string;
+  pubkey: string;
+  kind: number;
+  npub: string | undefined;
+  authorName: string | undefined;
+  authorUsername: string | undefined;
+  authorPicture: string | undefined;
+  authorAbout: string | undefined;
+  relayHints: string[];
+  createdAt: number;
+  content: string;
+  replyAction: WebAction;
+  repostAction: WebAction;
+  showActions: true;
+  inlineProfiles: Record<string, InlineProfile>;
+  embeddedReferences: WebNostrPostReference[];
+};
+
 export type WotFetchProfileResult = {
   type: 'wotFetchProfile';
   profile: string;
@@ -68,9 +122,36 @@ type MergeProfilePayloadProps = {
   metadata: ProfileMetadata | null;
 };
 
+type ProfileRootProps = {
+  payload: ProfilePayload;
+  currentUserPubkey: string | null;
+  activeTab: ProfileTab;
+  latestPosts: LatestProfilePost[] | null;
+};
+
+type FetchLatestProfilePostsProps = {
+  pubkey: string;
+  profile: ProfilePayload;
+};
+
+type NostrPostNodeProps = {
+  post: LatestProfilePost;
+  profile: ProfilePayload;
+  relayHints: string[];
+};
+
+type LatestProfilePostFromEventProps = {
+  event: NostrEvent;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+  contextById: Map<string, NostrEvent>;
+  relayHints: string[];
+};
+
 const followState = createSignal<Record<string, boolean>>({});
 const getFollowState = followState[0];
 const setFollowState = followState[1];
+const NOSTR_REFERENCE_RE = /nostr:([a-z0-9]+)/gi;
 
 function text(value: string): WebNode {
   return { type: 'text', value };
@@ -205,6 +286,10 @@ function followAction(
   };
 }
 
+function profileTabAction(payload: ProfilePayload, tab: ProfileTab): WebAction {
+  return profileAction({ ...payload, tab });
+}
+
 function openNostrAction(nprofile: string): WebAction {
   return {
     type: 'clientAction',
@@ -221,15 +306,344 @@ function copyNprofileAction(nprofile: string): WebAction {
   };
 }
 
+function rootReferenceFromEvent(event: NostrEvent): {
+  id: string | null;
+  pubkey: string | null;
+} {
+  const rootTag = event.tags.find(
+    (tag) => tag[0] === 'e' && tag[3] === 'root' && tag[1],
+  );
+
+  if (!rootTag) {
+    return { id: null, pubkey: null };
+  }
+
+  return {
+    id: rootTag[1] ?? null,
+    pubkey:
+      typeof rootTag[4] === 'string' && rootTag[4].trim().length > 0
+        ? rootTag[4].trim()
+        : null,
+  };
+}
+
+function replyEventAction({
+  event,
+  profile,
+  relayHints,
+}: {
+  event: NostrEvent;
+  profile: ProfileMetadata | null;
+  relayHints: string[];
+}): WebAction {
+  const root = rootReferenceFromEvent(event);
+
+  return {
+    type: 'clientAction',
+    action: 'nostr.openReplyPanel',
+    payload: {
+      eventId: event.id,
+      eventPubkey: event.pubkey,
+      eventKind: event.kind,
+      nrAlias: 'nr',
+      eventCreatedAt: event.created_at,
+      eventContent: event.content,
+      eventAuthorName: profile?.name,
+      eventAuthorUsername: profile?.username,
+      eventAuthorPicture: profile?.picture,
+      rootEventId: root.id,
+      rootPubkey: root.pubkey,
+      relayHints,
+    },
+  };
+}
+
+function repostEventAction({
+  event,
+  profile,
+  relayHints,
+}: {
+  event: NostrEvent;
+  profile: ProfileMetadata | null;
+  relayHints: string[];
+}): WebAction {
+  return {
+    type: 'clientAction',
+    action: 'nostr.openRepostPanel',
+    payload: {
+      eventId: event.id,
+      eventPubkey: event.pubkey,
+      eventKind: event.kind,
+      nrAlias: 'nr',
+      eventCreatedAt: event.created_at,
+      eventContent: event.content,
+      eventAuthorName: profile?.name,
+      eventAuthorUsername: profile?.username,
+      eventAuthorPicture: profile?.picture,
+      eventRawJson: JSON.stringify(event),
+      relayHints,
+    },
+  };
+}
+
+function eventProfileMetadata({
+  event,
+  viewedProfile,
+  profileByPubkey,
+}: {
+  event: NostrEvent;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+}): ProfileMetadata | null {
+  if (event.pubkey.toLowerCase() === viewedProfile.pubkey.toLowerCase()) {
+    return {
+      name: viewedProfile.name,
+      username: viewedProfile.username,
+      picture: viewedProfile.picture,
+      about: viewedProfile.about,
+    };
+  }
+
+  return profileByPubkey.get(event.pubkey.toLowerCase()) ?? null;
+}
+
+function inlineProfileForPubkey({
+  pubkey,
+  profileByPubkey,
+}: {
+  pubkey: string;
+  profileByPubkey: Map<string, ProfileMetadata>;
+}): InlineProfile {
+  const profile = profileByPubkey.get(pubkey.toLowerCase());
+
+  return {
+    pubkey,
+    npub: npubForPubkey(pubkey) ?? undefined,
+    authorName: profile?.name ?? undefined,
+    authorUsername: profile?.username ?? undefined,
+    authorPicture: profile?.picture ?? undefined,
+    authorAbout: profile?.about ?? undefined,
+    relayHints: [],
+  };
+}
+
+function inlineProfilesFromEvent({
+  event,
+  profileByPubkey,
+}: {
+  event: NostrEvent;
+  profileByPubkey: Map<string, ProfileMetadata>;
+}): Record<string, InlineProfile> {
+  const inlineProfiles: Record<string, InlineProfile> = {};
+
+  for (const match of event.content.matchAll(/nostr:([a-z0-9]+)/gi)) {
+    const token = match[0];
+
+    try {
+      const decoded = nip19.decode(match[1]!);
+
+      const pubkey =
+        decoded.type === 'npub'
+          ? decoded.data
+          : decoded.type === 'nprofile'
+            ? decoded.data.pubkey
+            : null;
+
+      if (!pubkey) {
+        continue;
+      }
+
+      inlineProfiles[token] = inlineProfileForPubkey({
+        pubkey,
+        profileByPubkey,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return inlineProfiles;
+}
+
+function displayContentForEvent(event: NostrEvent): string {
+  return event.content.replace(/#\[(\d+)\]/g, (token, indexText: string) => {
+    const index = Number.parseInt(indexText, 10);
+    const tag = event.tags[index];
+
+    if (tag?.[0] !== 'p' || !tag[1]) {
+      return token;
+    }
+
+    const npub = npubForPubkey(tag[1]);
+
+    return npub ? `nostr:${npub}` : token;
+  });
+}
+
+function addressReferencesForContent({
+  content,
+  viewedProfile,
+  profileByPubkey,
+}: {
+  content: string;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+}): WebNostrPostReference[] {
+  const references = new Map<string, WebNostrPostReference>();
+
+  for (const match of content.matchAll(NOSTR_REFERENCE_RE)) {
+    try {
+      const decoded = nip19.decode(match[1]!);
+
+      if (decoded.type !== 'naddr') {
+        continue;
+      }
+
+      const id = `${decoded.data.kind}:${decoded.data.pubkey}:${decoded.data.identifier}`;
+
+      const profile =
+        decoded.data.pubkey.toLowerCase() === viewedProfile.pubkey.toLowerCase()
+          ? {
+              name: viewedProfile.name,
+              username: viewedProfile.username,
+              picture: viewedProfile.picture,
+              about: viewedProfile.about,
+            }
+          : profileByPubkey.get(decoded.data.pubkey.toLowerCase());
+
+      references.set(id, {
+        token: match[0],
+        type: 'address',
+        id,
+        pubkey: decoded.data.pubkey,
+        kind: decoded.data.kind,
+        npub: npubForPubkey(decoded.data.pubkey) ?? undefined,
+        relayHints: decoded.data.relays ?? [],
+        authorName: profile?.name ?? undefined,
+        authorUsername: profile?.username ?? undefined,
+        authorPicture: profile?.picture ?? undefined,
+        authorAbout: profile?.about ?? undefined,
+        href: `https://jumble.social/notes/${match[1]!}`,
+        label:
+          decoded.data.kind === 30023
+            ? 'Read long-form post on Jumble'
+            : 'Open addressable event on Jumble',
+        showActions: false,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return [...references.values()];
+}
+
+function inlineProfilesForDisplayEvent({
+  event,
+  profileByPubkey,
+}: {
+  event: NostrEvent;
+  profileByPubkey: Map<string, ProfileMetadata>;
+}): Record<string, InlineProfile> {
+  const inlineProfiles = inlineProfilesFromEvent({ event, profileByPubkey });
+
+  for (const tag of event.tags) {
+    if (tag[0] !== 'p' || !tag[1]) {
+      continue;
+    }
+
+    const npub = npubForPubkey(tag[1]);
+
+    if (!npub) {
+      continue;
+    }
+
+    inlineProfiles[`nostr:${npub}`] = inlineProfileForPubkey({
+      pubkey: tag[1],
+      profileByPubkey,
+    });
+  }
+
+  return inlineProfiles;
+}
+
+function latestPostNode({
+  post,
+  profile,
+  relayHints,
+}: NostrPostNodeProps): WebNode {
+  return el({
+    tag: 'nostrPost',
+    props: {
+      size: 'sm',
+      nostrEventId: post.id,
+      nostrPubkey: post.pubkey,
+      nostrNpub: profile.npub ?? npubForPubkey(post.pubkey) ?? undefined,
+      nostrAuthorName: profile.name ?? undefined,
+      nostrAuthorUsername: profile.username ?? undefined,
+      nostrAuthorPicture: profile.picture ?? undefined,
+      nostrAuthorAbout: profile.about ?? undefined,
+      nostrRelayHints: relayHints,
+      nostrCreatedAt: post.createdAt,
+      nostrContent: post.content,
+      nostrInlineProfiles: post.inlineProfiles,
+      nostrEmbeds: post.embeds,
+      nostrReplyContext: post.replyContext,
+      nostrShowReplyContext: post.replyContext.length > 0,
+      nostrReplyAction: replyEventAction({
+        event: post.event,
+        profile,
+        relayHints,
+      }),
+      nostrRepostAction: repostEventAction({
+        event: post.event,
+        profile,
+        relayHints,
+      }),
+      nostrPreviewImages: true,
+      nostrShowActions: true,
+    },
+    children: [],
+  });
+}
+
+function profileTabButton({
+  payload,
+  activeTab,
+  tab,
+  label,
+}: {
+  payload: ProfilePayload;
+  activeTab: ProfileTab;
+  tab: ProfileTab;
+  label: string;
+}): WebNode {
+  const isActive = activeTab === tab;
+
+  return el({
+    tag: 'button',
+    props: {
+      label,
+      className: `web-button widget-tab${isActive ? ' active' : ''}`,
+      action: profileTabAction(payload, tab),
+    },
+    children: [],
+  });
+}
+
 function profileRoot({
   payload,
   currentUserPubkey,
-}: {
-  payload: ProfilePayload;
-  currentUserPubkey: string | null;
-}): WebNodeRoot {
+  activeTab,
+  latestPosts,
+}: ProfileRootProps): WebNodeRoot {
   const npub = payload.npub ?? npubForPubkey(payload.pubkey);
   const nprofile = nprofileForPayload(payload);
+
+  const relayHints = uniqueRelays([
+    ...payload.relayHints,
+    ...payload.fallbackRelays,
+  ]);
 
   const displayName =
     firstNonEmpty([
@@ -277,6 +691,52 @@ function profileRoot({
       children: [],
     }),
   );
+
+  const profileContent: WebNode[] = [
+    ...(payload.about
+      ? [
+          el({
+            tag: 'text',
+            props: {
+              whiteSpace: 'pre-wrap',
+              className: 'web-nostrProfile__about',
+            },
+            children: [text(payload.about)],
+          }),
+        ]
+      : []),
+    el({
+      tag: 'text',
+      props: { tone: 'muted', className: 'web-nostrProfile__npub' },
+      children: [text(npub ?? payload.pubkey)],
+    }),
+    el({
+      tag: 'row',
+      props: { gap: 'xs', itemAlign: 'center' },
+      children: buttons,
+    }),
+  ];
+
+  const latestPostContent: WebNode[] =
+    latestPosts == null
+      ? [
+          el({
+            tag: 'text',
+            props: { tone: 'muted' },
+            children: [text('Loading latest posts...')],
+          }),
+        ]
+      : latestPosts.length > 0
+        ? latestPosts.map((post) =>
+            latestPostNode({ post, profile: payload, relayHints }),
+          )
+        : [
+            el({
+              tag: 'text',
+              props: { tone: 'muted' },
+              children: [text('No recent posts found.')],
+            }),
+          ];
 
   return {
     kind: 'ui',
@@ -329,27 +789,33 @@ function profileRoot({
             }),
           ],
         }),
-        ...(payload.about
-          ? [
-              el({
-                tag: 'text',
-                props: {
-                  whiteSpace: 'pre-wrap',
-                  className: 'web-nostrProfile__about',
-                },
-                children: [text(payload.about)],
-              }),
-            ]
-          : []),
-        el({
-          tag: 'text',
-          props: { tone: 'muted', className: 'web-nostrProfile__npub' },
-          children: [text(npub ?? payload.pubkey)],
-        }),
         el({
           tag: 'row',
-          props: { gap: 'xs', itemAlign: 'center' },
-          children: buttons,
+          props: {
+            className: 'widget-tabs',
+            gap: 'xs',
+            itemAlign: 'center',
+          },
+          children: [
+            profileTabButton({
+              payload,
+              activeTab,
+              tab: 'profile',
+              label: 'Profile',
+            }),
+            profileTabButton({
+              payload,
+              activeTab,
+              tab: 'latestPosts',
+              label: 'Latest Posts',
+            }),
+          ],
+        }),
+        el({
+          tag: 'stack',
+          props: { gap: 'sm' },
+          children:
+            activeTab === 'profile' ? profileContent : latestPostContent,
         }),
       ],
     }),
@@ -383,6 +849,189 @@ async function fetchContactList({
     };
   } finally {
     pool.close(normalizedRelays);
+  }
+}
+
+function replyContextFromEvent({
+  event,
+  viewedProfile,
+  profileByPubkey,
+  relayHints,
+}: Omit<
+  LatestProfilePostFromEventProps,
+  'contextById'
+>): LatestProfilePostReference {
+  const profile = eventProfileMetadata({
+    event,
+    viewedProfile,
+    profileByPubkey,
+  });
+
+  return {
+    type: 'event',
+    id: event.id,
+    pubkey: event.pubkey,
+    kind: event.kind,
+    npub: npubForPubkey(event.pubkey) ?? undefined,
+    authorName: profile?.name ?? undefined,
+    authorUsername: profile?.username ?? undefined,
+    authorPicture: profile?.picture ?? undefined,
+    authorAbout: profile?.about ?? undefined,
+    relayHints,
+    createdAt: event.created_at,
+    content: displayContentForEvent(event),
+    replyAction: replyEventAction({ event, profile, relayHints }),
+    repostAction: repostEventAction({ event, profile, relayHints }),
+    showActions: true,
+    inlineProfiles: inlineProfilesForDisplayEvent({ event, profileByPubkey }),
+    embeddedReferences: addressReferencesForContent({
+      content: displayContentForEvent(event),
+      viewedProfile,
+      profileByPubkey,
+    }),
+  };
+}
+
+function latestProfilePostFromEvent({
+  event,
+  viewedProfile,
+  profileByPubkey,
+  contextById,
+  relayHints,
+}: LatestProfilePostFromEventProps): LatestProfilePost {
+  const replyContext = event.tags
+    .filter((tag) => tag[0] === 'e' && tag[1])
+    .map((tag) => contextById.get(tag[1]!))
+    .filter((context): context is NostrEvent => context != null)
+    .map((context) =>
+      replyContextFromEvent({
+        event: context,
+        viewedProfile,
+        profileByPubkey,
+        relayHints,
+      }),
+    );
+
+  const content = displayContentForEvent(event);
+
+  const addressReferences = addressReferencesForContent({
+    content,
+    viewedProfile,
+    profileByPubkey,
+  });
+
+  return {
+    id: event.id,
+    pubkey: event.pubkey,
+    kind: event.kind,
+    createdAt: event.created_at,
+    content,
+    event,
+    inlineProfiles: inlineProfilesForDisplayEvent({ event, profileByPubkey }),
+    replyContext,
+    embeds: Object.fromEntries(
+      addressReferences.flatMap((reference) =>
+        reference.token ? [[reference.token, reference]] : [],
+      ),
+    ),
+  };
+}
+
+async function fetchLatestProfilePosts({
+  pubkey,
+  profile,
+}: FetchLatestProfilePostsProps): Promise<LatestProfilePost[]> {
+  const pool = new SimplePool();
+  let writeRelays: string[] = [];
+
+  try {
+    writeRelays = await fetchNip65WriteRelays({
+      pool,
+      authorPubkey: pubkey,
+    });
+
+    const events = await pool.querySync(
+      writeRelays,
+      { kinds: [1], authors: [pubkey], limit: 10 },
+      { maxWait: 4_000 },
+    );
+
+    const eventsById = new Map(events.map((event) => [event.id, event]));
+
+    const latestEvents = [...eventsById.values()]
+      .sort((a, b) => b.created_at - a.created_at)
+      .slice(0, 10);
+
+    const contextIds = [
+      ...new Set(
+        latestEvents.flatMap((event) =>
+          event.tags
+            .filter((tag) => tag[0] === 'e' && tag[1])
+            .map((tag) => tag[1]!),
+        ),
+      ),
+    ].slice(0, 20);
+
+    const contextEvents =
+      contextIds.length > 0
+        ? await pool.querySync(
+            writeRelays,
+            { ids: contextIds, kinds: [1], limit: contextIds.length },
+            { maxWait: 4_000 },
+          )
+        : [];
+
+    const contextById = new Map(
+      contextEvents.map((context) => [context.id, context]),
+    );
+
+    const profilePubkeys = [
+      ...new Set(
+        [...latestEvents, ...contextEvents]
+          .flatMap((event) => [
+            event.pubkey,
+            ...event.tags
+              .filter((tag) => tag[0] === 'p' && tag[1])
+              .map((tag) => tag[1]!),
+          ])
+          .filter(
+            (candidate) => candidate.toLowerCase() !== pubkey.toLowerCase(),
+          ),
+      ),
+    ].slice(0, 30);
+
+    const profileMetadataResults = await Promise.allSettled(
+      profilePubkeys.map(
+        async (profilePubkey) =>
+          [
+            profilePubkey.toLowerCase(),
+            await fetchProfileMetadata({
+              pubkey: profilePubkey,
+              relays: PROFILE_RELAYS_FOR_QUERY as string[],
+            }),
+          ] as const,
+      ),
+    );
+
+    const profileByPubkey = new Map(
+      profileMetadataResults.flatMap((result) =>
+        result.status === 'fulfilled' && result.value[1] !== null
+          ? [result.value as readonly [string, ProfileMetadata]]
+          : [],
+      ),
+    );
+
+    return latestEvents.map((event) =>
+      latestProfilePostFromEvent({
+        event,
+        viewedProfile: profile,
+        profileByPubkey,
+        contextById,
+        relayHints: writeRelays,
+      }),
+    );
+  } finally {
+    pool.close(uniqueRelays([...PROFILE_RELAYS_FOR_QUERY, ...writeRelays]));
   }
 }
 
@@ -427,12 +1076,22 @@ export async function handleNostrOpenProfilePanelAction({
   const payload = ProfilePayloadSchema.parse(action.payload ?? {});
   let renderedPayload = payload;
   let fetchedMetadata: ProfileMetadata | null = null;
+  let latestPosts: LatestProfilePost[] | null = null;
 
   setChromeModal({
     command: 'nostr',
     subcommand: 'profile',
     title: 'Nostr profile',
   });
+
+  setChromeWeb(
+    profileRoot({
+      payload,
+      currentUserPubkey,
+      activeTab: payload.tab,
+      latestPosts,
+    }),
+  );
 
   try {
     fetchedMetadata = await fetchProfileMetadata({
@@ -452,7 +1111,36 @@ export async function handleNostrOpenProfilePanelAction({
     renderedPayload = payload;
   }
 
-  setChromeWeb(profileRoot({ payload: renderedPayload, currentUserPubkey }));
+  setChromeWeb(
+    profileRoot({
+      payload: renderedPayload,
+      currentUserPubkey,
+      activeTab: renderedPayload.tab,
+      latestPosts,
+    }),
+  );
+
+  if (renderedPayload.tab === 'latestPosts') {
+    try {
+      latestPosts = await fetchLatestProfilePosts({
+        pubkey: renderedPayload.pubkey,
+        profile: renderedPayload,
+      });
+    } catch (error) {
+      setChromeError(error instanceof Error ? error.message : String(error));
+      latestPosts = [];
+    }
+
+    setChromeWeb(
+      profileRoot({
+        payload: renderedPayload,
+        currentUserPubkey,
+        activeTab: renderedPayload.tab,
+        latestPosts,
+      }),
+    );
+  }
+
   setChromeLoading(false);
 
   const fetchProfileResult = fetchedMetadata
@@ -485,7 +1173,14 @@ export async function handleNostrOpenProfilePanelAction({
       ),
     }));
 
-    setChromeWeb(profileRoot({ payload: renderedPayload, currentUserPubkey }));
+    setChromeWeb(
+      profileRoot({
+        payload: renderedPayload,
+        currentUserPubkey,
+        activeTab: renderedPayload.tab,
+        latestPosts,
+      }),
+    );
   } catch {
     // The modal is still useful without live follow-state detection.
   } finally {
@@ -571,7 +1266,14 @@ export async function handleNostrFollowProfileAction({
       [followKey]: payload.mode === 'follow',
     }));
 
-    setChromeWeb(profileRoot({ payload, currentUserPubkey: signed.pubkey }));
+    setChromeWeb(
+      profileRoot({
+        payload,
+        currentUserPubkey: signed.pubkey,
+        activeTab: payload.tab,
+        latestPosts: null,
+      }),
+    );
 
     appendSystemMessage(
       payload.mode === 'follow' ? 'Followed profile' : 'Unfollowed profile',

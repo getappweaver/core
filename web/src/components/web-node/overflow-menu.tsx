@@ -59,6 +59,34 @@ export function getVisibleVerticalBoundsForElement(el: HTMLElement): {
   return { top, bottom };
 }
 
+export function getVisibleHorizontalBoundsForElement(el: HTMLElement): {
+  left: number;
+  right: number;
+} {
+  let left = 0;
+  let right = window.innerWidth;
+  let n: HTMLElement | null = el;
+
+  while (n && n !== document.documentElement) {
+    const overflowX = window.getComputedStyle(n).overflowX;
+
+    if (
+      overflowX === 'auto' ||
+      overflowX === 'scroll' ||
+      overflowX === 'hidden' ||
+      overflowX === 'clip'
+    ) {
+      const rect = n.getBoundingClientRect();
+      left = Math.max(left, rect.left);
+      right = Math.min(right, rect.right);
+    }
+
+    n = layoutParentElement(n);
+  }
+
+  return { left, right };
+}
+
 export function listScrollableAncestors(el: HTMLElement): HTMLElement[] {
   const out: HTMLElement[] = [];
   let n: HTMLElement | null = el;
@@ -86,6 +114,7 @@ export type WebOverflowMenuProps = {
 export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
   const [open, setOpen] = createSignal(false);
   const [flipUp, setFlipUp] = createSignal(false);
+  const [flipRight, setFlipRight] = createSignal(false);
   const getBusy = useContext(WebShadowUiBusyContext);
   let rootEl: HTMLDivElement | undefined;
   let panelEl: HTMLDivElement | undefined;
@@ -98,6 +127,7 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
   createEffect(() => {
     if (!open()) {
       setFlipUp(false);
+      setFlipRight(false);
 
       return;
     }
@@ -119,6 +149,9 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
       const { top: vTop, bottom: vBottom } =
         getVisibleVerticalBoundsForElement(root);
 
+      const { left: vLeft, right: vRight } =
+        getVisibleHorizontalBoundsForElement(root);
+
       const t = trigger.getBoundingClientRect();
       const p = panel.getBoundingClientRect();
       const gap = OVERFLOW_PANEL_GAP_PX;
@@ -128,23 +161,25 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
 
       if (needHeight <= spaceBelow) {
         setFlipUp(false);
-
-        return;
-      }
-
-      if (spaceAbove >= needHeight) {
+      } else if (spaceAbove >= needHeight) {
         setFlipUp(true);
-
-        return;
-      }
-
-      if (spaceAbove > spaceBelow) {
+      } else if (spaceAbove > spaceBelow) {
         setFlipUp(true);
-
-        return;
+      } else {
+        setFlipUp(false);
       }
 
-      setFlipUp(false);
+      const spaceLeft = t.right - vLeft - gap;
+      const spaceRight = vRight - t.left - gap;
+      const needWidth = p.width;
+
+      if (needWidth <= spaceLeft) {
+        setFlipRight(false);
+      } else if (spaceRight >= needWidth) {
+        setFlipRight(true);
+      } else {
+        setFlipRight(spaceRight > spaceLeft);
+      }
     };
 
     let ro: ResizeObserver | undefined;
@@ -284,7 +319,10 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
       <Show when={open()}>
         <div
           class="web-overflow-panel"
-          classList={{ 'is-flip-up': flipUp() }}
+          classList={{
+            'is-flip-up': flipUp(),
+            'is-flip-right': flipRight(),
+          }}
           role="menu"
           ref={(el) => {
             panelEl = el;

@@ -45,9 +45,11 @@ type WebNostrPostElementProps = {
 
 type PostActionItem = {
   label: string;
+  ariaLabel?: string;
   action: WebAction | null;
   disabled: boolean;
   success: boolean;
+  separatorBefore?: 'pipe';
 };
 
 type ContentAttachment =
@@ -333,6 +335,7 @@ function linkifyTextParts(value: string): ContentPart[] {
 function visibleContentParts(
   content: string,
   inlineProfiles: Record<string, InlineProfile>,
+  embeds: Record<string, WebNostrPostReference>,
 ): ContentPart[] {
   const parts: ContentPart[] = [];
   let cursor = 0;
@@ -345,6 +348,8 @@ function visibleContentParts(
 
     if (inlineProfiles[token]) {
       parts.push({ type: 'profile', value: inlineProfiles[token] });
+    } else if (!embeds[token]) {
+      parts.push({ type: 'text', value: token });
     }
 
     cursor = index + token.length;
@@ -360,10 +365,17 @@ function visibleContentParts(
 function InlineContent(props: {
   content: string;
   inlineProfiles: Record<string, InlineProfile>;
+  embeds?: Record<string, WebNostrPostReference>;
   runAction: (action: WebAction | undefined) => void;
 }): JSX.Element {
   return (
-    <For each={visibleContentParts(props.content, props.inlineProfiles)}>
+    <For
+      each={visibleContentParts(
+        props.content,
+        props.inlineProfiles,
+        props.embeds ?? {},
+      )}
+    >
       {(part) =>
         part.type === 'profile' ? (
           <button
@@ -592,12 +604,15 @@ function ActionRow(props: {
           {(item, index) => (
             <>
               <Show when={index() > 0}>
-                <span class="web-nostrPost__actionSeparator">•</span>
+                <span class="web-nostrPost__actionSeparator">
+                  {item.separatorBefore === 'pipe' ? '|' : '•'}
+                </span>
               </Show>
               <button
                 type="button"
                 class="web-nostrPost__action"
                 classList={{ 'is-success': item.success }}
+                aria-label={item.ariaLabel}
                 disabled={item.disabled}
                 onClick={() => props.runAction(item.action ?? undefined)}
               >
@@ -688,6 +703,15 @@ function ReferenceCard(props: {
   const attachments = () =>
     attachmentsFromContent(props.reference.content ?? '');
 
+  const embeddedReferences = () => props.reference.embeddedReferences ?? [];
+
+  const embeddedReferenceMap = () =>
+    Object.fromEntries(
+      embeddedReferences().flatMap((reference) =>
+        reference.token ? [[reference.token, reference]] : [],
+      ),
+    );
+
   const showActions = () => props.reference.showActions !== false;
 
   const openProfile = () =>
@@ -734,6 +758,7 @@ function ReferenceCard(props: {
                   <InlineContent
                     content={content()}
                     inlineProfiles={props.reference.inlineProfiles ?? {}}
+                    embeds={embeddedReferenceMap()}
                     runAction={props.runAction}
                   />
                 </div>
@@ -743,6 +768,20 @@ function ReferenceCard(props: {
               attachments={attachments()}
               onOpenImage={props.onOpenImage}
             />
+            <Show when={embeddedReferences().length > 0}>
+              <div class="web-nostrPost__embeds">
+                <For each={embeddedReferences()}>
+                  {(reference) => (
+                    <ReferenceCard
+                      reference={reference}
+                      runAction={props.runAction}
+                      onOpenImage={props.onOpenImage}
+                      currentUserPubkey={props.currentUserPubkey}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
             <Show when={showActions()}>
               <ActionRow
                 items={referenceActionItems(
@@ -778,6 +817,7 @@ function ReferenceCard(props: {
                   <InlineContent
                     content={content()}
                     inlineProfiles={props.reference.inlineProfiles ?? {}}
+                    embeds={embeddedReferenceMap()}
                     runAction={props.runAction}
                   />
                 </div>
@@ -858,6 +898,25 @@ export function WebNostrPostElement(
   const openAuthorProfile = () =>
     props.runAction(profileActionForElement(elementProps()));
 
+  const activityHeaders = () => elementProps()?.nostrActivityHeaders ?? [];
+
+  const openActivityActorProfile = (
+    activity: NonNullable<WebNostrPostProps['nostrActivityHeaders']>[number],
+  ) => {
+    props.runAction(
+      profileActionForReference({
+        type: 'profile',
+        pubkey: activity.actorPubkey,
+        npub: activity.actorNpub,
+        authorName: activity.actorName,
+        authorUsername: activity.actorUsername,
+        authorPicture: activity.actorPicture,
+        authorAbout: activity.actorAbout,
+        relayHints: [],
+      }),
+    );
+  };
+
   const actionItems = createMemo<PostActionItem[]>(() => {
     const props = elementProps();
     const items: PostActionItem[] = [];
@@ -883,19 +942,20 @@ export function WebNostrPostElement(
 
     if (props?.nostrArchiveAction) {
       items.push({
-        label: props.nostrArchived === true ? 'Unarchive' : 'Archive',
+        label: props.nostrArchived === true ? 'Archived' : 'Archive',
         action: props.nostrArchiveAction,
         disabled: false,
-        success: false,
+        success: props.nostrArchived === true,
       });
     }
 
     for (const extraAction of props?.nostrExtraActions ?? []) {
       items.push({
         label: extraAction.label,
+        ariaLabel: extraAction.ariaLabel,
         action: extraAction.action,
         disabled: extraAction.disabled === true,
-        success: false,
+        success: extraAction.active === true,
       });
     }
 
@@ -936,6 +996,19 @@ export function WebNostrPostElement(
       });
     }
 
+    for (const [index, trailingAction] of (
+      props?.nostrTrailingActions ?? []
+    ).entries()) {
+      items.push({
+        label: trailingAction.label,
+        ariaLabel: trailingAction.ariaLabel,
+        action: trailingAction.action,
+        disabled: trailingAction.disabled === true,
+        success: trailingAction.active === true,
+        ...(index === 0 ? { separatorBefore: 'pipe' as const } : {}),
+      });
+    }
+
     return items;
   });
 
@@ -945,22 +1018,42 @@ export function WebNostrPostElement(
       data-ui={elementUi(props.element)}
       style={elementStyle(props.element)}
     >
-      <button
-        type="button"
-        class="web-nostrPost__avatar web-nostrPost__profileButton"
-        aria-label={`Open ${name()} profile`}
-        onClick={openAuthorProfile}
-        disabled={!elementProps()?.nostrPubkey}
-      >
-        <Show
-          when={elementProps()?.nostrAuthorPicture}
-          fallback={initials(name())}
+      <For each={activityHeaders()}>
+        {(activity) => (
+          <div class="web-nostrPost__activityHeader">
+            <span>{activity.label} · by </span>
+            <button
+              type="button"
+              class="web-nostrPost__activityActor web-nostrPost__authorButton"
+              onClick={() => openActivityActorProfile(activity)}
+            >
+              @
+              {activity.actorUsername ??
+                activity.actorName ??
+                activity.actorNpub}
+            </button>
+            <span> · </span>
+            <time class="web-nostrPost__time">
+              {relativeTime(activity.createdAt, nowMs())}
+            </time>
+          </div>
+        )}
+      </For>
+      <div class="web-nostrPost__profileHeader">
+        <button
+          type="button"
+          class="web-nostrPost__avatar web-nostrPost__profileButton"
+          aria-label={`Open ${name()} profile`}
+          onClick={openAuthorProfile}
+          disabled={!elementProps()?.nostrPubkey}
         >
-          {(src) => <img src={src()} alt="" />}
-        </Show>
-      </button>
-
-      <div class="web-nostrPost__main">
+          <Show
+            when={elementProps()?.nostrAuthorPicture}
+            fallback={initials(name())}
+          >
+            {(src) => <img src={src()} alt="" />}
+          </Show>
+        </button>
         <div class="web-nostrPost__header">
           <div class="web-nostrPost__author">
             <button
@@ -976,7 +1069,9 @@ export function WebNostrPostElement(
             {(time) => <time class="web-nostrPost__time">{time()}</time>}
           </Show>
         </div>
+      </div>
 
+      <div class="web-nostrPost__main">
         <Show when={replyContext().length > 0}>
           <div class="web-nostrPost__contextBlock">
             <button
@@ -1008,13 +1103,15 @@ export function WebNostrPostElement(
         <div class="web-nostrPost__body">
           <Show
             when={
-              visibleContentParts(visibleContent(), inlineProfiles()).length > 0
+              visibleContentParts(visibleContent(), inlineProfiles(), embeds())
+                .length > 0
             }
             fallback={content().length > 0 ? '' : '(empty note)'}
           >
             <InlineContent
               content={visibleContent()}
               inlineProfiles={inlineProfiles()}
+              embeds={embeds()}
               runAction={props.runAction}
             />
           </Show>

@@ -99,6 +99,17 @@ type NostrPostView = {
   authorPicture: string | null;
 };
 
+type ProfileMetadata = {
+  name: string | null;
+  username: string | null;
+  picture: string | null;
+};
+
+type FetchedReplies = {
+  replies: NostrEvent[];
+  profiles: Map<string, ProfileMetadata>;
+};
+
 function nostrPostNode({ post }: { post: NostrPostView }): WebNode {
   return el(
     'nostrPost',
@@ -119,30 +130,66 @@ function nostrPostNode({ post }: { post: NostrPostView }): WebNode {
   );
 }
 
-function postViewFromReplyPayload(
-  payload: z.infer<typeof ReplyPayloadSchema>,
-): NostrPostView {
+function postViewFromReplyPayload({
+  payload,
+  profiles,
+}: {
+  payload: z.infer<typeof ReplyPayloadSchema>;
+  profiles: Map<string, ProfileMetadata>;
+}): NostrPostView {
+  const profile = profiles.get(payload.eventPubkey.toLowerCase());
+
   return {
     id: payload.eventId,
     pubkey: payload.eventPubkey,
     createdAt: payload.eventCreatedAt,
     content: payload.eventContent ?? '',
-    authorName: payload.eventAuthorName,
-    authorUsername: payload.eventAuthorUsername,
-    authorPicture: payload.eventAuthorPicture,
+    authorName: profile?.name ?? payload.eventAuthorName,
+    authorUsername: profile?.username ?? payload.eventAuthorUsername,
+    authorPicture: profile?.picture ?? payload.eventAuthorPicture,
   };
 }
 
-function postViewFromEvent(event: NostrEvent): NostrPostView {
+function postViewFromEvent({
+  event,
+  profiles,
+}: {
+  event: NostrEvent;
+  profiles: Map<string, ProfileMetadata>;
+}): NostrPostView {
+  const profile = profiles.get(event.pubkey.toLowerCase());
+
   return {
     id: event.id,
     pubkey: event.pubkey,
     createdAt: event.created_at,
     content: event.content,
-    authorName: null,
-    authorUsername: null,
-    authorPicture: null,
+    authorName: profile?.name ?? null,
+    authorUsername: profile?.username ?? null,
+    authorPicture: profile?.picture ?? null,
   };
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function parseProfileMetadata(event: NostrEvent): ProfileMetadata | null {
+  try {
+    const parsed = JSON.parse(event.content) as Record<string, unknown>;
+
+    return {
+      name:
+        nonEmptyString(parsed.display_name) ??
+        nonEmptyString(parsed.displayName),
+      username: nonEmptyString(parsed.name),
+      picture: nonEmptyString(parsed.picture) ?? nonEmptyString(parsed.image),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchReplies({
@@ -155,7 +202,7 @@ async function fetchReplies({
   eventPubkey: string;
   relayHints: string[];
   fallbackRelays: string[];
-}): Promise<NostrEvent[]> {
+}): Promise<FetchedReplies> {
   const relays = await fetchAuthorReadRelays({
     pubkey: eventPubkey,
     relayHints,
@@ -171,10 +218,105 @@ async function fetchReplies({
       { maxWait: 4_000 },
     );
 
-    return replies.sort((a, b) => a.created_at - b.created_at);
+    const sortedReplies = replies.sort((a, b) => a.created_at - b.created_at);
+
+    const profilePubkeys = [
+      ...new Set([
+        eventPubkey,
+        ...sortedReplies.map((reply) => reply.pubkey),
+        ...sortedReplies.flatMap((reply) =>
+          reply.tags
+            .filter((tag) => tag[0] === 'e' && tag[4])
+            .map((tag) => tag[4]!),
+        ),
+      ]),
+    ];
+
+    const profileEvents = await pool.querySync(
+      uniqueRelays([...relays, ...PROFILE_RELAYS_FOR_QUERY]),
+      { kinds: [0], authors: profilePubkeys, limit: profilePubkeys.length },
+      { maxWait: 4_000 },
+    );
+
+    const latestProfileEvents = new Map<string, NostrEvent>();
+
+    for (const profileEvent of profileEvents) {
+      const pubkey = profileEvent.pubkey.toLowerCase();
+      const current = latestProfileEvents.get(pubkey);
+
+      if (!current || profileEvent.created_at > current.created_at) {
+        latestProfileEvents.set(pubkey, profileEvent);
+      }
+    }
+
+    const profiles = new Map<string, ProfileMetadata>();
+
+    for (const [pubkey, profileEvent] of latestProfileEvents) {
+      const profile = parseProfileMetadata(profileEvent);
+
+      if (profile) {
+        profiles.set(pubkey, profile);
+      }
+    }
+
+    return { replies: sortedReplies, profiles };
   } finally {
-    pool.close(relays);
+    pool.close(uniqueRelays([...relays, ...PROFILE_RELAYS_FOR_QUERY]));
   }
+}
+
+function profileLabel({
+  pubkey,
+  payload,
+  profiles,
+}: {
+  pubkey: string;
+  payload: z.infer<typeof ReplyPayloadSchema>;
+  profiles: Map<string, ProfileMetadata>;
+}): string {
+  const profile = profiles.get(pubkey.toLowerCase());
+
+  const isOriginalAuthor =
+    pubkey.toLowerCase() === payload.eventPubkey.toLowerCase();
+
+  return (
+    profile?.name ??
+    profile?.username ??
+    (isOriginalAuthor
+      ? (payload.eventAuthorName ?? payload.eventAuthorUsername)
+      : null) ??
+    npubForPubkey(pubkey)?.slice(0, 16) ??
+    pubkey.slice(0, 16)
+  );
+}
+
+function replyTargetPubkey({
+  reply,
+  payload,
+  repliesById,
+}: {
+  reply: NostrEvent;
+  payload: z.infer<typeof ReplyPayloadSchema>;
+  repliesById: Map<string, NostrEvent>;
+}): string {
+  const eventTags = reply.tags.filter(
+    (tag) => tag[0] === 'e' && tag[1] && tag[3] !== 'mention',
+  );
+
+  const targetTag =
+    eventTags.findLast((tag) => tag[3] === 'reply') ??
+    eventTags.findLast((tag) => !tag[3]) ??
+    eventTags.find((tag) => tag[3] === 'root');
+
+  if (!targetTag || targetTag[1] === payload.eventId) {
+    return payload.eventPubkey;
+  }
+
+  return (
+    targetTag[4] ??
+    repliesById.get(targetTag[1]!)?.pubkey ??
+    payload.eventPubkey
+  );
 }
 
 function replyTags(
@@ -206,9 +348,11 @@ function replyTags(
 function replyPanelRoot({
   payload,
   replies,
+  profiles,
 }: {
   payload: z.infer<typeof ReplyPayloadSchema>;
   replies: NostrEvent[];
+  profiles: Map<string, ProfileMetadata>;
 }): WebNodeRoot {
   const action = {
     type: 'clientAction' as const,
@@ -216,13 +360,15 @@ function replyPanelRoot({
     payload,
   };
 
+  const repliesById = new Map(replies.map((reply) => [reply.id, reply]));
+
   return {
     kind: 'ui',
     version: 1,
     meta: { command: 'nostr', subcommand: 'reply' },
     tree: el('stack', { gap: 'sm' }, [
       el('text', { tone: 'muted', size: 'sm' }, [text('Replying to')]),
-      nostrPostNode({ post: postViewFromReplyPayload(payload) }),
+      nostrPostNode({ post: postViewFromReplyPayload({ payload, profiles }) }),
       el('treeItem', { id: 'nostr-reply-compose', defaultExpanded: true }, [
         el(
           'form',
@@ -256,9 +402,24 @@ function replyPanelRoot({
                 text('No replies found.'),
               ]),
             ]
-          : replies.map((reply) =>
-              nostrPostNode({ post: postViewFromEvent(reply) }),
-            )),
+          : replies.map((reply) => {
+              const targetPubkey = replyTargetPubkey({
+                reply,
+                payload,
+                repliesById,
+              });
+
+              return el('stack', { gap: 'xs' }, [
+                el('text', { tone: 'muted', size: 'sm' }, [
+                  text(
+                    `${profileLabel({ pubkey: reply.pubkey, payload, profiles })} replied to ${profileLabel({ pubkey: targetPubkey, payload, profiles })}`,
+                  ),
+                ]),
+                nostrPostNode({
+                  post: postViewFromEvent({ event: reply, profiles }),
+                }),
+              ]);
+            })),
       ]),
     ]),
   };
@@ -287,7 +448,7 @@ export async function handleNostrOpenReplyPanelAction({
     const relayHints = uniqueRelays(payload.relayHints);
     const fallbackRelays = uniqueRelays(payload.fallbackRelays);
 
-    const replies = await fetchReplies({
+    const { replies, profiles } = await fetchReplies({
       eventId: payload.eventId,
       eventPubkey: payload.eventPubkey,
       relayHints,
@@ -298,6 +459,7 @@ export async function handleNostrOpenReplyPanelAction({
       replyPanelRoot({
         payload: { ...payload, relayHints, fallbackRelays },
         replies,
+        profiles,
       }),
     );
   } catch (error) {
