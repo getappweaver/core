@@ -20,7 +20,7 @@ const PLUGINS_JSON = join(ROOT, 'plugins.json');
 const PKG_JSON = join(ROOT, 'package.json');
 
 const PLUGIN_QUERY_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
   'wss://nos.lol',
   'wss://nostr.mom',

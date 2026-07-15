@@ -15,7 +15,7 @@ export const PROFILE_RELAYS_FOR_QUERY: readonly string[] = [
   'wss://purplepag.es',
   'wss://relay.nos.social',
   'wss://user.kindpag.es',
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
 ];
 

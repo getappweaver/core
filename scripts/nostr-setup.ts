@@ -16,7 +16,7 @@ const PROFILE_PUBLISH_RELAYS = [
   'wss://purplepag.es',
   'wss://relay.nos.social',
   'wss://user.kindpag.es',
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
   'wss://relay.0xchat.com',
 ];
@@ -119,10 +119,10 @@ async function main() {
 
   const relays = await getOrSetEnvVar(ENV_PATH, 'BOT_RELAYS', async () => {
     const raw = await question(
-      'DM/Inbox Relays (comma-separated).\nCheck https://marcodpt.github.io/nostracker/relays/index.html for NIP17 and NIP42 supported relays.\nEnter your relays (leave empty for default wss://relay.primal.net,wss://relay.damus.io): ',
+      'DM/Inbox Relays (comma-separated).\nCheck https://marcodpt.github.io/nostracker/relays/index.html for NIP17 and NIP42 supported relays.\nEnter your relays (leave empty for default wss://relay.primal.net,wss://relay.ditto.pub): ',
     );
 
-    return raw.trim() || 'wss://relay.primal.net,wss://relay.damus.io';
+    return raw.trim() || 'wss://relay.primal.net,wss://relay.ditto.pub';
   });
 
   const relayList = relays

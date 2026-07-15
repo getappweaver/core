@@ -30,7 +30,7 @@ import { renderPluginsInstallWeb } from './renderers/web';
 const PLUGIN_KIND = 32107;
 
 export const PLUGIN_QUERY_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
   'wss://nos.lol',
   'wss://nostr.mom',

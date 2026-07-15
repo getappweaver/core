@@ -11,7 +11,7 @@
  *   BOT_KEY                 - Bot's private key (hex)
  *   BOT_PUBKEY              - Bot's public key (hex) - optional, derived from BOT_KEY if omitted
  *   BOT_MASTER_PUBKEY       - Master's pubkey to listen to and reply to (hex)
- *   BOT_RELAYS              - Comma-separated relay URLs (e.g. wss://relay.damus.io,wss://relay.nos.social)
+ *   BOT_RELAYS              - Comma-separated relay URLs (e.g. wss://relay.ditto.pub,wss://relay.nos.social)
  *   DEBUG                   - Set to 1 for extra logging (subscription, received events, send targets)
  *   LOG                     - Set to 0 to suppress all log()/logError() output. Default 1.
  *   BOT_OPENCODE_SERVE_URL  - Attach to a running opencode server (e.g. http://localhost:4096)

@@ -8,7 +8,7 @@ export const SEARCH_RELAY_DISCOVERY_RELAYS = [
   'wss://purplepag.es',
   'wss://relay.nos.social',
   'wss://user.kindpag.es',
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
 ];
 

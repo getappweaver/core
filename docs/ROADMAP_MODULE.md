@@ -455,7 +455,7 @@ If AppWeaver wants compatibility with NIP-34 clients, it should announce the pro
     ["name", "AppWeaver"],
     ["description", "Nostr-native app builder"],
     ["web", "https://getappweaver.com"],
-    ["relays", "wss://relay.damus.io", "wss://relay.primal.net", "wss://relay.snort.social", "wss://nostr.mom", "wss://nos.lol"]
+    ["relays", "wss://relay.ditto.pub", "wss://relay.primal.net", "wss://relay.snort.social", "wss://nostr.mom", "wss://nos.lol"]
   ]
 }
 ```
@@ -472,7 +472,6 @@ Discovery/bootstrap relays:
 wss://purplepag.es
 wss://relay.nos.social
 wss://user.kindpag.es
-wss://relay.damus.io
 wss://relay.primal.net
 ```
 
@@ -621,7 +620,7 @@ Possible board/workflow event shape. The exact AppWeaver event kind can be chose
     ["col", "shipped", "Shipped"],
     ["col", "rejected", "Rejected"],
     ["col", "archived", "Archived"],
-    ["a", "30617:appweaver-owner-pubkey:appweaver", "wss://relay.damus.io", "project"]
+    ["a", "30617:appweaver-owner-pubkey:appweaver", "wss://xxx", "project"]
   ]
 }
 ```
@@ -642,8 +641,8 @@ Possible tracker event shape. The exact AppWeaver event kind can be chosen later
   "content": "in-progress",
   "tags": [
     ["d", "appweaver-roadmap:issue-event-id-1"],
-    ["e", "issue-event-id-1", "wss://relay.damus.io", "tracked_item"],
-    ["a", "39010:appweaver-board-pubkey:appweaver-roadmap", "wss://relay.damus.io", "workflow"],
+    ["e", "issue-event-id-1", "wss://xxx", "tracked_item"],
+    ["a", "39010:appweaver-board-pubkey:appweaver-roadmap", "wss://xxx", "workflow"],
     ["rank", "10"]
   ]
 }

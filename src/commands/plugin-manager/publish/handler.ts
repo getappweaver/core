@@ -27,7 +27,7 @@ import { renderPluginsPublishWeb } from './renderers/web';
 const PLUGIN_KIND = 32107;
 
 const PLUGIN_PUBLISH_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
   'wss://nos.lol',
   'wss://nostr.mom',

@@ -60,7 +60,7 @@ const PROFILE_RELAYS = [
 ];
 
 const PLUGIN_PUBLISH_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://relay.primal.net',
   'wss://nos.lol',
   'wss://nostr.mom',
@@ -637,7 +637,7 @@ async function main(): Promise<void> {
     console.log('No NIP-65 write relays found, using defaults.');
 
     writeRelays = [
-      'wss://relay.damus.io',
+      'wss://relay.ditto.pub',
       'wss://relay.primal.net',
       'wss://relay.nostr.band',
     ];

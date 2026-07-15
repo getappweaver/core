@@ -32,7 +32,7 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
   const initialRelays = () =>
     props.status.runtime.relays.length > 0
       ? props.status.runtime.relays.join('\n')
-      : 'wss://relay.primal.net\nwss://relay.damus.io';
+      : 'wss://relay.primal.net\nwss://relay.ditto.pub';
 
   const [savingMaster, setSavingMaster] = createSignal(false);
   const [generatingBotKey, setGeneratingBotKey] = createSignal(false);

@@ -22,7 +22,27 @@ export function allowRelayOperation(
   relayUrl: string,
   operation: ['read', Filter[]] | ['write', Event],
 ): boolean {
-  return operation[0] !== 'read' || !blockedReadRelays.has(relayUrl);
+  if (operation[0] !== 'read' || !blockedReadRelays.has(relayUrl)) {
+    return true;
+  }
+
+  const isDmSubscription = operation[1].some(
+    (filter) => filter.kinds?.includes(1059) === true,
+  );
+
+  if (isDmSubscription) {
+    debug(
+      `relay notice: allowing blocked relay ${relayUrl} for NIP-17 DM subscription`,
+    );
+
+    return true;
+  }
+
+  debug(
+    `relay notice: blocked read REQ to ${relayUrl}: ${JSON.stringify(operation[1])}`,
+  );
+
+  return false;
 }
 
 export function installRelayNoticeTracking(pool: SimplePool): void {
