@@ -11,13 +11,19 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
+import { createStore } from 'solid-js/store';
 import { render } from 'solid-js/web';
 
 import type { WebAction, WebNodeRoot, WebStyleSheet } from '@src/web/ui-schema';
 
+import type {
+  RunWebActionParams,
+  WebEntityPendingState,
+} from '../commands/types';
 import baseWebUiCss from '../webview/base-web-ui.css?raw';
 import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
 
+import { reconcileWebNodeRoot } from './web-node/reconcile';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import {
   getTreeItemExpandedStateForScope,
@@ -33,6 +39,7 @@ import {
   WebTreeHeaderElCallbackContext,
   WebTreeToolbarRegisterContext,
   type WebTreeToolbarRegistration,
+  WebPendingEntityContext,
 } from './WebNodeRenderer';
 
 type WebNodeShadowRootProps = {
@@ -40,6 +47,7 @@ type WebNodeShadowRootProps = {
   stateScopeId?: string;
   renderSurface?: 'dock' | 'modal' | 'timeline';
   busy?: boolean;
+  getEntityPending?: (entityKey: string) => WebEntityPendingState;
   /** When set, root-level `tree` UI registers handlers so the host can render toolbar in light DOM. */
   onWebTreeToolbarChange?: (
     registration: WebTreeToolbarRegistration | null,
@@ -53,18 +61,7 @@ type WebNodeShadowRootProps = {
   currentUserPubkey?: string | null;
   onError?: (message: string) => void;
   promptRequestId?: string;
-  onRunAction?: (
-    action: WebAction,
-    params?: {
-      onReplaceRoot?: (root: WebNodeRoot) => void;
-      promptRequestId?: string;
-      uiExecutionPolicy?: {
-        recordInTimeline?: boolean;
-        suppressSystemMessage?: boolean;
-      };
-      webCommandSourceId?: string;
-    },
-  ) => void;
+  onRunAction?: (action: WebAction, params?: RunWebActionParams) => void;
 };
 
 const BASE_STYLE_TEXT = `${baseWebUiCss}\n${webOverflowPanelCss}\n${hljsGithubDarkCss}`;
@@ -117,7 +114,7 @@ function syncPayloadStylesheets(props: SyncPayloadStylesheetsProps): void {
 export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   let hostEl: HTMLDivElement | undefined;
   const [ctx, setCtx] = createSignal<ShadowMountContext | null>(null);
-  const [currentRoot, setCurrentRoot] = createSignal<WebNodeRoot>(props.root);
+  const [currentRoot, setCurrentRoot] = createStore<WebNodeRoot>(props.root);
   const speechSentences = createMemo(() => props.speechSentences);
 
   const activeSpeechSentenceIndex = createMemo(
@@ -213,11 +210,11 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   });
 
   createEffect(() => {
-    setCurrentRoot(props.root);
+    setCurrentRoot(reconcileWebNodeRoot(props.root));
   });
 
   createEffect(() => {
-    const tree = currentRoot().tree;
+    const tree = currentRoot.tree;
 
     if (tree.type !== 'element' || tree.tag === 'tree') {
       return;
@@ -278,7 +275,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   });
 
   createEffect(() => {
-    const initialRevealedIds = currentRoot().initialRevealedIds ?? [];
+    const initialRevealedIds = currentRoot.initialRevealedIds ?? [];
 
     if (initialRevealedIds.length === 0) {
       return;
@@ -305,7 +302,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     syncPayloadStylesheets({
       shadow: c.shadow,
       mount: c.mount,
-      stylesheets: currentRoot().stylesheets,
+      stylesheets: currentRoot.stylesheets,
     });
   });
 
@@ -316,7 +313,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
       return;
     }
 
-    const mountScrollY = currentRoot().shadowMountOverflow !== 'hidden';
+    const mountScrollY = currentRoot.shadowMountOverflow !== 'hidden';
 
     c.mount.className = mountScrollY
       ? 'web-shadow-mount web-shadow-mount--scroll-y'
@@ -336,7 +333,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
       () => (
         <WebShadowUiBusyContext.Provider value={busyAccessor}>
           <TreeItemExpandedStateContext.Provider value={treeItemExpandedById}>
-            <WebRenderMetaContext.Provider value={() => currentRoot().meta}>
+            <WebRenderMetaContext.Provider value={() => currentRoot.meta}>
               <WebRenderSurfaceContext.Provider
                 value={() => props.renderSurface ?? null}
               >
@@ -351,18 +348,32 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                     >
                       <WebRevealContext.Provider value={revealContext}>
                         <WebToggleContext.Provider value={toggleContext}>
-                          <WebNodeRenderer
-                            root={currentRoot()}
-                            onReplaceRoot={props.onReplaceRoot}
-                            onError={props.onError}
-                            promptRequestId={props.promptRequestId}
-                            speechSentences={speechSentences}
-                            activeSpeechSentenceIndex={
-                              activeSpeechSentenceIndex
+                          <WebPendingEntityContext.Provider
+                            value={(entityKey) =>
+                              props.getEntityPending?.(entityKey) ?? {
+                                pending: false,
+                                label: null,
+                              }
                             }
-                            onSpeechSentenceClick={onSpeechSentenceClick}
-                            onRunAction={props.onRunAction}
-                          />
+                          >
+                            <WebNodeRenderer
+                              root={currentRoot}
+                              onReplaceRoot={props.onReplaceRoot}
+                              onError={props.onError}
+                              promptRequestId={props.promptRequestId}
+                              speechSentences={speechSentences}
+                              activeSpeechSentenceIndex={
+                                activeSpeechSentenceIndex
+                              }
+                              onSpeechSentenceClick={onSpeechSentenceClick}
+                              onRunAction={(action, params) =>
+                                props.onRunAction?.(action, {
+                                  ...params,
+                                  webTargetRoot: c.shadow,
+                                })
+                              }
+                            />
+                          </WebPendingEntityContext.Provider>
                         </WebToggleContext.Provider>
                       </WebRevealContext.Provider>
                     </WebCurrentUserPubkeyContext.Provider>

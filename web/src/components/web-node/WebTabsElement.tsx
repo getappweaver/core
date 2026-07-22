@@ -75,21 +75,21 @@ export function WebTabsElement(props: WebTabsElementProps): JSX.Element {
       <div class="widget-tabs" role="tablist">
         <For each={panels()}>
           {(panel) => {
-            const panelId = panel.props?.id ?? '';
+            const panelId = () => panel.props?.id ?? '';
 
             return (
               <WebButton
                 type="button"
                 class="web-button widget-tab"
-                classList={{ active: activeTabId() === panelId }}
+                classList={{ active: activeTabId() === panelId() }}
                 role="tab"
-                aria-selected={activeTabId() === panelId}
+                aria-selected={activeTabId() === panelId()}
                 aria-controls={
-                  panelId.length > 0 ? `${panelId}-panel` : undefined
+                  panelId().length > 0 ? `${panelId()}-panel` : undefined
                 }
-                onClick={() => setActiveTabId(panelId)}
+                onClick={() => setActiveTabId(panelId())}
               >
-                {panel.props?.label ?? panelId}
+                {panel.props?.label ?? panelId()}
               </WebButton>
             );
           }}
@@ -97,13 +97,13 @@ export function WebTabsElement(props: WebTabsElementProps): JSX.Element {
       </div>
       <Show when={activePanel()} keyed>
         {(panelNode) => {
-          const panelId = panelNode.props?.id;
+          const panelId = () => panelNode.props?.id;
 
           return (
             <div
               class={elementClass(panelNode)}
               data-ui={elementUi(panelNode)}
-              id={panelId != null ? `${panelId}-panel` : undefined}
+              id={panelId() != null ? `${panelId()}-panel` : undefined}
               role="tabpanel"
               style={elementStyle(panelNode)}
             >

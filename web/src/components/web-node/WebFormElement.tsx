@@ -281,7 +281,7 @@ type WebTextFieldNodeProps = {
 
 export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
-  const name = props.element.props?.formFieldName;
+  const name = () => props.element.props?.formFieldName;
   let inputEl: HTMLInputElement | undefined;
 
   createEffect(() => {
@@ -297,11 +297,13 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
 
   createEffect(() => {
     const stop = onStoryFillForm((values) => {
-      if (!inputEl || !name) {
+      const fieldName = name();
+
+      if (!inputEl || !fieldName) {
         return;
       }
 
-      const value = values.arguments[name] ?? values.options[name];
+      const value = values.arguments[fieldName] ?? values.options[fieldName];
 
       if (typeof value === 'string' || typeof value === 'number') {
         inputEl.value = String(value);
@@ -326,29 +328,31 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
     });
   });
 
-  if (name == null || name.length === 0) {
-    return null;
-  }
-
   return (
-    <div
-      class={elementClass(props.element)}
-      data-ui={elementUi(props.element)}
-      style={elementStyle(props.element)}
-    >
-      <input
-        ref={(el) => {
-          inputEl = el;
-        }}
-        class="web-textField__input"
-        type="text"
-        name={name}
-        value={props.element.props?.value ?? ''}
-        placeholder={props.element.props?.inputPlaceholder}
-        disabled={props.element.props?.disabled === true || getBusy() === true}
-        autocomplete="off"
-      />
-    </div>
+    <Show when={name()}>
+      {(fieldName) => (
+        <div
+          class={elementClass(props.element)}
+          data-ui={elementUi(props.element)}
+          style={elementStyle(props.element)}
+        >
+          <input
+            ref={(el) => {
+              inputEl = el;
+            }}
+            class="web-textField__input"
+            type="text"
+            name={fieldName()}
+            value={props.element.props?.value ?? ''}
+            placeholder={props.element.props?.inputPlaceholder}
+            disabled={
+              props.element.props?.disabled === true || getBusy() === true
+            }
+            autocomplete="off"
+          />
+        </div>
+      )}
+    </Show>
   );
 }
 
@@ -378,7 +382,7 @@ export function resizeAutoGrowTextArea(
 
 export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
-  const name = props.element.props?.formFieldName;
+  const name = () => props.element.props?.formFieldName;
   const maxRows = () => props.element.props?.maxRows ?? 4;
   let textareaEl: HTMLTextAreaElement | undefined;
 
@@ -403,11 +407,13 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
 
   createEffect(() => {
     const stop = onStoryFillForm((values) => {
-      if (!textareaEl || !name) {
+      const fieldName = name();
+
+      if (!textareaEl || !fieldName) {
         return;
       }
 
-      const value = values.arguments[name] ?? values.options[name];
+      const value = values.arguments[fieldName] ?? values.options[fieldName];
 
       if (typeof value === 'string' || typeof value === 'number') {
         textareaEl.value = String(value);
@@ -441,40 +447,40 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
     });
   });
 
-  const isReadOnlyTextArea = name == null || name.length === 0;
-
-  if (isReadOnlyTextArea && props.element.props?.disabled !== true) {
-    return null;
-  }
+  const isReadOnlyTextArea = () => !name();
 
   return (
-    <div
-      class={elementClass(props.element)}
-      data-ui={elementUi(props.element)}
-      style={elementStyle(props.element)}
-    >
-      <textarea
-        ref={(el) => {
-          textareaEl = el;
-          queueMicrotask(resize);
-        }}
-        class="web-textArea__input"
-        name={name ?? undefined}
-        rows={1}
-        value={props.element.props?.value ?? ''}
-        placeholder={props.element.props?.inputPlaceholder}
-        disabled={props.element.props?.disabled === true || getBusy() === true}
-        readOnly={isReadOnlyTextArea}
-        autocomplete="off"
-        onInput={resize}
-      />
-    </div>
+    <Show when={name() || props.element.props?.disabled === true}>
+      <div
+        class={elementClass(props.element)}
+        data-ui={elementUi(props.element)}
+        style={elementStyle(props.element)}
+      >
+        <textarea
+          ref={(el) => {
+            textareaEl = el;
+            queueMicrotask(resize);
+          }}
+          class="web-textArea__input"
+          name={name()}
+          rows={1}
+          value={props.element.props?.value ?? ''}
+          placeholder={props.element.props?.inputPlaceholder}
+          disabled={
+            props.element.props?.disabled === true || getBusy() === true
+          }
+          readOnly={isReadOnlyTextArea()}
+          autocomplete="off"
+          onInput={resize}
+        />
+      </div>
+    </Show>
   );
 }
 
 export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
-  const name = props.element.props?.formFieldName;
+  const name = () => props.element.props?.formFieldName;
   let selectEl: HTMLSelectElement | undefined;
 
   createEffect(() => {
@@ -509,7 +515,7 @@ export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
           selectEl = el;
         }}
         class="web-select__input"
-        name={name}
+        name={name()}
         disabled={props.element.props?.disabled === true || getBusy() === true}
         value={
           props.element.props?.value ?? props.element.props?.choices?.[0] ?? ''
@@ -540,13 +546,37 @@ export function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
     new Set(props.element.props?.values ?? []),
   );
 
-  const name = props.element.props?.formFieldName;
+  const name = () => props.element.props?.formFieldName;
   let customInputEl: HTMLInputElement | undefined;
 
   const selectedValueList = createMemo(() => Array.from(selectedValues()));
 
   const choiceSelected = (choice: string) =>
     multiple() ? selectedValues().has(choice) : selected() === choice;
+
+  createEffect(() => {
+    const available = new Set(choices());
+
+    if (multiple()) {
+      setSelectedValues((current) => {
+        const retained = new Set(
+          [...current].filter((choice) => available.has(choice)),
+        );
+
+        return retained.size > 0
+          ? retained
+          : choices()[0]
+            ? new Set([choices()[0]!])
+            : new Set();
+      });
+
+      return;
+    }
+
+    if (!available.has(selected())) {
+      setSelected(props.element.props?.value ?? choices()[0] ?? '');
+    }
+  });
 
   const toggleChoice = (choice: string) => {
     if (!multiple()) {
@@ -586,12 +616,12 @@ export function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
         when={multiple()}
         fallback={
           <Show when={selected() !== customChoice()}>
-            <input type="hidden" name={name} value={selected()} />
+            <input type="hidden" name={name()} value={selected()} />
           </Show>
         }
       >
         <For each={selectedValueList()}>
-          {(choice) => <input type="hidden" name={name} value={choice} />}
+          {(choice) => <input type="hidden" name={name()} value={choice} />}
         </For>
       </Show>
       <div class="web-choiceField__choices">

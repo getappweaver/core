@@ -1,5 +1,6 @@
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
+import type { RunWebActionParams } from '../../commands/types';
 import type { LayoutPrefs } from '../../layout/desktopLayoutPrefs';
 import type { TimelineItem } from '../../types';
 
@@ -20,15 +21,11 @@ export type TimelineViewProps = {
   onAppendSystem: (text: string) => void;
   currentUserPubkey: string | null;
   isWebUiBusy: (sourceId: string) => boolean;
-  onRunWebAction: (
-    action: WebAction,
-    params?: {
-      onReplaceRoot?: (root: WebNodeRoot) => void;
-      promptRequestId?: string;
-      promptInTimeline?: boolean;
-      webCommandSourceId?: string;
-    },
-  ) => void;
+  getWebEntityPending: (
+    sourceId: string,
+    entityKey: string,
+  ) => import('../../commands/types').WebEntityPendingState;
+  onRunWebAction: (action: WebAction, params?: RunWebActionParams) => void;
   onRunJsonCommand: (props: {
     command: string;
     subcommand: string;

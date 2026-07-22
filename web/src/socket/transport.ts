@@ -63,7 +63,7 @@ export function connectSocketTransport(params: {
     setSocket(null);
     handlers.setWsConnected(false);
     state.pendingRequests.clear();
-    handlers.setWebUiBusyCounts({});
+    handlers.clearWebPendingState();
     handlers.scheduleSocketReconnect();
   });
 

@@ -41,6 +41,19 @@ export type RunWebActionParams = {
     suppressSystemMessage?: boolean;
   };
   webCommandSourceId?: string;
+  webCommandSourceEntityKey?: string;
+  webTargetRoot?: ParentNode;
+};
+
+export type WebEntityPendingState = {
+  pending: boolean;
+  label: string | null;
+};
+
+export type BeginWebEntityPendingProps = {
+  sourceId: string;
+  entityKey: string;
+  label: string;
 };
 
 export type CommandWebAction = Extract<WebAction, { type: 'command' }>;
@@ -87,6 +100,8 @@ export type CommandsAdapters = {
   refreshCoreUpdateState: () => Promise<void>;
   beginWebUiBusy: (sourceId: string) => void;
   endWebUiBusy: (sourceId: string) => void;
+  beginWebEntityPending: (props: BeginWebEntityPendingProps) => void;
+  endWebEntityPending: (sourceId: string, entityKey: string) => void;
   pendingRequests: Map<string, PendingRequest>;
   sendSocketMessage: (message: unknown) => void;
   runOpenCommandFormFromWebCommand: (action: CommandWebAction) => Promise<void>;

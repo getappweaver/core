@@ -149,3 +149,27 @@ Plugin / handler guardrails:
 Schema: `WebStyleSheet` in `src/web/ui-schema.ts` (`{ id, cssText }`); optional `stylesheets` array on `WebRenderResultSchema` / `WebNodeRoot`.
 
 **Shadow mount overflow:** optional `shadowMountOverflow` on `WebNodeRoot` (`'hidden' | 'scroll-y'`). Omitted or `'scroll-y'` lets the inner Solid mount scroll when content is taller than the host (typical timeline cards). Use `'hidden'` when your tree defines its own scroll regions (for example a fixed chrome row plus an `overflow: auto` panel inside `stylesheets`). The file `tree` web renderer sets `'hidden'` so only `.web-file-tree-block` scrolls in the modal.
+
+## Stable identity and pending UI
+
+Refreshed `WebNodeRoot` payloads are authoritative complete trees. The client reconciles compatible element nodes so stateful components can keep local UI state while server-rendered props, children, metadata, and stylesheets update.
+
+- Put `renderKey` on repeated or stateful element nodes. It must be stable across equivalent refreshes, unique among siblings, independent of sorting/counts, and never reused for another element tag.
+- Include branch context when one entity appears in several places, for example `topic:nostr:event:<id>` and `mood:focused:event:<id>`. `renderKey` identifies one rendered instance.
+- Put `entityKey` in element props when several render instances represent one logical entity, for example `nostr-event:<id>`. Duplicate entity keys are intentional and are not reconciliation keys.
+- Unkeyed legacy nodes continue to reconcile positionally. Reordered stateful collections should always provide keys.
+- The client uses a focused recursive WebNode reconciler rather than Solid's stock keyed array reconciler because WebNode arrays may mix keyed elements, unkeyed elements, and text nodes.
+
+Command actions may choose pending presentation:
+
+```ts
+pendingUi: {
+  presentation: 'entity',
+  label: 'Updating...',
+}
+```
+
+- Omitted or `widget` keeps the widget-wide Working overlay.
+- `entity` uses the nearest ancestor `entityKey`, marks every mounted copy in the same widget source pending, and falls back to widget pending when no entity is available.
+- `none` runs without a pending overlay.
+- Keep the action's refresh command server-authoritative. Entity pending remains active through refresh settlement, and late older refresh roots are ignored.

@@ -7,6 +7,11 @@ import { Show } from 'solid-js';
 
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
+import type {
+  RunWebActionParams,
+  WebEntityPendingState,
+} from '../commands/types';
+
 import { WebButton } from './WebButton';
 import { WebNodeShadowRoot } from './WebNodeShadowRoot';
 
@@ -22,19 +27,12 @@ type WebCommandOutputModalProps = {
   currentUserPubkey: string | null;
   onReplaceWeb: (root: WebNodeRoot) => void;
   isWebUiBusy: (sourceId: string) => boolean;
+  getWebEntityPending: (
+    sourceId: string,
+    entityKey: string,
+  ) => WebEntityPendingState;
   chromeWebCommandSourceId: string;
-  onRunWebAction: (
-    action: WebAction,
-    params?: {
-      onReplaceRoot?: (root: WebNodeRoot) => void;
-      promptRequestId?: string;
-      uiExecutionPolicy?: {
-        recordInTimeline?: boolean;
-        suppressSystemMessage?: boolean;
-      };
-      webCommandSourceId?: string;
-    },
-  ) => void;
+  onRunWebAction: (action: WebAction, params?: RunWebActionParams) => void;
   /** When set, a prompt from a chrome command is shown above the main body. */
   chromePromptOverlay?: () => JSX.Element | null;
 };
@@ -109,13 +107,16 @@ export function WebCommandOutputModal(
                   renderSurface="modal"
                   currentUserPubkey={props.currentUserPubkey}
                   busy={props.isWebUiBusy(props.chromeWebCommandSourceId)}
+                  getEntityPending={(entityKey) =>
+                    props.getWebEntityPending(
+                      props.chromeWebCommandSourceId,
+                      entityKey,
+                    )
+                  }
                   onRunAction={(action, params) =>
                     props.onRunWebAction(action, {
                       ...params,
-                      onReplaceRoot: (root) => {
-                        params?.onReplaceRoot?.(root);
-                        props.onReplaceWeb(root);
-                      },
+                      onReplaceRoot: props.onReplaceWeb,
                     })
                   }
                   onReplaceRoot={props.onReplaceWeb}

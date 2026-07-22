@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v10.0.0] - 2026-07-23
+
+- feat: add keyed WebNode reconciliation (99e43c3)
+
 ## [v9.55.0] - 2026-07-23
 
-- feat: integrate Nostr interactions with event resolution (35c6177)
+- feat: integrate Nostr interactions with event resolution (b709f97)
 
 ## [v9.54.1] - 2026-07-23
 

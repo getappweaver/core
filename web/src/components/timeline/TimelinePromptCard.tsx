@@ -55,6 +55,7 @@ function scrollTimelineItemToTop(
 type TimelinePromptCardProps = {
   item: Extract<TimelineItem, { type: 'prompt' }>;
   isWebUiBusy: TimelineViewProps['isWebUiBusy'];
+  getWebEntityPending: TimelineViewProps['getWebEntityPending'];
   onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
   onRunWebAction: TimelineViewProps['onRunWebAction'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
@@ -114,6 +115,9 @@ export function TimelinePromptCard(props: TimelinePromptCardProps) {
             root={props.item.web!}
             promptRequestId={props.item.requestId}
             busy={props.isWebUiBusy(props.item.id)}
+            getEntityPending={(entityKey) =>
+              props.getWebEntityPending(props.item.id, entityKey)
+            }
             currentUserPubkey={props.currentUserPubkey}
             onRunAction={(action, params) =>
               props.onRunWebAction(action, {

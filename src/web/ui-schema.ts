@@ -54,6 +54,11 @@ export const WebCommandStatusSchema = z.object({
   statusTargetId: z.string().min(1).optional(),
 });
 
+export const WebPendingUiSchema = z.object({
+  presentation: z.enum(['widget', 'entity', 'none']),
+  label: z.string().min(1).optional(),
+});
+
 /** Optional line under a command option in the web form; not sent to the bot. */
 export const WebOptionFieldHintObjectSchema = z.object({
   /** Human-readable context for the current option value (e.g. todo title for `--under`). */
@@ -133,6 +138,8 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     clientContext: z.array(z.enum(['nostrSearchRelays'])).optional(),
     /** Optional client-visible lifecycle messages for long-running command actions. */
     clientStatus: WebCommandStatusSchema.optional(),
+    /** Choose widget-wide, nearest-entity, or no pending presentation. */
+    pendingUi: WebPendingUiSchema.optional(),
   }),
   z.object({
     /** Browser-side action handled by the web app; payload is client-specific JSON. */
@@ -207,6 +214,8 @@ export const WebNostrSharePrefixesSchema = z.object({
 });
 
 const WebNostrPostReferenceBaseSchema = z.object({
+  /** Shared logical identity for pending state on nested post references. */
+  entityKey: z.string().min(1).optional(),
   token: z.string().min(1).optional(),
   type: z.enum(['event', 'profile', 'address', 'unknown']).optional(),
   id: z.string().min(1).optional(),
@@ -373,6 +382,8 @@ export const WebButtonVariantSchema = z.enum(['default', 'icon']);
 
 export const WebBasePropsSchema = z.object({
   id: z.string().min(1).optional(),
+  /** Shared logical identity; unlike `renderKey`, duplicates are intentional. */
+  entityKey: z.string().min(1).optional(),
   className: z.string().min(1).optional(),
   ui: z.string().min(1).optional(),
   href: z.string().min(1).optional(),
@@ -573,6 +584,8 @@ export type WebTextNode = z.infer<typeof WebTextNodeSchema>;
 export type WebGenericElementNode = {
   type: 'element';
   tag: z.infer<typeof WebGenericElementTagSchema>;
+  /** Stable sibling identity used by client-side render reconciliation. */
+  renderKey?: string;
   props?: z.infer<typeof WebBasePropsSchema>;
   /** Optional tree item summary; if omitted, first child is used for backward compatibility. */
   summary?: WebNode;
@@ -585,6 +598,8 @@ export type WebNostrPostProps = z.infer<typeof WebNostrPostElementPropsSchema>;
 export type WebNostrPostElement = {
   type: 'element';
   tag: 'nostrPost';
+  /** Stable sibling identity used by client-side render reconciliation. */
+  renderKey?: string;
   props?: WebNostrPostProps;
   summary?: WebNode;
   children?: WebNode[];
@@ -599,6 +614,7 @@ export const WebElementNodeSchema: z.ZodType<WebElementNode> = z.lazy(() =>
     z.object({
       type: z.literal('element'),
       tag: z.literal('nostrPost'),
+      renderKey: z.string().min(1).optional(),
       props: WebNostrPostElementPropsSchema.optional(),
       summary: WebNodeSchema.optional(),
       children: z.array(WebNodeSchema).optional(),
@@ -606,6 +622,7 @@ export const WebElementNodeSchema: z.ZodType<WebElementNode> = z.lazy(() =>
     z.object({
       type: z.literal('element'),
       tag: WebGenericElementTagSchema,
+      renderKey: z.string().min(1).optional(),
       props: WebBasePropsSchema.optional(),
       summary: WebNodeSchema.optional(),
       children: z.array(WebNodeSchema).optional(),

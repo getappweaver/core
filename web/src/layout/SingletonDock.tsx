@@ -1,5 +1,5 @@
 import type { Accessor, JSX } from 'solid-js';
-import { For, Show } from 'solid-js';
+import { For, Show, createMemo } from 'solid-js';
 
 import { TimelineCommandResultCard } from '../components/timeline/TimelineCommandResultCard';
 import type { TimelineViewProps } from '../components/timeline/types';
@@ -44,6 +44,7 @@ type SingletonDockProps = {
   onCloseTaskbarWidget: (command: string, subcommand: string) => void;
   onReplaceCommandWeb: TimelineViewProps['onReplaceCommandWeb'];
   isWebUiBusy: TimelineViewProps['isWebUiBusy'];
+  getWebEntityPending: TimelineViewProps['getWebEntityPending'];
   onRunWebAction: TimelineViewProps['onRunWebAction'];
   onRunJsonCommand: TimelineViewProps['onRunJsonCommand'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
@@ -54,6 +55,14 @@ type SingletonDockProps = {
 };
 
 export function SingletonDock(props: SingletonDockProps): JSX.Element {
+  const dockCardKeys = createMemo(() =>
+    props.dockedWidgetCards().map((card) => card.key),
+  );
+
+  const dockCardsByKey = createMemo(
+    () => new Map(props.dockedWidgetCards().map((card) => [card.key, card])),
+  );
+
   const isExpanded = (key: string) =>
     props.expandedDockWidgetKeys().includes(key);
 
@@ -107,59 +116,20 @@ export function SingletonDock(props: SingletonDockProps): JSX.Element {
         </div>
         <div class="singleton-dock__cards">
           <Show
-            when={props.dockedWidgetCards().length > 0}
+            when={dockCardKeys().length > 0}
             fallback={
               <div class="singleton-dock__placeholder">
                 Open a widget to keep it here while you chat.
               </div>
             }
           >
-            <For each={props.dockedWidgetCards()}>
-              {(dockCard) => (
-                <section
-                  class="singleton-dock-card"
-                  classList={{
-                    'singleton-dock-card--focused': isExpanded(dockCard.key),
-                    'singleton-dock-card--active': isExpanded(dockCard.key),
-                  }}
-                  tabIndex={-1}
-                  ref={(el) => props.onDockCardElement(dockCard.key, el)}
-                >
-                  <div class="singleton-dock-card__body">
-                    <TimelineCommandResultCard
-                      item={dockCard.item}
-                      iconUrl={resolveWidgetIconUrl(dockCard.widget)}
-                      onOpenCommand={props.onOpenCommand}
-                      onRepeatSubcommand={props.onRepeatSubcommand}
-                      onDeleteTimelineItem={() =>
-                        props.onCloseTaskbarWidget(
-                          dockCard.widget.command,
-                          dockCard.widget.subcommand,
-                        )
-                      }
-                      onReplaceCommandWeb={props.onReplaceCommandWeb}
-                      isWebUiBusy={props.isWebUiBusy}
-                      onRunWebAction={props.onRunWebAction}
-                      onRunJsonCommand={props.onRunJsonCommand}
-                      onAppendSystem={props.onAppendSystem}
-                      currentUserPubkey={props.currentUserPubkey()}
-                      renderSurface="dock"
-                      collapsed={!isExpanded(dockCard.key)}
-                      onHeadClick={() =>
-                        props.onToggleExpandedDockWidget(dockCard.key)
-                      }
-                      onCollapsedChange={(collapsed) => {
-                        if (collapsed) {
-                          props.onCollapseDockWidget(dockCard.key);
-
-                          return;
-                        }
-
-                        props.onExpandDockWidget(dockCard.key);
-                      }}
-                    />
-                  </div>
-                </section>
+            <For each={dockCardKeys()}>
+              {(cardKey) => (
+                <DockCardSlot
+                  card={() => dockCardsByKey().get(cardKey) ?? null}
+                  dockProps={props}
+                  isExpanded={isExpanded}
+                />
               )}
             </For>
           </Show>
@@ -175,5 +145,67 @@ export function SingletonDock(props: SingletonDockProps): JSX.Element {
         />
       </Show>
     </>
+  );
+}
+
+type DockCardSlotProps = {
+  card: Accessor<DockedWidgetCard | null>;
+  dockProps: SingletonDockProps;
+  isExpanded: (key: string) => boolean;
+};
+
+function DockCardSlot(props: DockCardSlotProps): JSX.Element {
+  const dockProps = props.dockProps;
+
+  return (
+    <Show when={props.card()}>
+      {(dockCard) => (
+        <section
+          class="singleton-dock-card"
+          classList={{
+            'singleton-dock-card--focused': props.isExpanded(dockCard().key),
+            'singleton-dock-card--active': props.isExpanded(dockCard().key),
+          }}
+          tabIndex={-1}
+          ref={(el) => dockProps.onDockCardElement(dockCard().key, el)}
+        >
+          <div class="singleton-dock-card__body">
+            <TimelineCommandResultCard
+              item={dockCard().item}
+              iconUrl={resolveWidgetIconUrl(dockCard().widget)}
+              onOpenCommand={dockProps.onOpenCommand}
+              onRepeatSubcommand={dockProps.onRepeatSubcommand}
+              onDeleteTimelineItem={() =>
+                dockProps.onCloseTaskbarWidget(
+                  dockCard().widget.command,
+                  dockCard().widget.subcommand,
+                )
+              }
+              onReplaceCommandWeb={dockProps.onReplaceCommandWeb}
+              isWebUiBusy={dockProps.isWebUiBusy}
+              getWebEntityPending={dockProps.getWebEntityPending}
+              onRunWebAction={dockProps.onRunWebAction}
+              onRunJsonCommand={dockProps.onRunJsonCommand}
+              onAppendSystem={dockProps.onAppendSystem}
+              currentUserPubkey={dockProps.currentUserPubkey()}
+              renderSurface="dock"
+              collapsed={!props.isExpanded(dockCard().key)}
+              onHeadClick={() =>
+                dockProps.onToggleExpandedDockWidget(dockCard().key)
+              }
+              onCollapsedChange={(collapsed) => {
+                if (collapsed) {
+                  dockProps.onCollapseDockWidget(dockCard().key);
+
+                  return;
+                }
+
+                dockProps.onExpandDockWidget(dockCard().key);
+              }}
+            />
+          </div>
+        </section>
+      )}
+    </Show>
   );
 }

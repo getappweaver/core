@@ -267,12 +267,32 @@ select {
 }
 
 .web-nostrPost {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.45rem;
   padding: 0.35rem 0.45rem;
   border-left: 2px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
   background: color-mix(in srgb, var(--color-surface-alt) 68%, transparent);
+}
+
+.web-nostrPost__pending {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: grid;
+  place-items: start end;
+  padding: 0.3rem 0.45rem;
+  background: color-mix(in srgb, var(--color-surface-alt) 28%, transparent);
+  pointer-events: none;
+}
+
+.web-nostrPost__pending span {
+  padding: 0.08rem 0.25rem;
+  background: #000;
+  color: var(--color-warning);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .web-nostrPost--nested {

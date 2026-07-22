@@ -3,7 +3,10 @@ import { createEffect, createMemo, createSignal } from 'solid-js';
 import { renderStoryListRoot } from '@src/commands/story/renderers/story-list-component';
 import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
 
-import type { ComposerAiState } from '../commands/types';
+import type {
+  BeginWebEntityPendingProps,
+  ComposerAiState,
+} from '../commands/types';
 import { isWebDemoMode } from '../demo/runtime';
 import {
   consumePluginInstallRestartMessage,
@@ -240,6 +243,10 @@ export function useSocket(adapters: SocketAppAdapters) {
     Record<string, number>
   >({});
 
+  const [webEntityPending, setWebEntityPending] = createSignal<
+    Record<string, Record<string, { count: number; label: string }>>
+  >({});
+
   const [wsReconnectNonce, setWsReconnectNonce] = createSignal(0);
 
   let socket: WebSocket | null = null;
@@ -286,6 +293,59 @@ export function useSocket(adapters: SocketAppAdapters) {
 
   function isWebUiBusyFor(sourceId: string): boolean {
     return (webUiBusyCounts()[sourceId] ?? 0) > 0;
+  }
+
+  function beginWebEntityPending({
+    sourceId,
+    entityKey,
+    label,
+  }: BeginWebEntityPendingProps): void {
+    setWebEntityPending((prev) => ({
+      ...prev,
+      [sourceId]: {
+        ...(prev[sourceId] ?? {}),
+        [entityKey]: {
+          count: (prev[sourceId]?.[entityKey]?.count ?? 0) + 1,
+          label,
+        },
+      },
+    }));
+  }
+
+  function endWebEntityPending(sourceId: string, entityKey: string): void {
+    setWebEntityPending((prev) => {
+      const source = { ...(prev[sourceId] ?? {}) };
+      const current = source[entityKey];
+
+      if (!current) {
+        return prev;
+      }
+
+      if (current.count <= 1) {
+        delete source[entityKey];
+      } else {
+        source[entityKey] = { ...current, count: current.count - 1 };
+      }
+
+      const next = { ...prev };
+
+      if (Object.keys(source).length === 0) {
+        delete next[sourceId];
+      } else {
+        next[sourceId] = source;
+      }
+
+      return next;
+    });
+  }
+
+  function getWebEntityPendingFor(sourceId: string, entityKey: string) {
+    const state = webEntityPending()[sourceId]?.[entityKey];
+
+    return {
+      pending: (state?.count ?? 0) > 0,
+      label: state?.label ?? null,
+    };
   }
 
   const webUiBusyDigest = createMemo(() => JSON.stringify(webUiBusyCounts()));
@@ -637,7 +697,10 @@ export function useSocket(adapters: SocketAppAdapters) {
       setSocket,
       handlers: {
         setWsConnected,
-        setWebUiBusyCounts,
+        clearWebPendingState: () => {
+          setWebUiBusyCounts({});
+          setWebEntityPending({});
+        },
         scheduleSocketReconnect: () => {
           if (adapters.auth.authState().status === 'connected') {
             scheduleReconnect();
@@ -802,10 +865,13 @@ export function useSocket(adapters: SocketAppAdapters) {
   }
 
   return {
+    beginWebEntityPending,
     beginWebUiBusy,
     connectSocket,
     disconnectSocket,
+    endWebEntityPending,
     endWebUiBusy,
+    getWebEntityPendingFor,
     isWebUiBusyFor,
     pendingRequests,
     requestComposerAiState,

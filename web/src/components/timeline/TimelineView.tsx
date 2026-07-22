@@ -1,4 +1,5 @@
-import { For, Match, Show, Switch, createSignal } from 'solid-js';
+import type { Accessor } from 'solid-js';
+import { For, Match, Show, Switch, createMemo, createSignal } from 'solid-js';
 
 import type { TimelineFileDiff } from '@src/timeline/types';
 
@@ -31,142 +32,170 @@ import { TimelineSpeechButton } from './TimelineSpeechButton';
 import type { TimelineViewProps } from './types';
 
 export function TimelineView(props: TimelineViewProps) {
+  const itemIds = createMemo(() => props.timeline.map((item) => item.id));
+
+  const itemsById = createMemo(
+    () => new Map(props.timeline.map((item) => [item.id, item])),
+  );
+
   return (
     <div
       class="timeline panel"
       classList={{ 'timeline--bottom-fade': props.showBottomFade }}
       ref={(el) => props.setTimelineRef(el)}
     >
-      <For each={props.timeline}>
-        {(item) => (
-          <Switch>
-            <Match when={isSystemItem(item)}>
-              <TimelineSystemCard
-                text={(item as Extract<TimelineItem, { type: 'system' }>).text}
-              />
-            </Match>
-
-            <Match when={isChatItem(item)}>
-              <TimelineChatEntry
-                item={item as Extract<TimelineItem, { type: 'chat' }>}
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-              />
-            </Match>
-
-            <Match when={isReasoningItem(item)}>
-              <TimelineReasoningCard
-                id={(item as Extract<TimelineItem, { type: 'reasoning' }>).id}
-                text={
-                  (item as Extract<TimelineItem, { type: 'reasoning' }>).text
-                }
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-              />
-            </Match>
-
-            <Match when={isAgentSummaryItem(item)}>
-              <TimelineAgentSummaryCard
-                text={
-                  (item as Extract<TimelineItem, { type: 'agent_summary' }>)
-                    .text
-                }
-              />
-            </Match>
-
-            <Match when={isDiffItem(item)}>
-              <TimelineDiffCard
-                item={item as Extract<TimelineItem, { type: 'diff' }>}
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-                onRunJsonCommand={props.onRunJsonCommand}
-                onRunJsonCommandOutput={props.onRunJsonCommandOutput}
-                onReplaceTimelineItem={props.onReplaceTimelineItem}
-                onRunWebAction={props.onRunWebAction}
-                onAppendSystem={props.onAppendSystem}
-              />
-            </Match>
-
-            <Match when={isDiffSummaryItem(item)}>
-              <TimelineDiffSummaryRow
-                summary={
-                  (item as Extract<TimelineItem, { type: 'diff_summary' }>)
-                    .summary
-                }
-              />
-            </Match>
-
-            <Match when={isToolItem(item)}>
-              <TimelineToolCard
-                item={item as Extract<TimelineItem, { type: 'tool' }>}
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-              />
-            </Match>
-
-            <Match when={isPromptItem(item)}>
-              <TimelinePromptCard
-                item={item as Extract<TimelineItem, { type: 'prompt' }>}
-                isWebUiBusy={props.isWebUiBusy}
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-                onRunWebAction={props.onRunWebAction}
-                onAppendSystem={props.onAppendSystem}
-                currentUserPubkey={props.currentUserPubkey}
-              />
-            </Match>
-
-            <Match when={isLayoutSettingsItem(item)}>
-              <Show when={props.layoutPrefs && props.onUpdateLayoutPrefs}>
-                <TimelineLayoutSettingsCard
-                  item={
-                    item as Extract<TimelineItem, { type: 'layout_settings' }>
-                  }
-                  layoutPrefs={props.layoutPrefs!}
-                  onUpdateLayoutPrefs={props.onUpdateLayoutPrefs!}
-                  onDeleteTimelineItem={props.onDeleteTimelineItem}
-                />
-              </Show>
-            </Match>
-
-            <Match when={isCommandResultItem(item)}>
-              <div
-                classList={{
-                  'timeline-item-visually-hidden':
-                    props.isTimelineItemHidden?.(
-                      item as Extract<TimelineItem, { type: 'command_result' }>,
-                    ) === true,
-                }}
-              >
-                <TimelineCommandResultCard
-                  item={
-                    item as Extract<TimelineItem, { type: 'command_result' }>
-                  }
-                  onOpenCommand={props.onOpenCommand}
-                  onRepeatSubcommand={props.onRepeatSubcommand}
-                  onDeleteTimelineItem={props.onDeleteTimelineItem}
-                  onReplaceCommandWeb={props.onReplaceCommandWeb}
-                  isWebUiBusy={props.isWebUiBusy}
-                  onRunWebAction={props.onRunWebAction}
-                  onRunJsonCommand={props.onRunJsonCommand}
-                  onAppendSystem={props.onAppendSystem}
-                  currentUserPubkey={props.currentUserPubkey}
-                />
-              </div>
-            </Match>
-
-            <Match when={isCommandFormItem(item)}>
-              <CommandFormCard
-                active={props.activeFormId === item.id}
-                formItem={
-                  item as Extract<TimelineItem, { type: 'command_form' }>
-                }
-                onOpenCommand={props.onOpenCommand}
-                onRepeatSubcommand={props.onRepeatSubcommand}
-                onDeleteTimelineItem={props.onDeleteTimelineItem}
-                onUpdateFormValue={props.onUpdateFormValue}
-                onSubmitForm={props.onSubmitForm}
-              />
-            </Match>
-          </Switch>
+      <For each={itemIds()}>
+        {(itemId) => (
+          <TimelineItemSlot
+            item={() => itemsById().get(itemId) ?? null}
+            viewProps={props}
+          />
         )}
       </For>
     </div>
+  );
+}
+
+type TimelineItemSlotProps = {
+  item: Accessor<TimelineItem | null>;
+  viewProps: TimelineViewProps;
+};
+
+function TimelineItemSlot(props: TimelineItemSlotProps) {
+  const viewProps = props.viewProps;
+
+  return (
+    <Show when={props.item()}>
+      {(item) => (
+        <Switch>
+          <Match when={isSystemItem(item())}>
+            <TimelineSystemCard
+              text={(item() as Extract<TimelineItem, { type: 'system' }>).text}
+            />
+          </Match>
+
+          <Match when={isChatItem(item())}>
+            <TimelineChatEntry
+              item={item() as Extract<TimelineItem, { type: 'chat' }>}
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+            />
+          </Match>
+
+          <Match when={isReasoningItem(item())}>
+            <TimelineReasoningCard
+              id={(item() as Extract<TimelineItem, { type: 'reasoning' }>).id}
+              text={
+                (item() as Extract<TimelineItem, { type: 'reasoning' }>).text
+              }
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+            />
+          </Match>
+
+          <Match when={isAgentSummaryItem(item())}>
+            <TimelineAgentSummaryCard
+              text={
+                (item() as Extract<TimelineItem, { type: 'agent_summary' }>)
+                  .text
+              }
+            />
+          </Match>
+
+          <Match when={isDiffItem(item())}>
+            <TimelineDiffCard
+              item={item() as Extract<TimelineItem, { type: 'diff' }>}
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+              onRunJsonCommand={viewProps.onRunJsonCommand}
+              onRunJsonCommandOutput={viewProps.onRunJsonCommandOutput}
+              onReplaceTimelineItem={viewProps.onReplaceTimelineItem}
+              onRunWebAction={viewProps.onRunWebAction}
+              onAppendSystem={viewProps.onAppendSystem}
+            />
+          </Match>
+
+          <Match when={isDiffSummaryItem(item())}>
+            <TimelineDiffSummaryRow
+              summary={
+                (item() as Extract<TimelineItem, { type: 'diff_summary' }>)
+                  .summary
+              }
+            />
+          </Match>
+
+          <Match when={isToolItem(item())}>
+            <TimelineToolCard
+              item={item() as Extract<TimelineItem, { type: 'tool' }>}
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+            />
+          </Match>
+
+          <Match when={isPromptItem(item())}>
+            <TimelinePromptCard
+              item={item() as Extract<TimelineItem, { type: 'prompt' }>}
+              isWebUiBusy={viewProps.isWebUiBusy}
+              getWebEntityPending={viewProps.getWebEntityPending}
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+              onRunWebAction={viewProps.onRunWebAction}
+              onAppendSystem={viewProps.onAppendSystem}
+              currentUserPubkey={viewProps.currentUserPubkey}
+            />
+          </Match>
+
+          <Match when={isLayoutSettingsItem(item())}>
+            <Show when={viewProps.layoutPrefs && viewProps.onUpdateLayoutPrefs}>
+              <TimelineLayoutSettingsCard
+                item={
+                  item() as Extract<TimelineItem, { type: 'layout_settings' }>
+                }
+                layoutPrefs={viewProps.layoutPrefs!}
+                onUpdateLayoutPrefs={viewProps.onUpdateLayoutPrefs!}
+                onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+              />
+            </Show>
+          </Match>
+
+          <Match when={isCommandResultItem(item())}>
+            <div
+              classList={{
+                'timeline-item-visually-hidden':
+                  viewProps.isTimelineItemHidden?.(
+                    item() as Extract<TimelineItem, { type: 'command_result' }>,
+                  ) === true,
+              }}
+            >
+              <TimelineCommandResultCard
+                item={
+                  item() as Extract<TimelineItem, { type: 'command_result' }>
+                }
+                onOpenCommand={viewProps.onOpenCommand}
+                onRepeatSubcommand={viewProps.onRepeatSubcommand}
+                onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+                onReplaceCommandWeb={viewProps.onReplaceCommandWeb}
+                isWebUiBusy={viewProps.isWebUiBusy}
+                getWebEntityPending={viewProps.getWebEntityPending}
+                onRunWebAction={viewProps.onRunWebAction}
+                onRunJsonCommand={viewProps.onRunJsonCommand}
+                onAppendSystem={viewProps.onAppendSystem}
+                currentUserPubkey={viewProps.currentUserPubkey}
+              />
+            </div>
+          </Match>
+
+          <Match when={isCommandFormItem(item())}>
+            <CommandFormCard
+              active={viewProps.activeFormId === item().id}
+              formItem={
+                item() as Extract<TimelineItem, { type: 'command_form' }>
+              }
+              onOpenCommand={viewProps.onOpenCommand}
+              onRepeatSubcommand={viewProps.onRepeatSubcommand}
+              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+              onUpdateFormValue={viewProps.onUpdateFormValue}
+              onSubmitForm={viewProps.onSubmitForm}
+            />
+          </Match>
+        </Switch>
+      )}
+    </Show>
   );
 }
 

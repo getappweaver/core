@@ -92,6 +92,7 @@ type TimelineCommandResultCardProps = {
   onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
   onReplaceCommandWeb: TimelineViewProps['onReplaceCommandWeb'];
   isWebUiBusy: TimelineViewProps['isWebUiBusy'];
+  getWebEntityPending: TimelineViewProps['getWebEntityPending'];
   onRunWebAction: TimelineViewProps['onRunWebAction'];
   onRunJsonCommand: TimelineViewProps['onRunJsonCommand'];
   onAppendSystem: TimelineViewProps['onAppendSystem'];
@@ -701,6 +702,9 @@ export function TimelineCommandResultCard(
               renderSurface={props.renderSurface ?? 'timeline'}
               stateScopeId={props.item.id}
               busy={props.isWebUiBusy(props.item.id)}
+              getEntityPending={(entityKey) =>
+                props.getWebEntityPending(props.item.id, entityKey)
+              }
               currentUserPubkey={props.currentUserPubkey}
               speechSentences={
                 speechHighlightActive() ? speechState().sentences : undefined

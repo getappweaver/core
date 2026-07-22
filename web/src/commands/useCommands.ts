@@ -357,6 +357,57 @@ function expandHighlightTargetTemplate(
 }
 
 export function useCommands(adapters: CommandsAdapters): CommandsHook {
+  const refreshGenerationBySource = new Map<string, number>();
+
+  const pendingReleasesBySource = new Map<
+    string,
+    Map<number, Set<() => void>>
+  >();
+
+  function beginRefreshGeneration(
+    sourceId: string,
+    releasePending: () => void,
+  ): number {
+    const generation = (refreshGenerationBySource.get(sourceId) ?? 0) + 1;
+    refreshGenerationBySource.set(sourceId, generation);
+
+    const releases = pendingReleasesBySource.get(sourceId) ?? new Map();
+    const generationReleases = releases.get(generation) ?? new Set();
+    generationReleases.add(releasePending);
+    releases.set(generation, generationReleases);
+    pendingReleasesBySource.set(sourceId, releases);
+
+    return generation;
+  }
+
+  function settleRefreshGeneration(sourceId: string, generation: number): void {
+    if (refreshGenerationBySource.get(sourceId) !== generation) {
+      return;
+    }
+
+    const releases = pendingReleasesBySource.get(sourceId);
+
+    if (!releases) {
+      return;
+    }
+
+    for (const [releaseGeneration, generationReleases] of releases) {
+      if (releaseGeneration > generation) {
+        continue;
+      }
+
+      for (const release of generationReleases) {
+        release();
+      }
+
+      releases.delete(releaseGeneration);
+    }
+
+    if (releases.size === 0) {
+      pendingReleasesBySource.delete(sourceId);
+    }
+  }
+
   async function refreshComposerAiState(): Promise<void> {
     if (adapters.authStatus() !== 'connected' || !adapters.wsConnected()) {
       adapters.setComposerAiState(null);
@@ -554,9 +605,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                   recordInTimeline: false,
                 },
                 {
-                  onReplaceRoot: params.onReplaceRoot,
-                  promptRequestId: params.promptRequestId,
-                  uiExecutionPolicy: { recordInTimeline: false },
+                  ...params,
+                  uiExecutionPolicy: {
+                    ...params.uiExecutionPolicy,
+                    recordInTimeline: false,
+                  },
                 },
               );
             });
@@ -845,9 +898,9 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               recordInTimeline: false,
             },
             {
-              onReplaceRoot: params?.onReplaceRoot,
-              promptRequestId: params?.promptRequestId,
+              ...params,
               uiExecutionPolicy: {
+                ...params?.uiExecutionPolicy,
                 recordInTimeline: false,
                 suppressSystemMessage: true,
               },
@@ -1191,7 +1244,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     );
 
     const sourceId = params?.webCommandSourceId;
+    const sourceEntityKey = params?.webCommandSourceEntityKey;
     const runsInBackground = commandAction.clientStatus?.background === true;
+
+    const pendingPresentation =
+      commandAction.pendingUi?.presentation ?? 'widget';
+
+    const pendingLabel = commandAction.pendingUi?.label ?? 'Updating...';
 
     if (statusTargetId && commandAction.clientStatus?.pending) {
       setBackgroundCommandStatus({
@@ -1206,7 +1265,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     let refreshChildInFlight = false;
     let promptRefreshDispatchAttempted = false;
     let finalRefreshDispatchAttempted = false;
-    let userBusyEnded = false;
+    let userPendingEnded = false;
     let backgroundOutputText: string | null = null;
 
     const refreshHighlightTargetIds = [
@@ -1252,16 +1311,25 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       );
     }
 
-    function endUserWebUiBusyOnce(): void {
-      if (!sourceId || userBusyEnded) {
+    function endUserPendingOnce(): void {
+      if (!sourceId || userPendingEnded) {
         return;
       }
 
-      userBusyEnded = true;
-      adapters.endWebUiBusy(sourceId);
+      userPendingEnded = true;
+
+      if (pendingPresentation === 'entity' && sourceEntityKey) {
+        adapters.endWebEntityPending(sourceId, sourceEntityKey);
+      } else if (pendingPresentation !== 'none' && !runsInBackground) {
+        adapters.endWebUiBusy(sourceId);
+      }
     }
 
-    function dispatchRefreshOnce(refreshStage: 'prompt' | 'final'): void {
+    function dispatchRefreshOnce({
+      refreshStage,
+    }: {
+      refreshStage: 'prompt' | 'final';
+    }): void {
       const refresh = commandAction.refresh;
 
       if (!refresh) {
@@ -1295,6 +1363,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
       const refreshRequestId = adapters.createId();
 
+      const refreshGeneration = sourceId
+        ? beginRefreshGeneration(sourceId, endUserPendingOnce)
+        : null;
+
       adapters.pendingRequests.set(refreshRequestId, {
         recordInTimeline: refreshRecordTl,
         onCommandResult: (refreshMessage) => {
@@ -1310,6 +1382,14 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 refreshHighlightTargetIds,
               )
             : null;
+
+          if (
+            sourceId &&
+            refreshGeneration !== null &&
+            refreshGenerationBySource.get(sourceId) !== refreshGeneration
+          ) {
+            return;
+          }
 
           if (refreshesTaskbar) {
             adapters.setTaskbarDockResult({
@@ -1332,10 +1412,18 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             subcommand: refresh.subcommand,
           });
 
-          endUserWebUiBusyOnce();
+          if (sourceId && refreshGeneration !== null) {
+            settleRefreshGeneration(sourceId, refreshGeneration);
+          } else {
+            endUserPendingOnce();
+          }
         },
         onError: () => {
-          endUserWebUiBusyOnce();
+          if (sourceId && refreshGeneration !== null) {
+            settleRefreshGeneration(sourceId, refreshGeneration);
+          } else {
+            endUserPendingOnce();
+          }
         },
       });
 
@@ -1360,6 +1448,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         adapters.appendSystemMessage(
           err instanceof Error ? err.message : String(err),
         );
+
+        if (sourceId && refreshGeneration !== null) {
+          settleRefreshGeneration(sourceId, refreshGeneration);
+        } else {
+          endUserPendingOnce();
+        }
       }
     }
 
@@ -1390,7 +1484,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         if (timelineEventItem !== null) {
           adapters.setTimeline((prev) => [...prev, timelineEventItem]);
 
-          dispatchRefreshOnce('final');
+          dispatchRefreshOnce({ refreshStage: 'final' });
 
           return;
         }
@@ -1407,7 +1501,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             visible: true,
           });
 
-          dispatchRefreshOnce('final');
+          dispatchRefreshOnce({ refreshStage: 'final' });
 
           return;
         }
@@ -1462,18 +1556,20 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           );
         }
 
-        dispatchRefreshOnce('final');
+        dispatchRefreshOnce({ refreshStage: 'final' });
       },
       onPrompt: (message) => {
         const prompt = splitPromptPayload(message.prompt);
 
-        dispatchRefreshOnce('prompt');
+        dispatchRefreshOnce({ refreshStage: 'prompt' });
 
         adapters.setPendingPromptRequestId(message.requestId);
 
         // A prompt hands control back to the user, so the source widget should
         // stop showing its long-running busy overlay while waiting for input.
-        endUserWebUiBusyOnce();
+        if (!refreshChildInFlight) {
+          endUserPendingOnce();
+        }
 
         if (!recordTl) {
           adapters.setChromePromptSession({
@@ -1514,7 +1610,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           void adapters.refreshCoreUpdateState();
         }
 
-        dispatchRefreshOnce('final');
+        dispatchRefreshOnce({ refreshStage: 'final' });
 
         if (runsInBackground && commandAction.clientStatus?.success) {
           const successText = commandAction.clientStatus.success;
@@ -1542,7 +1638,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
 
         if (!refreshChildInFlight) {
-          endUserWebUiBusyOnce();
+          endUserPendingOnce();
         }
 
         if (adapters.pendingPromptRequestId() === requestId) {
@@ -1565,7 +1661,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
 
         if (!refreshChildInFlight) {
-          endUserWebUiBusyOnce();
+          endUserPendingOnce();
         }
 
         if (adapters.pendingPromptRequestId() === requestId) {
@@ -1579,7 +1675,23 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     });
 
     try {
-      if (sourceId && !runsInBackground) {
+      if (sourceId && pendingPresentation === 'entity' && sourceEntityKey) {
+        adapters.beginWebEntityPending({
+          sourceId,
+          entityKey: sourceEntityKey,
+          label: pendingLabel,
+        });
+      } else if (
+        sourceId &&
+        pendingPresentation !== 'none' &&
+        !runsInBackground
+      ) {
+        if (pendingPresentation === 'entity' && import.meta.env.DEV) {
+          console.debug(
+            'Entity pending UI requested without a source entity; using widget pending UI.',
+          );
+        }
+
         adapters.beginWebUiBusy(sourceId);
       }
 
@@ -1597,7 +1709,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       });
     } catch (err) {
       clearPluginInstallRestartStatus();
-      endUserWebUiBusyOnce();
+      endUserPendingOnce();
       adapters.pendingRequests.delete(requestId);
 
       adapters.appendSystemMessage(

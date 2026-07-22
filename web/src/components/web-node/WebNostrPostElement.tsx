@@ -6,6 +6,7 @@ import {
   onCleanup,
   onMount,
   Show,
+  useContext,
 } from 'solid-js';
 
 import type {
@@ -22,7 +23,11 @@ import {
 } from '../../nostr/profileAction';
 import { fetchJson } from '../../utils';
 
-import { useWebCurrentUserPubkey } from './contexts';
+import {
+  useWebCurrentUserPubkey,
+  useWebEntityPending,
+  WebPendingEntityContext,
+} from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
 
 const NOSTR_REFERENCE_RE = /nostr:[a-z0-9]+/gi;
@@ -40,7 +45,7 @@ type InlineProfile = NonNullable<
 
 type WebNostrPostElementProps = {
   element: NostrPostElement;
-  runAction: (action: WebAction | undefined) => void;
+  runAction: (action: WebAction | undefined, entityKey?: string | null) => void;
 };
 
 type PostActionItem = {
@@ -538,8 +543,21 @@ function ImagePreview(props: {
 function AttachmentPreview(props: {
   attachments: ContentAttachment[];
   onOpenImage: (url: string) => void;
+  showPreview?: boolean;
+  onShowPreviewChange?: (show: boolean) => void;
 }): JSX.Element {
-  const [showPreview, setShowPreview] = createSignal(false);
+  const [localShowPreview, setLocalShowPreview] = createSignal(false);
+  const showPreview = () => props.showPreview ?? localShowPreview();
+
+  const togglePreview = () => {
+    const next = !showPreview();
+
+    if (props.onShowPreviewChange) {
+      props.onShowPreviewChange(next);
+    } else {
+      setLocalShowPreview(next);
+    }
+  };
 
   return (
     <Show when={props.attachments.length > 0}>
@@ -547,7 +565,7 @@ function AttachmentPreview(props: {
         <button
           type="button"
           class="web-nostrPost__action web-nostrPost__mediaToggle"
-          onClick={() => setShowPreview((current) => !current)}
+          onClick={togglePreview}
         >
           {showPreview()
             ? 'Hide preview'
@@ -604,7 +622,9 @@ function ImageLightbox(props: {
 
 function ActionRow(props: {
   items: PostActionItem[];
-  runAction: (action: WebAction | undefined) => void;
+  runAction: (action: WebAction | undefined, entityKey?: string | null) => void;
+  disabled?: boolean;
+  entityKey?: string | null;
 }): JSX.Element {
   return (
     <Show when={props.items.length > 0}>
@@ -622,8 +642,10 @@ function ActionRow(props: {
                 class="web-nostrPost__action"
                 classList={{ 'is-success': item.success }}
                 aria-label={item.ariaLabel}
-                disabled={item.disabled}
-                onClick={() => props.runAction(item.action ?? undefined)}
+                disabled={item.disabled || props.disabled === true}
+                onClick={() =>
+                  props.runAction(item.action ?? undefined, props.entityKey)
+                }
               >
                 {item.label}
               </button>
@@ -716,7 +738,7 @@ function referenceActionItems(
 
 function ReferenceCard(props: {
   reference: WebNostrPostReference;
-  runAction: (action: WebAction | undefined) => void;
+  runAction: (action: WebAction | undefined, entityKey?: string | null) => void;
   onOpenImage: (url: string) => void;
   currentUserPubkey: string | null;
 }): JSX.Element {
@@ -735,6 +757,12 @@ function ReferenceCard(props: {
     );
 
   const showActions = () => props.reference.showActions !== false;
+  const getEntityPending = useContext(WebPendingEntityContext);
+
+  const referencePending = () =>
+    props.reference.entityKey
+      ? getEntityPending(props.reference.entityKey).pending
+      : false;
 
   const openProfile = () =>
     props.runAction(profileActionForReference(props.reference));
@@ -811,6 +839,8 @@ function ReferenceCard(props: {
                   props.currentUserPubkey,
                 )}
                 runAction={props.runAction}
+                disabled={referencePending()}
+                entityKey={props.reference.entityKey}
               />
             </Show>
           </div>
@@ -869,6 +899,8 @@ export function WebNostrPostElement(
     props.element.props?.nostrInitiallyExpanded === true,
   );
 
+  const [showMediaPreview, setShowMediaPreview] = createSignal(false);
+
   const [lightboxImageUrl, setLightboxImageUrl] = createSignal<string | null>(
     null,
   );
@@ -890,6 +922,7 @@ export function WebNostrPostElement(
 
   const elementProps = () => props.element.props;
   const currentUserPubkey = useWebCurrentUserPubkey();
+  const entityPending = useWebEntityPending();
   const name = () => displayName(elementProps());
   const embeds = () => elementProps()?.nostrEmbeds ?? {};
   const inlineProfiles = () => elementProps()?.nostrInlineProfiles ?? {};
@@ -1039,7 +1072,13 @@ export function WebNostrPostElement(
       class={elementClass(props.element)}
       data-ui={elementUi(props.element)}
       style={elementStyle(props.element)}
+      aria-busy={entityPending().pending ? 'true' : undefined}
     >
+      <Show when={entityPending().pending}>
+        <div class="web-nostrPost__pending" aria-hidden="true">
+          <span>{entityPending().label ?? 'Updating...'}</span>
+        </div>
+      </Show>
       <For each={activityHeaders()}>
         {(activity) => (
           <div class="web-nostrPost__activityHeader">
@@ -1153,6 +1192,8 @@ export function WebNostrPostElement(
           <AttachmentPreview
             attachments={attachments()}
             onOpenImage={setLightboxImageUrl}
+            showPreview={showMediaPreview()}
+            onShowPreviewChange={setShowMediaPreview}
           />
         </Show>
 
@@ -1172,7 +1213,11 @@ export function WebNostrPostElement(
         </Show>
 
         <Show when={showActions() && actionItems().length > 0}>
-          <ActionRow items={actionItems()} runAction={props.runAction} />
+          <ActionRow
+            items={actionItems()}
+            runAction={props.runAction}
+            disabled={entityPending().pending}
+          />
         </Show>
       </div>
       <ImageLightbox

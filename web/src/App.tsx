@@ -46,6 +46,7 @@ import {
   type SingletonWidgetEntry,
   type TaskbarWidget,
 } from './layout/SingletonDock';
+import { resolveWidgetIconUrl } from './layout/widgetIcons';
 import { PaletteView } from './palette/PaletteView';
 import { usePalette } from './palette/usePalette';
 import { registerWebPushNotifications } from './register-web-push';
@@ -155,59 +156,6 @@ type HeaderWidget = {
   icon?: string;
   order?: number;
 };
-
-function resolveHeaderWidgetIconUrl(widget: HeaderWidget): string | null {
-  const raw = widget.icon?.trim();
-
-  if (!raw) {
-    return null;
-  }
-
-  const lower = raw.toLowerCase();
-
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('data:')
-  ) {
-    return raw;
-  }
-
-  const flatten = (value: string): string => value.replace(/[\\/]/g, '__');
-  const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
-
-  if (widget.source === 'plugin') {
-    const alias = widget.pluginAlias?.trim();
-
-    if (!alias) {
-      return null;
-    }
-
-    if (raw.startsWith('/plugins/')) {
-      const rel = raw.slice('/plugins/'.length);
-      const slashIdx = rel.indexOf('/');
-
-      if (slashIdx <= 0) {
-        return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-      }
-
-      const relAlias = rel.slice(0, slashIdx);
-      const relIcon = rel.slice(slashIdx + 1);
-
-      return relAlias
-        ? asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`)
-        : null;
-    }
-
-    const rel = raw.startsWith('/') ? raw.slice(1) : raw;
-
-    return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-  }
-
-  return raw.startsWith('/')
-    ? asset(`builtin-icons/${flatten(raw.slice(1))}`)
-    : null;
-}
 
 type CoreUpdateResponse = {
   ok: boolean;
@@ -451,8 +399,11 @@ function AppInner(): JSX.Element {
   } = connect;
 
   const {
+    beginWebEntityPending,
     beginWebUiBusy,
+    endWebEntityPending,
     endWebUiBusy,
+    getWebEntityPendingFor,
     isWebUiBusyFor,
     pendingRequests,
     requestComposerAiState,
@@ -1114,7 +1065,7 @@ function AppInner(): JSX.Element {
         command: widget.command,
         subcommand: widget.subcommand,
         title: widget.modalTitle,
-        iconUrl: resolveHeaderWidgetIconUrl(widget),
+        iconUrl: resolveWidgetIconUrl(widget),
       });
 
       emitStoryWidgetOpened({
@@ -1973,7 +1924,7 @@ function AppInner(): JSX.Element {
       command: widget.command,
       subcommand: widget.subcommand,
       title: widget.modalTitle,
-      iconUrl: resolveHeaderWidgetIconUrl(widget),
+      iconUrl: resolveWidgetIconUrl(widget),
     });
 
     emitStoryWidgetOpened({
@@ -2107,6 +2058,8 @@ function AppInner(): JSX.Element {
     requestComposerAiState,
     refreshCoreUpdateState,
     beginWebUiBusy,
+    beginWebEntityPending,
+    endWebEntityPending,
     endWebUiBusy,
     pendingRequests,
     sendSocketMessage,
@@ -2668,6 +2621,7 @@ function AppInner(): JSX.Element {
             onCloseTaskbarWidget={closeTaskbarWidget}
             onReplaceCommandWeb={replaceCommandResultWeb}
             isWebUiBusy={isWebUiBusyFor}
+            getWebEntityPending={getWebEntityPendingFor}
             onRunWebAction={runWebAction}
             onRunJsonCommand={runJsonCommand}
             onAppendSystem={appendSystemMessage}
@@ -2749,6 +2703,7 @@ function AppInner(): JSX.Element {
                 return state.status === 'connected' ? state.pubkey : null;
               })()}
               isWebUiBusy={isWebUiBusyFor}
+              getWebEntityPending={getWebEntityPendingFor}
               onRunWebAction={runWebAction}
               onRunJsonCommand={runJsonCommand}
               onRunJsonCommandOutput={runJsonCommandOutput}
@@ -2862,6 +2817,7 @@ function AppInner(): JSX.Element {
           return state.status === 'connected' ? state.pubkey : null;
         })()}
         isWebUiBusy={isWebUiBusyFor}
+        getWebEntityPending={getWebEntityPendingFor}
         onClose={closeChromeModal}
         onRunWebAction={runWebAction}
       />

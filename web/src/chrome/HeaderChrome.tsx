@@ -10,6 +10,7 @@ import {
 } from 'solid-js';
 
 import { WebButton } from '../components/WebButton';
+import { resolveWidgetIconUrl } from '../layout/widgetIcons';
 
 type HeaderChromeWidget = {
   command: string;
@@ -50,67 +51,6 @@ type HeaderChromeProps = {
   onRestartBot: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
-
-function resolveWidgetIconUrl(widget: {
-  source: 'builtin' | 'plugin';
-  pluginAlias?: string;
-  icon?: string;
-}): string | null {
-  const raw = widget.icon?.trim();
-
-  if (!raw) {
-    return null;
-  }
-
-  const lower = raw.toLowerCase();
-
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('data:')
-  ) {
-    return raw;
-  }
-
-  const flatten = (value: string): string => value.replace(/[\\/]/g, '__');
-  const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
-
-  if (widget.source === 'plugin') {
-    const alias = widget.pluginAlias?.trim();
-
-    if (!alias) {
-      return null;
-    }
-
-    if (raw.startsWith('/plugins/')) {
-      const rel = raw.slice('/plugins/'.length);
-      const slashIdx = rel.indexOf('/');
-
-      if (slashIdx <= 0) {
-        return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-      }
-
-      const relAlias = rel.slice(0, slashIdx);
-      const relIcon = rel.slice(slashIdx + 1);
-
-      if (relAlias.length === 0) {
-        return null;
-      }
-
-      return asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`);
-    }
-
-    const rel = raw.replace(/^[./]+/, '');
-
-    return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-  }
-
-  if (!raw.startsWith('/')) {
-    return null;
-  }
-
-  return asset(`builtin-icons/${flatten(raw.slice(1))}`);
-}
 
 function IconGlyph(props: {
   icon?: string;

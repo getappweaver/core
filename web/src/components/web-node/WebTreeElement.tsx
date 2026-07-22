@@ -200,6 +200,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
       <div
         class={elementClass(props.element)}
         data-ui={elementUi(props.element)}
+        data-web-node-id={treeItemId() ?? undefined}
       >
         <div
           class="web-tree-item-summary"

@@ -77,7 +77,7 @@ export type SocketState = {
 
 export type SocketConnectHandlers = {
   setWsConnected: (value: boolean) => void;
-  setWebUiBusyCounts: (value: Record<string, number>) => void;
+  clearWebPendingState: () => void;
 };
 
 export type SocketOpenHandlers = {

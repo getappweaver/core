@@ -1,6 +1,10 @@
 import type { JSX } from 'solid-js';
 import { Show } from 'solid-js';
 
+import type {
+  RunWebActionParams,
+  WebEntityPendingState,
+} from '../commands/types';
 import { WebCommandOutputModal } from '../components/WebCommandOutputModal';
 import { WebNodeShadowRoot } from '../components/WebNodeShadowRoot';
 import { splitPromptPayload } from '../socket/dispatch';
@@ -15,18 +19,14 @@ type ChromeOverlayProps = {
   chrome: ChromeHook;
   currentUserPubkey: string | null;
   isWebUiBusy: (sourceId: string) => boolean;
+  getWebEntityPending: (
+    sourceId: string,
+    entityKey: string,
+  ) => WebEntityPendingState;
   onClose: () => void;
   onRunWebAction: (
     action: import('@src/web/ui-schema').WebAction,
-    params?: {
-      onReplaceRoot?: (root: import('@src/web/ui-schema').WebNodeRoot) => void;
-      promptRequestId?: string;
-      uiExecutionPolicy?: {
-        recordInTimeline?: boolean;
-        suppressSystemMessage?: boolean;
-      };
-      webCommandSourceId?: string;
-    },
+    params?: RunWebActionParams,
   ) => void;
 };
 
@@ -45,6 +45,7 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
         currentUserPubkey={props.currentUserPubkey}
         onReplaceWeb={(root) => props.chrome.setChromeWeb(root)}
         isWebUiBusy={props.isWebUiBusy}
+        getWebEntityPending={props.getWebEntityPending}
         chromeWebCommandSourceId={CHROME_WEB_COMMAND_SOURCE_ID}
         onRunWebAction={(action, params) =>
           props.onRunWebAction(action, {
@@ -81,6 +82,9 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
                     promptRequestId={session.requestId}
                     currentUserPubkey={props.currentUserPubkey}
                     busy={props.isWebUiBusy(promptSourceId)}
+                    getEntityPending={(entityKey) =>
+                      props.getWebEntityPending(promptSourceId, entityKey)
+                    }
                     onRunAction={(action, params) =>
                       props.onRunWebAction(action, {
                         ...params,

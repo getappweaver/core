@@ -9,6 +9,11 @@ import type {
   WebRenderMeta,
 } from '@src/web/ui-schema';
 
+import type {
+  RunWebActionParams,
+  WebEntityPendingState,
+} from '../../commands/types';
+
 // ---------------------------------------------------------------------------
 // Reveal context
 // ---------------------------------------------------------------------------
@@ -138,6 +143,14 @@ export const WebCurrentUserPubkeyContext = createContext<
   Accessor<string | null> | undefined
 >(undefined);
 
+export const WebEntityKeyContext = createContext<Accessor<string | null>>(
+  () => null,
+);
+
+export const WebPendingEntityContext = createContext<
+  (entityKey: string) => WebEntityPendingState
+>(() => ({ pending: false, label: null }));
+
 // ---------------------------------------------------------------------------
 // Hooks
 // ---------------------------------------------------------------------------
@@ -152,6 +165,21 @@ export function useWebCurrentUserPubkey(): Accessor<string | null> {
   const ctx = useContext(WebCurrentUserPubkeyContext);
 
   return () => (ctx !== undefined ? ctx() : null);
+}
+
+export function useWebEntityKey(): Accessor<string | null> {
+  return useContext(WebEntityKeyContext);
+}
+
+export function useWebEntityPending(): Accessor<WebEntityPendingState> {
+  const entityKey = useWebEntityKey();
+  const getPending = useContext(WebPendingEntityContext);
+
+  return () => {
+    const key = entityKey();
+
+    return key ? getPending(key) : { pending: false, label: null };
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -169,15 +197,5 @@ export type WebNodeRendererProps = {
   onSpeechSentenceClick?: Accessor<
     ((index: number) => void) | null | undefined
   >;
-  onRunAction?: (
-    action: WebAction,
-    params?: {
-      onReplaceRoot?: (root: WebNodeRoot) => void;
-      promptRequestId?: string;
-      uiExecutionPolicy?: {
-        recordInTimeline?: boolean;
-        suppressSystemMessage?: boolean;
-      };
-    },
-  ) => void;
+  onRunAction?: (action: WebAction, params?: RunWebActionParams) => void;
 };

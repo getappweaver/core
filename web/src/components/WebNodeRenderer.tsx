@@ -19,7 +19,10 @@ import {
   TreeExpandRequestSetterContext,
   TreeFilterStateContext,
   TreeItemExpandedStateContext,
+  useWebEntityKey,
   useWebCurrentUserPubkey,
+  WebEntityKeyContext,
+  WebPendingEntityContext,
   WebRevealContext,
   WebToggleContext,
 } from './web-node/contexts';
@@ -101,6 +104,15 @@ function renderElement({
   renderChild,
 }: RenderElementProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
+  const entityKey = useWebEntityKey();
+  const getEntityPending = useContext(WebPendingEntityContext);
+
+  const entityPending = () => {
+    const key = entityKey();
+
+    return key ? getEntityPending(key).pending : false;
+  };
+
   const filterState = useContext(TreeFilterStateContext);
 
   return (
@@ -120,16 +132,18 @@ function renderElement({
 
       <Match when={element.tag === 'button'}>
         {(() => {
-          const htmlType = element.props?.htmlType ?? 'button';
-          const submitAction = element.props?.submitAction;
+          const htmlType = () => element.props?.htmlType ?? 'button';
+          const submitAction = () => element.props?.submitAction;
 
-          const disabledUntilFormFieldPositiveInteger =
+          const disabledUntilFormFieldPositiveInteger = () =>
             element.props?.disabledUntilFormFieldPositiveInteger;
 
-          const disabled =
-            element.props?.disabled === true || getBusy() === true;
+          const disabled = () =>
+            element.props?.disabled === true ||
+            getBusy() === true ||
+            entityPending();
 
-          if (htmlType === 'submit') {
+          if (htmlType() === 'submit') {
             return (
               <WebButton
                 type="submit"
@@ -142,18 +156,11 @@ function renderElement({
                     : undefined
                 }
                 style={elementStyle(element)}
-                disabled={disabled}
-                {...(submitAction
-                  ? {
-                      'data-web-submit-action': JSON.stringify(submitAction),
-                    }
-                  : {})}
-                {...(disabledUntilFormFieldPositiveInteger
-                  ? {
-                      'data-web-disable-until-positive-integer':
-                        disabledUntilFormFieldPositiveInteger,
-                    }
-                  : {})}
+                disabled={disabled()}
+                data-web-submit-action={
+                  submitAction() ? JSON.stringify(submitAction()) : undefined
+                }
+                data-web-disable-until-positive-integer={disabledUntilFormFieldPositiveInteger()}
                 onClick={() => {
                   if (element.props?.storyTargetId) {
                     emitStoryTargetClicked(element.props.storyTargetId);
@@ -182,16 +189,11 @@ function renderElement({
                   : undefined
               }
               style={elementStyle(element)}
-              disabled={disabled}
-              {...(submitAction
-                ? { 'data-web-submit-action': JSON.stringify(submitAction) }
-                : {})}
-              {...(disabledUntilFormFieldPositiveInteger
-                ? {
-                    'data-web-disable-until-positive-integer':
-                      disabledUntilFormFieldPositiveInteger,
-                  }
-                : {})}
+              disabled={disabled()}
+              data-web-submit-action={
+                submitAction() ? JSON.stringify(submitAction()) : undefined
+              }
+              data-web-disable-until-positive-integer={disabledUntilFormFieldPositiveInteger()}
               onClick={(e) => {
                 if (element.props?.stopPropagation) {
                   e.stopPropagation();
@@ -360,7 +362,11 @@ function renderElement({
               : undefined
           }
           style={elementStyle(element)}
-          disabled={element.props?.disabled === true || getBusy() === true}
+          disabled={
+            element.props?.disabled === true ||
+            getBusy() === true ||
+            entityPending()
+          }
           onClick={(e) => {
             if (element.props?.stopPropagation) {
               e.stopPropagation();
@@ -566,10 +572,32 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
   const currentUserPubkey = useWebCurrentUserPubkey();
   const expandedById = useContext(TreeItemExpandedStateContext);
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
+  const parentEntityKey = useWebEntityKey();
+  const getEntityPending = useContext(WebPendingEntityContext);
   const node = () => props.node ?? props.root?.tree;
 
-  const runAction = (action: WebAction | undefined) => {
+  const effectiveEntityKey = () => {
+    const current = node();
+
+    return current?.type === 'element'
+      ? (current.props?.entityKey ?? parentEntityKey())
+      : parentEntityKey();
+  };
+
+  const runAction = (
+    action: WebAction | undefined,
+    sourceEntityKey = effectiveEntityKey(),
+  ) => {
     if (!action) {
+      return;
+    }
+
+    if (
+      action.type === 'command' &&
+      action.pendingUi?.presentation === 'entity' &&
+      sourceEntityKey &&
+      getEntityPending(sourceEntityKey).pending
+    ) {
       return;
     }
 
@@ -589,6 +617,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
     props.onRunAction?.(action, {
       onReplaceRoot: props.onReplaceRoot,
       promptRequestId: props.promptRequestId,
+      webCommandSourceEntityKey: sourceEntityKey ?? undefined,
     });
   };
 
@@ -614,40 +643,32 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
       <Match when={node()?.type === 'element'}>
         {(() => {
           const element = node() as WebElementNode;
-          const revealId = element.props?.revealId;
-          const visibleForPubkeys = element.props?.visibleForPubkeys;
-          const hiddenWhenToggleKey = element.props?.hiddenWhenToggleKey;
-          const visibleWhenToggleKey = element.props?.visibleWhenToggleKey;
 
-          if (
-            visibleForPubkeys !== undefined &&
-            !visibleForPubkeys.includes(currentUserPubkey() ?? '')
-          ) {
-            return null;
-          }
+          const visible = () => {
+            const revealId = element.props?.revealId;
+            const visibleForPubkeys = element.props?.visibleForPubkeys;
+            const hiddenWhenToggleKey = element.props?.hiddenWhenToggleKey;
+            const visibleWhenToggleKey = element.props?.visibleWhenToggleKey;
 
-          if (
-            element.props?.hiddenUntilRevealed === true &&
-            (!revealId || revealContext?.isRevealed(revealId) !== true)
-          ) {
-            return null;
-          }
+            return !(
+              (visibleForPubkeys !== undefined &&
+                !visibleForPubkeys.includes(currentUserPubkey() ?? '')) ||
+              (element.props?.hiddenUntilRevealed === true &&
+                (!revealId || revealContext?.isRevealed(revealId) !== true)) ||
+              (hiddenWhenToggleKey !== undefined &&
+                toggleContext?.isActive(hiddenWhenToggleKey) === true) ||
+              (visibleWhenToggleKey !== undefined &&
+                toggleContext?.isActive(visibleWhenToggleKey) !== true)
+            );
+          };
 
-          if (
-            hiddenWhenToggleKey !== undefined &&
-            toggleContext?.isActive(hiddenWhenToggleKey) === true
-          ) {
-            return null;
-          }
-
-          if (
-            visibleWhenToggleKey !== undefined &&
-            toggleContext?.isActive(visibleWhenToggleKey) !== true
-          ) {
-            return null;
-          }
-
-          return renderElement({ element, props, runAction, renderChild });
+          return (
+            <WebEntityKeyContext.Provider value={effectiveEntityKey}>
+              <Show when={visible()}>
+                {renderElement({ element, props, runAction, renderChild })}
+              </Show>
+            </WebEntityKeyContext.Provider>
+          );
         })()}
       </Match>
     </Switch>

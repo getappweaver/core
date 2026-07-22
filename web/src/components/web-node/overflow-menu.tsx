@@ -16,6 +16,7 @@ import { emitStoryTargetClicked } from '../../story/events';
 import { WebShadowUiBusyContext } from '../web-shadow-ui-busy-context';
 import { WebButton } from '../WebButton';
 
+import { useWebEntityPending } from './contexts';
 import {
   elementClass,
   elementStyle,
@@ -116,6 +117,7 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
   const [flipUp, setFlipUp] = createSignal(false);
   const [flipRight, setFlipRight] = createSignal(false);
   const getBusy = useContext(WebShadowUiBusyContext);
+  const entityPending = useWebEntityPending();
   let rootEl: HTMLDivElement | undefined;
   let panelEl: HTMLDivElement | undefined;
   const triggerProps = () => props.element.props;
@@ -288,6 +290,7 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
             aria-expanded={open()}
             aria-haspopup="true"
             aria-label={props.element.props?.label ?? 'More actions'}
+            disabled={getBusy() || entityPending().pending}
             onClick={(e) => {
               e.stopPropagation();
 
@@ -312,7 +315,11 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
           style={elementStyle(props.element)}
           checked={triggerProps()?.checked === true}
           indeterminate={triggerProps()?.indeterminate === true}
-          disabled={triggerProps()?.disabled === true}
+          disabled={
+            triggerProps()?.disabled === true ||
+            getBusy() ||
+            entityPending().pending
+          }
           onChange={() => setOpen((v) => !v)}
         />
       </Show>
@@ -329,29 +336,8 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
           }}
         >
           <For each={menuItems()}>
-            {(mi) => (
-              <WebButton
-                type="button"
-                role="menuitem"
-                class={`${elementClass(mi)} web-button`}
-                data-story-target={mi.props?.storyTargetId}
-                disabled={mi.props?.disabled === true || getBusy() === true}
-                ref={(el) =>
-                  mi.props?.storyTargetId
-                    ? registerStoryDomTarget(mi.props.storyTargetId, el)
-                    : undefined
-                }
-                onClick={(e) => {
-                  e.stopPropagation();
-
-                  if (mi.props?.storyTargetId) {
-                    emitStoryTargetClicked(mi.props.storyTargetId);
-                  }
-
-                  setOpen(false);
-                  props.runAction(mi.props?.action);
-                }}
-              >
+            {(mi) => {
+              const content = (
                 <Show
                   when={(mi.children ?? []).length > 0}
                   fallback={mi.props?.label ?? ''}
@@ -360,8 +346,78 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
                     {(child) => props.renderChild(child)}
                   </For>
                 </Show>
-              </WebButton>
-            )}
+              );
+
+              return (
+                <Show
+                  when={mi.props?.href}
+                  fallback={
+                    <WebButton
+                      type="button"
+                      role="menuitem"
+                      class={`${elementClass(mi)} web-button`}
+                      data-story-target={mi.props?.storyTargetId}
+                      disabled={
+                        mi.props?.disabled === true ||
+                        getBusy() === true ||
+                        entityPending().pending
+                      }
+                      ref={(el) =>
+                        mi.props?.storyTargetId
+                          ? registerStoryDomTarget(mi.props.storyTargetId, el)
+                          : undefined
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        if (mi.props?.storyTargetId) {
+                          emitStoryTargetClicked(mi.props.storyTargetId);
+                        }
+
+                        setOpen(false);
+                        props.runAction(mi.props?.action);
+                      }}
+                    >
+                      {content}
+                    </WebButton>
+                  }
+                >
+                  {(href) => (
+                    <a
+                      role="menuitem"
+                      class={`${elementClass(mi)} web-button`}
+                      data-story-target={mi.props?.storyTargetId}
+                      href={href()}
+                      target={mi.props?.external ? '_blank' : undefined}
+                      rel={
+                        mi.props?.external ? 'noopener noreferrer' : undefined
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        if (
+                          mi.props?.disabled === true ||
+                          getBusy() === true ||
+                          entityPending().pending
+                        ) {
+                          e.preventDefault();
+
+                          return;
+                        }
+
+                        if (mi.props?.storyTargetId) {
+                          emitStoryTargetClicked(mi.props.storyTargetId);
+                        }
+
+                        setOpen(false);
+                      }}
+                    >
+                      {content}
+                    </a>
+                  )}
+                </Show>
+              );
+            }}
           </For>
         </div>
       </Show>
