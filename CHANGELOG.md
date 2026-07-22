@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v10.0.1] - 2026-07-23
+
+- fix: scope landing roadmap event loading (2292701)
+
 ## [v10.0.0] - 2026-07-23
 
-- feat: add keyed WebNode reconciliation (99e43c3)
+- feat: add keyed WebNode reconciliation (a03a1cf)
 
 ## [v9.55.0] - 2026-07-23
 

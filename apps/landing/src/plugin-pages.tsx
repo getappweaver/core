@@ -13,7 +13,10 @@ import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, officialAuthor, socialLinks } from './landing-data';
 import { OfficialAppGrid, pluginIconSrcForSlug } from './official-app-grid';
-import { RoadmapPanel } from './roadmap-panel';
+import {
+  RoadmapPanel,
+  appWeaverRoadmapTarget,
+} from './roadmap-panel';
 
 type PluginPageSectionId = 'features' | 'demo' | 'install' | 'apps' | 'more';
 
@@ -106,22 +109,13 @@ const pluginInstallScreenshotSlugs: Record<string, string> = {
   todo: 'todo-app',
 };
 
-const pluginRoadmapBoardKeys: Record<string, string> = {
-  bm: 'appweaver-plugin-bookmarks-roadmap',
-  file: 'appweaver-plugin-file-roadmap',
-  job: 'appweaver-plugin-job-roadmap',
-  journal: 'appweaver-plugin-journal-roadmap',
-  nr: 'appweaver-plugin-nostr-radar-roadmap',
-  todo: 'appweaver-plugin-todo-roadmap',
-};
-
-const pluginRoadmapRepos: Record<string, string> = {
-  bm: 'nostr://_@getappweaver.com/relay.ngit.dev/bm',
-  file: 'nostr://_@getappweaver.com/relay.ngit.dev/file',
-  job: 'nostr://_@getappweaver.com/relay.ngit.dev/job',
-  journal: 'nostr://_@getappweaver.com/relay.ngit.dev/journal',
-  nr: 'nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar',
-  todo: 'nostr://_@getappweaver.com/relay.ngit.dev/todo',
+const pluginRoadmapRepoIds: Record<string, string> = {
+  bm: 'bm',
+  file: 'file',
+  job: 'job',
+  journal: 'journal',
+  nr: 'Nostr-Radar',
+  todo: 'todo',
 };
 
 const pluginDemoStories: Record<string, PluginDemoStory[]> = {
@@ -823,12 +817,14 @@ function SiteFooter() {
 }
 
 function PluginMoreSection(props: { page: PluginPage }) {
+  const repoId = pluginRoadmapRepoIds[props.page.command] ?? props.page.command;
+
   return (
     <div class="more-section-stack">
       <RoadmapPanel
         title={`${props.page.eyebrow} Roadmap`}
-        boardKey={pluginRoadmapBoardKeys[props.page.command] ?? `${props.page.command}-roadmap`}
-        repo={pluginRoadmapRepos[props.page.command]}
+        boardKey={repoId}
+        target={appWeaverRoadmapTarget(repoId)}
       />
       <BlogPostsSection />
       <SiteFooter />

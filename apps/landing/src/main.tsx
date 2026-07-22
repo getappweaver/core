@@ -13,7 +13,10 @@ import {
   isPluginRoute,
   pluginNavItemsForPath,
 } from './plugin-pages';
-import { RoadmapPanel } from './roadmap-panel';
+import {
+  RoadmapPanel,
+  appWeaverRoadmapTarget,
+} from './roadmap-panel';
 
 import './lightbox.css';
 import './styles.css';
@@ -282,8 +285,8 @@ function MoreSection() {
     <div class="more-section-stack">
       <RoadmapPanel
         title="Core Roadmap"
-        boardKey="appweaver-roadmap"
-        repo="nostr://_@getappweaver.com/relay.ngit.dev/core"
+        boardKey="core"
+        target={appWeaverRoadmapTarget('core')}
       />
       <BlogPostsSection />
       <SiteFooter />
