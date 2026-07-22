@@ -26,6 +26,14 @@ export function normalizeRelay(raw: string): string | null {
     return null;
   }
 
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed);
+  const isWebSocketScheme = /^wss?:/i.test(trimmed);
+  const isBareHostWithPort = /^[^/:\s]+:\d+(?:[/?#]|$)/.test(trimmed);
+
+  if (hasScheme && !isWebSocketScheme && !isBareHostWithPort) {
+    return null;
+  }
+
   const withProtocol = /^wss?:\/\//i.test(trimmed)
     ? trimmed
     : `wss://${trimmed}`;
@@ -34,6 +42,10 @@ export function normalizeRelay(raw: string): string | null {
     const url = new URL(withProtocol);
 
     if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
+      return null;
+    }
+
+    if (url.username || url.password || url.hash) {
       return null;
     }
 

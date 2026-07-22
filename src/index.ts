@@ -75,14 +75,29 @@ import {
   signWithBunkerInteractive,
 } from './nostr/bunker-sign';
 import {
+  closeNostrCacheDb,
+  openNostrCacheDb,
+  type NostrCacheDb,
+} from './nostr/cache/db';
+import {
+  DEFAULT_NOSTR_CACHE_LIMITS,
+  runNostrCacheMaintenance,
+} from './nostr/cache/maintenance';
+import {
   createDmSubscription,
   createSignAuthEvent,
   sendDm,
 } from './nostr/nip17';
+import { PROFILE_RELAYS_FOR_QUERY } from './nostr/nip65';
 import {
   allowRelayOperation,
+  filterBlockedReadRelays,
   installRelayNoticeTracking,
 } from './nostr/relay-notices';
+import {
+  createNostrResolutionService,
+  type NostrResolutionRuntime,
+} from './nostr/resolution-service';
 import { createWotServices } from './nostr/wot-service';
 import {
   dmBotRoot,
@@ -99,6 +114,32 @@ import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { resolveHost, resolvePort, startLocalWebServer } from './web/server';
 import { createSetupSecret } from './web/setup/secret';
 import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
+
+let activeNostrCacheDb: NostrCacheDb | null = null;
+let activeNostrResolutionRuntime: NostrResolutionRuntime | null = null;
+let activePool: SimplePool | null = null;
+
+async function closeActiveNostrResources(): Promise<void> {
+  const runtime = activeNostrResolutionRuntime;
+  const pool = activePool;
+
+  activeNostrResolutionRuntime = null;
+  activePool = null;
+
+  try {
+    if (runtime) {
+      activeNostrCacheDb = null;
+      await runtime.shutdown();
+    } else if (activeNostrCacheDb) {
+      const db = activeNostrCacheDb;
+
+      activeNostrCacheDb = null;
+      closeNostrCacheDb(db);
+    }
+  } finally {
+    pool?.destroy();
+  }
+}
 
 async function waitForever(): Promise<never> {
   return new Promise(() => {});
@@ -180,6 +221,8 @@ async function startSetupOnlyMode(props: {
         headless: process.env.BOT_BROWSER_HEADLESS === '1',
       },
     },
+    wot: null,
+    nostrResolution: null,
     setupSecret: props.setupSecret,
     setupMode: true,
     setupBillboard: props.setupBillboard,
@@ -244,26 +287,49 @@ async function main() {
 
   // --- Databases ---
   const pool = new SimplePool({ enablePing: true, enableReconnect: true });
+
+  activePool = pool;
   pool.allowConnectingToRelay = allowRelayOperation;
   installRelayNoticeTracking(pool);
   const seenDb = openCoreDb();
   const providerDb = asProviderDb(seenDb);
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
+  const nostrCacheDb = openNostrCacheDb();
+
+  activeNostrCacheDb = nostrCacheDb;
+
+  runNostrCacheMaintenance({
+    db: nostrCacheDb,
+    limits: DEFAULT_NOSTR_CACHE_LIMITS,
+  });
+
+  const nostrResolutionRuntime = createNostrResolutionService({
+    db: nostrCacheDb,
+    pool,
+    nowMs: Date.now,
+    filterReadRelays: filterBlockedReadRelays,
+    profileRelays: PROFILE_RELAYS_FOR_QUERY,
+    closeDbOnShutdown: true,
+  });
+
+  activeNostrResolutionRuntime = nostrResolutionRuntime;
+  const nostrResolution = nostrResolutionRuntime.service;
 
   let shuttingDown = false;
 
-  function shutdown(exitCode: number): void {
+  async function shutdown(exitCode: number): Promise<void> {
     if (shuttingDown) {
       return;
     }
 
     shuttingDown = true;
     disposeOpencodeSdk();
+    await closeActiveNostrResources();
     process.exit(exitCode);
   }
 
-  process.once('SIGINT', () => shutdown(130));
-  process.once('SIGTERM', () => shutdown(143));
+  process.once('SIGINT', () => void shutdown(130));
+  process.once('SIGTERM', () => void shutdown(143));
 
   const parentOfBotRoot = getParentWorkspaceRoot();
 
@@ -301,6 +367,13 @@ async function main() {
 
   const prefix = getDmCommandPrefix(seenDb);
 
+  const wot = createWotServices({
+    db: seenDb,
+    nostrResolution,
+    rootPubkey: config.masterPubkey,
+    fallbackRelays: botRelayUrls,
+  });
+
   const statusLines = renderBotStatusText(statusRep, { prefix });
 
   for (const line of statusLines.split('\n')) {
@@ -323,6 +396,8 @@ async function main() {
     walletDb,
     providerDb,
     config,
+    wot,
+    nostrResolution,
     setupSecret,
     setupMode: false,
     setupBillboard,
@@ -428,12 +503,8 @@ async function main() {
         pendingPrompt = resolve;
       });
     },
-    wot: createWotServices({
-      db: seenDb,
-      pool,
-      rootPubkey: config.masterPubkey,
-      fallbackRelays: botRelayUrls,
-    }),
+    wot,
+    nostrResolution,
     getWotScore: (pubkey: string, rootPubkey?: string) =>
       pluginContext.wot.getWotScore(pubkey, rootPubkey),
     signWithBunker: (eventTemplate, bunkerName) =>
@@ -561,6 +632,7 @@ async function main() {
         botPubkey,
         walletDb,
         providerDb,
+        nostrResolution,
         config,
         source,
         sendReply: (message: string) => sendReplyForSource(source, message),
@@ -662,8 +734,9 @@ async function main() {
   startDmSubscription();
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err);
   disposeOpencodeSdk();
+  await closeActiveNostrResources();
   process.exit(1);
 });

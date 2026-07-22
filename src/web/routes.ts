@@ -26,6 +26,10 @@ import {
   listConnections,
   saveConnection,
 } from '@src/nostr/connections';
+import { DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS } from '@src/nostr/event-resolver';
+import { uniqueRelays } from '@src/nostr/nip65';
+import type { NostrResolutionService } from '@src/nostr/resolution-service';
+import type { WotServices } from '@src/nostr/wot-service';
 import type { ProviderDb } from '@src/providers/db';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import type { WalletDb } from '@src/wallet/db';
@@ -40,6 +44,15 @@ import { executeBuiltinCommand } from './execute';
 import { fetchLinkPreview } from './link-preview';
 import { synthesizeNativePiper } from './native-tts';
 import { verifyNip98Authorization } from './nip98-verify';
+import {
+  MAX_NOSTR_PROFILE_POSTS_BODY_BYTES,
+  NostrEventContextRequestSchema,
+  NostrEventContextResponseSchema,
+  NostrInteractionRelaysRequestSchema,
+  NostrInteractionRelaysResponseSchema,
+  NostrProfilePostsRequestSchema,
+  NostrProfilePostsResponseSchema,
+} from './nostr-resolution-schema';
 import {
   PushSubscriptionBodySchema,
   PushUnsubscribeBodySchema,
@@ -80,6 +93,8 @@ export type WebRouteContext = {
   walletDb: WalletDb | null;
   providerDb: ProviderDb | null;
   config: BotConfig;
+  wot: WotServices | null;
+  nostrResolution: NostrResolutionService | null;
   setupSecret: string;
   setupMode: boolean;
 };
@@ -102,6 +117,326 @@ async function parseJsonBody(req: Request): Promise<unknown> {
     return await req.json();
   } catch {
     throw new Error('invalid_json');
+  }
+}
+
+type ParseLimitedJsonBodyProps = {
+  req: Request;
+  maxBytes: number;
+};
+
+async function parseLimitedJsonBody({
+  req,
+  maxBytes,
+}: ParseLimitedJsonBodyProps): Promise<unknown> {
+  const contentLength = req.headers.get('Content-Length');
+
+  if (contentLength) {
+    const declaredBytes = Number.parseInt(contentLength, 10);
+
+    if (Number.isFinite(declaredBytes) && declaredBytes > maxBytes) {
+      throw new Error('request_body_too_large');
+    }
+  }
+
+  if (!req.body) {
+    throw new Error('invalid_json');
+  }
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    totalBytes += value.byteLength;
+
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      throw new Error('request_body_too_large');
+    }
+
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return JSON.parse(new TextDecoder().decode(body)) as unknown;
+  } catch {
+    throw new Error('invalid_json');
+  }
+}
+
+type ResolveNostrProfilePostsProps = {
+  req: Request;
+  service: NostrResolutionService;
+  contextRelays: string[];
+  nowMs: () => number;
+};
+
+async function resolveNostrProfilePosts({
+  req,
+  service,
+  contextRelays,
+  nowMs,
+}: ResolveNostrProfilePostsProps): Promise<Response> {
+  try {
+    const payload = await parseLimitedJsonBody({
+      req,
+      maxBytes: MAX_NOSTR_PROFILE_POSTS_BODY_BYTES,
+    });
+
+    const input = NostrProfilePostsRequestSchema.parse(payload);
+    const deadlineAtMs = nowMs() + 8_000;
+
+    const primaryEvents = await service.queryAuthorEvents({
+      pubkey: input.pubkey,
+      kind: 1,
+      relayHints: input.relayHints,
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      limit: input.limit,
+      refreshMode: 'require-fresh',
+      refreshIntervalMs: DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS,
+      deadlineAtMs,
+    });
+
+    const graph = await service.resolveGraph({
+      rootEvents: primaryEvents,
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      policy: {
+        includeThread: true,
+        includeEmbeds: true,
+        includeInteractions: true,
+        includeReplies: false,
+        maxDepth: 2,
+        maxEvents: 50,
+        maxReferencesPerEvent: 8,
+        timeoutMs: 8_000,
+      },
+      deadlineAtMs,
+    });
+
+    const response = NostrProfilePostsResponseSchema.parse({
+      ok: true,
+      primaryEvents,
+      graph,
+    });
+
+    return jsonResponse(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    const status =
+      message === 'request_body_too_large'
+        ? 413
+        : message === 'invalid_json' || err instanceof ZodError
+          ? 400
+          : message === 'nostr_resolution_unavailable'
+            ? 503
+            : 500;
+
+    return jsonResponse({ error: message }, { status });
+  }
+}
+
+type ResolveNostrEventContextProps = ResolveNostrProfilePostsProps;
+
+async function resolveNostrEventContext({
+  req,
+  service,
+  contextRelays,
+  nowMs,
+}: ResolveNostrEventContextProps): Promise<Response> {
+  try {
+    const payload = await parseLimitedJsonBody({
+      req,
+      maxBytes: MAX_NOSTR_PROFILE_POSTS_BODY_BYTES,
+    });
+
+    const input = NostrEventContextRequestSchema.parse(payload);
+    const deadlineAtMs = nowMs() + 8_000;
+
+    if (input.targetEvent && input.targetEvent.id !== input.eventId) {
+      return jsonResponse({ error: 'nostr_event_mismatch' }, { status: 400 });
+    }
+
+    if (input.targetEvent) {
+      await service.seedEvents({
+        entries: [
+          {
+            event: input.targetEvent,
+            relayHints: input.relayHints,
+            lastCheckedAtMs: null,
+          },
+        ],
+      });
+    }
+
+    const targetResult = await service.resolveEventById({
+      eventId: input.eventId,
+      authorPubkey: input.authorPubkey,
+      relayHints: input.relayHints,
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      deadlineAtMs,
+    });
+
+    if (!targetResult.event) {
+      return jsonResponse({ error: 'nostr_event_not_found' }, { status: 404 });
+    }
+
+    const graph = await service.resolveGraph({
+      rootEvents: [targetResult.event],
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      policy: {
+        includeThread: true,
+        includeEmbeds: true,
+        includeInteractions: true,
+        includeReplies: false,
+        maxDepth: 2,
+        maxEvents: 50,
+        maxReferencesPerEvent: 8,
+        timeoutMs: 8_000,
+      },
+      deadlineAtMs,
+    });
+
+    const directReplies = input.includeDirectReplies
+      ? await service.queryDirectReplies({
+          eventId: targetResult.event.id,
+          address: input.address,
+          authorPubkey: targetResult.event.pubkey,
+          relayHints: targetResult.relayHints,
+          contextRelays,
+          fallbackRelays: input.fallbackRelays,
+          limit: input.replyLimit,
+          deadlineAtMs,
+        })
+      : [];
+
+    const profilePubkeys = [
+      ...new Set(
+        [...graph.events, ...directReplies].map((event) => event.pubkey),
+      ),
+    ];
+
+    const profileEvents = await service.getCachedReplaceableEvents({
+      kind: 0,
+      pubkeys: profilePubkeys,
+      identifier: null,
+    });
+
+    const response = NostrEventContextResponseSchema.parse({
+      ok: true,
+      targetEvent: targetResult.event,
+      targetRelayHints: uniqueRelays([
+        ...targetResult.relayHints,
+        ...input.relayHints,
+      ]),
+      graph,
+      directReplies,
+      profileEvents,
+    });
+
+    return jsonResponse(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    const status =
+      message === 'request_body_too_large'
+        ? 413
+        : message === 'invalid_json' || err instanceof ZodError
+          ? 400
+          : message === 'nostr_resolution_unavailable'
+            ? 503
+            : 500;
+
+    return jsonResponse({ error: message }, { status });
+  }
+}
+
+type ResolveNostrInteractionRelaysProps = ResolveNostrProfilePostsProps;
+
+async function resolveNostrInteractionRelays({
+  req,
+  service,
+  contextRelays,
+  nowMs,
+}: ResolveNostrInteractionRelaysProps): Promise<Response> {
+  try {
+    const payload = await parseLimitedJsonBody({
+      req,
+      maxBytes: MAX_NOSTR_PROFILE_POSTS_BODY_BYTES,
+    });
+
+    const input = NostrInteractionRelaysRequestSchema.parse(payload);
+    const deadlineAtMs = nowMs() + 8_000;
+
+    const signer = await service.resolveAuthorRelaySet({
+      pubkey: input.signerPubkey,
+      relayHints: [],
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      deadlineAtMs,
+    });
+
+    const recipients = await Promise.all(
+      [...new Set(input.recipientPubkeys)].map((pubkey) =>
+        service.resolveAuthorRelaySet({
+          pubkey,
+          relayHints: input.relayHints,
+          contextRelays,
+          fallbackRelays: input.fallbackRelays,
+          deadlineAtMs,
+        }),
+      ),
+    );
+
+    const recipientReadRelays = uniqueRelays(
+      recipients.flatMap((recipient) => recipient.readRelays),
+    );
+
+    const signerWriteRelays = uniqueRelays(signer.writeRelays);
+
+    const response = NostrInteractionRelaysResponseSchema.parse({
+      ok: true,
+      signerWriteRelays,
+      recipientReadRelays,
+      publishRelays: uniqueRelays([
+        ...signerWriteRelays,
+        ...recipientReadRelays,
+      ]),
+    });
+
+    return jsonResponse(response);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    const status =
+      message === 'request_body_too_large'
+        ? 413
+        : message === 'invalid_json' || err instanceof ZodError
+          ? 400
+          : message === 'nostr_resolution_unavailable'
+            ? 503
+            : 500;
+
+    return jsonResponse({ error: message }, { status });
   }
 }
 
@@ -679,6 +1014,21 @@ export function createWebFetchHandler(
       return jsonResponse({ error: 'not_found' }, { status: 404 });
     }
 
+    if (
+      req.method === 'POST' &&
+      [
+        '/api/nostr/profile-posts',
+        '/api/nostr/event-context',
+        '/api/nostr/interaction-relays',
+      ].includes(path) &&
+      !ctx.nostrResolution
+    ) {
+      return jsonResponse(
+        { error: 'nostr_resolution_unavailable' },
+        { status: 503 },
+      );
+    }
+
     if (path.startsWith('/api/') && path !== '/api/push/vapid-key') {
       const authFail = verifyNip98Auth({
         req,
@@ -690,9 +1040,53 @@ export function createWebFetchHandler(
       }
     }
 
+    if (req.method === 'POST' && path === '/api/nostr/profile-posts') {
+      return resolveNostrProfilePosts({
+        req,
+        service: ctx.nostrResolution!,
+        contextRelays: ctx.botRelayUrls,
+        nowMs: Date.now,
+      });
+    }
+
+    if (req.method === 'POST' && path === '/api/nostr/event-context') {
+      return resolveNostrEventContext({
+        req,
+        service: ctx.nostrResolution!,
+        contextRelays: ctx.botRelayUrls,
+        nowMs: Date.now,
+      });
+    }
+
+    if (req.method === 'POST' && path === '/api/nostr/interaction-relays') {
+      return resolveNostrInteractionRelays({
+        req,
+        service: ctx.nostrResolution!,
+        contextRelays: ctx.botRelayUrls,
+        nowMs: Date.now,
+      });
+    }
+
     if (req.method === 'GET' && path === '/api/commands') {
       return jsonResponse({
         commands: listAllCommandsDetailForWeb(ctx.prefix),
+      });
+    }
+
+    if (req.method === 'GET' && path === '/api/nostr/followed-by-follows') {
+      const pubkey = url.searchParams.get('pubkey')?.trim().toLowerCase();
+
+      if (!pubkey || !/^[0-9a-f]{64}$/.test(pubkey)) {
+        return jsonResponse({ error: 'invalid_pubkey' }, { status: 400 });
+      }
+
+      const pubkeys = ctx.wot?.getFollowsWhoFollow(pubkey) ?? null;
+
+      return jsonResponse({
+        ok: true,
+        available: pubkeys !== null,
+        count: pubkeys?.length ?? null,
+        pubkeys: pubkeys ?? [],
       });
     }
 

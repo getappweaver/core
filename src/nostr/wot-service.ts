@@ -1,16 +1,18 @@
 import type { Event } from 'nostr-tools/core';
-import type { SimplePool } from 'nostr-tools/pool';
 
 import type {
-  CachedContactList,
   CachedProfile,
   CachedRelayList,
   CoreDb,
+  LegacyWotEventKind,
 } from '@src/db';
 import {
+  clearLegacyWotEvent,
   getCachedContactList,
   getCachedProfiles,
   getCachedRelayList,
+  getLegacyWotEvent,
+  getWotFollowsWhoFollow,
   getWotScore,
   upsertCachedContactList,
   upsertCachedProfile,
@@ -18,25 +20,19 @@ import {
 } from '@src/db';
 import { debug } from '@src/logger';
 
+import { DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS } from './event-resolver';
 import {
   parseNip65RelayTags,
   PROFILE_RELAYS_FOR_QUERY,
   uniqueRelays,
 } from './nip65';
+import type { NostrResolutionService } from './resolution-service';
 import { normalizePubkeyInput, parseFollowList } from './wot';
 
 const CONTACT_LIST_KIND = 3;
 const PROFILE_KIND = 0;
 const RELAY_LIST_KIND = 10002;
-const DEFAULT_MAX_WAIT_MS = 4_000;
-
-type CountCapablePool = SimplePool & {
-  count?: (
-    relays: string[],
-    filters: Record<string, unknown>,
-    opts?: { maxWait?: number },
-  ) => Promise<number | { count: number }>;
-};
+const PROFILE_CONCURRENCY = 4;
 
 export type RelayAuthorGroup = {
   relay: string;
@@ -45,10 +41,24 @@ export type RelayAuthorGroup = {
 
 export type WotServices = {
   getWotScore: (pubkey: string, rootPubkey?: string) => number | null;
+  getFollowsWhoFollow: (pubkey: string, rootPubkey?: string) => string[] | null;
   getFollows: (pubkey: string) => Promise<string[]>;
-  getProfiles: (pubkeys: string[]) => Promise<Map<string, CachedProfile>>;
+  getProfiles: (props: GetProfilesProps) => Promise<Map<string, CachedProfile>>;
   getRelayList: (pubkey: string) => Promise<CachedRelayList | null>;
   getRelayAuthorMap: (pubkeys: string[]) => Promise<RelayAuthorGroup[]>;
+  refreshRelayLists?: (pubkeys: string[]) => Promise<void>;
+};
+
+export type GetProfilesProps = {
+  pubkeys: string[];
+  waitForMissing: boolean;
+};
+
+type CreateWotServicesProps = {
+  db: CoreDb;
+  nostrResolution: NostrResolutionService;
+  rootPubkey: string;
+  fallbackRelays: string[];
 };
 
 type ProfileMetadata = {
@@ -56,6 +66,18 @@ type ProfileMetadata = {
   displayName: string | null;
   picture: string | null;
   about: string | null;
+};
+
+type ResolveAndCacheProps = {
+  kind: LegacyWotEventKind;
+  pubkey: string;
+  refreshMode: 'stale-while-revalidate' | 'require-fresh';
+};
+
+type MapWithConcurrencyProps<T, R> = {
+  items: T[];
+  concurrency: number;
+  map: (item: T) => Promise<R>;
 };
 
 function stringField(value: unknown): string | null {
@@ -80,329 +102,233 @@ function parseProfileMetadata(content: string): ProfileMetadata {
   }
 }
 
-async function countNewerReplaceable({
-  pool,
-  relays,
-  pubkey,
+async function mapWithConcurrency<T, R>({
+  items,
+  concurrency,
+  map,
+}: MapWithConcurrencyProps<T, R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+
+      nextIndex += 1;
+      results[index] = await map(items[index]!);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+
+  return results;
+}
+
+function legacyMetadataMatches({
+  input,
   kind,
-  since,
-}: {
-  pool: SimplePool;
-  relays: string[];
-  pubkey: string;
-  kind: number;
-  since: number;
-}): Promise<number | null> {
-  const count = (pool as CountCapablePool).count;
-
-  if (!count) {
-    return null;
-  }
-
-  try {
-    const result = await count(
-      relays,
-      { authors: [pubkey], kinds: [kind], since, limit: 1 },
-      { maxWait: 2_000 },
-    );
-
-    return typeof result === 'number' ? result : result.count;
-  } catch (err) {
-    debug(`wot-service count failed for kind ${kind}: ${String(err)}`);
-
-    return null;
-  }
-}
-
-async function fetchLatestReplaceable({
-  pool,
-  relays,
   pubkey,
-  kind,
+  eventId,
+  createdAt,
 }: {
-  pool: SimplePool;
-  relays: string[];
+  input: unknown;
+  kind: LegacyWotEventKind;
   pubkey: string;
-  kind: number;
-}): Promise<Event | null> {
-  try {
-    const events = await pool.querySync(
-      relays,
-      { authors: [pubkey], kinds: [kind], limit: 1 },
-      { maxWait: DEFAULT_MAX_WAIT_MS },
-    );
-
-    return events.sort((a, b) => b.created_at - a.created_at)[0] ?? null;
-  } catch (err) {
-    debug(`wot-service fetch failed for kind ${kind}: ${String(err)}`);
-
-    return null;
+  eventId: string;
+  createdAt: number;
+}): boolean {
+  if (!input || typeof input !== 'object') {
+    return false;
   }
-}
 
-function backgroundCheckAndUpdateContactList({
-  db,
-  pool,
-  relays,
-  cached,
-}: {
-  db: CoreDb;
-  pool: SimplePool;
-  relays: string[];
-  cached: CachedContactList;
-}): void {
-  void (async () => {
-    const newerCount = await countNewerReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: CONTACT_LIST_KIND,
-      since: cached.createdAt + 1,
-    });
+  const event = input as Partial<Event>;
 
-    if (newerCount === 0) {
-      debug(`wot-service follows cache current for ${cached.pubkey}`);
-
-      return;
-    }
-
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: CONTACT_LIST_KIND,
-    });
-
-    if (!latest || latest.created_at <= cached.createdAt) {
-      return;
-    }
-
-    const follows = parseFollowList(latest).map((follow) => follow.pubkey);
-
-    upsertCachedContactList({
-      db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
-      follows,
-      rawJson: JSON.stringify(latest),
-    });
-
-    debug(
-      `wot-service updated follows cache for ${latest.pubkey}: ${follows.length}`,
-    );
-  })();
-}
-
-function backgroundCheckAndUpdateRelayList({
-  db,
-  pool,
-  relays,
-  cached,
-}: {
-  db: CoreDb;
-  pool: SimplePool;
-  relays: string[];
-  cached: CachedRelayList;
-}): void {
-  void (async () => {
-    const newerCount = await countNewerReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: RELAY_LIST_KIND,
-      since: cached.createdAt + 1,
-    });
-
-    if (newerCount === 0) {
-      debug(`wot-service relay cache current for ${cached.pubkey}`);
-
-      return;
-    }
-
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: RELAY_LIST_KIND,
-    });
-
-    if (!latest || latest.created_at <= cached.createdAt) {
-      return;
-    }
-
-    const parsed = parseNip65RelayTags(latest.tags);
-
-    upsertCachedRelayList({
-      db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
-      readRelays: parsed.readRelays,
-      writeRelays: parsed.writeRelays,
-      rawJson: JSON.stringify(latest),
-    });
-
-    debug(
-      `wot-service updated relay cache for ${latest.pubkey}: ${parsed.writeRelays.length} write relays`,
-    );
-  })();
-}
-
-function backgroundCheckAndUpdateProfile({
-  db,
-  pool,
-  relays,
-  cached,
-}: {
-  db: CoreDb;
-  pool: SimplePool;
-  relays: string[];
-  cached: CachedProfile;
-}): void {
-  void (async () => {
-    const newerCount = await countNewerReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: PROFILE_KIND,
-      since: cached.createdAt + 1,
-    });
-
-    if (newerCount === 0) {
-      debug(`wot-service profile cache current for ${cached.pubkey}`);
-
-      return;
-    }
-
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey: cached.pubkey,
-      kind: PROFILE_KIND,
-    });
-
-    if (!latest || latest.created_at <= cached.createdAt) {
-      return;
-    }
-
-    const metadata = parseProfileMetadata(latest.content);
-
-    upsertCachedProfile({
-      db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
-      name: metadata.name,
-      displayName: metadata.displayName,
-      picture: metadata.picture,
-      about: metadata.about,
-      rawJson: JSON.stringify(latest),
-    });
-
-    debug(`wot-service updated profile cache for ${latest.pubkey}`);
-  })();
+  return (
+    event.kind === kind &&
+    event.pubkey?.toLowerCase() === pubkey &&
+    event.id?.toLowerCase() === eventId &&
+    event.created_at === createdAt
+  );
 }
 
 export function createWotServices({
   db,
-  pool,
+  nostrResolution,
   rootPubkey,
   fallbackRelays,
-}: {
-  db: CoreDb;
-  pool: SimplePool;
-  rootPubkey: string;
-  fallbackRelays: string[];
-}): WotServices {
+}: CreateWotServicesProps): WotServices {
   const relays = uniqueRelays([...PROFILE_RELAYS_FOR_QUERY, ...fallbackRelays]);
+  const pendingRelayListRefreshes = new Set<string>();
+  let relayListRefreshPromise: Promise<void> | null = null;
 
-  async function fetchAndCacheFollows(
+  async function migrateLegacy(
+    kind: LegacyWotEventKind,
     pubkey: string,
-  ): Promise<CachedContactList | null> {
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey,
-      kind: CONTACT_LIST_KIND,
-    });
+  ): Promise<void> {
+    const legacy = getLegacyWotEvent({ db, kind, pubkey });
 
-    if (!latest) {
-      debug(`wot-service no follows found for ${pubkey}`);
-
-      return null;
+    if (!legacy?.rawJson) {
+      return;
     }
 
-    const follows = parseFollowList(latest).map((follow) => follow.pubkey);
+    try {
+      const event = JSON.parse(legacy.rawJson) as unknown;
 
-    return upsertCachedContactList({
-      db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
-      follows,
-      rawJson: JSON.stringify(latest),
-    });
+      if (
+        !legacyMetadataMatches({
+          input: event,
+          kind,
+          pubkey: legacy.pubkey,
+          eventId: legacy.eventId,
+          createdAt: legacy.createdAt,
+        })
+      ) {
+        return;
+      }
+
+      const result = await nostrResolution.seedEvents({
+        entries: [
+          {
+            event,
+            relayHints: [],
+            lastCheckedAtMs: legacy.fetchedAt * 1_000,
+          },
+        ],
+      });
+
+      if (result.seeded === 1) {
+        clearLegacyWotEvent({
+          db,
+          kind,
+          pubkey: legacy.pubkey,
+          eventId: legacy.eventId,
+        });
+      }
+    } catch (error) {
+      debug(
+        `wot-service legacy seed failed for ${kind}:${pubkey}: ${String(error)}`,
+      );
+    }
   }
 
-  async function fetchAndCacheRelayList(
-    pubkey: string,
-  ): Promise<CachedRelayList | null> {
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey,
-      kind: RELAY_LIST_KIND,
-    });
+  function cacheDerivedEvent(kind: LegacyWotEventKind, event: Event): void {
+    if (kind === CONTACT_LIST_KIND) {
+      upsertCachedContactList({
+        db,
+        pubkey: event.pubkey,
+        eventId: event.id,
+        createdAt: event.created_at,
+        follows: parseFollowList(event).map((follow) => follow.pubkey),
+        rawJson: '',
+      });
 
-    if (!latest) {
-      debug(`wot-service no relay list found for ${pubkey}`);
-
-      return null;
+      return;
     }
 
-    const parsed = parseNip65RelayTags(latest.tags);
+    if (kind === RELAY_LIST_KIND) {
+      const parsed = parseNip65RelayTags(event.tags);
 
-    return upsertCachedRelayList({
-      db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
-      readRelays: parsed.readRelays,
-      writeRelays: parsed.writeRelays,
-      rawJson: JSON.stringify(latest),
-    });
-  }
+      upsertCachedRelayList({
+        db,
+        pubkey: event.pubkey,
+        eventId: event.id,
+        createdAt: event.created_at,
+        readRelays: parsed.readRelays,
+        writeRelays: parsed.writeRelays,
+        rawJson: '',
+      });
 
-  async function fetchAndCacheProfile(
-    pubkey: string,
-  ): Promise<CachedProfile | null> {
-    const latest = await fetchLatestReplaceable({
-      pool,
-      relays,
-      pubkey,
-      kind: PROFILE_KIND,
-    });
-
-    if (!latest) {
-      debug(`wot-service no profile found for ${pubkey}`);
-
-      return null;
+      return;
     }
 
-    const metadata = parseProfileMetadata(latest.content);
+    const metadata = parseProfileMetadata(event.content);
 
-    return upsertCachedProfile({
+    upsertCachedProfile({
       db,
-      pubkey: latest.pubkey,
-      eventId: latest.id,
-      createdAt: latest.created_at,
+      pubkey: event.pubkey,
+      eventId: event.id,
+      createdAt: event.created_at,
       name: metadata.name,
       displayName: metadata.displayName,
       picture: metadata.picture,
       about: metadata.about,
-      rawJson: JSON.stringify(latest),
+      rawJson: '',
     });
+  }
+
+  async function resolveAndCache({
+    kind,
+    pubkey,
+    refreshMode,
+  }: ResolveAndCacheProps): Promise<Event | null> {
+    const result = await nostrResolution.resolveReplaceableEvent({
+      kind,
+      pubkey,
+      identifier: null,
+      relayHints: [],
+      contextRelays: fallbackRelays,
+      fallbackRelays: relays,
+      refreshMode,
+      refreshIntervalMs: DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS,
+      deadlineAtMs: Date.now() + 8_000,
+    });
+
+    if (result.event) {
+      cacheDerivedEvent(kind, result.event);
+    }
+
+    return result.event;
+  }
+
+  function refreshInBackground(kind: LegacyWotEventKind, pubkey: string): void {
+    void resolveAndCache({ kind, pubkey, refreshMode: 'require-fresh' }).catch(
+      (error) =>
+        debug(
+          `wot-service refresh failed for ${kind}:${pubkey}: ${String(error)}`,
+        ),
+    );
+  }
+
+  function refreshRelayLists(pubkeys: string[]): Promise<void> {
+    for (const pubkey of pubkeys) {
+      pendingRelayListRefreshes.add(normalizePubkeyInput(pubkey));
+    }
+
+    if (relayListRefreshPromise) {
+      return relayListRefreshPromise;
+    }
+
+    relayListRefreshPromise = (async () => {
+      while (pendingRelayListRefreshes.size > 0) {
+        const batch = [...pendingRelayListRefreshes];
+
+        pendingRelayListRefreshes.clear();
+
+        const events = await nostrResolution.refreshReplaceableEventsBatch({
+          kind: RELAY_LIST_KIND,
+          pubkeys: batch,
+          identifier: null,
+          contextRelays: fallbackRelays,
+          fallbackRelays: relays,
+          refreshIntervalMs: DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS,
+          deadlineAtMs: Date.now() + 8_000,
+        });
+
+        for (const event of events) {
+          cacheDerivedEvent(RELAY_LIST_KIND, event);
+        }
+
+        debug(
+          `wot-service refreshed relay lists in batches: ${events.length}/${batch.length} cached`,
+        );
+      }
+    })().finally(() => {
+      relayListRefreshPromise = null;
+    });
+
+    return relayListRefreshPromise;
   }
 
   return {
@@ -418,40 +344,73 @@ export function createWotServices({
       }
     },
 
+    getFollowsWhoFollow: (pubkey: string, queryRootPubkey = rootPubkey) => {
+      try {
+        return getWotFollowsWhoFollow({
+          db,
+          targetPubkey: normalizePubkeyInput(pubkey),
+          rootPubkey: normalizePubkeyInput(queryRootPubkey),
+        });
+      } catch {
+        return null;
+      }
+    },
+
     async getFollows(pubkey: string): Promise<string[]> {
       const normalizedPubkey = normalizePubkeyInput(pubkey);
       const cached = getCachedContactList(db, normalizedPubkey);
 
+      await migrateLegacy(CONTACT_LIST_KIND, normalizedPubkey);
+
       if (cached) {
-        backgroundCheckAndUpdateContactList({ db, pool, relays, cached });
+        refreshInBackground(CONTACT_LIST_KIND, normalizedPubkey);
 
         return cached.follows;
       }
 
-      return (await fetchAndCacheFollows(normalizedPubkey))?.follows ?? [];
+      await resolveAndCache({
+        kind: CONTACT_LIST_KIND,
+        pubkey: normalizedPubkey,
+        refreshMode: 'require-fresh',
+      });
+
+      return getCachedContactList(db, normalizedPubkey)?.follows ?? [];
     },
 
     async getRelayList(pubkey: string): Promise<CachedRelayList | null> {
       const normalizedPubkey = normalizePubkeyInput(pubkey);
       const cached = getCachedRelayList(db, normalizedPubkey);
 
+      await migrateLegacy(RELAY_LIST_KIND, normalizedPubkey);
+
       if (cached) {
-        backgroundCheckAndUpdateRelayList({ db, pool, relays, cached });
+        refreshInBackground(RELAY_LIST_KIND, normalizedPubkey);
 
         return cached;
       }
 
-      return await fetchAndCacheRelayList(normalizedPubkey);
+      await resolveAndCache({
+        kind: RELAY_LIST_KIND,
+        pubkey: normalizedPubkey,
+        refreshMode: 'require-fresh',
+      });
+
+      return getCachedRelayList(db, normalizedPubkey);
     },
 
-    async getProfiles(pubkeys: string[]): Promise<Map<string, CachedProfile>> {
+    async getProfiles({
+      pubkeys,
+      waitForMissing,
+    }: GetProfilesProps): Promise<Map<string, CachedProfile>> {
       const normalizedPubkeys = [
-        ...new Set(
-          pubkeys
-            .map((pubkey) => normalizePubkeyInput(pubkey))
-            .filter((pubkey): pubkey is string => pubkey !== null),
-        ),
+        ...new Set(pubkeys.map((pubkey) => normalizePubkeyInput(pubkey))),
       ];
+
+      await mapWithConcurrency({
+        items: normalizedPubkeys,
+        concurrency: PROFILE_CONCURRENCY,
+        map: async (pubkey) => migrateLegacy(PROFILE_KIND, pubkey),
+      });
 
       const profiles = getCachedProfiles(db, normalizedPubkeys);
 
@@ -460,12 +419,35 @@ export function createWotServices({
       );
 
       for (const cached of profiles.values()) {
-        backgroundCheckAndUpdateProfile({ db, pool, relays, cached });
+        refreshInBackground(PROFILE_KIND, cached.pubkey);
       }
 
-      const fetchedProfiles = await Promise.all(
-        missingPubkeys.map((pubkey) => fetchAndCacheProfile(pubkey)),
-      );
+      const fetchMissing = () =>
+        mapWithConcurrency({
+          items: missingPubkeys,
+          concurrency: PROFILE_CONCURRENCY,
+          map: async (pubkey) => {
+            await resolveAndCache({
+              kind: PROFILE_KIND,
+              pubkey,
+              refreshMode: 'require-fresh',
+            });
+
+            return getCachedProfiles(db, [pubkey]).get(pubkey) ?? null;
+          },
+        });
+
+      if (!waitForMissing) {
+        void fetchMissing().catch((error) =>
+          debug(
+            `wot-service background profile fetch failed: ${String(error)}`,
+          ),
+        );
+
+        return profiles;
+      }
+
+      const fetchedProfiles = await fetchMissing();
 
       for (const profile of fetchedProfiles) {
         if (profile) {
@@ -479,24 +461,43 @@ export function createWotServices({
     async getRelayAuthorMap(pubkeys: string[]): Promise<RelayAuthorGroup[]> {
       const relayToAuthors = new Map<string, Set<string>>();
 
-      await Promise.all(
-        pubkeys.map(async (pubkey) => {
-          const relayList = await this.getRelayList(pubkey);
+      const normalizedPubkeys = [
+        ...new Set(pubkeys.map((pubkey) => normalizePubkeyInput(pubkey))),
+      ];
 
-          const writeRelays = relayList?.writeRelays.length
-            ? relayList.writeRelays
-            : fallbackRelays;
+      await mapWithConcurrency({
+        items: normalizedPubkeys,
+        concurrency: PROFILE_CONCURRENCY,
+        map: (pubkey) => migrateLegacy(RELAY_LIST_KIND, pubkey),
+      });
 
-          for (const relay of uniqueRelays(writeRelays)) {
-            const authors = relayToAuthors.get(relay) ?? new Set<string>();
-            authors.add(pubkey);
-            relayToAuthors.set(relay, authors);
-          }
-        }),
-      );
+      const cachedEvents = await nostrResolution.getCachedReplaceableEvents({
+        kind: RELAY_LIST_KIND,
+        pubkeys: normalizedPubkeys,
+        identifier: null,
+      });
+
+      for (const event of cachedEvents) {
+        cacheDerivedEvent(RELAY_LIST_KIND, event);
+      }
+
+      for (const pubkey of normalizedPubkeys) {
+        const relayList = getCachedRelayList(db, pubkey);
+
+        const writeRelays = relayList?.writeRelays.length
+          ? relayList.writeRelays
+          : fallbackRelays;
+
+        for (const relay of uniqueRelays(writeRelays)) {
+          const authors = relayToAuthors.get(relay) ?? new Set<string>();
+
+          authors.add(pubkey);
+          relayToAuthors.set(relay, authors);
+        }
+      }
 
       debug(
-        `wot-service relay author map: ${pubkeys.length} authors across ${relayToAuthors.size} relays`,
+        `wot-service relay author map: ${normalizedPubkeys.length} authors across ${relayToAuthors.size} relays`,
       );
 
       return [...relayToAuthors.entries()].map(([relay, authors]) => ({
@@ -504,5 +505,7 @@ export function createWotServices({
         authors: [...authors],
       }));
     },
+
+    refreshRelayLists,
   };
 }

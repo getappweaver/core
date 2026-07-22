@@ -14,8 +14,10 @@ import {
 
 import { PROFILE_RELAYS } from './nip17';
 import { PROFILE_RELAYS_FOR_QUERY } from './nip65';
+import type { NostrResolutionService } from './resolution-service';
 
 const KIND_CONTACTS = 3;
+const KIND_RELAY_LIST = 10002;
 const MAX_SUBSCRIPTION_WAIT_MS = 8_000;
 
 const HexPubkeySchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -31,6 +33,7 @@ export type WotFollowTag = z.infer<typeof WotFollowTagSchema>;
 export const CrawlWotParamsSchema = z.object({
   pool: z.custom<SimplePool>((value) => value != null),
   db: z.custom<CoreDb>((value) => value != null),
+  nostrResolution: z.custom<NostrResolutionService>((value) => value != null),
   rootPubkey: HexPubkeySchema,
   maxDepth: z.number().int().positive().default(2),
   chunkSize: z.number().int().positive().default(100),
@@ -44,6 +47,12 @@ export const CrawlWotParamsSchema = z.object({
 });
 
 export type CrawlWotParams = z.input<typeof CrawlWotParamsSchema>;
+
+type FetchLatestWotEventsForAuthorsProps = {
+  pool: SimplePool;
+  relays: string[];
+  authors: string[];
+};
 
 export function normalizePubkeyInput(input: string): string {
   const trimmed = input.trim();
@@ -84,35 +93,48 @@ export function parseFollowList(event: Event): WotFollowTag[] {
   return follows;
 }
 
-export async function fetchLatestContactListsForAuthors(
-  pool: SimplePool,
-  relays: string[],
-  authors: string[],
-): Promise<Event[]> {
+export async function fetchLatestWotEventsForAuthors({
+  pool,
+  relays,
+  authors,
+}: FetchLatestWotEventsForAuthorsProps): Promise<Event[]> {
   if (authors.length === 0) {
     return [];
   }
 
   const filter = {
-    kinds: [KIND_CONTACTS],
+    kinds: [KIND_CONTACTS, KIND_RELAY_LIST],
     authors,
-    limit: Math.max(authors.length * 2, 500),
+    limit: Math.max(authors.length * 4, 500),
   };
 
   return new Promise((resolve) => {
-    const bestByAuthor = new Map<string, Event>();
+    const authorSet = new Set(authors);
+    const bestByKindAndAuthor = new Map<string, Event>();
 
     pool.subscribeEose(relays, filter, {
       maxWait: MAX_SUBSCRIPTION_WAIT_MS,
       onevent(event: Event) {
-        const current = bestByAuthor.get(event.pubkey);
+        if (
+          !authorSet.has(event.pubkey) ||
+          (event.kind !== KIND_CONTACTS && event.kind !== KIND_RELAY_LIST)
+        ) {
+          return;
+        }
 
-        if (!current || event.created_at > current.created_at) {
-          bestByAuthor.set(event.pubkey, event);
+        const key = `${event.kind}:${event.pubkey}`;
+        const current = bestByKindAndAuthor.get(key);
+
+        if (
+          !current ||
+          event.created_at > current.created_at ||
+          (event.created_at === current.created_at && event.id < current.id)
+        ) {
+          bestByKindAndAuthor.set(key, event);
         }
       },
       onclose() {
-        resolve(Array.from(bestByAuthor.values()));
+        resolve(Array.from(bestByKindAndAuthor.values()));
       },
     });
   });
@@ -152,8 +174,16 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function crawlWot(input: CrawlWotParams): Promise<void> {
-  const { pool, db, rootPubkey, maxDepth, chunkSize, concurrency, onProgress } =
-    CrawlWotParamsSchema.parse(input);
+  const {
+    pool,
+    db,
+    nostrResolution,
+    rootPubkey,
+    maxDepth,
+    chunkSize,
+    concurrency,
+    onProgress,
+  } = CrawlWotParamsSchema.parse(input);
 
   const relays = [
     ...new Set([
@@ -192,16 +222,37 @@ export async function crawlWot(input: CrawlWotParams): Promise<void> {
       authorChunks,
       concurrency,
       async (authorChunk) =>
-        fetchLatestContactListsForAuthors(pool, relays, authorChunk),
+        fetchLatestWotEventsForAuthors({
+          pool,
+          relays,
+          authors: authorChunk,
+        }),
     );
 
     const events = chunkResults.flat();
 
     const eventsByAuthor = new Map(
-      events.map((event) => [event.pubkey, event]),
+      events
+        .filter((event) => event.kind === KIND_CONTACTS)
+        .map((event) => [event.pubkey, event]),
     );
 
     const fetchedAt = Math.floor(Date.now() / 1000);
+
+    try {
+      for (const eventChunk of chunk(events, 100)) {
+        await nostrResolution.seedEvents({
+          entries: eventChunk.map((event) => ({
+            event,
+            relayHints: [],
+            lastCheckedAtMs: fetchedAt * 1_000,
+          })),
+        });
+      }
+    } catch {
+      // WoT graph state remains authoritative when disposable cache seeding fails.
+    }
+
     const nodeRows: WotNodeRow[] = [];
     const nextLevel = new Set<string>();
 

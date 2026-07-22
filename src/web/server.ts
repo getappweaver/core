@@ -8,6 +8,8 @@ import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
+import type { NostrResolutionService } from '@src/nostr/resolution-service';
+import type { WotServices } from '@src/nostr/wot-service';
 import type { ProviderDb } from '@src/providers/db';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -35,6 +37,8 @@ export type StartLocalWebServerOptions = {
   walletDb: WalletDb | null;
   providerDb: ProviderDb | null;
   config: BotConfig;
+  wot: WotServices | null;
+  nostrResolution: NostrResolutionService | null;
   setupSecret: string;
   setupMode: boolean;
   setupBillboard: boolean;
@@ -222,6 +226,8 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
     walletDb: options.walletDb,
     providerDb: options.providerDb,
     config: options.config,
+    wot: options.wot,
+    nostrResolution: options.nostrResolution,
     setupSecret: options.setupSecret,
     setupMode: options.setupMode,
   };

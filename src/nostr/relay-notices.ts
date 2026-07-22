@@ -3,26 +3,57 @@ import type { SimplePool } from 'nostr-tools/pool';
 
 import { debug } from '../logger';
 
-const blockedReadRelays = new Set<string>();
+export const RELAY_OVERLOAD_COOLDOWN_MS = 60_000;
 
-function shouldBlockRelayForNotice(message: string): boolean {
+type RelayReadBlock = {
+  permanent: boolean;
+  blockedUntilMs: number;
+};
+
+const blockedReadRelays = new Map<string, RelayReadBlock>();
+
+function blockForNotice(message: string): RelayReadBlock | null {
   const normalized = message.toLowerCase();
 
-  return (
-    normalized.includes('does not accept reqs') ||
-    normalized.includes('too many concurrent reqs')
-  );
+  if (normalized.includes('does not accept reqs')) {
+    return { permanent: true, blockedUntilMs: Number.POSITIVE_INFINITY };
+  }
+
+  if (normalized.includes('too many concurrent reqs')) {
+    return {
+      permanent: false,
+      blockedUntilMs: Date.now() + RELAY_OVERLOAD_COOLDOWN_MS,
+    };
+  }
+
+  return null;
+}
+
+function activeReadBlock(relayUrl: string): RelayReadBlock | null {
+  const block = blockedReadRelays.get(relayUrl);
+
+  if (!block) {
+    return null;
+  }
+
+  if (!block.permanent && block.blockedUntilMs <= Date.now()) {
+    blockedReadRelays.delete(relayUrl);
+
+    return null;
+  }
+
+  return block;
 }
 
 export function filterBlockedReadRelays(relays: string[]): string[] {
-  return relays.filter((relay) => !blockedReadRelays.has(relay));
+  return relays.filter((relay) => activeReadBlock(relay) === null);
 }
 
 export function allowRelayOperation(
   relayUrl: string,
   operation: ['read', Filter[]] | ['write', Event],
 ): boolean {
-  if (operation[0] !== 'read' || !blockedReadRelays.has(relayUrl)) {
+  if (operation[0] !== 'read' || activeReadBlock(relayUrl) === null) {
     return true;
   }
 
@@ -70,14 +101,19 @@ export function installRelayNoticeTracking(pool: SimplePool): void {
     relay.onnotice = (message: string) => {
       previousNoticeHandler(message);
 
-      if (!shouldBlockRelayForNotice(message)) {
+      const block = blockForNotice(message);
+
+      if (!block) {
         return;
       }
 
-      blockedReadRelays.add(relay.url);
+      const existing = activeReadBlock(relay.url);
+      const appliedBlock = existing?.permanent === true ? existing : block;
+
+      blockedReadRelays.set(relay.url, appliedBlock);
 
       debug(
-        `relay notice: suppressing future read REQs to ${relay.url}: ${message}`,
+        `relay notice: ${appliedBlock.permanent ? 'suppressing future' : 'cooling down'} read REQs to ${relay.url}: ${message}`,
       );
 
       poolWithRelayAccess.close([relay.url]);

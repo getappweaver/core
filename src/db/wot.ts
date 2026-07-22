@@ -179,6 +179,85 @@ export type CachedProfile = {
   fetchedAt: number;
 };
 
+export type LegacyWotEventKind = 0 | 3 | 10002;
+
+export type LegacyWotEvent = {
+  kind: LegacyWotEventKind;
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  fetchedAt: number;
+  rawJson: string;
+};
+
+function legacyWotTable(kind: LegacyWotEventKind): string {
+  if (kind === 0) {
+    return 'wot_profile_cache';
+  }
+
+  if (kind === 3) {
+    return 'wot_contact_list_cache';
+  }
+
+  return 'wot_relay_list_cache';
+}
+
+export function getLegacyWotEvent({
+  db,
+  kind,
+  pubkey,
+}: {
+  db: CoreDb;
+  kind: LegacyWotEventKind;
+  pubkey: string;
+}): LegacyWotEvent | null {
+  const row = db
+    .prepare(
+      `SELECT pubkey, event_id, created_at, fetched_at, raw_json
+       FROM ${legacyWotTable(kind)} WHERE pubkey = ?`,
+    )
+    .get(pubkey.toLowerCase()) as
+    | {
+        pubkey: string;
+        event_id: string;
+        created_at: number;
+        fetched_at: number;
+        raw_json: string;
+      }
+    | undefined;
+
+  return row
+    ? {
+        kind,
+        pubkey: row.pubkey,
+        eventId: row.event_id,
+        createdAt: row.created_at,
+        fetchedAt: row.fetched_at,
+        rawJson: row.raw_json,
+      }
+    : null;
+}
+
+export function clearLegacyWotEvent({
+  db,
+  kind,
+  pubkey,
+  eventId,
+}: {
+  db: CoreDb;
+  kind: LegacyWotEventKind;
+  pubkey: string;
+  eventId: string;
+}): boolean {
+  return (
+    db.run(
+      `UPDATE ${legacyWotTable(kind)} SET raw_json = ''
+       WHERE pubkey = ? AND event_id = ? AND raw_json <> ''`,
+      [pubkey.toLowerCase(), eventId.toLowerCase()],
+    ).changes > 0
+  );
+}
+
 export function getCachedContactList(
   db: CoreDb,
   pubkey: string,
@@ -228,9 +307,18 @@ export function upsertCachedContactList({
 
   db.run(
     `
-    INSERT OR REPLACE INTO wot_contact_list_cache
+    INSERT INTO wot_contact_list_cache
       (pubkey, event_id, created_at, follows, raw_json, fetched_at)
     VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(pubkey) DO UPDATE SET
+      event_id = excluded.event_id,
+      created_at = excluded.created_at,
+      follows = excluded.follows,
+      raw_json = excluded.raw_json,
+      fetched_at = excluded.fetched_at
+    WHERE excluded.created_at > wot_contact_list_cache.created_at
+       OR (excluded.created_at = wot_contact_list_cache.created_at
+           AND excluded.event_id < wot_contact_list_cache.event_id)
   `,
     [
       normalizedPubkey,
@@ -242,13 +330,7 @@ export function upsertCachedContactList({
     ],
   );
 
-  return {
-    pubkey: normalizedPubkey,
-    eventId,
-    createdAt,
-    follows,
-    fetchedAt,
-  };
+  return getCachedContactList(db, normalizedPubkey)!;
 }
 
 export function getCachedRelayList(
@@ -304,9 +386,19 @@ export function upsertCachedRelayList({
 
   db.run(
     `
-    INSERT OR REPLACE INTO wot_relay_list_cache
+    INSERT INTO wot_relay_list_cache
       (pubkey, event_id, created_at, read_relays, write_relays, raw_json, fetched_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(pubkey) DO UPDATE SET
+      event_id = excluded.event_id,
+      created_at = excluded.created_at,
+      read_relays = excluded.read_relays,
+      write_relays = excluded.write_relays,
+      raw_json = excluded.raw_json,
+      fetched_at = excluded.fetched_at
+    WHERE excluded.created_at > wot_relay_list_cache.created_at
+       OR (excluded.created_at = wot_relay_list_cache.created_at
+           AND excluded.event_id < wot_relay_list_cache.event_id)
   `,
     [
       normalizedPubkey,
@@ -319,14 +411,7 @@ export function upsertCachedRelayList({
     ],
   );
 
-  return {
-    pubkey: normalizedPubkey,
-    eventId,
-    createdAt,
-    readRelays,
-    writeRelays,
-    fetchedAt,
-  };
+  return getCachedRelayList(db, normalizedPubkey)!;
 }
 
 export function getCachedProfile(
@@ -407,9 +492,21 @@ export function upsertCachedProfile({
 
   db.run(
     `
-    INSERT OR REPLACE INTO wot_profile_cache
+    INSERT INTO wot_profile_cache
       (pubkey, event_id, created_at, name, display_name, picture, about, raw_json, fetched_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(pubkey) DO UPDATE SET
+      event_id = excluded.event_id,
+      created_at = excluded.created_at,
+      name = excluded.name,
+      display_name = excluded.display_name,
+      picture = excluded.picture,
+      about = excluded.about,
+      raw_json = excluded.raw_json,
+      fetched_at = excluded.fetched_at
+    WHERE excluded.created_at > wot_profile_cache.created_at
+       OR (excluded.created_at = wot_profile_cache.created_at
+           AND excluded.event_id < wot_profile_cache.event_id)
   `,
     [
       normalizedPubkey,
@@ -424,16 +521,7 @@ export function upsertCachedProfile({
     ],
   );
 
-  return {
-    pubkey: normalizedPubkey,
-    eventId,
-    createdAt,
-    name,
-    displayName,
-    picture,
-    about,
-    fetchedAt,
-  };
+  return getCachedProfile(db, normalizedPubkey)!;
 }
 
 export function clearWotForRoot(db: CoreDb, rootPubkey: string): void {
@@ -738,4 +826,63 @@ export function getWotRootStats(
   }
 
   return WotRootStatsSchema.parse(row);
+}
+
+type GetWotFollowsWhoFollowProps = {
+  db: CoreDb;
+  targetPubkey: string;
+  rootPubkey: string;
+};
+
+export function getWotFollowsWhoFollow({
+  db,
+  targetPubkey,
+  rootPubkey,
+}: GetWotFollowsWhoFollowProps): string[] | null {
+  const normalizedRootPubkey = rootPubkey.toLowerCase();
+
+  if (!getWotRootStats(db, normalizedRootPubkey)) {
+    return null;
+  }
+
+  const incomplete = db
+    .prepare(
+      `
+      SELECT COUNT(*) AS count
+      FROM wot_edges direct
+      LEFT JOIN wot_nodes followed_node
+        ON followed_node.root_pubkey = direct.root_pubkey
+       AND followed_node.pubkey = direct.followed_pubkey
+      WHERE direct.root_pubkey = ?
+        AND direct.follower_pubkey = ?
+        AND COALESCE(followed_node.follow_list_fetched_at, 0) = 0
+    `,
+    )
+    .get(normalizedRootPubkey, normalizedRootPubkey) as { count: number };
+
+  if (incomplete.count > 0) {
+    return null;
+  }
+
+  const rows = db
+    .prepare(
+      `
+      SELECT direct.followed_pubkey AS pubkey
+      FROM wot_edges direct
+      INNER JOIN wot_edges support
+        ON support.root_pubkey = direct.root_pubkey
+       AND support.follower_pubkey = direct.followed_pubkey
+      WHERE direct.root_pubkey = ?
+        AND direct.follower_pubkey = ?
+        AND support.followed_pubkey = ?
+      ORDER BY direct.followed_pubkey ASC
+    `,
+    )
+    .all(
+      normalizedRootPubkey,
+      normalizedRootPubkey,
+      targetPubkey.toLowerCase(),
+    ) as Array<{ pubkey: string }>;
+
+  return rows.map((row) => row.pubkey);
 }

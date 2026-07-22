@@ -2,6 +2,9 @@
 dm-bot.sqlite
 dm-bot.sqlite-shm
 dm-bot.sqlite-wal
+nostr-cache.sqlite
+nostr-cache.sqlite-shm
+nostr-cache.sqlite-wal
 restart.requested
 node_modules
 .opencode/*

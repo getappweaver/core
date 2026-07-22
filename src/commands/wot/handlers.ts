@@ -25,14 +25,17 @@ export const handleWotRoot: BuiltinHandler = (ctx) => {
     );
   }
 
-  return handleError(
-    async () =>
-      handleWot({
-        db: input.seenDb,
-        pool: input.pool,
-        config: input.config,
-        args: input.args,
-      }),
-    'WoT command failed',
-  );
+  return handleError(async () => {
+    if (!input.nostrResolution) {
+      throw new Error('Nostr resolution service is unavailable.');
+    }
+
+    return handleWot({
+      db: input.seenDb,
+      pool: input.pool,
+      nostrResolution: input.nostrResolution,
+      config: input.config,
+      args: input.args,
+    });
+  }, 'WoT command failed');
 };

@@ -1,5 +1,4 @@
 import { nip19 } from 'nostr-tools';
-import type { Event } from 'nostr-tools/core';
 import type { SimplePool } from 'nostr-tools/pool';
 
 import type { CoreDb } from '@src/db';
@@ -10,6 +9,7 @@ import {
 } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
+import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import { crawlWot, normalizePubkeyInput } from '@src/nostr/wot';
 
 function getWotUsage(): string {
@@ -145,21 +145,10 @@ function parseWotFetchProfileArgs(args: string[]): ProfileTarget {
   return parseProfileTarget(value);
 }
 
-async function fetchLatestProfile({
-  pool,
-  relays,
-  pubkey,
-}: {
-  pool: SimplePool;
-  relays: string[];
-  pubkey: string;
-}): Promise<Event | null> {
-  return await pool.get(relays, { kinds: [0], authors: [pubkey], limit: 1 });
-}
-
 export type HandleWotProps = {
   db: CoreDb;
   pool: SimplePool;
+  nostrResolution: NostrResolutionService;
   config: BotConfig;
   args: string[];
 };
@@ -167,6 +156,7 @@ export type HandleWotProps = {
 export async function handleWot({
   db,
   pool,
+  nostrResolution,
   config,
   args,
 }: HandleWotProps): Promise<string> {
@@ -244,11 +234,19 @@ Last fetched at: ${stats.last_fetched_at}`;
       ...config.botRelayUrls,
     ]);
 
-    const latest = await fetchLatestProfile({
-      pool,
-      relays,
+    const resolved = await nostrResolution.resolveReplaceableEvent({
+      kind: 0,
       pubkey: target.pubkey,
+      identifier: null,
+      relayHints: target.relayHints,
+      contextRelays: config.botRelayUrls,
+      fallbackRelays: PROFILE_RELAYS_FOR_QUERY as string[],
+      refreshMode: 'require-fresh',
+      refreshIntervalMs: 15 * 60 * 1_000,
+      deadlineAtMs: Date.now() + 8_000,
     });
+
+    const latest = resolved.event;
 
     if (!latest) {
       return `No kind 0 profile found for ${target.pubkey}.
@@ -266,7 +264,7 @@ Relays queried: ${relays.join(', ')}`;
       displayName: metadata.displayName,
       picture: metadata.picture,
       about: metadata.about,
-      rawJson: JSON.stringify(latest),
+      rawJson: '',
     });
 
     const display = metadata.displayName ?? metadata.name ?? '(unnamed)';
@@ -287,6 +285,7 @@ Relays queried: ${relays.join(', ')}`;
   await crawlWot({
     pool,
     db,
+    nostrResolution,
     rootPubkey,
     maxDepth,
   });

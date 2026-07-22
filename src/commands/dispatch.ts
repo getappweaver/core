@@ -8,6 +8,7 @@ import type { SimplePool } from 'nostr-tools/pool';
 import type { PromptFn, RunAgentFn, SendReplyFn } from '@src/core/plugin';
 import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { MessageSource } from '@src/messaging';
+import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { AgentBackend } from '../backends/types';
@@ -81,6 +82,7 @@ export type RouteCommandProps = {
   pool: SimplePool;
   walletDb: WalletDb | null;
   providerDb: ProviderDb | null;
+  nostrResolution: NostrResolutionService | null;
   config: BotConfig;
   source: MessageSource;
   sendReply?: SendReplyFn;
