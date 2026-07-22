@@ -1,22 +1,22 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
-import { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
 
 import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
+import type { NostrEventContextResponse } from '@src/web/nostr-resolution-schema';
 import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
 import type { ChromeModalState } from '../chrome/types';
 
 import {
+  resolveNostrEventContext,
+  resolveNostrInteractionRelays,
+} from './interactionResolution';
+import {
   markNostrInteraction,
   type NostrInteractionRecordResult,
 } from './interactionState';
-import {
-  fetchAuthorReadRelays,
-  fetchUserWriteRelays,
-  publishEvent,
-} from './relayLists';
+import { publishEvent } from './relayLists';
 
 const ReplyPayloadSchema = z.object({
   eventId: z.string().min(1),
@@ -28,6 +28,7 @@ const ReplyPayloadSchema = z.object({
   eventAuthorName: z.string().nullable().default(null),
   eventAuthorUsername: z.string().nullable().default(null),
   eventAuthorPicture: z.string().nullable().default(null),
+  eventRawJson: z.string().nullable().default(null),
   rootEventId: z.string().min(1).nullable().default(null),
   rootPubkey: z.string().min(1).nullable().default(null),
   relayHints: z.array(z.string().min(1)).default([]),
@@ -108,9 +109,16 @@ type ProfileMetadata = {
 type FetchedReplies = {
   replies: NostrEvent[];
   profiles: Map<string, ProfileMetadata>;
+  threadContext: NostrEvent[];
 };
 
-function nostrPostNode({ post }: { post: NostrPostView }): WebNode {
+function nostrPostNode({
+  post,
+  threadContext,
+}: {
+  post: NostrPostView;
+  threadContext: NostrEvent[];
+}): WebNode {
   return el(
     'nostrPost',
     {
@@ -123,6 +131,17 @@ function nostrPostNode({ post }: { post: NostrPostView }): WebNode {
       nostrAuthorPicture: post.authorPicture ?? undefined,
       nostrCreatedAt: post.createdAt ?? undefined,
       nostrContent: post.content,
+      nostrReplyContext: threadContext.map((event) => ({
+        type: 'event' as const,
+        id: event.id,
+        pubkey: event.pubkey,
+        kind: event.kind,
+        npub: npubForPubkey(event.pubkey),
+        createdAt: event.created_at,
+        content: event.content,
+        showActions: false,
+      })),
+      nostrShowReplyContext: threadContext.length > 0,
       nostrPreviewImages: true,
       nostrShowActions: false,
     },
@@ -192,77 +211,101 @@ function parseProfileMetadata(event: NostrEvent): ProfileMetadata | null {
   }
 }
 
-async function fetchReplies({
-  eventId,
-  eventPubkey,
-  relayHints,
-  fallbackRelays,
-}: {
-  eventId: string;
-  eventPubkey: string;
-  relayHints: string[];
-  fallbackRelays: string[];
-}): Promise<FetchedReplies> {
-  const relays = await fetchAuthorReadRelays({
-    pubkey: eventPubkey,
-    relayHints,
-    fallbackRelays,
+function fetchedRepliesFromContext(
+  response: NostrEventContextResponse,
+): FetchedReplies {
+  const profiles = new Map<string, ProfileMetadata>();
+
+  for (const profileEvent of response.profileEvents) {
+    const profile = parseProfileMetadata(profileEvent);
+
+    if (profile) {
+      profiles.set(profileEvent.pubkey.toLowerCase(), profile);
+    }
+  }
+
+  const eventsById = new Map(
+    response.graph.events.map((event) => [event.id, event]),
+  );
+
+  const threadContext = response.graph.edges.flatMap((edge) => {
+    if (
+      edge.sourceEventId !== response.targetEvent.id ||
+      (edge.role !== 'thread-root' && edge.role !== 'thread-parent') ||
+      edge.target.type !== 'event'
+    ) {
+      return [];
+    }
+
+    const event = eventsById.get(edge.target.eventId);
+
+    return event ? [event] : [];
   });
 
-  const pool = new SimplePool();
+  return {
+    replies: response.directReplies,
+    profiles,
+    threadContext: [
+      ...new Map(threadContext.map((event) => [event.id, event])).values(),
+    ],
+  };
+}
 
-  try {
-    const replies = await pool.querySync(
-      relays,
-      { kinds: [1], '#e': [eventId], limit: 20 },
-      { maxWait: 4_000 },
-    );
+function canonicalReplyPayload({
+  payload,
+  response,
+}: {
+  payload: z.infer<typeof ReplyPayloadSchema>;
+  response: NostrEventContextResponse;
+}): z.infer<typeof ReplyPayloadSchema> {
+  const rootEdge = response.graph.edges.find(
+    (edge) =>
+      edge.sourceEventId === response.targetEvent.id &&
+      edge.role === 'thread-root' &&
+      edge.target.type === 'event',
+  );
 
-    const sortedReplies = replies.sort((a, b) => a.created_at - b.created_at);
+  return {
+    ...payload,
+    eventId: response.targetEvent.id,
+    eventPubkey: response.targetEvent.pubkey,
+    eventKind: response.targetEvent.kind,
+    eventCreatedAt: response.targetEvent.created_at,
+    eventContent: response.targetEvent.content,
+    eventRawJson: JSON.stringify(response.targetEvent),
+    rootEventId:
+      rootEdge?.target.type === 'event'
+        ? rootEdge.target.eventId
+        : response.targetEvent.id,
+    rootPubkey:
+      rootEdge?.target.type === 'event'
+        ? (rootEdge.target.authorPubkey ?? response.targetEvent.pubkey)
+        : response.targetEvent.pubkey,
+    relayHints: response.targetRelayHints,
+  };
+}
 
-    const profilePubkeys = [
-      ...new Set([
-        eventPubkey,
-        ...sortedReplies.map((reply) => reply.pubkey),
-        ...sortedReplies.flatMap((reply) =>
-          reply.tags
-            .filter((tag) => tag[0] === 'e' && tag[4])
-            .map((tag) => tag[4]!),
-        ),
-      ]),
-    ];
+async function resolveReplyContext({
+  payload,
+  includeDirectReplies,
+}: {
+  payload: z.infer<typeof ReplyPayloadSchema>;
+  includeDirectReplies: boolean;
+}): Promise<NostrEventContextResponse> {
+  const targetEvent = payload.eventRawJson
+    ? (JSON.parse(payload.eventRawJson) as NostrEvent)
+    : null;
 
-    const profileEvents = await pool.querySync(
-      uniqueRelays([...relays, ...PROFILE_RELAYS_FOR_QUERY]),
-      { kinds: [0], authors: profilePubkeys, limit: profilePubkeys.length },
-      { maxWait: 4_000 },
-    );
-
-    const latestProfileEvents = new Map<string, NostrEvent>();
-
-    for (const profileEvent of profileEvents) {
-      const pubkey = profileEvent.pubkey.toLowerCase();
-      const current = latestProfileEvents.get(pubkey);
-
-      if (!current || profileEvent.created_at > current.created_at) {
-        latestProfileEvents.set(pubkey, profileEvent);
-      }
-    }
-
-    const profiles = new Map<string, ProfileMetadata>();
-
-    for (const [pubkey, profileEvent] of latestProfileEvents) {
-      const profile = parseProfileMetadata(profileEvent);
-
-      if (profile) {
-        profiles.set(pubkey, profile);
-      }
-    }
-
-    return { replies: sortedReplies, profiles };
-  } finally {
-    pool.close(uniqueRelays([...relays, ...PROFILE_RELAYS_FOR_QUERY]));
-  }
+  return resolveNostrEventContext({
+    eventId: payload.eventId,
+    authorPubkey: payload.eventPubkey,
+    address: null,
+    targetEvent,
+    relayHints: uniqueRelays(payload.relayHints),
+    fallbackRelays: uniqueRelays(payload.fallbackRelays),
+    includeDirectReplies,
+    replyLimit: 20,
+  });
 }
 
 function profileLabel({
@@ -349,10 +392,12 @@ function replyPanelRoot({
   payload,
   replies,
   profiles,
+  threadContext,
 }: {
   payload: z.infer<typeof ReplyPayloadSchema>;
   replies: NostrEvent[];
   profiles: Map<string, ProfileMetadata>;
+  threadContext: NostrEvent[];
 }): WebNodeRoot {
   const action = {
     type: 'clientAction' as const,
@@ -368,7 +413,10 @@ function replyPanelRoot({
     meta: { command: 'nostr', subcommand: 'reply' },
     tree: el('stack', { gap: 'sm' }, [
       el('text', { tone: 'muted', size: 'sm' }, [text('Replying to')]),
-      nostrPostNode({ post: postViewFromReplyPayload({ payload, profiles }) }),
+      nostrPostNode({
+        post: postViewFromReplyPayload({ payload, profiles }),
+        threadContext,
+      }),
       el('treeItem', { id: 'nostr-reply-compose', defaultExpanded: true }, [
         el(
           'form',
@@ -417,6 +465,7 @@ function replyPanelRoot({
                 ]),
                 nostrPostNode({
                   post: postViewFromEvent({ event: reply, profiles }),
+                  threadContext: [],
                 }),
               ]);
             })),
@@ -445,21 +494,23 @@ export async function handleNostrOpenReplyPanelAction({
 
   try {
     const payload = ReplyPayloadSchema.parse(action.payload ?? {});
-    const relayHints = uniqueRelays(payload.relayHints);
-    const fallbackRelays = uniqueRelays(payload.fallbackRelays);
 
-    const { replies, profiles } = await fetchReplies({
-      eventId: payload.eventId,
-      eventPubkey: payload.eventPubkey,
-      relayHints,
-      fallbackRelays,
+    const response = await resolveReplyContext({
+      payload,
+      includeDirectReplies: true,
     });
+
+    const canonicalPayload = canonicalReplyPayload({ payload, response });
+
+    const { replies, profiles, threadContext } =
+      fetchedRepliesFromContext(response);
 
     setChromeWeb(
       replyPanelRoot({
-        payload: { ...payload, relayHints, fallbackRelays },
+        payload: canonicalPayload,
         replies,
         profiles,
+        threadContext,
       }),
     );
   } catch (error) {
@@ -484,8 +535,8 @@ export async function handleNostrSendReplyAction({
   setChromeText(null);
 
   try {
-    const payload = SendReplyPayloadSchema.parse(action.payload ?? {});
-    const content = payload.content.trim();
+    const submittedPayload = SendReplyPayloadSchema.parse(action.payload ?? {});
+    const content = submittedPayload.content.trim();
 
     if (!currentUserPubkey) {
       throw new Error('Connect or unlock a Nostr signer to reply.');
@@ -495,8 +546,23 @@ export async function handleNostrSendReplyAction({
       throw new Error('Reply cannot be empty.');
     }
 
-    const relayHints = uniqueRelays(payload.relayHints);
-    const fallbackRelays = uniqueRelays(payload.fallbackRelays);
+    const response = await resolveReplyContext({
+      payload: submittedPayload,
+      includeDirectReplies: false,
+    });
+
+    const canonicalPayload = canonicalReplyPayload({
+      payload: submittedPayload,
+      response,
+    });
+
+    const relayHints = uniqueRelays(canonicalPayload.relayHints);
+    const fallbackRelays = uniqueRelays(canonicalPayload.fallbackRelays);
+
+    const payload = SendReplyPayloadSchema.parse({
+      ...canonicalPayload,
+      content,
+    });
 
     const template: EventTemplate = {
       kind: 1,
@@ -511,17 +577,19 @@ export async function handleNostrSendReplyAction({
       throw new Error('Reply was not signed.');
     }
 
-    const [userWriteRelays, authorReadRelays] = await Promise.all([
-      fetchUserWriteRelays({ pubkey: signed.pubkey, fallbackRelays }),
-      fetchAuthorReadRelays({
-        pubkey: payload.eventPubkey,
-        relayHints,
-        fallbackRelays,
-      }),
-    ]);
+    const relayPlan = await resolveNostrInteractionRelays({
+      signerPubkey: signed.pubkey,
+      recipientPubkeys: [
+        ...new Set([
+          payload.rootPubkey ?? payload.eventPubkey,
+          payload.eventPubkey,
+        ]),
+      ],
+      relayHints,
+      fallbackRelays,
+    });
 
-    const relays = uniqueRelays([...userWriteRelays, ...authorReadRelays]);
-    const acceptedRelays = await publishEvent(relays, signed);
+    const acceptedRelays = await publishEvent(relayPlan.publishRelays, signed);
 
     if (acceptedRelays.length === 0) {
       throw new Error('Reply publish failed on all relays.');

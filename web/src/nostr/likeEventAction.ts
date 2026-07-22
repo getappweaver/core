@@ -6,14 +6,14 @@ import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
 import {
+  resolveNostrEventContext,
+  resolveNostrInteractionRelays,
+} from './interactionResolution';
+import {
   markNostrInteraction,
   type NostrInteractionRecordResult,
 } from './interactionState';
-import {
-  fetchAuthorReadRelays,
-  fetchUserWriteRelays,
-  publishEvent,
-} from './relayLists';
+import { publishEvent } from './relayLists';
 
 const LikeEventPayloadSchema = z.object({
   eventId: z.string().min(1),
@@ -88,13 +88,27 @@ export async function handleNostrLikeEventAction({
       throw new Error('Connect or unlock a Nostr signer to like this note.');
     }
 
-    const relayHints = uniqueRelays(payload.relayHints);
+    const fallbackRelays = uniqueRelays(payload.fallbackRelays);
+
+    const context = await resolveNostrEventContext({
+      eventId: payload.eventId,
+      authorPubkey: payload.eventPubkey,
+      address: null,
+      targetEvent: null,
+      relayHints: uniqueRelays(payload.relayHints),
+      fallbackRelays,
+      includeDirectReplies: false,
+      replyLimit: 1,
+    });
+
+    const target = context.targetEvent;
+    const relayHints = context.targetRelayHints;
     const relayHint = relayHints[0] ?? '';
 
     const tags = [
-      ['e', payload.eventId, relayHint],
-      ['p', payload.eventPubkey],
-      ...(payload.eventKind ? [['k', String(payload.eventKind)]] : []),
+      ['e', target.id, relayHint],
+      ['p', target.pubkey],
+      ...(target.kind ? [['k', String(target.kind)]] : []),
     ];
 
     const template: EventTemplate = {
@@ -110,19 +124,14 @@ export async function handleNostrLikeEventAction({
       throw new Error('Like was not signed.');
     }
 
-    const fallbackRelays = uniqueRelays(payload.fallbackRelays);
+    const relayPlan = await resolveNostrInteractionRelays({
+      signerPubkey: signed.pubkey,
+      recipientPubkeys: [target.pubkey],
+      relayHints,
+      fallbackRelays,
+    });
 
-    const [userWriteRelays, authorReadRelays] = await Promise.all([
-      fetchUserWriteRelays({ pubkey: signed.pubkey, fallbackRelays }),
-      fetchAuthorReadRelays({
-        pubkey: payload.eventPubkey,
-        relayHints,
-        fallbackRelays,
-      }),
-    ]);
-
-    const relays = uniqueRelays([...userWriteRelays, ...authorReadRelays]);
-    const acceptedRelays = await publishEvent(relays, signed);
+    const acceptedRelays = await publishEvent(relayPlan.publishRelays, signed);
 
     if (acceptedRelays.length === 0) {
       throw new Error('Like publish failed on all relays.');
@@ -142,14 +151,14 @@ export async function handleNostrLikeEventAction({
 
     markNostrInteraction({
       userPubkey: signed.pubkey,
-      eventId: payload.eventId,
+      eventId: target.id,
       kind: 'liked',
     });
 
     return {
       type: 'nostrInteractionRecord',
       nrAlias: payload.nrAlias,
-      targetEventId: payload.eventId,
+      targetEventId: target.id,
       interactionEventId: signed.id,
       userPubkey: signed.pubkey,
       interactionType: 'liked',

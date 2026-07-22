@@ -4,19 +4,34 @@ import { SimplePool } from 'nostr-tools/pool';
 import { createSignal } from 'solid-js';
 import { z } from 'zod';
 
+import type {
+  EventReferenceEdge,
+  EventReferenceTarget,
+} from '@src/nostr/event-resolution-types';
+import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
 import {
-  fetchNip65WriteRelays,
-  PROFILE_RELAYS_FOR_QUERY,
-  uniqueRelays,
-} from '@src/nostr/nip65';
+  NostrProfilePostsRequestSchema,
+  NostrProfilePostsResponseSchema,
+  type NostrProfilePostsRequest,
+  type NostrProfilePostsResponse,
+} from '@src/web/nostr-resolution-schema';
+import {
+  openNostrShareAction,
+  type NostrSharePrefixes,
+} from '@src/web/nostr-share';
 import type {
   WebAction,
   WebNode,
   WebNodeRoot,
   WebNostrPostReference,
 } from '@src/web/ui-schema';
+import {
+  WebNostrPostExtraActionSchema,
+  type WebNostrPostExtraAction,
+} from '@src/web/ui-schema';
 
 import type { ChromeModalState } from '../chrome/types';
+import { fetchJson, postJson } from '../utils';
 
 import { fetchUserWriteRelays, publishEvent } from './relayLists';
 
@@ -29,6 +44,11 @@ const ProfilePayloadSchema = z.object({
   about: z.string().nullable().default(null),
   tab: z.enum(['profile', 'latestPosts']).default('profile'),
   relayHints: z.array(z.string().min(1)).default([]),
+  sharePrefixes: z.object({
+    nevent: z.string().min(1),
+    nprofile: z.string().min(1),
+  }),
+  profileActions: z.array(WebNostrPostExtraActionSchema).default([]),
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
@@ -129,9 +149,28 @@ type ProfileRootProps = {
   latestPosts: LatestProfilePost[] | null;
 };
 
+const FollowedByFollowsResponseSchema = z.object({
+  ok: z.literal(true),
+  available: z.boolean(),
+  count: z.number().int().nonnegative().nullable(),
+  pubkeys: z.array(z.string()),
+});
+
 type FetchLatestProfilePostsProps = {
   pubkey: string;
   profile: ProfilePayload;
+};
+
+type BuildNostrProfileActionPayloadProps = {
+  pubkey: string;
+  npub: string | null;
+  name: string | null;
+  username: string | null;
+  picture: string | null;
+  about: string | null;
+  relayHints: string[];
+  profileActions: WebNostrPostExtraAction[];
+  sharePrefixes: NostrSharePrefixes;
 };
 
 type NostrPostNodeProps = {
@@ -144,13 +183,53 @@ type LatestProfilePostFromEventProps = {
   event: NostrEvent;
   viewedProfile: ProfilePayload;
   profileByPubkey: Map<string, ProfileMetadata>;
-  contextById: Map<string, NostrEvent>;
+  graph: ProfilePostGraph;
+  defaultRelayHints: string[];
+};
+
+type ProfilePostGraph = {
+  eventsById: Map<string, NostrEvent>;
+  eventsByAddress: Map<string, NostrEvent>;
+  edgesBySource: Map<string, EventReferenceEdge[]>;
+};
+
+type ResolvedReferencesProps = {
+  event: NostrEvent;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+  graph: ProfilePostGraph;
+  defaultRelayHints: string[];
+  depth: number;
+  visitedEventIds: Set<string>;
+};
+
+type BuildLatestProfilePostsProps = {
+  response: NostrProfilePostsResponse;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+  defaultRelayHints: string[];
+};
+
+type BuildProfilePostsRequestProps = {
+  pubkey: string;
+  profile: ProfilePayload;
+};
+
+type ReplyContextFromEventProps = {
+  event: NostrEvent;
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
   relayHints: string[];
 };
 
 const followState = createSignal<Record<string, boolean>>({});
 const getFollowState = followState[0];
 const setFollowState = followState[1];
+
+const followedByFollowsState = createSignal<Record<string, number | null>>({});
+
+const getFollowedByFollowsState = followedByFollowsState[0];
+const setFollowedByFollowsState = followedByFollowsState[1];
 const NOSTR_REFERENCE_RE = /nostr:([a-z0-9]+)/gi;
 
 function text(value: string): WebNode {
@@ -275,6 +354,18 @@ function profileAction(payload: ProfilePayload): WebAction {
   };
 }
 
+async function fetchFollowedByFollowsCount(
+  pubkey: string,
+): Promise<number | null> {
+  const response = FollowedByFollowsResponseSchema.parse(
+    await fetchJson<unknown>(
+      `/api/nostr/followed-by-follows?pubkey=${encodeURIComponent(pubkey)}`,
+    ),
+  );
+
+  return response.available ? response.count : null;
+}
+
 function followAction(
   payload: ProfilePayload,
   mode: 'follow' | 'unfollow',
@@ -288,14 +379,6 @@ function followAction(
 
 function profileTabAction(payload: ProfilePayload, tab: ProfileTab): WebAction {
   return profileAction({ ...payload, tab });
-}
-
-function openNostrAction(nprofile: string): WebAction {
-  return {
-    type: 'clientAction',
-    action: 'web.openUrl',
-    payload: { url: `nostr://${nprofile}` },
-  };
 }
 
 function copyNprofileAction(nprofile: string): WebAction {
@@ -351,6 +434,7 @@ function replyEventAction({
       eventAuthorName: profile?.name,
       eventAuthorUsername: profile?.username,
       eventAuthorPicture: profile?.picture,
+      eventRawJson: JSON.stringify(event),
       rootEventId: root.id,
       rootPubkey: root.pubkey,
       relayHints,
@@ -663,6 +747,9 @@ function profileRoot({
 
   const following = getFollowState()[followKey] === true;
 
+  const followedByFollowsCount =
+    getFollowedByFollowsState()[payload.pubkey.toLowerCase()];
+
   const buttons: WebNode[] = [];
 
   if (!isSelf) {
@@ -680,9 +767,29 @@ function profileRoot({
   }
 
   buttons.push(
+    ...payload.profileActions.map((action) =>
+      el({
+        tag: 'button',
+        props: {
+          label: action.label,
+          title: action.ariaLabel,
+          action: action.action ?? undefined,
+          disabled: action.disabled,
+          className: action.active ? 'web-button active' : 'web-button',
+        },
+        children: [],
+      }),
+    ),
     el({
       tag: 'button',
-      props: { label: 'Open nostr://', action: openNostrAction(nprofile) },
+      props: {
+        label: 'Open in nostr',
+        action: openNostrShareAction({
+          type: 'nprofile',
+          identifier: nprofile,
+          prefixes: payload.sharePrefixes,
+        }),
+      },
       children: [],
     }),
     el({
@@ -702,6 +809,21 @@ function profileRoot({
               className: 'web-nostrProfile__about',
             },
             children: [text(payload.about)],
+          }),
+        ]
+      : []),
+    ...(typeof followedByFollowsCount === 'number'
+      ? [
+          el({
+            tag: 'text',
+            props: { tone: 'muted', size: 'sm' },
+            children: [
+              text(
+                followedByFollowsCount === 1
+                  ? 'Followed by 1 person you follow'
+                  : `Followed by ${followedByFollowsCount} people you follow`,
+              ),
+            ],
           }),
         ]
       : []),
@@ -857,10 +979,7 @@ function replyContextFromEvent({
   viewedProfile,
   profileByPubkey,
   relayHints,
-}: Omit<
-  LatestProfilePostFromEventProps,
-  'contextById'
->): LatestProfilePostReference {
+}: ReplyContextFromEventProps): LatestProfilePostReference {
   const profile = eventProfileMetadata({
     event,
     viewedProfile,
@@ -892,32 +1011,288 @@ function replyContextFromEvent({
   };
 }
 
+function addressKey({
+  kind,
+  pubkey,
+  identifier,
+}: {
+  kind: number;
+  pubkey: string;
+  identifier: string;
+}): string {
+  return `${kind}:${pubkey.toLowerCase()}:${identifier}`;
+}
+
+function targetKey(target: EventReferenceTarget): string {
+  return target.type === 'event'
+    ? `event:${target.eventId}`
+    : `address:${addressKey(target)}`;
+}
+
+function targetFromNip19(value: string): EventReferenceTarget | null {
+  try {
+    const decoded = nip19.decode(value);
+
+    if (decoded.type === 'note') {
+      return {
+        type: 'event',
+        eventId: decoded.data.toLowerCase(),
+        authorPubkey: null,
+      };
+    }
+
+    if (decoded.type === 'nevent') {
+      return {
+        type: 'event',
+        eventId: decoded.data.id.toLowerCase(),
+        authorPubkey: decoded.data.author?.toLowerCase() ?? null,
+      };
+    }
+
+    if (decoded.type === 'naddr') {
+      return {
+        type: 'address',
+        kind: decoded.data.kind,
+        pubkey: decoded.data.pubkey.toLowerCase(),
+        identifier: decoded.data.identifier,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function createProfilePostGraph(
+  response: NostrProfilePostsResponse,
+): ProfilePostGraph {
+  const eventsById = new Map(
+    response.graph.events.map((event) => [event.id, event]),
+  );
+
+  const eventsByAddress = new Map<string, NostrEvent>();
+
+  for (const event of response.graph.events) {
+    if (
+      event.kind === 0 ||
+      event.kind === 3 ||
+      (event.kind >= 10_000 && event.kind < 20_000) ||
+      (event.kind >= 30_000 && event.kind < 40_000)
+    ) {
+      const identifier =
+        event.kind >= 30_000 && event.kind < 40_000
+          ? (event.tags.find((tag) => tag[0] === 'd')?.[1] ?? '')
+          : '';
+
+      eventsByAddress.set(
+        addressKey({ kind: event.kind, pubkey: event.pubkey, identifier }),
+        event,
+      );
+    }
+  }
+
+  const edgesBySource = new Map<string, EventReferenceEdge[]>();
+
+  for (const edge of response.graph.edges) {
+    const edges = edgesBySource.get(edge.sourceEventId) ?? [];
+
+    edges.push(edge);
+    edgesBySource.set(edge.sourceEventId, edges);
+  }
+
+  return { eventsById, eventsByAddress, edgesBySource };
+}
+
+function eventForTarget(
+  target: EventReferenceTarget,
+  graph: ProfilePostGraph,
+): NostrEvent | null {
+  return target.type === 'event'
+    ? (graph.eventsById.get(target.eventId) ?? null)
+    : (graph.eventsByAddress.get(addressKey(target)) ?? null);
+}
+
+function resolvedReferencesForEvent({
+  event,
+  viewedProfile,
+  profileByPubkey,
+  graph,
+  defaultRelayHints,
+  depth,
+  visitedEventIds,
+}: ResolvedReferencesProps): WebNostrPostReference[] {
+  const references: WebNostrPostReference[] = [];
+  const sourceEdges = graph.edgesBySource.get(event.id) ?? [];
+  const content = displayContentForEvent(event);
+
+  for (const match of content.matchAll(NOSTR_REFERENCE_RE)) {
+    const target = targetFromNip19(match[1]!);
+
+    if (!target) {
+      continue;
+    }
+
+    const edge = sourceEdges.find(
+      (candidate) =>
+        candidate.role === 'embed' &&
+        targetKey(candidate.target) === targetKey(target),
+    );
+
+    const relayHints = uniqueRelays([
+      ...(edge?.relayHints ?? []),
+      ...defaultRelayHints,
+    ]);
+
+    const resolvedEvent = edge ? eventForTarget(edge.target, graph) : null;
+
+    if (target.type === 'address') {
+      const addressReference = addressReferencesForContent({
+        content: match[0],
+        viewedProfile,
+        profileByPubkey,
+      })[0];
+
+      if (!addressReference) {
+        continue;
+      }
+
+      if (!resolvedEvent) {
+        references.push({ ...addressReference, relayHints });
+        continue;
+      }
+
+      const nestedVisited = new Set(visitedEventIds).add(resolvedEvent.id);
+
+      references.push({
+        ...addressReference,
+        relayHints,
+        createdAt: resolvedEvent.created_at,
+        content: displayContentForEvent(resolvedEvent),
+        inlineProfiles: inlineProfilesForDisplayEvent({
+          event: resolvedEvent,
+          profileByPubkey,
+        }),
+        embeddedReferences:
+          depth < 2 && !visitedEventIds.has(resolvedEvent.id)
+            ? resolvedReferencesForEvent({
+                event: resolvedEvent,
+                viewedProfile,
+                profileByPubkey,
+                graph,
+                defaultRelayHints,
+                depth: depth + 1,
+                visitedEventIds: nestedVisited,
+              })
+            : [],
+      });
+
+      continue;
+    }
+
+    if (!resolvedEvent) {
+      continue;
+    }
+
+    const reference = replyContextFromEvent({
+      event: resolvedEvent,
+      viewedProfile,
+      profileByPubkey,
+      relayHints,
+    });
+
+    const nestedVisited = new Set(visitedEventIds).add(resolvedEvent.id);
+
+    references.push({
+      ...reference,
+      token: match[0],
+      embeddedReferences:
+        depth < 2 && !visitedEventIds.has(resolvedEvent.id)
+          ? resolvedReferencesForEvent({
+              event: resolvedEvent,
+              viewedProfile,
+              profileByPubkey,
+              graph,
+              defaultRelayHints,
+              depth: depth + 1,
+              visitedEventIds: nestedVisited,
+            })
+          : [],
+    });
+  }
+
+  return references;
+}
+
+function replyContextFromGraph({
+  event,
+  viewedProfile,
+  profileByPubkey,
+  graph,
+  defaultRelayHints,
+}: Omit<
+  ResolvedReferencesProps,
+  'depth' | 'visitedEventIds'
+>): LatestProfilePostReference[] {
+  const seenEventIds = new Set<string>();
+  const references: LatestProfilePostReference[] = [];
+
+  for (const edge of graph.edgesBySource.get(event.id) ?? []) {
+    if (edge.role !== 'thread-root' && edge.role !== 'thread-parent') {
+      continue;
+    }
+
+    const context = eventForTarget(edge.target, graph);
+
+    if (!context || seenEventIds.has(context.id)) {
+      continue;
+    }
+
+    seenEventIds.add(context.id);
+
+    const relayHints = uniqueRelays([...edge.relayHints, ...defaultRelayHints]);
+
+    const reference = replyContextFromEvent({
+      event: context,
+      viewedProfile,
+      profileByPubkey,
+      relayHints,
+    });
+
+    references.push({
+      ...reference,
+      embeddedReferences: resolvedReferencesForEvent({
+        event: context,
+        viewedProfile,
+        profileByPubkey,
+        graph,
+        defaultRelayHints,
+        depth: 1,
+        visitedEventIds: new Set([event.id, context.id]),
+      }),
+    });
+  }
+
+  return references;
+}
+
 function latestProfilePostFromEvent({
   event,
   viewedProfile,
   profileByPubkey,
-  contextById,
-  relayHints,
+  graph,
+  defaultRelayHints,
 }: LatestProfilePostFromEventProps): LatestProfilePost {
-  const replyContext = event.tags
-    .filter((tag) => tag[0] === 'e' && tag[1])
-    .map((tag) => contextById.get(tag[1]!))
-    .filter((context): context is NostrEvent => context != null)
-    .map((context) =>
-      replyContextFromEvent({
-        event: context,
-        viewedProfile,
-        profileByPubkey,
-        relayHints,
-      }),
-    );
-
   const content = displayContentForEvent(event);
 
-  const addressReferences = addressReferencesForContent({
-    content,
+  const resolvedReferences = resolvedReferencesForEvent({
+    event,
     viewedProfile,
     profileByPubkey,
+    graph,
+    defaultRelayHints,
+    depth: 0,
+    visitedEventIds: new Set([event.id]),
   });
 
   return {
@@ -928,111 +1303,129 @@ function latestProfilePostFromEvent({
     content,
     event,
     inlineProfiles: inlineProfilesForDisplayEvent({ event, profileByPubkey }),
-    replyContext,
+    replyContext: replyContextFromGraph({
+      event,
+      viewedProfile,
+      profileByPubkey,
+      graph,
+      defaultRelayHints,
+    }),
     embeds: Object.fromEntries(
-      addressReferences.flatMap((reference) =>
+      resolvedReferences.flatMap((reference) =>
         reference.token ? [[reference.token, reference]] : [],
       ),
     ),
   };
 }
 
+export function collectGraphProfilePubkeys({
+  response,
+  viewedPubkey,
+}: {
+  response: NostrProfilePostsResponse;
+  viewedPubkey: string;
+}): string[] {
+  const pubkeys = new Set<string>();
+
+  for (const event of response.graph.events) {
+    pubkeys.add(event.pubkey.toLowerCase());
+
+    for (const tag of event.tags) {
+      if (tag[0] === 'p' && tag[1]) {
+        pubkeys.add(tag[1].toLowerCase());
+      }
+    }
+  }
+
+  for (const edge of response.graph.edges) {
+    if (edge.target.type === 'event' && edge.target.authorPubkey) {
+      pubkeys.add(edge.target.authorPubkey.toLowerCase());
+    } else if (edge.target.type === 'address') {
+      pubkeys.add(edge.target.pubkey.toLowerCase());
+    }
+  }
+
+  pubkeys.delete(viewedPubkey.toLowerCase());
+
+  return [...pubkeys].slice(0, 30);
+}
+
+export function buildLatestProfilePostsFromResolution({
+  response,
+  viewedProfile,
+  profileByPubkey,
+  defaultRelayHints,
+}: BuildLatestProfilePostsProps): LatestProfilePost[] {
+  const graph = createProfilePostGraph(response);
+
+  return response.primaryEvents.map((event) =>
+    latestProfilePostFromEvent({
+      event,
+      viewedProfile,
+      profileByPubkey,
+      graph,
+      defaultRelayHints,
+    }),
+  );
+}
+
+export function buildProfilePostsRequest({
+  pubkey,
+  profile,
+}: BuildProfilePostsRequestProps): NostrProfilePostsRequest {
+  return NostrProfilePostsRequestSchema.parse({
+    pubkey,
+    relayHints: uniqueRelays(profile.relayHints).slice(0, 8),
+    fallbackRelays: uniqueRelays(profile.fallbackRelays).slice(0, 8),
+    limit: 10,
+  });
+}
+
 async function fetchLatestProfilePosts({
   pubkey,
   profile,
 }: FetchLatestProfilePostsProps): Promise<LatestProfilePost[]> {
-  const pool = new SimplePool();
-  let writeRelays: string[] = [];
+  const request = buildProfilePostsRequest({ pubkey, profile });
 
-  try {
-    writeRelays = await fetchNip65WriteRelays({
-      pool,
-      authorPubkey: pubkey,
-    });
+  const response = NostrProfilePostsResponseSchema.parse(
+    await postJson<unknown>('/api/nostr/profile-posts', request),
+  );
 
-    const events = await pool.querySync(
-      writeRelays,
-      { kinds: [1], authors: [pubkey], limit: 10 },
-      { maxWait: 4_000 },
-    );
+  const profilePubkeys = collectGraphProfilePubkeys({
+    response,
+    viewedPubkey: pubkey,
+  });
 
-    const eventsById = new Map(events.map((event) => [event.id, event]));
+  const profileMetadataResults = await Promise.allSettled(
+    profilePubkeys.map(
+      async (profilePubkey) =>
+        [
+          profilePubkey.toLowerCase(),
+          await fetchProfileMetadata({
+            pubkey: profilePubkey,
+            relays: PROFILE_RELAYS_FOR_QUERY as string[],
+          }),
+        ] as const,
+    ),
+  );
 
-    const latestEvents = [...eventsById.values()]
-      .sort((a, b) => b.created_at - a.created_at)
-      .slice(0, 10);
+  const profileByPubkey = new Map(
+    profileMetadataResults.flatMap((result) =>
+      result.status === 'fulfilled' && result.value[1] !== null
+        ? [result.value as readonly [string, ProfileMetadata]]
+        : [],
+    ),
+  );
 
-    const contextIds = [
-      ...new Set(
-        latestEvents.flatMap((event) =>
-          event.tags
-            .filter((tag) => tag[0] === 'e' && tag[1])
-            .map((tag) => tag[1]!),
-        ),
-      ),
-    ].slice(0, 20);
-
-    const contextEvents =
-      contextIds.length > 0
-        ? await pool.querySync(
-            writeRelays,
-            { ids: contextIds, kinds: [1], limit: contextIds.length },
-            { maxWait: 4_000 },
-          )
-        : [];
-
-    const contextById = new Map(
-      contextEvents.map((context) => [context.id, context]),
-    );
-
-    const profilePubkeys = [
-      ...new Set(
-        [...latestEvents, ...contextEvents]
-          .flatMap((event) => [
-            event.pubkey,
-            ...event.tags
-              .filter((tag) => tag[0] === 'p' && tag[1])
-              .map((tag) => tag[1]!),
-          ])
-          .filter(
-            (candidate) => candidate.toLowerCase() !== pubkey.toLowerCase(),
-          ),
-      ),
-    ].slice(0, 30);
-
-    const profileMetadataResults = await Promise.allSettled(
-      profilePubkeys.map(
-        async (profilePubkey) =>
-          [
-            profilePubkey.toLowerCase(),
-            await fetchProfileMetadata({
-              pubkey: profilePubkey,
-              relays: PROFILE_RELAYS_FOR_QUERY as string[],
-            }),
-          ] as const,
-      ),
-    );
-
-    const profileByPubkey = new Map(
-      profileMetadataResults.flatMap((result) =>
-        result.status === 'fulfilled' && result.value[1] !== null
-          ? [result.value as readonly [string, ProfileMetadata]]
-          : [],
-      ),
-    );
-
-    return latestEvents.map((event) =>
-      latestProfilePostFromEvent({
-        event,
-        viewedProfile: profile,
-        profileByPubkey,
-        contextById,
-        relayHints: writeRelays,
-      }),
-    );
-  } finally {
-    pool.close(uniqueRelays([...PROFILE_RELAYS_FOR_QUERY, ...writeRelays]));
-  }
+  return buildLatestProfilePostsFromResolution({
+    response,
+    viewedProfile: profile,
+    profileByPubkey,
+    defaultRelayHints: uniqueRelays([
+      ...request.relayHints,
+      ...request.fallbackRelays,
+    ]),
+  });
 }
 
 function contactTags({
@@ -1074,6 +1467,11 @@ export async function handleNostrOpenProfilePanelAction({
   setChromeText(null);
 
   const payload = ProfilePayloadSchema.parse(action.payload ?? {});
+
+  const followedByFollowsPromise = fetchFollowedByFollowsCount(
+    payload.pubkey,
+  ).catch(() => undefined);
+
   let renderedPayload = payload;
   let fetchedMetadata: ProfileMetadata | null = null;
   let latestPosts: LatestProfilePost[] | null = null;
@@ -1109,6 +1507,15 @@ export async function handleNostrOpenProfilePanelAction({
     });
   } catch {
     renderedPayload = payload;
+  }
+
+  const followedByFollowsCount = await followedByFollowsPromise;
+
+  if (followedByFollowsCount !== undefined) {
+    setFollowedByFollowsState((current) => ({
+      ...current,
+      [payload.pubkey.toLowerCase()]: followedByFollowsCount,
+    }));
   }
 
   setChromeWeb(
@@ -1293,15 +1700,9 @@ export function buildNostrProfileActionPayload({
   picture,
   about,
   relayHints,
-}: {
-  pubkey: string;
-  npub: string | null;
-  name: string | null;
-  username: string | null;
-  picture: string | null;
-  about: string | null;
-  relayHints: string[];
-}): ProfilePayload {
+  profileActions,
+  sharePrefixes,
+}: BuildNostrProfileActionPayloadProps): ProfilePayload {
   return ProfilePayloadSchema.parse({
     pubkey,
     npub,
@@ -1310,6 +1711,8 @@ export function buildNostrProfileActionPayload({
     picture,
     about,
     relayHints,
+    profileActions,
+    sharePrefixes,
   });
 }
 

@@ -193,6 +193,19 @@ export const WebToolbarActionSchema = z.object({
   activeAction: WebActionSchema.optional(),
 });
 
+export const WebNostrPostExtraActionSchema = z.object({
+  label: z.string().min(1),
+  ariaLabel: z.string().min(1).optional(),
+  action: WebActionSchema.nullable(),
+  disabled: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+export const WebNostrSharePrefixesSchema = z.object({
+  nevent: z.string().min(1),
+  nprofile: z.string().min(1),
+});
+
 const WebNostrPostReferenceBaseSchema = z.object({
   token: z.string().min(1).optional(),
   type: z.enum(['event', 'profile', 'address', 'unknown']).optional(),
@@ -220,6 +233,7 @@ const WebNostrPostReferenceBaseSchema = z.object({
   reposted: z.boolean().optional(),
   quoted: z.boolean().optional(),
   showActions: z.boolean().optional(),
+  trailingActions: z.array(WebNostrPostExtraActionSchema).optional(),
   inlineProfiles: z
     .record(
       z.string(),
@@ -260,14 +274,6 @@ export const WebNostrInlineProfilesSchema = z.record(
   }),
 );
 
-export const WebNostrPostExtraActionSchema = z.object({
-  label: z.string().min(1),
-  ariaLabel: z.string().min(1).optional(),
-  action: WebActionSchema.nullable(),
-  disabled: z.boolean().optional(),
-  active: z.boolean().optional(),
-});
-
 export const WebNostrPostActivityHeaderSchema = z.object({
   label: z.string().min(1),
   actorPubkey: z.string().min(1),
@@ -300,6 +306,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrNpub: z.string().min(1).optional(),
   /** Relay hints for encoding nprofile/opening profile. */
   nostrRelayHints: z.array(z.string().min(1)).optional(),
+  /** Configured URL prefixes for sharing Nostr event and profile identifiers. */
+  nostrSharePrefixes: WebNostrSharePrefixesSchema.optional(),
   /** Optional external permalink for clients that have one. */
   nostrPermalink: z.string().min(1).optional(),
   /** View-only display count. */
@@ -312,6 +320,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrExtraActions: z.array(WebNostrPostExtraActionSchema).optional(),
   /** Additional plugin-owned actions shown after public post actions. */
   nostrTrailingActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  /** Additional plugin-owned actions shown in the author's profile modal. */
+  nostrProfileActions: z.array(WebNostrPostExtraActionSchema).optional(),
   /** Optional command/client action for plugin-owned archive behavior. */
   nostrArchiveAction: WebActionSchema.nullable().optional(),
   /** True when plugin-owned archive state is active. */

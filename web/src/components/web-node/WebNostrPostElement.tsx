@@ -191,6 +191,8 @@ function profileActionForInlineProfile(
       picture: profile.authorPicture ?? null,
       about: profile.authorAbout ?? null,
       relayHints: profile.relayHints ?? [],
+      profileActions: [],
+      sharePrefixes: { nevent: 'nostr://', nprofile: 'nostr://' },
     }),
   );
 }
@@ -211,6 +213,8 @@ function profileActionForReference(
       picture: reference.authorPicture ?? null,
       about: reference.authorAbout ?? null,
       relayHints: reference.relayHints ?? [],
+      profileActions: [],
+      sharePrefixes: { nevent: 'nostr://', nprofile: 'nostr://' },
     }),
   );
 }
@@ -231,6 +235,11 @@ function profileActionForElement(
       picture: elementProps.nostrAuthorPicture ?? null,
       about: elementProps.nostrAuthorAbout ?? null,
       relayHints: elementProps.nostrRelayHints ?? [],
+      profileActions: elementProps.nostrProfileActions ?? [],
+      sharePrefixes: elementProps.nostrSharePrefixes ?? {
+        nevent: 'nostr://',
+        nprofile: 'nostr://',
+      },
     }),
   );
 }
@@ -686,6 +695,19 @@ function referenceActionItems(
       action: reposted || quoted ? null : reference.repostAction,
       disabled: reposted || quoted,
       success: reposted || quoted,
+    });
+  }
+
+  for (const [index, trailingAction] of (
+    reference.trailingActions ?? []
+  ).entries()) {
+    items.push({
+      label: trailingAction.label,
+      ariaLabel: trailingAction.ariaLabel,
+      action: trailingAction.action,
+      disabled: trailingAction.disabled === true,
+      success: trailingAction.active === true,
+      ...(index === 0 ? { separatorBefore: 'pipe' as const } : {}),
     });
   }
 

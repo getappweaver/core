@@ -3,19 +3,20 @@ import { nip19 } from 'nostr-tools';
 import { z } from 'zod';
 
 import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
+import type { NostrEventContextResponse } from '@src/web/nostr-resolution-schema';
 import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
 import type { ChromeModalState } from '../chrome/types';
 
 import {
+  resolveNostrEventContext,
+  resolveNostrInteractionRelays,
+} from './interactionResolution';
+import {
   markNostrInteraction,
   type NostrInteractionRecordResult,
 } from './interactionState';
-import {
-  fetchAuthorReadRelays,
-  fetchUserWriteRelays,
-  publishEvent,
-} from './relayLists';
+import { publishEvent } from './relayLists';
 
 const RepostPayloadSchema = z.object({
   eventId: z.string().min(1),
@@ -159,6 +160,44 @@ function postViewFromPayload(
   };
 }
 
+function canonicalRepostPayload({
+  payload,
+  response,
+}: {
+  payload: z.infer<typeof RepostPayloadSchema>;
+  response: NostrEventContextResponse;
+}): z.infer<typeof RepostPayloadSchema> {
+  return {
+    ...payload,
+    eventId: response.targetEvent.id,
+    eventPubkey: response.targetEvent.pubkey,
+    eventKind: response.targetEvent.kind,
+    eventCreatedAt: response.targetEvent.created_at,
+    eventContent: response.targetEvent.content,
+    eventRawJson: JSON.stringify(response.targetEvent),
+    relayHints: response.targetRelayHints,
+  };
+}
+
+async function resolveRepostContext(
+  payload: z.infer<typeof RepostPayloadSchema>,
+): Promise<NostrEventContextResponse> {
+  const targetEvent = payload.eventRawJson
+    ? (JSON.parse(payload.eventRawJson) as NostrEvent)
+    : null;
+
+  return resolveNostrEventContext({
+    eventId: payload.eventId,
+    authorPubkey: payload.eventPubkey,
+    address: null,
+    targetEvent,
+    relayHints: uniqueRelays(payload.relayHints),
+    fallbackRelays: uniqueRelays(payload.fallbackRelays),
+    includeDirectReplies: false,
+    replyLimit: 1,
+  });
+}
+
 function nostrPostNode(post: NostrPostView): WebNode {
   return el({
     tag: 'nostrPost',
@@ -291,19 +330,14 @@ async function publishRepost({
   relayHints,
   fallbackRelays,
 }: PublishRepostProps): Promise<string[]> {
-  const [userWriteRelays, authorReadRelays] = await Promise.all([
-    fetchUserWriteRelays({ pubkey: signed.pubkey, fallbackRelays }),
-    fetchAuthorReadRelays({
-      pubkey: payload.eventPubkey,
-      relayHints,
-      fallbackRelays,
-    }),
-  ]);
+  const relayPlan = await resolveNostrInteractionRelays({
+    signerPubkey: signed.pubkey,
+    recipientPubkeys: [payload.eventPubkey],
+    relayHints,
+    fallbackRelays,
+  });
 
-  return publishEvent(
-    uniqueRelays([...userWriteRelays, ...authorReadRelays]),
-    signed,
-  );
+  return publishEvent(relayPlan.publishRelays, signed);
 }
 
 export async function handleNostrOpenRepostPanelAction({
@@ -326,13 +360,14 @@ export async function handleNostrOpenRepostPanelAction({
 
   try {
     const payload = RepostPayloadSchema.parse(action.payload ?? {});
+    const response = await resolveRepostContext(payload);
+    const canonicalPayload = canonicalRepostPayload({ payload, response });
 
     setChromeWeb(
       repostPanelRoot({
         payload: {
-          ...payload,
-          relayHints: uniqueRelays(payload.relayHints),
-          fallbackRelays: uniqueRelays(payload.fallbackRelays),
+          ...canonicalPayload,
+          fallbackRelays: uniqueRelays(canonicalPayload.fallbackRelays),
         },
       }),
     );
@@ -358,12 +393,27 @@ export async function handleNostrSendRepostOrQuoteAction({
   setChromeText(null);
 
   try {
-    const payload = SendRepostPayloadSchema.parse(action.payload ?? {});
-    const content = payload.content.trim();
+    const submittedPayload = SendRepostPayloadSchema.parse(
+      action.payload ?? {},
+    );
+
+    const content = submittedPayload.content.trim();
 
     if (!currentUserPubkey) {
       throw new Error('Connect or unlock a Nostr signer to repost this note.');
     }
+
+    const response = await resolveRepostContext(submittedPayload);
+
+    const canonicalPayload = canonicalRepostPayload({
+      payload: submittedPayload,
+      response,
+    });
+
+    const payload = SendRepostPayloadSchema.parse({
+      ...canonicalPayload,
+      content,
+    });
 
     const relayHints = uniqueRelays(payload.relayHints);
     const fallbackRelays = uniqueRelays(payload.fallbackRelays);
