@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'fs';
 import { dirname, extname, join } from 'path';
 
 import {
@@ -10,10 +10,12 @@ import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
 import type { CommandDefinition } from '@src/system/command-definition';
 
-const ALLOWED_ICON_EXTS = new Set(['.svg', '.png', '.webp']);
+import {
+  localWidgetIconSourceReference,
+  publishedWidgetIconPath,
+} from './widget-icon-path';
 
-const flattenIconPath = (value: string): string =>
-  value.replace(/[\\/]/g, '__');
+const ALLOWED_ICON_EXTS = new Set(['.svg', '.png', '.webp']);
 
 function resolvePluginDefinition(
   plugin: ReturnType<typeof listRegisteredPlugins>[number],
@@ -43,13 +45,10 @@ function copyIconIfPresent(params: {
     return;
   }
 
-  const rootedIcon = icon.startsWith('/')
-    ? icon
-    : params.pluginAlias
-      ? `/plugins/${params.pluginAlias}/${icon}`
-      : icon;
+  const pluginAlias = params.pluginAlias ?? null;
+  const rootedIcon = localWidgetIconSourceReference({ icon, pluginAlias });
 
-  if (!rootedIcon.startsWith('/')) {
+  if (!rootedIcon) {
     return;
   }
 
@@ -68,21 +67,11 @@ function copyIconIfPresent(params: {
     return;
   }
 
-  const targetRel = rootedIcon.startsWith('/plugins/')
-    ? (() => {
-        const rel = rootedIcon.slice('/plugins/'.length);
-        const slashIdx = rel.indexOf('/');
+  const targetRel = publishedWidgetIconPath({ icon, pluginAlias });
 
-        if (slashIdx <= 0) {
-          return `plugin-icons/${flattenIconPath(rel)}`;
-        }
-
-        const alias = rel.slice(0, slashIdx);
-        const iconRel = rel.slice(slashIdx + 1);
-
-        return `plugin-icons/${alias}/${flattenIconPath(iconRel)}`;
-      })()
-    : `builtin-icons/${flattenIconPath(rootedIcon.slice(1))}`;
+  if (!targetRel) {
+    return;
+  }
 
   const targetPath = join(dmBotRoot, 'web', 'public', targetRel);
   mkdirSync(dirname(targetPath), { recursive: true });
@@ -102,6 +91,16 @@ function publishDefinitionIcons(params: {
 }
 
 export function publishWidgetIcons(prefix: string): void {
+  rmSync(join(dmBotRoot, 'web', 'public', 'plugin-icons'), {
+    recursive: true,
+    force: true,
+  });
+
+  rmSync(join(dmBotRoot, 'web', 'public', 'builtin-icons'), {
+    recursive: true,
+    force: true,
+  });
+
   const builtins = getBuiltinDefinitionsMap({ prefix });
   for (const root of BUILTIN_ROOT_NAMES) {
     publishDefinitionIcons({ definition: builtins[root] });

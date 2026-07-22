@@ -1,3 +1,8 @@
+import {
+  isRemoteWidgetIcon,
+  publishedWidgetIconPath,
+} from '@src/web/widget-icon-path';
+
 export type WidgetIconSource = {
   source: 'builtin' | 'plugin';
   pluginAlias?: string;
@@ -11,52 +16,17 @@ export function resolveWidgetIconUrl(widget: WidgetIconSource): string | null {
     return null;
   }
 
-  const lower = raw.toLowerCase();
-
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('data:')
-  ) {
+  if (isRemoteWidgetIcon(raw)) {
     return raw;
   }
 
-  const flatten = (value: string): string => value.replace(/[\\/]/g, '__');
   const asset = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
 
-  if (widget.source === 'plugin') {
-    const alias = widget.pluginAlias?.trim();
+  const path = publishedWidgetIconPath({
+    icon: raw,
+    pluginAlias:
+      widget.source === 'plugin' ? (widget.pluginAlias?.trim() ?? null) : null,
+  });
 
-    if (!alias) {
-      return null;
-    }
-
-    if (raw.startsWith('/plugins/')) {
-      const rel = raw.slice('/plugins/'.length);
-      const slashIdx = rel.indexOf('/');
-
-      if (slashIdx <= 0) {
-        return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-      }
-
-      const relAlias = rel.slice(0, slashIdx);
-      const relIcon = rel.slice(slashIdx + 1);
-
-      if (relAlias.length === 0) {
-        return null;
-      }
-
-      return asset(`plugin-icons/${relAlias}/${flatten(relIcon)}`);
-    }
-
-    const rel = raw.startsWith('/') ? raw.slice(1) : raw;
-
-    return asset(`plugin-icons/${alias}/${flatten(rel)}`);
-  }
-
-  if (!raw.startsWith('/')) {
-    return null;
-  }
-
-  return asset(`builtin-icons/${flatten(raw.slice(1))}`);
+  return path ? asset(path) : null;
 }

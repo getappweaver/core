@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'fs';
 import { dirname, extname, join } from 'path';
@@ -19,6 +20,11 @@ import type {
 } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
 import { inferWebExecutionMode } from '@src/web/command-catalog';
+import {
+  isRemoteWidgetIcon,
+  localWidgetIconSourceReference,
+  publishedWidgetIconPath,
+} from '@src/web/widget-icon-path';
 
 type PluginEntry = {
   alias: string;
@@ -120,10 +126,6 @@ function resolveCommandDefinition(
     : plugin.commandDefinition;
 }
 
-function flattenIconPath(value: string): string {
-  return value.replace(/[\\/]/g, '__');
-}
-
 function serializeSubcommand(subcommand: SubcommandDefinition) {
   return {
     name: subcommand.name,
@@ -197,22 +199,14 @@ function publishWidgetIcon(params: {
 }): void {
   const icon = params.icon?.trim();
 
-  if (
-    !icon ||
-    icon.startsWith('http://') ||
-    icon.startsWith('https://') ||
-    icon.startsWith('data:')
-  ) {
+  if (!icon || isRemoteWidgetIcon(icon)) {
     return;
   }
 
-  const rootedIcon = icon.startsWith('/')
-    ? icon
-    : params.pluginAlias
-      ? `/plugins/${params.pluginAlias}/${icon}`
-      : icon;
+  const pluginAlias = params.pluginAlias ?? null;
+  const rootedIcon = localWidgetIconSourceReference({ icon, pluginAlias });
 
-  if (!rootedIcon.startsWith('/')) {
+  if (!rootedIcon) {
     return;
   }
 
@@ -223,21 +217,11 @@ function publishWidgetIcon(params: {
     return;
   }
 
-  const targetRel = rootedIcon.startsWith('/plugins/')
-    ? (() => {
-        const rel = rootedIcon.slice('/plugins/'.length);
-        const slashIdx = rel.indexOf('/');
+  const targetRel = publishedWidgetIconPath({ icon, pluginAlias });
 
-        if (slashIdx <= 0) {
-          return `plugin-icons/${flattenIconPath(rel)}`;
-        }
-
-        const alias = rel.slice(0, slashIdx);
-        const iconRel = rel.slice(slashIdx + 1);
-
-        return `plugin-icons/${alias}/${flattenIconPath(iconRel)}`;
-      })()
-    : `builtin-icons/${flattenIconPath(rootedIcon.slice(1))}`;
+  if (!targetRel) {
+    return;
+  }
 
   const targetPath = join(WEB_PUBLIC_DIR, targetRel);
   mkdirSync(dirname(targetPath), { recursive: true });
@@ -254,43 +238,16 @@ function publishedWidgetIconUrl(params: {
     return undefined;
   }
 
-  const lower = icon.toLowerCase();
-
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('data:')
-  ) {
+  if (isRemoteWidgetIcon(icon)) {
     return icon;
   }
 
-  const rootedIcon = icon.startsWith('/')
-    ? icon
-    : params.pluginAlias
-      ? `/plugins/${params.pluginAlias}/${icon}`
-      : icon;
+  const path = publishedWidgetIconPath({
+    icon,
+    pluginAlias: params.pluginAlias ?? null,
+  });
 
-  if (!rootedIcon.startsWith('/')) {
-    return undefined;
-  }
-
-  if (rootedIcon.startsWith('/plugins/')) {
-    const rel = rootedIcon.slice('/plugins/'.length);
-    const slashIdx = rel.indexOf('/');
-
-    if (slashIdx <= 0) {
-      return params.pluginAlias
-        ? `/plugin-icons/${params.pluginAlias}/${flattenIconPath(rel)}`
-        : undefined;
-    }
-
-    const alias = rel.slice(0, slashIdx);
-    const iconRel = rel.slice(slashIdx + 1);
-
-    return `/plugin-icons/${alias}/${flattenIconPath(iconRel)}`;
-  }
-
-  return `/builtin-icons/${flattenIconPath(rootedIcon.slice(1))}`;
+  return path ? `/${path}` : undefined;
 }
 
 function storyWidgetIconUrl(params: {
@@ -446,6 +403,17 @@ async function main(): Promise<void> {
   };
 
   mkdirSync(DEMO_DIR, { recursive: true });
+
+  rmSync(join(WEB_PUBLIC_DIR, 'plugin-icons'), {
+    recursive: true,
+    force: true,
+  });
+
+  rmSync(join(WEB_PUBLIC_DIR, 'builtin-icons'), {
+    recursive: true,
+    force: true,
+  });
+
   const builtinDefinitions = getBuiltinDefinitionsMap({ prefix: DEMO_PREFIX });
 
   const builtinCommands = BUILTIN_ROOT_NAMES.map((root) => {

@@ -187,6 +187,12 @@ When the bot runs in `agent` mode after an implementation/change request:
 - If you receive a follow-up message prefixed with `[Post-edit lint feedback]`, treat it as authoritative runtime feedback and fix issues directly.
 - Provide a concise final summary after applying lint-driven fixes.
 
+## Testing preference
+
+- Do not add unit, regression, integration, or end-to-end tests unless the user explicitly asks for them.
+- Do not run test commands unless the user explicitly asks for them.
+- A narrowly scoped one-off check, such as `bun -e '...'`, is allowed only when it directly validates the change and is more practical than manual inspection. Do not use it as a default verification step.
+
 ---
 
 # AppWeaver Codebase Context

@@ -9,6 +9,21 @@ export type LinkPreview = {
 const LINK_PREVIEW_TIMEOUT_MS = 6_000;
 const LINK_PREVIEW_MAX_HTML_CHARS = 2_000_000;
 
+const HTML_PREVIEW_HEADERS = {
+  Accept:
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Accept-Language': 'en-US,en;q=0.9',
+  Connection: 'keep-alive',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+};
+
 const OEMBED_ENDPOINTS: Record<string, string> = {
   'flic.kr': 'https://www.flickr.com/services/oembed/?format=json&url=',
   'flickr.com': 'https://www.flickr.com/services/oembed/?format=json&url=',
@@ -107,6 +122,21 @@ function stringField(value: unknown): string | null {
 
 function titleCase(value: string | null): string | null {
   return value ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : null;
+}
+
+function previewUrlFor(url: URL): URL {
+  const hostname = url.hostname.toLowerCase();
+
+  if (hostname !== 'x.com' && hostname !== 'www.x.com') {
+    return url;
+  }
+
+  const nitterUrl = new URL(url.toString());
+
+  nitterUrl.protocol = 'https:';
+  nitterUrl.hostname = 'nitter.net';
+
+  return nitterUrl;
 }
 
 function recordField(value: unknown, key: string): unknown {
@@ -264,11 +294,13 @@ export function extractLinkPreview({
 }
 
 export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
-  const parsed = new URL(url);
+  const originalUrl = new URL(url);
 
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  if (originalUrl.protocol !== 'http:' && originalUrl.protocol !== 'https:') {
     throw new Error('unsupported_url_protocol');
   }
+
+  const parsed = previewUrlFor(originalUrl);
 
   const fallback: LinkPreview = {
     url: parsed.toString(),
@@ -292,13 +324,7 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
     }
 
     const response = await fetch(parsed.toString(), {
-      headers: {
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 AppWeaver/1.0',
-      },
+      headers: HTML_PREVIEW_HEADERS,
       signal: controller.signal,
     });
 

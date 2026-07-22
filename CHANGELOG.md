@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.53.6] - 2026-07-22
+
+- fix: harden web previews and widget assets (3a5d4d8)
+
 ## [v9.53.5] - 2026-07-15
 
-- chore: ignore local Caddy configuration (c704a40)
+- chore: ignore local Caddy configuration (eb0000b)
 
 ## [v9.53.4] - 2026-07-15
 

@@ -2,6 +2,10 @@ import type { BotPlugin } from '@src/core/plugin';
 import { listRegisteredPlugins } from '@src/core/registry';
 import type { CommandDefinition } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
+import {
+  isRemoteWidgetIcon,
+  publishedWidgetIconPath,
+} from '@src/web/widget-icon-path';
 
 export type RegisteredStory = {
   id: string;
@@ -10,10 +14,6 @@ export type RegisteredStory = {
   iconUrl?: string;
   story: StoryDefinition<unknown>;
 };
-
-function flattenIconPath(value: string): string {
-  return value.replace(/[\\/]/g, '__');
-}
 
 function publishedIconUrl(params: {
   icon: string | undefined;
@@ -25,31 +25,16 @@ function publishedIconUrl(params: {
     return undefined;
   }
 
-  const lower = raw.toLowerCase();
-
-  if (
-    lower.startsWith('http://') ||
-    lower.startsWith('https://') ||
-    lower.startsWith('data:')
-  ) {
+  if (isRemoteWidgetIcon(raw)) {
     return raw;
   }
 
-  if (raw.startsWith('/plugins/')) {
-    const rel = raw.slice('/plugins/'.length);
-    const slashIdx = rel.indexOf('/');
+  const path = publishedWidgetIconPath({
+    icon: raw,
+    pluginAlias: params.pluginAlias,
+  });
 
-    if (slashIdx <= 0) {
-      return `/plugin-icons/${params.pluginAlias}/${flattenIconPath(rel)}`;
-    }
-
-    const alias = rel.slice(0, slashIdx);
-    const iconRel = rel.slice(slashIdx + 1);
-
-    return `/plugin-icons/${alias}/${flattenIconPath(iconRel)}`;
-  }
-
-  return `/plugin-icons/${params.pluginAlias}/${flattenIconPath(raw.startsWith('/') ? raw.slice(1) : raw)}`;
+  return path ? `/${path}` : undefined;
 }
 
 function resolvePluginDefinition(plugin: BotPlugin): CommandDefinition | null {
