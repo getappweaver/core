@@ -1,12 +1,12 @@
 ---
-direct_hash: 59ff1a6e2ec4b2c71b7c46c2b77bd8b6134e348408a2359be9cc9e8e6bb259c6
-subtree_hash: 8fba8fd214ba5b50942a131d33010b7a18b4e02e53b94bd86d1d3f11fffd84bf
+direct_hash: bdf03618461fc448c44f43201c4ed6002f6881764e6b746b458cc0926da50f8e
+subtree_hash: 6be4a1d38284a460cdb2f74b1cddea64cc76502016ab84f605f9fdc87237e95d
 files:
-  local-cli.ts: cb72fdaf1ef29112b4f9463a9582dd202863e1ad053946ff2fcc1b7e04488e81
+  local-cli.ts: 619c3ef9702b0596b4f352e16cdca09c3925e15a73ba6f9a4fec21b2ec44bfad
 children:
 ---
 
-# cli
+# src/cli
 
 ## Purpose
 Local terminal chat interface using readline. Accepts user input and processes messages asynchronously with special handling to prevent deadlocks when plugins await prompt input.

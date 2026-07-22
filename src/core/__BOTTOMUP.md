@@ -1,22 +1,24 @@
 ---
-direct_hash: 5ca4359f5fd1f8a073842ee1e635273d69be9f84d5fa04ee7c582a82f0cfde1c
-subtree_hash: 8fb1aaa52bafe1f0e0508c2f233c22bc0a090c9fc6922c16865e22d4368bab7a
+direct_hash: 72ee35099fff7726d85332c19a9b3fd9fd9a7183205801fd997db5858dcab6cf
+subtree_hash: 60b52b39f8d0f3eb94d7b9a83d53dfadc4ff555e60cd3204dbb94b7b9132ae9e
 files:
-  plugin.ts: 3f7f7e3bdc166f69252268afb0ced3c7d88c0034f8e598e0284fba126e7f98eb
-  registry.ts: 9fac418d6ed91cd3aa8dc6e27072e010eb230d42f378b3434398bdccec663535
+  plugin.ts: 4f5dcd6993dafde0fc758cdf3d00adaabf334eb3904fa376dd7dffb18295eec4
+  registry.ts: 487434d0660ebfb35ec800ef2668db16ac98924b104f6eb07e23e50b55764c98
+  update-check.ts: fd1f3fb78dd719f77894a50ea2414fb2cd086e5c646db92e532e6427ea98301c
 children:
 ---
 
-# core
+# src/core
 
 ## Purpose
-Core plugin system: defines the BotPlugin interface and lifecycle (onInit/handler), PluginContext with shared utilities (pool, runAgent, sendReply, promptFn, etc.), and a registry for dispatching commands to plugins by alias.
+Core infrastructure for AppWeaver plugin integration and self-update status. It defines the plugin contract, keeps the in-memory plugin registry, and exposes a git-backed core update checker.
 
 ## Files
-- `plugin.ts` - Plugin types: BotPlugin interface, PluginContext, PluginInvocationContext, prompt payload helpers, and parsePluginPackageJson validation
-- `registry.ts` - In-memory plugin registry: registerPlugin, getPluginByAlias, listRegisteredPlugins, dispatchPluginCommand, getPluginHelpTexts
+- `plugin.ts` - Defines plugin-facing types, prompt payload helpers, plugin metadata validation, and the BotPlugin contract used by registered plugins.
+- `registry.ts` - Maintains the alias-keyed plugin registry and dispatches plugin commands, aliases, and help text.
+- `update-check.ts` - Creates a core update checker that fetches git upstream state, compares package versions, builds changelog snapshots, and can fast-forward pull updates.
 
 ## Notes
-- Plugins define command routing via handler(args, context)
-- PluginContext defaults are UI hints; authoritative state lives in plugin-local SQLite
-- Command dispatch returns null when no plugin matches alias
+- Plugin handlers return web UI handler results and receive shared runtime context.
+- Plugin package metadata is validated from each plugin's package.json.
+- Update checks depend on the current git upstream and package.json versions.

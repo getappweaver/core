@@ -1,16 +1,16 @@
 ---
-direct_hash: eb9c389ccf3272489356759906fb80e266bb835eb593b8920f8861be68037bca
-subtree_hash: c5d0f42191b37484c43565834be83eb075b6ca55a8e97d48df3782c4c8c8f5b5
+direct_hash: 871e33f2864e8ebf968a71c98729e0cb94d1ea0d51d0f96a2d54da82e3677d16
+subtree_hash: fae4444a3701c7371cf5ff5a87dbbb764c8c764ccb2a460ae8c7226c402f8ba0
 files:
-  agent-conversation.ts: 0f8b0de8424e4f5ee21f4da5754b09cd0cea0feffe35a39d7a79dd438b97b127
-  agent-lint-follow-up.ts: e4a4adcadefa7473796308383fe4faf77039f6bdcfec1ba4d92b2fc448201e65
-  auto-flow-deposit.ts: 0b7d0ba099d6e0513aca269fe178cf8c864713d68614950325e2dd876b1a4d17
-  auto-flow-refund.ts: 6d53b615bbadfd095ab06db15d4e10d27cb2ad8752e8605b937070fbd8450aa2
-  prepare-provider-run.ts: e03a6b9508323a5db3291a1efcc26d88772a317a4583b88e4be03ee94b65577c
+  agent-conversation.ts: 8fc8611557807df092f3ada6a24075b9c79fc08c2741d6bed43c2fc3c7fb86f0
+  agent-lint-follow-up.ts: 0b45226d1270219f7f726ef5045736cd3c7c49449fd9aa1a724ccf27a27d1eca
+  auto-flow-deposit.ts: d9bcadf57dc95f8bbe90d9e892ad497e05c80e8c9d20bdb1c12edbc89a13393c
+  auto-flow-refund.ts: d5340ad836117ecb26816775913eb22fe06493aa44452e28b96c315c7bcf833c
+  prepare-provider-run.ts: 38d666d1023dfc1e9b29c41a5acc6d501ee691e9226ed3ac0609052856bc0481
 children:
 ---
 
-# flow
+# src/flow
 
 ## Purpose
 Orchestration layer for agent conversation execution. Handles session management, provider initialization, budget annotation parsing, auto-flow deposits/refunds for paid providers, and optional lint follow-up rounds.

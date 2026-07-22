@@ -1,32 +1,39 @@
 ---
-direct_hash: bb47164f0ccfee762f87466f94151f94c9e6d6d0db9703e70feabe0b569c3b6b
-subtree_hash: d9343ad669621c5294962b9444104579aad4240de893c3ad09b06e9901735311
+direct_hash: 9e4bab5406cf1510965b491d8581981ef36a128d301196642ebc94b673e0310e
+subtree_hash: 3295259b4cf5cbbdbb3a367f1f65162a46f4743f1e9cd833eb0305f16b986be5
 files:
-  agent-stream-chunk.ts: 8ad689cc04bdbd73d8f6c388ff3573a7707f9b24f86f2057de741bcb5bd9fb55
-  cursor.ts: 164ebe9f9c6ab27227b5ae262e3f262ae67a5b80f6bbd9a0da911d4d67733316
-  factory.ts: ac0d54d04b6aa7812edff578a729ca2e2f63c91d5bd40b8a4661576658dc592b
-  opencode-common.ts: e6d175fdea50bbb612631468e1779ff4ffad3f7ade7567105994bae77e03b12e
-  opencode-sdk.ts: f05a5f0a4b7eceea853f27222090f8c447dd7be85d7e53145ac6e141d8607465
-  opencode.ts: a06a9c7978468f87d8f6b305744dc17027b315e02244ccfee80d3e9fafae8f4a
-  types.ts: 230b949ca6fa43acbf6ec4579e03d223cfba0bb8162c2ed6a7c6f32408e64aab
+  agent-stream-chunk.ts: 60e68345a78182c2bb6cec09a989847dab681096b2481b13d07b16330d885315
+  cursor-sdk-worker.mjs: 24bb853f2767e65f68cbaf81e90956151984553ac990368efe52252fbb74f7c4
+  cursor-sdk.ts: d2110836950f85d462860e516eda42d20e272286b958a2709882a26513a4060e
+  factory.ts: d069baaedfc17f72db61afb9bb47b5d44160a817dbe13be09ebbb4bffb3d8a50
+  opencode-common.ts: 77ce85fe22fff7a1c0fa1917276ee3272483ffc1ffb7775ca4f4b5598e761be3
+  opencode-config.ts: a822f15b149f716ee5c8eed731283b82f3d2c1c53185da4afa2ce8221ef87592
+  opencode-parts.ts: 43e1233199003f153390b5b973f40693fbe8482dc0d3120b5328141a4b93c1a1
+  opencode-runtime-context.ts: 3f389528db12801590bd88d0efd3a5f7e38e599b424e0f5af4864942e95b599f
+  opencode-sdk.ts: 2b44aa677c9e5308a043056e6fd3da6a9f13fa7c492bb9fddde3ba4f3e6c0be2
+  stream-debug.ts: e6cee504db78879285828d71381112de3149f72ec6ee34f47ff15529683121e8
+  types.ts: 45196c58e12445c301c1f99f9cea140a33cc884e0d2d23a72a4da659288d1f24
 children:
 ---
 
-# backends
+# src/backends
 
 ## Purpose
-Agent backend implementations for different AI coding assistants. Provides cursor (CLI), opencode (CLI), and opencode-sdk (in-process) backends with a common interface for session creation and message execution.
+Backend implementations and shared contracts for running AI agent sessions. This directory adapts Cursor and OpenCode SDKs into a common session/run/model interface with normalized streaming output.
 
 ## Files
-- `agent-stream-chunk.ts` - Normalizes OpenCode SDK SSE events into AgentStreamChunk (text_delta, status, error). Filters noisy events, extracts session-scoped payloads.
-- `cursor.ts` - Cursor backend using `agent` CLI. Creates sessions via `agent create-chat`, runs messages with model/workspace flags, returns merged stdout/stderr.
-- `factory.ts` - Backend factory routing to cursor, opencode, or opencode-sdk based on AgentBackendName. Passes mode, model, provider, attachUrl to creators.
-- `opencode-common.ts` - Shared helpers: reads model from opencode.json for mode, normalizes model prefix for provider (adds routstr/ when needed).
-- `opencode-sdk.ts` - In-process OpenCode via @opencode-ai/sdk. Manages server lifecycle, port selection, SDK session/prompt calls, parses response parts.
-- `opencode.ts` - OpenCode CLI backend. Spawns opencode binary, parses JSONL output into text/reasoning outputs, extracts tokens/cost from step_finish events.
-- `types.ts` - Core types: AgentRunResult (success/error), OutputSegment (text/reasoning), RunMessageProps, AgentBackend interface definition.
+- `agent-stream-chunk.ts` - Defines normalized stream chunk types and maps OpenCode SSE events into text, reasoning, tool, diff, status, summary, and error chunks.
+- `cursor-sdk-worker.mjs` - Node worker that talks to @cursor/sdk for session creation, message runs, model listing, and line-delimited streaming output.
+- `cursor-sdk.ts` - Cursor backend adapter that spawns the worker, streams text deltas, caches model listings, and implements AgentBackend.
+- `factory.ts` - Selects and constructs the configured backend implementation from backend name and runtime settings.
+- `opencode-common.ts` - Shared OpenCode model resolution helpers for config fallback and provider-specific model normalization.
+- `opencode-config.ts` - Reads, summarizes, edits, caches, and persists OpenCode root model and agent markdown configuration.
+- `opencode-parts.ts` - Parses OpenCode message parts into internal segments and converts text/reasoning segments into final outputs.
+- `opencode-runtime-context.ts` - Builds the runtime context prefix injected into OpenCode prompts for AppWeaver chat sessions.
+- `opencode-sdk.ts` - OpenCode backend adapter that manages the local SDK server, sessions, streaming runs, auth setup, context stats, summarization, and model listing.
+- `stream-debug.ts` - Collects and logs lightweight stream timing and chunk-size metrics for backend runs.
+- `types.ts` - Defines the shared AgentBackend interface, run result shapes, output segments, and output extraction helpers.
 
 ## Notes
-- All backends implement AgentBackend interface with createSession, runMessage, availableModels
-- opencode-common.ts shared by both opencode backends for model config reading and provider normalization
-- agent-stream-chunk.ts normalizes SDK SSE events into unified chunk types for streaming
+- OpenCode streaming is normalized through agent-stream-chunk.ts and opencode-parts.ts before reaching callers.
+- OpenCode config helpers read and write both opencode.json and .opencode/agents markdown files.

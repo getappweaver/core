@@ -1,26 +1,30 @@
 ---
-direct_hash: de616771d895a8867b79389f567a0305b01c109e3d34147dad5eaefd9ea04228
-subtree_hash: 2bb539ad81a95737c652efb041ac9339f9694fca2379251220d53698e37bffd2
+direct_hash: 4cf40a290a5a1dd648496a57ef55674a61bd4cb2c98b5b3947ad20fc910c9ac7
+subtree_hash: 957feb19fc1ed055966bdaef8caad7781044f58728d66cac6a44e689f7fd3450
+enriched: true
+enriched_version: 1
 files:
-  core.ts: 2efae8e40268c45493cd68a4ac68506c9f3bdfcd33a09748de11fe24028eebd3
-  shared.ts: 45d974563b0b444640a866019dbb9695768a2697399aa16ab9112ac61e68a391
-  state.ts: 39632cd7c1ccd2ce8033969f1530babd74c986029036749f4fa0342838ebcf21
-  wot.ts: f8c349ef4e9387c58f38cdf5e7c33907ebbc62f05ee4f599a44c0d1f8fd4db26
+  core.ts: 45d1e0760cabd83eb717c6faae4cac3b82a4587de6d03cb5a17859369ecec531
+  routstr-index.ts: 2f3c33c9a2fe20f5dee75879938cc31459f4df4efff4da66d77ace621f0fc686
+  shared.ts: c9d6f90be5c96177ef828bb086be68cc7e42b1c40a608d3e229e0c145301c240
+  state.ts: f03233e09a2603606c5d97bcce358afe8ad6d31269358e828c2087dbb674e9c0
+  wot.ts: 6e37083973d288f9f05e09c5bdd77986c654389e7b0c4de6a378642cb783cd6a
 children:
 ---
 
-# db
+# src/db
 
 ## Purpose
-Core SQLite database for bot state, sessions, configuration, and Web of Trust graph storage. Opened once at startup; passed as DI throughout the app.
+Database helpers for the core SQLite store. This directory owns shared DB types/constants, schema initialization, persisted runtime state, Routstr model indexing, and Web-of-Trust cache/query tables.
 
 ## Files
-- `core.ts` - Opens core DB, creates tables (seen_events, sessions, session_messages, state, spend_log), delegates table creation to domain modules
-- `shared.ts` - Defines schemas (AgentMode, AgentBackendName, ProviderName, ReplyTransport, WorkspaceTarget, Linting, DmCommandPrefix), state key constants, CoreDb branded type
-- `state.ts` - Getter/setter functions for all config: mode, backend, transport, workspace target, model overrides, budgets, cached models, linting, command prefix
-- `wot.ts` - Web of Trust graph storage and queries: nodes, edges, depth, follower count, weighted support, scores per root pubkey
+- `core.ts` - Opens and initializes the core SQLite database, applies local migrations, creates core tables, and exposes seen-event helpers.
+- `routstr-index.ts` - Defines the Routstr provider/model index schema and query/update functions for cached provider model availability and pricing.
+- `shared.ts` - Holds shared DB-facing schemas, state key constants, defaults, and the branded CoreDb type.
+- `state.ts` - Provides typed getters/setters for persisted bot configuration, setup state, model/provider choices, linting, Routstr secrets, and cached Routstr models.
+- `wot.ts` - Creates and maintains Web-of-Trust graph, contact-list, relay-list, and profile cache tables with scoring and lookup helpers.
 
 ## Notes
-- WAL mode enabled; foreign keys enforced
-- State keys follow naming pattern STATE_* in shared.ts
-- WoT tables replaced per root on each crawl
+- CoreDb is a branded Bun SQLite database type shared across modules.
+- State accessors validate persisted strings with zod and provide defaults for unset or legacy values.
+- Schema creation is coordinated by core.ts, which also initializes tables owned by nearby feature modules.

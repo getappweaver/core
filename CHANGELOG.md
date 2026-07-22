@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v9.54.1] - 2026-07-23
+
+- docs: refresh bottom-up workspace guides (c4e308f)
+
 ## [v9.54.0] - 2026-07-22
 
-- feat: add cached Nostr event resolution (80b0640)
+- feat: add cached Nostr event resolution (f9f8a11)
 
 ## [v9.53.6] - 2026-07-22
 

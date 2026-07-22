@@ -1,13 +1,13 @@
 ---
-direct_hash: f8772d4a8866b996547f7ec7584e5d0faad9989d82f01991667dc518372a630d
-subtree_hash: 77e0d46f5e1d8e047018ba56e9b04ceeadd59e4061c243b186f55e25eebb3aeb
+direct_hash: fdbbd960cce92cd8a138b1e25b8141b780270ecbb226d262a29e97d10af91933
+subtree_hash: dcd9e936ab20d8c0729e7990f3074301613ff2afbbb670ab85a3045d9e6db32f
 files:
-  db.ts: bff16b7e5896e1b38849bf231d46cb321f21b5c6edc09302d65c0f0a8f8e7b3e
-  types.ts: 70aa83a50656c1943188fbc5a454934f601a249d6c98981c64802d69187cb51f
+  db.ts: 90e043f7a837ac1e8557ff55b06854f676432898ca38eeac5961073b349abcf4
+  types.ts: 583d42e9d9ac6a8d6b1676942b3e22d860a3ae53d9c222445ea421bf1ca5f822
 children:
 ---
 
-# timeline
+# src/timeline
 
 ## Purpose
 Stores and retrieves conversation events for timeline display, including chat messages, prompts, and command interactions.

@@ -1,17 +1,17 @@
 ---
-direct_hash: 446bdf9a917ea6c7861057ef657c58ea1b9c7296cebd2a53d982180329cbb76f
-subtree_hash: 815f69828d4eb19a15bde49c6afb2209efebd4f0226372d1559c4b9ccc207d34
+direct_hash: 332c18931ed90f147f691ea9f5ebfcb429bc5d653754d5529d74c761c4cec4e6
+subtree_hash: c74249e4cf41a4185ad37c79d56302dac455d5684695deffb68795a8bb2f2b21
 files:
   db.ts: 9b0f940ff020595c6d7b6a3cd3afcd01932ff2bb60a5f0d157fc5444f0977c32
-  factory.ts: 8ccb963e2de8164ab0e74a816b29de2fa07d61910aa2a6f4034eb7581083df52
+  factory.ts: c10119e2872c8da337a3c62ce42d55d740970ac960eb27b785bb18ab812bc497
   local.ts: 9d23ea572462a82e87a72425b02fe6a38d4a7597e1e94b99203faaaceed16cf9
-  routstr-models.ts: 72e7a5d9dd2f51a351a56291421c099fe419c49854daef94cf4ebfbc5a8e946e
-  routstr.ts: 6af3fe552735d9cd4b406e9f9a93970b3fc9142fbfc890a6407b023b260bb7e6
+  routstr-models.ts: ebe535783168d17d032afc04e958c1a9697fd3d9abf72f5d18b6f0aeddf8f9ba
+  routstr.ts: 028514a31bae0b12aaea5bd0cd991e5f8b25b88c77a3e9d2e66d1b2ff3c9a9fe
   types.ts: 32ea2f63f86294279db293123f71a3afb0b9d658ec97405f5987991e5e8bc970
 children:
 ---
 
-# providers
+# src/providers
 
 ## Purpose
 Abstraction layer for LLM provider backends supporting 'local' (no payment) and 'routstr' (Cashu-backed payment). Factory pattern creates providers; spend tracking is centralized in db.ts.
