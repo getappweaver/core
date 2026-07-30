@@ -36,6 +36,7 @@ import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
+import { listOpencodeModelCatalog } from './backends/opencode-config';
 import {
   disposeOpencodeSdk,
   getOpenCodeAuthJsonPath,
@@ -47,9 +48,10 @@ import { routeCommand } from './commands/dispatch';
 import {
   getPromptPayloadValue,
   type PluginDefaults,
-  type PluginContext,
+  type PluginHostContext,
   type PromptPayload,
 } from './core/plugin';
+import { finalizePluginRegistration } from './core/registry';
 import { createCoreUpdateChecker } from './core/update-check';
 import {
   openCoreDb,
@@ -451,6 +453,32 @@ async function main() {
     };
   }
 
+  async function getAvailablePluginModels(): Promise<string[]> {
+    const backendName = getAgentBackend(seenDb);
+
+    const cwd =
+      getWorkspaceTarget(seenDb) === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
+    if (backendName === 'opencode') {
+      return listOpencodeModelCatalog(cwd).map((choice) => choice.value);
+    }
+
+    const executionProfile = getBackendExecutionProfile(seenDb, backendName);
+
+    const backend = createBackend({
+      backendName,
+      dmBotRoot,
+      cursorMode: getCurrentOrDefaultMode(seenDb),
+      opencodeAgentName:
+        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
+      attachUrl: opencodeServeUrl,
+      modelOverride: getModelOverride(seenDb, backendName),
+      providerName: getProviderName(seenDb),
+    });
+
+    return backend.availableModels();
+  }
+
   let pendingPrompt: ((answer: string) => void) | null = null;
 
   /** Plugin `sendReply` / `promptFn` mirrors the current inbound message source. */
@@ -482,7 +510,7 @@ async function main() {
   }
 
   // --- Plugins ---
-  const pluginContext: PluginContext = {
+  const pluginContext: PluginHostContext = {
     pool,
     masterPubkey,
     runAgent: null, // will set later in the conversation loop
@@ -526,6 +554,7 @@ async function main() {
       }),
 
     getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
+    getAvailableModels: getAvailablePluginModels,
     defaults: getCurrentPluginDefaults(),
   };
 
@@ -538,6 +567,8 @@ async function main() {
   } catch (err) {
     log.error(`Failed to register plugins: ${String(err)}`);
     log.error(`Run 'bun run scripts/install-plugin.ts' to install plugins`);
+  } finally {
+    finalizePluginRegistration();
   }
 
   publishWidgetIcons(getDmCommandPrefix(seenDb));

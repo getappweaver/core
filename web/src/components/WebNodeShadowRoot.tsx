@@ -11,7 +11,7 @@ import {
   onCleanup,
   onMount,
 } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
 import { render } from 'solid-js/web';
 
 import type { WebAction, WebNodeRoot, WebStyleSheet } from '@src/web/ui-schema';
@@ -23,6 +23,7 @@ import type {
 import baseWebUiCss from '../webview/base-web-ui.css?raw';
 import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
 
+import { applyOptimisticMutationsToRoot } from './web-node/optimistic';
 import { reconcileWebNodeRoot } from './web-node/reconcile';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import {
@@ -191,6 +192,16 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     },
   };
 
+  const applyLocalOptimisticMutations: NonNullable<
+    RunWebActionParams['applyOptimisticMutations']
+  > = (mutations) => {
+    setCurrentRoot(
+      produce((root) => {
+        applyOptimisticMutationsToRoot({ root, mutations });
+      }),
+    );
+  };
+
   onMount(() => {
     const host = hostEl;
 
@@ -261,6 +272,8 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
 
         props.onRunAction?.(action, {
           onReplaceRoot: props.onReplaceRoot,
+          getWebRoot: () => currentRoot,
+          applyOptimisticMutations: applyLocalOptimisticMutations,
           promptRequestId: props.promptRequestId,
         });
       },
@@ -369,6 +382,9 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                               onRunAction={(action, params) =>
                                 props.onRunAction?.(action, {
                                   ...params,
+                                  getWebRoot: () => currentRoot,
+                                  applyOptimisticMutations:
+                                    applyLocalOptimisticMutations,
                                   webTargetRoot: c.shadow,
                                 })
                               }

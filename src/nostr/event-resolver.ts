@@ -6,7 +6,7 @@ import type {
 } from 'nostr-tools/pool';
 
 import type { NostrCacheDb } from './cache/db';
-import { parseVerifiedNostrEvent } from './cache/schema';
+import { parseNostrEvent } from './cache/schema';
 import {
   getCachedEventById,
   getCachedReplaceableEvent,
@@ -168,7 +168,7 @@ function validateReplaceableEvent({
   identifier,
 }: EventCacheAddressProps & { event: unknown }): NostrEvent | null {
   try {
-    const parsed = parseVerifiedNostrEvent(event);
+    const parsed = parseNostrEvent(event);
 
     if (parsed.kind !== kind || parsed.pubkey !== pubkey) {
       return null;
@@ -792,7 +792,7 @@ export function createEventResolver({
           deadlineAtMs,
           validate: (event) => {
             try {
-              const parsed = parseVerifiedNostrEvent(event);
+              const parsed = parseNostrEvent(event);
 
               return parsed.id === normalizedEventId ? parsed : null;
             } catch {

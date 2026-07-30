@@ -46,6 +46,30 @@ type DemoStoryEntry = {
   };
 };
 
+function preserveCurrentSingletonRoots(
+  restoredItems: TimelineItem[],
+  currentItems: TimelineItem[],
+): TimelineItem[] {
+  const currentSingletons = currentItems.filter(
+    (
+      item,
+    ): item is Extract<TimelineItem, { type: 'command_result' }> & {
+      timelineSingletonKey: string;
+    } => item.type === 'command_result' && Boolean(item.timelineSingletonKey),
+  );
+
+  if (currentSingletons.length === 0) {
+    return restoredItems;
+  }
+
+  const currentSingletonIds = new Set(currentSingletons.map((item) => item.id));
+
+  return [
+    ...restoredItems.filter((item) => !currentSingletonIds.has(item.id)),
+    ...currentSingletons,
+  ];
+}
+
 type CommandResultTimelineItem = Extract<
   TimelineItem,
   { type: 'command_result' }
@@ -635,7 +659,9 @@ export function useSocket(adapters: SocketAppAdapters) {
         }
 
         if (restoredItems.length > 0) {
-          adapters.setTimeline(restoredItems);
+          adapters.setTimeline((current) =>
+            preserveCurrentSingletonRoots(restoredItems, current),
+          );
         }
       },
     });

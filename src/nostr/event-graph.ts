@@ -163,10 +163,12 @@ export function createEventGraphResolver({
 
       expandedEventIds.add(event.id);
 
-      const references = parseEventReferences(event).slice(
-        0,
-        policy.maxReferencesPerEvent,
-      );
+      const parsedReferences = parseEventReferences(event);
+
+      const references = [
+        ...parsedReferences.filter((edge) => roleEnabled(edge.role, policy)),
+        ...parsedReferences.filter((edge) => !roleEnabled(edge.role, policy)),
+      ].slice(0, policy.maxReferencesPerEvent);
 
       for (const edge of references) {
         edgesByKey.set(edgeKey(edge), edge);

@@ -42,6 +42,7 @@ export type WebSubcommandDetail = {
   examples: string[];
   inferredWeb: InferredWebSupport;
   webWidget?: WebWidget;
+  monitoring?: SubcommandDefinition['monitoring'];
 };
 
 export type WebCommandDetail = {
@@ -112,10 +113,16 @@ function serializeSubcommandForWeb(
   };
 
   if (subcommand.webWidget !== undefined) {
-    return { ...base, webWidget: subcommand.webWidget };
+    return {
+      ...base,
+      webWidget: subcommand.webWidget,
+      ...(subcommand.monitoring ? { monitoring: subcommand.monitoring } : {}),
+    };
   }
 
-  return base;
+  return subcommand.monitoring
+    ? { ...base, monitoring: subcommand.monitoring }
+    : base;
 }
 
 function serializeCommandForWeb(params: {

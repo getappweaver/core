@@ -1,5 +1,6 @@
 import type { Event } from 'nostr-tools/core';
 
+import { monitoring } from '@src/core/monitoring';
 import type {
   CachedProfile,
   CachedRelayList,
@@ -52,6 +53,7 @@ export type WotServices = {
 export type GetProfilesProps = {
   pubkeys: string[];
   waitForMissing: boolean;
+  refreshCached: boolean;
 };
 
 type CreateWotServicesProps = {
@@ -162,6 +164,8 @@ export function createWotServices({
   const relays = uniqueRelays([...PROFILE_RELAYS_FOR_QUERY, ...fallbackRelays]);
   const pendingRelayListRefreshes = new Set<string>();
   let relayListRefreshPromise: Promise<void> | null = null;
+  const pendingProfileRefreshes = new Set<string>();
+  let profileRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function migrateLegacy(
     kind: LegacyWotEventKind,
@@ -331,6 +335,42 @@ export function createWotServices({
     return relayListRefreshPromise;
   }
 
+  function queueProfileRefresh(pubkeys: string[]): void {
+    for (const pubkey of pubkeys) {
+      pendingProfileRefreshes.add(pubkey);
+    }
+
+    if (profileRefreshTimer !== null) {
+      return;
+    }
+
+    profileRefreshTimer = setTimeout(() => {
+      profileRefreshTimer = null;
+      const batch = [...pendingProfileRefreshes];
+
+      pendingProfileRefreshes.clear();
+
+      void nostrResolution
+        .refreshReplaceableEventsBatch({
+          kind: PROFILE_KIND,
+          pubkeys: batch,
+          identifier: null,
+          contextRelays: fallbackRelays,
+          fallbackRelays: relays,
+          refreshIntervalMs: DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS,
+          deadlineAtMs: Date.now() + 8_000,
+        })
+        .then((events) => {
+          for (const event of events) {
+            cacheDerivedEvent(PROFILE_KIND, event);
+          }
+        })
+        .catch((error) =>
+          debug(`wot-service profile batch refresh failed: ${String(error)}`),
+        );
+    }, 0);
+  }
+
   return {
     getWotScore: (pubkey: string, scoreRootPubkey = rootPubkey) => {
       try {
@@ -401,26 +441,42 @@ export function createWotServices({
     async getProfiles({
       pubkeys,
       waitForMissing,
+      refreshCached,
     }: GetProfilesProps): Promise<Map<string, CachedProfile>> {
       const normalizedPubkeys = [
         ...new Set(pubkeys.map((pubkey) => normalizePubkeyInput(pubkey))),
       ];
 
-      await mapWithConcurrency({
-        items: normalizedPubkeys,
-        concurrency: PROFILE_CONCURRENCY,
-        map: async (pubkey) => migrateLegacy(PROFILE_KIND, pubkey),
-      });
+      const migrateProfiles = () =>
+        mapWithConcurrency({
+          items: normalizedPubkeys,
+          concurrency: PROFILE_CONCURRENCY,
+          map: async (pubkey) => migrateLegacy(PROFILE_KIND, pubkey),
+        });
 
-      const profiles = getCachedProfiles(db, normalizedPubkeys);
+      if (monitoring.currentContext()) {
+        await monitoring.withSpan({
+          name: 'wot.profiles.migrate-legacy',
+          attributes: { pubkeyCount: normalizedPubkeys.length },
+          parent: null,
+          run: migrateProfiles,
+        });
+      } else {
+        await migrateProfiles();
+      }
+
+      const profiles = monitoring.currentContext()
+        ? await monitoring.withSpan({
+            name: 'wot.profiles.cache-read',
+            attributes: { pubkeyCount: normalizedPubkeys.length },
+            parent: null,
+            run: () => getCachedProfiles(db, normalizedPubkeys),
+          })
+        : getCachedProfiles(db, normalizedPubkeys);
 
       const missingPubkeys = normalizedPubkeys.filter(
         (pubkey) => !profiles.has(pubkey),
       );
-
-      for (const cached of profiles.values()) {
-        refreshInBackground(PROFILE_KIND, cached.pubkey);
-      }
 
       const fetchMissing = () =>
         mapWithConcurrency({
@@ -438,13 +494,15 @@ export function createWotServices({
         });
 
       if (!waitForMissing) {
-        void fetchMissing().catch((error) =>
-          debug(
-            `wot-service background profile fetch failed: ${String(error)}`,
-          ),
-        );
+        if (refreshCached) {
+          queueProfileRefresh(normalizedPubkeys);
+        }
 
         return profiles;
+      }
+
+      if (refreshCached) {
+        queueProfileRefresh([...profiles.keys()]);
       }
 
       const fetchedProfiles = await fetchMissing();

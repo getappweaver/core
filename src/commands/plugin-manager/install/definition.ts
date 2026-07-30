@@ -10,7 +10,8 @@ export function getPluginsInstallSubcommandDefinition(
     arguments: [
       {
         name: 'target',
-        summary: 'Optional plugin event id, package name, or title to install.',
+        summary:
+          'Plugin target to install, or capability:<name>:v<major> to filter discovery.',
         kind: 'string',
         required: false,
         variadic: false,
@@ -21,6 +22,7 @@ export function getPluginsInstallSubcommandDefinition(
     examples: [
       `${prefix}plugins install`,
       `${prefix}plugins install appweaver-todo-plugin`,
+      `${prefix}plugins install capability:scheduler:v1`,
     ],
     webWidget: {
       placement: 'header',

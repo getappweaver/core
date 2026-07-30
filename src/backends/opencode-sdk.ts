@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -53,9 +54,20 @@ type SdkInstance = {
 
 let sdk: SdkInstance | null = null;
 let sdkInitPromise: Promise<SdkInstance> | null = null;
+let lastStartedPort: number | null = null;
 
 const DEFAULT_PORT_START = 4099;
 const DEFAULT_PORT_COUNT = 12;
+
+type PortAvailability =
+  | {
+      available: true;
+      error: null;
+    }
+  | {
+      available: false;
+      error: string;
+    };
 
 function stopOpencodeServerProcess(proc: ChildProcess): void {
   if (proc.exitCode !== null || proc.signalCode !== null) {
@@ -151,6 +163,72 @@ function buildPortRange(start: number, count: number): number[] {
 }
 
 const DEFAULT_PORTS = buildPortRange(DEFAULT_PORT_START, DEFAULT_PORT_COUNT);
+
+async function checkPortAvailability(port: number): Promise<PortAvailability> {
+  return await new Promise((resolve) => {
+    const server = createServer();
+
+    function cleanup(): void {
+      server.off('error', onError);
+      server.off('listening', onListening);
+    }
+
+    function onError(err: NodeJS.ErrnoException): void {
+      cleanup();
+      resolve({ available: false, error: err.code ?? err.message });
+    }
+
+    function onListening(): void {
+      cleanup();
+
+      server.close(() => {
+        resolve({ available: true, error: null });
+      });
+    }
+
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+function getPortProcessSummary(port: number): string | null {
+  const result = spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+
+  if (result.error || result.status !== 0) {
+    return null;
+  }
+
+  const lines = result.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length <= 1) {
+    return null;
+  }
+
+  const processRows = lines.slice(1).map((line) => {
+    const [command, pid, user] = line.split(/\s+/);
+
+    return [command, pid ? `pid=${pid}` : null, user ? `user=${user}` : null]
+      .filter((part): part is string => part !== null)
+      .join(' ');
+  });
+
+  return processRows.join('; ');
+}
+
+function prioritizePorts(ports: number[]): number[] {
+  if (lastStartedPort === null || !ports.includes(lastStartedPort)) {
+    return ports;
+  }
+
+  return [lastStartedPort, ...ports.filter((port) => port !== lastStartedPort)];
+}
 
 export type OpencodeSdkContextStats = {
   tokensTotal: number;
@@ -335,12 +413,29 @@ async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
 }
 
 async function initSdk(): Promise<SdkInstance> {
-  const ports = getPortsToTry();
+  const ports = prioritizePorts(getPortsToTry());
   let lastError: Error | null = null;
+  const occupiedPorts: string[] = [];
 
   for (const port of ports) {
+    const availability = await checkPortAvailability(port);
+
+    if (!availability.available) {
+      const processSummary = getPortProcessSummary(port);
+      const detail = processSummary ? ` (${processSummary})` : '';
+
+      occupiedPorts.push(`${port}${detail}`);
+
+      log.warn(
+        `opencode-sdk: port ${port} is unavailable (${availability.error})${detail}; skipping`,
+      );
+
+      continue;
+    }
+
     try {
       sdk = await createLocalOpencodeSdk(port);
+      lastStartedPort = port;
       debug(`opencode-sdk: server started on port ${port}`);
 
       return sdk;
@@ -362,8 +457,13 @@ async function initSdk(): Promise<SdkInstance> {
       ? `Port ${ports[0]} may be in use. Set OPENCODE_SDK_PORT to another port, or stop any running "opencode serve".`
       : `Ports ${ports.join(', ')} failed. Set OPENCODE_SDK_PORT to a free preferred port, set OPENCODE_SDK_STRICT_PORT=1 to disable fallback, or stop unused "opencode serve" processes.`;
 
+  const occupiedHint =
+    occupiedPorts.length > 0
+      ? `\nPorts already in use: ${occupiedPorts.join(', ')}`
+      : '';
+
   throw new Error(
-    `OpenCode SDK server failed to start: ${lastError?.message ?? 'unknown'}.\n${hint}`,
+    `OpenCode SDK server failed to start: ${lastError?.message ?? 'unknown'}.\n${hint}${occupiedHint}`,
   );
 }
 

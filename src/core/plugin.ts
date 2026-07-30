@@ -8,6 +8,15 @@ import type { EventTemplate, NostrEvent, SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
 import type { AgentRunResult } from '@src/backends/types';
+import {
+  normalizeCapabilityRelations,
+  PluginCapabilityRelationsSchema,
+  type PluginCapabilityRelations,
+} from '@src/capabilities/relations';
+import type {
+  CapabilityClient,
+  DefinedCapabilityProvider,
+} from '@src/capabilities/types';
 import type {
   AgentBackendName,
   AgentMode,
@@ -22,6 +31,8 @@ import type { AiDefinition } from '@src/system/ai-definition';
 import type { CommandDefinition } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
 import type { WebHandlerResult, WebNodeRoot } from '@src/web/ui-schema';
+
+import type { Monitoring } from './monitoring';
 
 // ---------------------------------------------------------------------------
 export type SendReplyFn = (message: string) => Promise<void>;
@@ -92,13 +103,28 @@ export type PluginContext = {
     bunkerName?: string,
   ) => Promise<NostrEvent>;
   getRoutstrSkKey: () => string | null;
+  /** Model ids available to editable plugin model fields for the active backend. */
+  getAvailableModels: () => Promise<string[]>;
+  /** Plugin-scoped client for invoking registered capability operations. */
+  capabilities: CapabilityClient;
+  /** Best-effort tracing facade. No registered provider means spans are discarded. */
+  monitoring: Monitoring;
   defaults: PluginDefaults;
 };
+
+/** Core-owned context before a plugin-scoped capability client is attached. */
+export type PluginHostContext = Omit<
+  PluginContext,
+  'capabilities' | 'monitoring'
+>;
 
 const PluginPackageJsonSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   appweaver: z.object({
+    title: z.string().min(1).optional(),
+    icon: z.string().min(1).optional(),
+    capabilities: PluginCapabilityRelationsSchema,
     coreApiVersion: z.string().min(1),
     description: z.string().min(1),
   }),
@@ -110,6 +136,9 @@ export type PluginPackageJson = {
   version: string;
   coreApiVersion: string;
   description: string;
+  title: string;
+  icon: string | null;
+  capabilities: PluginCapabilityRelations;
 };
 
 type ParsePluginPackageJsonProps = {
@@ -166,6 +195,9 @@ export function parsePluginPackageJson({
     version,
     coreApiVersion: appweaver.coreApiVersion,
     description: appweaver.description,
+    title: appweaver.title ?? name,
+    icon: appweaver.icon ?? null,
+    capabilities: normalizeCapabilityRelations(appweaver.capabilities),
   };
 }
 
@@ -204,4 +236,5 @@ export type BotPlugin = {
     | ((prefix: string, alias: string) => CommandDefinition);
   stories?: PluginStoriesProvider;
   aiDefinition?: AiDefinition<z.ZodType, any, any>;
+  capabilityProviders?: readonly DefinedCapabilityProvider[];
 };

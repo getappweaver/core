@@ -3,6 +3,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  createUniqueId,
   For,
   onCleanup,
   Show,
@@ -282,6 +283,8 @@ type WebTextFieldNodeProps = {
 export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
   const name = () => props.element.props?.formFieldName;
+  const listId = `web-text-field-${createUniqueId()}`;
+  const choices = () => props.element.props?.choices ?? [];
   let inputEl: HTMLInputElement | undefined;
 
   createEffect(() => {
@@ -345,11 +348,23 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
             name={fieldName()}
             value={props.element.props?.value ?? ''}
             placeholder={props.element.props?.inputPlaceholder}
+            list={choices().length > 0 ? listId : undefined}
             disabled={
               props.element.props?.disabled === true || getBusy() === true
             }
             autocomplete="off"
           />
+          <Show when={choices().length > 0}>
+            <datalist id={listId}>
+              <For each={choices()}>
+                {(choice) => (
+                  <option value={choice}>
+                    {props.element.props?.choiceLabels?.[choice] ?? choice}
+                  </option>
+                )}
+              </For>
+            </datalist>
+          </Show>
         </div>
       )}
     </Show>

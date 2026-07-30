@@ -3,6 +3,13 @@ import { join } from 'path';
 
 import type { NostrEvent } from 'nostr-tools';
 
+import {
+  matchesCapabilityCatalogFilter,
+  parseCapabilityCatalogFilter,
+  parseCapabilityRelationTags,
+  type CapabilityCatalogFilter,
+  type PluginCapabilityRelations,
+} from '@src/capabilities/relations';
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
 import type { CoreUpdateSnapshot } from '@src/core/update-check';
 import {
@@ -67,6 +74,7 @@ export type PluginCatalogEntry = {
   coreUpdateCanUnlockBlockedRef: boolean;
   changelogRefs: RefEntry[];
   updateAvailable: boolean;
+  capabilities: PluginCapabilityRelations;
 };
 
 export type InstalledPluginEntry = {
@@ -122,6 +130,7 @@ export type PluginsInstallRepresentation = {
   coreUpdate: CoreUpdateSnapshot | null;
   relays: string[];
   entries: PluginCatalogEntry[];
+  filter: string | null;
 };
 
 function tagValue(tags: string[][], name: string): string {
@@ -166,6 +175,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     coreUpdateCanUnlockBlockedRef: false,
     changelogRefs: [],
     updateAvailable: false,
+    capabilities: parseCapabilityRelationTags(event.kind, event.tags),
   };
 }
 
@@ -966,6 +976,7 @@ function attachInstalledState({
 export async function queryPluginCatalog(
   ctx: RouteCommandContext,
   options?: QueryPluginCatalogOptions,
+  capabilityFilter?: CapabilityCatalogFilter,
 ): Promise<PluginCatalogEntry[]> {
   const eventsById = new Map<string, NostrEvent>();
 
@@ -1024,9 +1035,13 @@ export async function queryPluginCatalog(
     }
   }
 
-  const entries = [...latestByPlugin.values()].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const entries = [...latestByPlugin.values()]
+    .filter((entry) =>
+      capabilityFilter
+        ? matchesCapabilityCatalogFilter(entry.capabilities, capabilityFilter)
+        : true,
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return attachAuthorIdentities(ctx, entries);
 }
@@ -1038,8 +1053,9 @@ export async function handlePluginsInstall(
   const coreUpdate = (await ctx.coreUpdateChecker?.checkNow()) ?? null;
   const installedPlugins = readInstalledPlugins(ctx.dmBotRoot);
   const target = ctx.args[1]?.trim() ?? '';
+  const capabilityFilter = parseCapabilityCatalogFilter(target);
 
-  if (target) {
+  if (target && !capabilityFilter) {
     const result = await installCatalogEntry({
       ctx,
       target,
@@ -1064,11 +1080,12 @@ export async function handlePluginsInstall(
       coreUpdate,
       relays: PLUGIN_QUERY_RELAYS,
       entries,
+      filter: null,
     });
   }
 
   const entries = attachInstalledState({
-    entries: await queryPluginCatalog(ctx),
+    entries: await queryPluginCatalog(ctx, undefined, capabilityFilter ?? undefined),
     installedPlugins,
     coreVersion,
     coreUpdate,
@@ -1080,6 +1097,7 @@ export async function handlePluginsInstall(
     coreUpdate,
     relays: PLUGIN_QUERY_RELAYS,
     entries,
+    filter: capabilityFilter ? target : null,
   };
 
   if (ctx.source === 'web') {

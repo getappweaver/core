@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { cliRegistry } from '../generated/cli-registry';
 
+import { disposeOpencodeSdk } from './backends/opencode-sdk';
 import { getDmCommandPrefix, getWotScore, openCoreDb } from './db';
 import { loadBotConfig } from './env';
 import { dmBotRoot } from './paths';
@@ -274,10 +275,22 @@ async function main(): Promise<void> {
 
     throw error;
   } finally {
-    coreDb.close();
-    pool.destroy();
+    try {
+      disposeOpencodeSdk();
+    } finally {
+      coreDb.close();
+      pool.destroy();
+    }
   }
 }
+
+function exitOnSignal(exitCode: number): void {
+  disposeOpencodeSdk();
+  process.exit(exitCode);
+}
+
+process.once('SIGINT', () => exitOnSignal(130));
+process.once('SIGTERM', () => exitOnSignal(143));
 
 void main()
   .then(() => {

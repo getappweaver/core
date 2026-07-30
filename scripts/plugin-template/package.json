@@ -4,6 +4,11 @@
   "appweaver": {
     "title": "{{TITLE}}",
     "coreApiVersion": "{{CORE_API_VERSION}}",
+    "capabilities": {
+      "provides": [],
+      "uses": [],
+      "requires": []
+    },
     "description": "{{DESCRIPTION}}"
   },
   "description": "{{DESCRIPTION}}",

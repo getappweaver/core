@@ -3,16 +3,17 @@ import type { SimplePool, SubscribeManyParams } from 'nostr-tools/pool';
 
 import type { NostrCacheDb } from './cache/db';
 import { closeNostrCacheDb } from './cache/db';
-import { parseVerifiedNostrEvent } from './cache/schema';
+import { parseNostrEvent } from './cache/schema';
 import {
   getCachedReplaceableEvent,
   isEphemeralKind,
   isReplaceableKind,
   markCachedReplaceableChecked,
-  putCachedEventById,
+  putTrustedCachedEventById,
   queryCachedAuthorEvents,
   touchCachedReplaceableEvent,
   upsertCachedReplaceableEvent,
+  upsertTrustedCachedReplaceableEvent,
 } from './cache/store';
 import { createEventGraphResolver } from './event-graph';
 import { parseEventReferences } from './event-references';
@@ -249,7 +250,7 @@ export function createNostrResolutionService({
     nowMs: currentTime,
   }: SeedOneProps): SeedEventResult {
     try {
-      const event = parseVerifiedNostrEvent(entry.event);
+      const event = parseNostrEvent(entry.event);
       const relayHints = uniqueRelays(entry.relayHints);
 
       if (isEphemeralKind(event.kind)) {
@@ -262,7 +263,7 @@ export function createNostrResolutionService({
             ? (event.tags.find((tag) => tag[0] === 'd')?.[1] ?? '')
             : null;
 
-        upsertCachedReplaceableEvent({
+        upsertTrustedCachedReplaceableEvent({
           db,
           event,
           kind: event.kind,
@@ -273,7 +274,7 @@ export function createNostrResolutionService({
           lastCheckedAt: entry.lastCheckedAtMs ?? 0,
         });
       } else {
-        putCachedEventById({
+        putTrustedCachedEventById({
           db,
           event,
           requestedEventId: event.id,
@@ -339,7 +340,7 @@ export function createNostrResolutionService({
 
       for (const input of result.events) {
         try {
-          const event = parseVerifiedNostrEvent(input);
+          const event = parseNostrEvent(input);
 
           if (event.pubkey !== pubkey || event.kind !== kind) {
             continue;
@@ -536,7 +537,7 @@ export function createNostrResolutionService({
 
       for (const input of result.events) {
         try {
-          const event = parseVerifiedNostrEvent(input);
+          const event = parseNostrEvent(input);
 
           const isDirect = parseEventReferences(event).some((edge) => {
             if (edge.role !== 'thread-parent') {
@@ -716,7 +717,7 @@ export function createNostrResolutionService({
 
       const verified = result.events.flatMap((input) => {
         try {
-          const event = parseVerifiedNostrEvent(input);
+          const event = parseNostrEvent(input);
 
           const eventIdentifier =
             event.kind >= 30_000 && event.kind < 40_000
@@ -778,9 +779,11 @@ export function createNostrResolutionService({
 
     const currentTime = nowMs();
 
-    const results = entries.map((entry) =>
-      seedOne({ entry, nowMs: currentTime }),
+    const seedBatch = db.transaction((batch: SeedEventInput[]) =>
+      batch.map((entry) => seedOne({ entry, nowMs: currentTime })),
     );
+
+    const results = seedBatch(entries);
 
     return {
       seeded: results.filter((result) => result.status === 'seeded').length,

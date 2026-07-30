@@ -112,6 +112,7 @@ export const NostrEventContextRequestSchema = z
     fallbackRelays: relayListSchema,
     includeDirectReplies: z.boolean(),
     replyLimit: z.number().int().min(1).max(MAX_NOSTR_DIRECT_REPLIES),
+    threadContextOnly: z.boolean().optional(),
   })
   .strict();
 

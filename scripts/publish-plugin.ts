@@ -29,6 +29,11 @@ import { SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
 import type { CoreDb } from '@src/db';
+import {
+  capabilityRelationTags,
+  normalizeCapabilityRelations,
+  PluginCapabilityRelationsSchema,
+} from '@src/capabilities/relations';
 import { openCoreDb } from '@src/db';
 import {
   createBlossomAuthBase64,
@@ -80,6 +85,7 @@ const PackageJsonSchema = z.object({
     website: z.url().optional(),
     coreApiVersion: z.string().min(1),
     description: z.string().optional(),
+    capabilities: PluginCapabilityRelationsSchema,
   }),
 });
 
@@ -673,6 +679,9 @@ async function main(): Promise<void> {
       ['version', gitTag],
       ['coreApiVersion', coreApiVersion],
       ['t', 'appweaver-plugin'],
+      ...capabilityRelationTags(
+        normalizeCapabilityRelations(pkg.appweaver.capabilities),
+      ),
       ...updatedRefs.map((r) => ['ref', r.tag, r.coreApiVersion, r.changelog]),
     ],
     content: eventContent,

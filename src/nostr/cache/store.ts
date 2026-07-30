@@ -4,7 +4,7 @@ import { uniqueRelays } from '../nip65';
 
 import type { NostrCacheDb } from './db';
 import { noteNostrCacheWrite } from './maintenance';
-import { parseVerifiedNostrEvent } from './schema';
+import { parseNostrEvent, parseVerifiedNostrEvent } from './schema';
 
 export { getNostrCacheStats, type NostrCacheStats } from './maintenance';
 
@@ -61,6 +61,10 @@ type PutCachedEventByIdProps = {
   nowMs: number;
 };
 
+type PutTrustedCachedEventByIdProps = Omit<PutCachedEventByIdProps, 'event'> & {
+  event: NostrEvent;
+};
+
 type UpsertCachedReplaceableEventProps = {
   db: NostrCacheDb;
   event: unknown;
@@ -70,6 +74,13 @@ type UpsertCachedReplaceableEventProps = {
   relayHints: string[];
   nowMs: number;
   lastCheckedAt: number;
+};
+
+type UpsertTrustedCachedReplaceableEventProps = Omit<
+  UpsertCachedReplaceableEventProps,
+  'event'
+> & {
+  event: NostrEvent;
 };
 
 type QueryCachedAuthorEventsProps = {
@@ -170,7 +181,7 @@ function mergeRelayHints(existing: string[], incoming: string[]): string[] {
 
 function parseEventRow(row: EventRow): CachedEvent {
   return {
-    event: parseVerifiedNostrEvent(JSON.parse(row.event_json) as unknown),
+    event: parseNostrEvent(JSON.parse(row.event_json) as unknown),
     relayHints: parseRelayHints(row.relay_hints_json),
     cachedAt: row.cached_at,
     lastAccessedAt: row.last_accessed_at,
@@ -209,14 +220,13 @@ export function getCachedEventById(
   }
 }
 
-export function putCachedEventById({
+function putTrustedCachedEventById({
   db,
-  event: input,
+  event,
   requestedEventId,
   relayHints,
   nowMs,
-}: PutCachedEventByIdProps): CachePutResult {
-  const event = parseVerifiedNostrEvent(input);
+}: PutTrustedCachedEventByIdProps): CachePutResult {
   const normalizedRequestedId = normalizeHex(requestedEventId);
 
   if (event.id !== normalizedRequestedId) {
@@ -260,6 +270,18 @@ export function putCachedEventById({
 
   return { event, persisted: true, replaced: existing === null };
 }
+
+export function putCachedEventById(
+  props: PutCachedEventByIdProps,
+): CachePutResult {
+  return putTrustedCachedEventById({
+    ...props,
+    event: parseVerifiedNostrEvent(props.event),
+  });
+}
+
+/** Write an event already verified by the receiving pool or trusted local DB. */
+export { putTrustedCachedEventById };
 
 export function touchCachedEventById({
   db,
@@ -397,17 +419,16 @@ function validateReplaceableAddress({
   }
 }
 
-export function upsertCachedReplaceableEvent({
+function upsertTrustedCachedReplaceableEvent({
   db,
-  event: input,
+  event,
   kind,
   pubkey,
   identifier,
   relayHints,
   nowMs,
   lastCheckedAt,
-}: UpsertCachedReplaceableEventProps): CachePutResult {
-  const event = parseVerifiedNostrEvent(input);
+}: UpsertTrustedCachedReplaceableEventProps): CachePutResult {
   const normalizedPubkey = normalizeHex(pubkey);
   const normalizedIdentifier = normalizeReplaceableIdentifier(identifier);
 
@@ -491,6 +512,18 @@ export function upsertCachedReplaceableEvent({
 
   return { event, persisted: true, replaced: true };
 }
+
+export function upsertCachedReplaceableEvent(
+  props: UpsertCachedReplaceableEventProps,
+): CachePutResult {
+  return upsertTrustedCachedReplaceableEvent({
+    ...props,
+    event: parseVerifiedNostrEvent(props.event),
+  });
+}
+
+/** Write an event already verified by the receiving pool or trusted local DB. */
+export { upsertTrustedCachedReplaceableEvent };
 
 export function touchCachedReplaceableEvent({
   db,

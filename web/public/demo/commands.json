@@ -4903,7 +4903,7 @@
       {
         "name": "reevaluate",
         "summary": "Re-run classification for one cached event.",
-        "usage": "reevaluate <event_id>",
+        "usage": "reevaluate <event_id> [--event-json <event_json>]",
         "aliases": [
           "reclassify"
         ],
@@ -4916,7 +4916,15 @@
             "variadic": false
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "event_json",
+            "flag": "--event-json",
+            "summary": "Internal raw Nostr event JSON to cache before reevaluating.",
+            "kind": "string",
+            "required": false
+          }
+        ],
         "examples": [
           "/nr reevaluate <event_id>"
         ],
@@ -5164,6 +5172,39 @@
         }
       },
       {
+        "name": "interest-record",
+        "summary": "Record a private interest signal for this NR instance.",
+        "usage": "interest-record --target-event-id <target_event_id> --preference <preference>",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "target_event_id",
+            "flag": "--target-event-id",
+            "summary": "Target Nostr event id.",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "preference",
+            "flag": "--preference",
+            "summary": "Private recommendation preference.",
+            "kind": "string",
+            "required": true,
+            "choices": [
+              "like",
+              "dislike",
+              "none"
+            ]
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
         "name": "debug",
         "summary": "Show a list-style parser for one pasted event JSON and its related context.",
         "usage": "debug [<event_json...>] [--force-reclassify] [--instructions <instructions>]",
@@ -5208,20 +5249,37 @@
       },
       {
         "name": "list",
-        "summary": "List timeline or archived cached posts grouped by topic tags and mood tags.",
-        "usage": "list [--mode <mode>]",
+        "summary": "List cached Nostr Radar items or recent activity from your write relays.",
+        "usage": "list [--mode <mode>] [--kinds <kinds>]",
         "aliases": [],
         "arguments": [],
         "options": [
           {
             "name": "mode",
             "flag": "--mode",
-            "summary": "List mode: timeline or archive.",
+            "summary": "List mode: timeline, for-you, profile, or archive.",
             "kind": "string",
             "required": false,
             "choices": [
               "timeline",
+              "for-you",
+              "profile",
               "archive"
+            ]
+          },
+          {
+            "name": "kinds",
+            "flag": "--kinds",
+            "summary": "Visible event categories for Timeline or Profile.",
+            "kind": "string",
+            "multiple": true,
+            "choices": [
+              "posts",
+              "replies",
+              "comments",
+              "reposts",
+              "quotes",
+              "reactions"
             ]
           }
         ],
@@ -5238,7 +5296,7 @@
           "surface": "timeline_singleton",
           "label": "Nostr Radar",
           "modalTitle": "Nostr Radar",
-          "icon": "./commands/list/renderers/nostr-radar.svg",
+          "icon": "./commands/list/renderers/list.svg",
           "order": 10
         }
       }

@@ -3,6 +3,11 @@ import { join } from 'path';
 
 import { summarizeOpencodeSdkSession } from '@src/backends/opencode-sdk';
 import {
+  monitoring,
+  recordMonitoringSpans,
+  runWithMonitoringContext,
+} from '@src/core/monitoring';
+import {
   getAgentBackend,
   getState,
   getWorkspaceTarget,
@@ -29,6 +34,7 @@ import type {
   WebNodeRoot,
 } from '@src/web/ui-schema';
 
+import { executeWebCapability } from './capability-actions';
 import { runWebChat } from './chat';
 import {
   getCommandDefinitionForWeb,
@@ -55,6 +61,7 @@ import {
   type JsonCommandClientMessage,
   type LoadTimelineBeforeClientMessage,
   type LoadTimelineClientMessage,
+  type RunCapabilityClientMessage,
   type RunCommandClientMessage,
   type SaveTimelineFormClientMessage,
   type WebSocketClientMessage,
@@ -466,6 +473,7 @@ async function handleDemoWebSocketMessage(params: {
     case 'cancel_chat':
     case 'delete_timeline_event':
     case 'save_timeline_form':
+    case 'record_monitoring_spans':
       sendMessage(ws, createDoneMessage(message.requestId));
 
       return;
@@ -476,6 +484,17 @@ async function handleDemoWebSocketMessage(params: {
         createErrorMessage({
           requestId: message.requestId,
           message: 'demo_mode_json_command_not_allowed',
+        }),
+      );
+
+      return;
+
+    case 'run_capability':
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: 'demo_mode_capability_not_allowed',
         }),
       );
   }
@@ -956,6 +975,55 @@ async function handleJsonCommand(params: {
   sendMessage(ws, createDoneMessage(message.requestId));
 }
 
+async function handleRunCapability(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  ctx: WebRouteContext;
+  message: RunCapabilityClientMessage;
+}): Promise<void> {
+  const { ws, ctx, message } = params;
+
+  const output = await executeWebCapability({
+    operation: message.operation,
+    input: message.input,
+    consumerAlias: message.consumerAlias,
+    providerId: message.providerId ?? null,
+    selection: message.selection,
+    surface: message.surface ?? null,
+    modalTitle: message.modalTitle ?? null,
+  });
+
+  if (output) {
+    if (message.surface === 'timeline') {
+      insertTimelineEvent(ctx.seenDb, {
+        timelineId: message.timelineId,
+        source: 'web',
+        kind: 'command_result',
+        role: null,
+        command: message.consumerAlias,
+        subcommand: message.operation,
+        subcommandTag: message.operation,
+        values: null,
+        form: null,
+        text: null,
+        web: output,
+        clientView: null,
+        prompt: null,
+        requestId: null,
+      });
+    }
+
+    sendMessage(
+      ws,
+      createCommandResultMessage({
+        requestId: message.requestId,
+        output,
+      }),
+    );
+  }
+
+  sendMessage(ws, createDoneMessage(message.requestId));
+}
+
 async function handleChat(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
@@ -1342,11 +1410,28 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             }
 
             case 'run_command': {
-              await handleRunCommand({
-                ws,
-                ctx,
-                message,
-              });
+              if (message.traceContext) {
+                await runWithMonitoringContext(message.traceContext, () =>
+                  monitoring.withSpan({
+                    name: 'appweaver.command',
+                    attributes: {
+                      command: message.command,
+                      subcommand: message.subcommand,
+                    },
+                    parent: null,
+                    run: () => handleRunCommand({ ws, ctx, message }),
+                  }),
+                );
+              } else {
+                await handleRunCommand({ ws, ctx, message });
+              }
+
+              return;
+            }
+
+            case 'record_monitoring_spans': {
+              recordMonitoringSpans(message.spans);
+              sendMessage(ws, createDoneMessage(message.requestId));
 
               return;
             }
@@ -1357,6 +1442,12 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ctx,
                 message,
               });
+
+              return;
+            }
+
+            case 'run_capability': {
+              await handleRunCapability({ ws, ctx, message });
 
               return;
             }

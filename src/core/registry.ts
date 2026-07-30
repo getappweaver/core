@@ -4,44 +4,171 @@
 
 import { join } from 'path';
 
+import type { PluginCapabilityRelations } from '@src/capabilities/relations';
+import type { CapabilityProviderSource } from '@src/capabilities/types';
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
 import type { WebHandlerResult } from '@src/web/ui-schema';
+import {
+  isRemoteWidgetIcon,
+  publishedWidgetIconPath,
+} from '@src/web/widget-icon-path';
 
+import {
+  capabilityRegistry,
+  createCapabilityClient,
+} from './capabilities/registry';
+import { monitoring } from './monitoring';
 import type {
   BotPlugin,
   PluginContext,
+  PluginHostContext,
   PluginInvocationContext,
+  PluginPackageJson,
 } from './plugin';
+import { parsePluginPackageJson } from './plugin';
 
 const byAlias = new Map<string, BotPlugin>();
+const capabilityRelationsByAlias = new Map<string, PluginCapabilityRelations>();
 
 type RegisterPluginProps = {
+  alias: string;
   plugin: BotPlugin;
-  ctx: PluginContext;
+  ctx: PluginHostContext;
 };
 
-export function registerPlugin({ plugin, ctx }: RegisterPluginProps) {
-  if (byAlias.has(plugin.identity.alias)) {
+type CreatePluginScopedContextProps = {
+  plugin: BotPlugin;
+  ctx: PluginHostContext;
+};
+
+function createPluginScopedContext({
+  plugin,
+  ctx,
+}: CreatePluginScopedContextProps): PluginContext {
+  const capabilities = createCapabilityClient({
+    registry: capabilityRegistry,
+    caller: {
+      type: 'plugin',
+      pluginName: plugin.identity.name,
+      alias: plugin.identity.alias,
+    },
+  });
+
+  const scoped = { capabilities, monitoring } as PluginContext;
+  const source = ctx as unknown as Record<string, unknown>;
+  const target = scoped as unknown as Record<string, unknown>;
+
+  for (const key of Object.keys(ctx)) {
+    Object.defineProperty(target, key, {
+      enumerable: true,
+      configurable: false,
+      get: () => source[key],
+      set: (value: unknown) => {
+        source[key] = value;
+      },
+    });
+  }
+
+  return scoped;
+}
+
+function providerIconUrl(icon: string | null, alias: string): string | null {
+  if (!icon) {
+    return null;
+  }
+
+  if (isRemoteWidgetIcon(icon)) {
+    return icon;
+  }
+
+  const path = publishedWidgetIconPath({ icon, pluginAlias: alias });
+
+  return path ? `/${path}` : null;
+}
+
+function capabilityProviderSource(
+  installedAlias: string,
+  pkg: PluginPackageJson,
+): CapabilityProviderSource {
+  return {
+    type: 'plugin',
+    pluginName: pkg.name,
+    alias: installedAlias,
+    version: pkg.version,
+    title: pkg.title,
+    description: pkg.description,
+    iconUrl: providerIconUrl(pkg.icon, installedAlias),
+  };
+}
+
+export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
+  if (plugin.identity.alias !== alias) {
     throw new Error(
-      `Plugin alias collision: "${plugin.identity.alias}" already registered`,
+      `Plugin alias mismatch: installed as "${alias}" but claimed "${plugin.identity.alias}"`,
     );
   }
 
-  const databasePath = join(
-    dmBotRoot,
-    'plugins',
-    plugin.identity.alias,
-    'db.sqlite',
-  );
+  if (byAlias.has(alias)) {
+    throw new Error(`Plugin alias collision: "${alias}" already registered`);
+  }
 
-  log.info(
-    `Registering plugin: ${plugin.identity.alias} creating database at ${databasePath}`,
-  );
+  const databasePath = join(dmBotRoot, 'plugins', alias, 'db.sqlite');
 
-  plugin.onInit(ctx);
+  log.info(`Registering plugin: ${alias} creating database at ${databasePath}`);
 
-  byAlias.set(plugin.identity.alias, plugin);
+  const scopedContext = createPluginScopedContext({ plugin, ctx });
+  const providers = plugin.capabilityProviders ?? [];
+
+  const pkg = parsePluginPackageJson({
+    pluginDir: join(dmBotRoot, 'plugins', alias),
+  });
+
+  if (!pkg) {
+    throw new Error(`Cannot register ${alias}: invalid package metadata.`);
+  }
+
+  if (
+    pkg.name !== plugin.identity.name ||
+    pkg.version !== plugin.identity.version
+  ) {
+    throw new Error(
+      `Cannot register ${alias}: package identity does not match runtime identity.`,
+    );
+  }
+
+  const source =
+    providers.length > 0 ? capabilityProviderSource(alias, pkg) : null;
+
+  if (source) {
+    capabilityRegistry.validateProviders({ source, providers });
+  }
+
+  plugin.onInit(scopedContext);
+
+  if (source) {
+    capabilityRegistry.registerProviders({
+      source,
+      providers,
+    });
+  }
+
+  byAlias.set(alias, plugin);
+  capabilityRelationsByAlias.set(alias, pkg.capabilities);
+}
+
+export function finalizePluginRegistration(): void {
+  capabilityRegistry.finalize();
+
+  for (const [alias, relations] of capabilityRelationsByAlias) {
+    for (const required of relations.requires) {
+      if (capabilityRegistry.listProviders(required).length === 0) {
+        log.warn(
+          `Plugin ${alias} requires missing capability ${required.name}:v${required.version}`,
+        );
+      }
+    }
+  }
 }
 
 export function getPluginByAlias(alias: string): BotPlugin | undefined {

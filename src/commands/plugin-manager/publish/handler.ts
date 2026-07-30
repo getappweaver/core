@@ -3,6 +3,11 @@ import { join } from 'path';
 
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 
+import {
+  capabilityRelationTags,
+  normalizeCapabilityRelations,
+  type PluginCapabilityRelations,
+} from '@src/capabilities/relations';
 import type { RouteCommandContext } from '@src/commands/dispatch';
 import { ensureWss } from '@src/env';
 import { bunkerSignEvent } from '@src/nostr/bunker';
@@ -48,6 +53,7 @@ type PluginPackage = {
   website: string | null;
   description: string;
   coreApiVersion: string;
+  capabilities: PluginCapabilityRelations;
 };
 
 export type PublishRelayResult = {
@@ -88,6 +94,7 @@ function readPluginPackage({
       website?: unknown;
       description?: unknown;
       coreApiVersion?: unknown;
+      capabilities?: unknown;
     };
   };
 
@@ -133,6 +140,7 @@ function readPluginPackage({
         : null,
     description,
     coreApiVersion: pkg.appweaver.coreApiVersion.trim(),
+    capabilities: normalizeCapabilityRelations(pkg.appweaver.capabilities),
   };
 }
 
@@ -412,6 +420,7 @@ function buildEventTemplate({
       ['version', `v${pkg.version}`],
       ['coreApiVersion', pkg.coreApiVersion],
       ['t', 'appweaver-plugin'],
+      ...capabilityRelationTags(pkg.capabilities),
       ...refs.map((ref) => ['ref', ref.tag, ref.coreApiVersion, ref.changelog]),
     ],
     content: pkg.description,

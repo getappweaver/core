@@ -97,14 +97,20 @@ function reconcileArray(previous: unknown[], next: unknown[]): void {
   const commonLength = Math.min(previous.length, next.length);
 
   for (let index = 0; index < commonLength; index += 1) {
-    previous[index] = reconcileValue(previous[index], next[index]);
+    const reconciled = reconcileValue(previous[index], next[index]);
+
+    if (!Object.is(previous[index], reconciled)) {
+      previous[index] = reconciled;
+    }
   }
 
-  previous.splice(
-    commonLength,
-    previous.length - commonLength,
-    ...next.slice(commonLength),
-  );
+  if (previous.length !== next.length) {
+    previous.splice(
+      commonLength,
+      previous.length - commonLength,
+      ...next.slice(commonLength),
+    );
+  }
 }
 
 function reconcileRecord(previous: MutableRecord, next: MutableRecord): void {
@@ -208,7 +214,12 @@ function reconcileWebNodeArray(previous: WebNode[], next: WebNode[]): void {
     return match;
   });
 
-  previous.splice(0, previous.length, ...selected);
+  if (
+    previous.length !== selected.length ||
+    selected.some((node, index) => !Object.is(node, previous[index]))
+  ) {
+    previous.splice(0, previous.length, ...selected);
+  }
 }
 
 export function reconcileWebNodeRoot(next: WebNodeRoot) {

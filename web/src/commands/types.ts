@@ -5,6 +5,7 @@ import type {
   WebAction,
   WebArgumentFieldChoice,
   WebNodeRoot,
+  WebOptimisticMutation,
 } from '@src/web/ui-schema';
 
 import type { ChromeModalState, ChromePromptSession } from '../chrome/types';
@@ -35,6 +36,11 @@ export type ComposerAiState = {
 
 export type RunWebActionParams = {
   onReplaceRoot?: (root: WebNodeRoot) => void;
+  getWebRoot?: () => WebNodeRoot;
+  applyOptimisticMutations?: (mutations: WebOptimisticMutation[]) => void;
+  onCapabilityResult?: (root: WebNodeRoot) => boolean;
+  onCapabilityError?: (message: string) => void;
+  onCapabilitySettled?: () => void;
   promptRequestId?: string;
   uiExecutionPolicy?: {
     recordInTimeline?: boolean;

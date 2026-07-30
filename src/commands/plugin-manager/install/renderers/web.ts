@@ -390,12 +390,33 @@ function sourceCodeLink(entry: PluginCatalogEntry): WebNode | null {
   };
 }
 
+function capabilityLabels(entry: PluginCatalogEntry): WebNode[] {
+  return (
+    [
+      ['provides', entry.capabilities.provides],
+      ['uses', entry.capabilities.uses],
+      ['requires', entry.capabilities.requires],
+    ] as const
+  ).flatMap(([relation, capabilities]) =>
+    capabilities.map((capability) => ({
+      type: 'element' as const,
+      tag: 'badge' as const,
+      props: {
+        label: `${relation}: ${capability.name}:v${capability.version}`,
+        size: 'sm' as const,
+        tone: relation === 'provides' ? ('success' as const) : ('muted' as const),
+      },
+    })),
+  );
+}
+
 function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   const actions = updateActions(entry);
   const changelog = changelogButton(entry);
   const changelogDetails = changelogPanel(entry);
   const icon = pluginIcon(entry);
   const source = sourceCodeLink(entry);
+  const capabilities = capabilityLabels(entry);
 
   return {
     type: 'element',
@@ -423,6 +444,16 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
           },
           ...(entry.description ? [textBlock(entry.description, 'muted')] : []),
           ...(source ? [source] : []),
+          ...(capabilities.length > 0
+            ? [
+                {
+                  type: 'element' as const,
+                  tag: 'row' as const,
+                  props: { gap: 'xs' as const },
+                  children: capabilities,
+                },
+              ]
+            : []),
           {
             type: 'element',
             tag: 'row',
@@ -470,7 +501,7 @@ export function renderPluginsInstallWeb(
           children: [textNode('Plugin Catalog')],
         },
         textBlock(
-          `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.`,
+          `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}`,
           'muted',
         ),
         ...(representation.entries.length === 0

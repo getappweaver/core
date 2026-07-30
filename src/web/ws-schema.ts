@@ -1,6 +1,8 @@
 import { z, ZodError } from 'zod';
 
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
+import { MonitoringSpanV1Schema } from '@src/capabilities/monitoring.v1';
+import { CapabilityOperationIdSchema } from '@src/capabilities/types';
 import type { PromptPayload } from '@src/core/plugin';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type { WebCommandListItem } from '@src/web/command-catalog';
@@ -11,12 +13,18 @@ import type {
 } from '@src/web/ui-schema';
 import {
   WebArgumentFieldChoiceSchema,
+  WebMonitoringActionSchema,
   WebOptionFieldHintValueSchema,
 } from '@src/web/ui-schema';
 
 import type { ComposerAiState } from './composer-ai-state';
 
 const RequestIdSchema = z.string().min(1);
+
+export const MonitoringTraceContextSchema = z.object({
+  traceId: z.string().min(1),
+  parentSpanId: z.string().min(1),
+});
 
 const CommandPayloadSchema = z.object({
   arguments: z.record(z.string(), z.unknown()).optional().default({}),
@@ -82,6 +90,13 @@ export const RunCommandClientMessageSchema = z.object({
   }),
   /** When false, no timeline rows for this command session (invocation, results, prompts, prompt answers). */
   recordInTimeline: z.boolean().optional().default(true),
+  traceContext: MonitoringTraceContextSchema.optional(),
+});
+
+export const RecordMonitoringSpansClientMessageSchema = z.object({
+  type: z.literal('record_monitoring_spans'),
+  requestId: RequestIdSchema,
+  spans: z.array(MonitoringSpanV1Schema).min(1).max(500),
 });
 
 export const JsonCommandClientMessageSchema = z.object({
@@ -92,6 +107,19 @@ export const JsonCommandClientMessageSchema = z.object({
   subcommand: z.string().min(1),
   payload: z.unknown(),
   recordInTimeline: z.boolean().optional().default(true),
+});
+
+export const RunCapabilityClientMessageSchema = z.object({
+  type: z.literal('run_capability'),
+  requestId: RequestIdSchema,
+  timelineId: z.string().min(1),
+  operation: CapabilityOperationIdSchema,
+  input: z.unknown(),
+  consumerAlias: z.string().min(1),
+  providerId: z.string().min(1).optional(),
+  selection: z.enum(['auto', 'always-choose']).optional().default('auto'),
+  surface: z.enum(['timeline', 'modal']).optional(),
+  modalTitle: z.string().min(1).optional(),
 });
 
 export const PromptAnswerClientMessageSchema = z.object({
@@ -168,6 +196,7 @@ export const SaveTimelineFormClientMessageSchema = z.object({
           ]),
         })
         .optional(),
+      monitoring: WebMonitoringActionSchema.optional(),
       webWidget: WebWidgetSchema.optional(),
     }),
     values: CommandPayloadSchema,
@@ -194,7 +223,9 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   LoadTimelineClientMessageSchema,
   LoadTimelineBeforeClientMessageSchema,
   RunCommandClientMessageSchema,
+  RecordMonitoringSpansClientMessageSchema,
   JsonCommandClientMessageSchema,
+  RunCapabilityClientMessageSchema,
   PromptAnswerClientMessageSchema,
   ChatClientMessageSchema,
   CancelChatClientMessageSchema,
@@ -284,8 +315,14 @@ export type RequestComposerAiStateClientMessage = z.infer<
 export type RunCommandClientMessage = z.infer<
   typeof RunCommandClientMessageSchema
 >;
+export type RecordMonitoringSpansClientMessage = z.infer<
+  typeof RecordMonitoringSpansClientMessageSchema
+>;
 export type JsonCommandClientMessage = z.infer<
   typeof JsonCommandClientMessageSchema
+>;
+export type RunCapabilityClientMessage = z.infer<
+  typeof RunCapabilityClientMessageSchema
 >;
 export type LoadTimelineClientMessage = z.infer<
   typeof LoadTimelineClientMessageSchema

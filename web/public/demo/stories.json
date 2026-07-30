@@ -66015,7 +66015,7 @@
                                                                   ],
                                                                   [
                                                                     "published_at",
-                                                                    "1783519049"
+                                                                    "1784152208"
                                                                   ],
                                                                   [
                                                                     "title",
@@ -66048,7 +66048,6 @@
                                                                 ],
                                                                 "signTitle": "Sign Event: Publish bookmark",
                                                                 "fallbackRelays": [
-                                                                  "wss://relay.damus.io",
                                                                   "wss://nos.lol",
                                                                   "wss://relay.nostr.band"
                                                                 ],
@@ -67240,7 +67239,7 @@
                                                               ],
                                                               [
                                                                 "published_at",
-                                                                "1783519049"
+                                                                "1784152208"
                                                               ],
                                                               [
                                                                 "title",
@@ -67273,7 +67272,6 @@
                                                             ],
                                                             "signTitle": "Sign Event: Publish bookmark",
                                                             "fallbackRelays": [
-                                                              "wss://relay.damus.io",
                                                               "wss://nos.lol",
                                                               "wss://relay.nostr.band"
                                                             ],
@@ -81181,7 +81179,6 @@
                                               ],
                                               "signTitle": "Sign Event: Publish journal entry",
                                               "fallbackRelays": [
-                                                "wss://relay.damus.io",
                                                 "wss://nos.lol",
                                                 "wss://relay.nostr.band"
                                               ],
@@ -81360,7 +81357,6 @@
                                               "tags": [],
                                               "signTitle": "Sign Event: Publish journal entry",
                                               "fallbackRelays": [
-                                                "wss://relay.damus.io",
                                                 "wss://nos.lol",
                                                 "wss://relay.nostr.band"
                                               ],
@@ -81745,7 +81741,6 @@
                                               ],
                                               "signTitle": "Sign Event: Publish journal entry",
                                               "fallbackRelays": [
-                                                "wss://relay.damus.io",
                                                 "wss://nos.lol",
                                                 "wss://relay.nostr.band"
                                               ],
@@ -81929,7 +81924,6 @@
                                               ],
                                               "signTitle": "Sign Event: Publish journal entry",
                                               "fallbackRelays": [
-                                                "wss://relay.damus.io",
                                                 "wss://nos.lol",
                                                 "wss://relay.nostr.band"
                                               ],
@@ -82108,7 +82102,6 @@
                                               "tags": [],
                                               "signTitle": "Sign Event: Publish journal entry",
                                               "fallbackRelays": [
-                                                "wss://relay.damus.io",
                                                 "wss://nos.lol",
                                                 "wss://relay.nostr.band"
                                               ],
@@ -82588,7 +82581,6 @@
                                           ],
                                           "signTitle": "Sign Event: Publish journal entry",
                                           "fallbackRelays": [
-                                            "wss://relay.damus.io",
                                             "wss://nos.lol",
                                             "wss://relay.nostr.band"
                                           ],
@@ -82767,7 +82759,6 @@
                                           "tags": [],
                                           "signTitle": "Sign Event: Publish journal entry",
                                           "fallbackRelays": [
-                                            "wss://relay.damus.io",
                                             "wss://nos.lol",
                                             "wss://relay.nostr.band"
                                           ],

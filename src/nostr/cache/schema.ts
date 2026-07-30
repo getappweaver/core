@@ -25,8 +25,13 @@ export const nostrEventSchema = z
 
 export const NostrEventSchema = nostrEventSchema;
 
+/** Structural parsing for events already verified before persistence. */
+export function parseNostrEvent(value: unknown): NostrEvent {
+  return nostrEventSchema.parse(value);
+}
+
 export function parseVerifiedNostrEvent(value: unknown): NostrEvent {
-  const event = nostrEventSchema.parse(value);
+  const event = parseNostrEvent(value);
 
   if (!verifyEvent(event)) {
     throw new Error('Nostr event ID or signature is invalid');

@@ -106,6 +106,10 @@ export type CommandSubcommand = {
       | 'runnable_default'
       | 'runnable_customizable';
   };
+  monitoring?: {
+    name: string;
+    attributes: Record<string, string | number | boolean | null>;
+  };
   webWidget?: WebWidget;
 };
 

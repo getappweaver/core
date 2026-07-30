@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { CapabilityOperationIdSchema } from '@src/capabilities/types';
+
 export const WebToneSchema = z.enum([
   'default',
   'muted',
@@ -45,6 +47,8 @@ export const WebRefreshSchema = z.object({
 export const WebCommandStatusSchema = z.object({
   /** Run without blocking the source widget busy overlay; useful for long commands. */
   background: z.boolean().optional(),
+  /** Optional element id to mark active while this background command is pending. */
+  activeTargetId: z.string().min(1).optional(),
   pending: z.string().min(1).optional(),
   restarting: z.string().min(1).optional(),
   success: z.string().min(1).optional(),
@@ -58,6 +62,62 @@ export const WebPendingUiSchema = z.object({
   presentation: z.enum(['widget', 'entity', 'none']),
   label: z.string().min(1).optional(),
 });
+
+export const WebMonitoringActionSchema = z.object({
+  name: z.string().min(1),
+  attributes: z
+    .record(
+      z.string(),
+      z.union([z.string(), z.number(), z.boolean(), z.null()]),
+    )
+    .optional()
+    .default({}),
+});
+
+export const WebOptimisticMutationSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('removeEntity'),
+    entityKey: z.string().min(1),
+    pruneEmptyParents: z.boolean().optional().default(true),
+    updateCounts: z.boolean().optional().default(true),
+  }),
+  z.object({
+    type: z.literal('patchEntityProps'),
+    entityKey: z.string().min(1),
+    props: z.record(z.string(), z.unknown()),
+  }),
+  z.object({
+    type: z.literal('patchEntityActions'),
+    entityKey: z.string().min(1),
+    actions: z.array(
+      z.object({
+        key: z.string().min(1),
+        label: z.string().min(1).optional(),
+        ariaLabel: z.string().min(1).optional(),
+        active: z.boolean().optional(),
+        disabled: z.boolean().optional(),
+      }),
+    ),
+  }),
+]);
+
+export type WebOptimisticMutation = z.infer<typeof WebOptimisticMutationSchema>;
+
+export const WebOptimisticCommandPayloadSchema = z.object({
+  mutations: z.array(WebOptimisticMutationSchema).min(1),
+  command: z.object({
+    command: z.string().min(1),
+    subcommand: z.string().min(1),
+    arguments: z.record(z.string(), z.unknown()).optional().default({}),
+    options: z.record(z.string(), z.unknown()).optional().default({}),
+    monitoring: WebMonitoringActionSchema.optional(),
+  }),
+  onError: z.enum(['log']).optional().default('log'),
+});
+
+export type WebOptimisticCommandPayload = z.infer<
+  typeof WebOptimisticCommandPayloadSchema
+>;
 
 /** Optional line under a command option in the web form; not sent to the bot. */
 export const WebOptionFieldHintObjectSchema = z.object({
@@ -140,6 +200,18 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     clientStatus: WebCommandStatusSchema.optional(),
     /** Choose widget-wide, nearest-entity, or no pending presentation. */
     pendingUi: WebPendingUiSchema.optional(),
+    /** Trace this command and any configured refresh as one browser/server operation. */
+    monitoring: WebMonitoringActionSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('capability'),
+    operation: CapabilityOperationIdSchema,
+    input: z.unknown(),
+    consumerAlias: z.string().min(1),
+    providerId: z.string().min(1).optional(),
+    selection: z.enum(['auto', 'always-choose']).optional().default('auto'),
+    surface: z.enum(['timeline', 'modal']).optional(),
+    modalTitle: z.string().min(1).optional(),
   }),
   z.object({
     /** Browser-side action handled by the web app; payload is client-specific JSON. */
@@ -201,8 +273,11 @@ export const WebToolbarActionSchema = z.object({
 });
 
 export const WebNostrPostExtraActionSchema = z.object({
+  /** Stable key used by generic optimistic mutations to update action display state. */
+  optimisticKey: z.string().min(1).optional(),
   label: z.string().min(1),
   ariaLabel: z.string().min(1).optional(),
+  icon: z.enum(['translate']).optional(),
   action: WebActionSchema.nullable(),
   disabled: z.boolean().optional(),
   active: z.boolean().optional(),
@@ -218,6 +293,9 @@ const WebNostrPostReferenceBaseSchema = z.object({
   entityKey: z.string().min(1).optional(),
   token: z.string().min(1).optional(),
   type: z.enum(['event', 'profile', 'address', 'unknown']).optional(),
+  resolutionStatus: z
+    .enum(['resolved', 'unresolved', 'loading', 'missing', 'error'])
+    .optional(),
   id: z.string().min(1).optional(),
   pubkey: z.string().min(1).optional(),
   kind: z.number().int().optional(),
@@ -491,6 +569,14 @@ export const WebBasePropsSchema = z.object({
   formOptionFieldNames: z.array(z.string().min(1)).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */
   ttsText: z.string().optional(),
+  /** Label used by optimistic tree mutations when recomputing a child count. */
+  optimisticCountLabel: z.string().min(1).optional(),
+  /** Stores the latest optimistic child count for parent aggregation. */
+  optimisticCountValue: z.number().int().nonnegative().optional(),
+  /** Marks a text element as the display target for the nearest optimistic count label. */
+  optimisticCountText: z.literal(true).optional(),
+  /** Remove this parent when optimistic child count reaches zero. */
+  optimisticPruneWhenEmpty: z.literal(true).optional(),
 });
 
 export const WebNostrPostElementPropsSchema = WebBasePropsSchema.extend(

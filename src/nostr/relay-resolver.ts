@@ -6,7 +6,7 @@ import type {
 } from 'nostr-tools/pool';
 
 import type { NostrCacheDb } from './cache/db';
-import { parseVerifiedNostrEvent } from './cache/schema';
+import { parseNostrEvent } from './cache/schema';
 import {
   getCachedEventById,
   getCachedReplaceableEvent,
@@ -389,7 +389,7 @@ export function createRelayResolver({
 
       const validEvents = queryResult.events.flatMap((event) => {
         try {
-          const parsed = parseVerifiedNostrEvent(event);
+          const parsed = parseNostrEvent(event);
 
           return parsed.kind === NIP65_RELAY_LIST_KIND &&
             parsed.pubkey === authorPubkey

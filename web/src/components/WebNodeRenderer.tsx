@@ -8,6 +8,8 @@ import type {
   WebNostrPostElement as NostrPostElement,
 } from '@src/web/ui-schema';
 
+import { backgroundCommandStatus } from '../commands/backgroundStatus';
+import type { RunWebActionParams } from '../commands/types';
 import { registerStoryDomTarget } from '../story/dom-targets';
 import {
   emitStoryTargetClicked,
@@ -67,7 +69,11 @@ function hljsLanguageFromUi(ui: string): string | null {
 type RenderElementProps = {
   element: WebElementNode;
   props: WebNodeRendererProps;
-  runAction: (action: WebAction | undefined) => void;
+  runAction: (
+    action: WebAction | undefined,
+    sourceEntityKey?: string | null,
+    params?: RunWebActionParams,
+  ) => void;
   renderChild: (child: WebNode) => JSX.Element;
 };
 
@@ -95,6 +101,33 @@ function isNostrPostElement(
   element: WebElementNode,
 ): element is NostrPostElement {
   return element.tag === 'nostrPost';
+}
+
+function isBackgroundCommandTargetActive(element: WebElementNode): boolean {
+  const action = element.props?.action;
+
+  if (action?.type !== 'command' || !element.props?.id) {
+    return false;
+  }
+
+  const status = backgroundCommandStatus(action.clientStatus?.statusTargetId);
+
+  return (
+    status?.state === 'pending' && status.activeTargetId === element.props.id
+  );
+}
+
+function isBackgroundCommandGroupPending(element: WebElementNode): boolean {
+  const action = element.props?.action;
+
+  if (action?.type !== 'command' || !action.clientStatus?.activeTargetId) {
+    return false;
+  }
+
+  return (
+    backgroundCommandStatus(action.clientStatus.statusTargetId)?.state ===
+    'pending'
+  );
 }
 
 function renderElement({
@@ -141,7 +174,8 @@ function renderElement({
           const disabled = () =>
             element.props?.disabled === true ||
             getBusy() === true ||
-            entityPending();
+            entityPending() ||
+            isBackgroundCommandGroupPending(element);
 
           if (htmlType() === 'submit') {
             return (
@@ -181,6 +215,10 @@ function renderElement({
             <WebButton
               type="button"
               class={elementClass(element)}
+              classList={{
+                'is-background-command-active':
+                  isBackgroundCommandTargetActive(element),
+              }}
               data-ui={elementUi(element)}
               data-story-target={element.props?.storyTargetId}
               ref={(el) =>
@@ -587,6 +625,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
   const runAction = (
     action: WebAction | undefined,
     sourceEntityKey = effectiveEntityKey(),
+    params?: RunWebActionParams,
   ) => {
     if (!action) {
       return;
@@ -618,6 +657,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
       onReplaceRoot: props.onReplaceRoot,
       promptRequestId: props.promptRequestId,
       webCommandSourceEntityKey: sourceEntityKey ?? undefined,
+      ...params,
     });
   };
 

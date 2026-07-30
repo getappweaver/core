@@ -1,4 +1,5 @@
-import type { JSX } from 'solid-js';
+import { nip19 } from 'nostr-tools';
+import type { Accessor, JSX } from 'solid-js';
 import {
   createMemo,
   createSignal,
@@ -11,11 +12,15 @@ import {
 
 import type {
   WebAction,
+  WebNode,
+  WebNodeRoot,
   WebNostrPostElement as NostrPostElement,
   WebNostrPostProps,
   WebNostrPostReference,
 } from '@src/web/ui-schema';
 
+import type { RunWebActionParams } from '../../commands/types';
+import { resolveNostrEventContext } from '../../nostr/interactionResolution';
 import { getNostrInteractionFlags } from '../../nostr/interactionState';
 import {
   buildNostrOpenProfileAction,
@@ -39,18 +44,36 @@ const URL_RE = /https?:\/\/[^\s<>()"']+/gi;
 
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.m4v', '.ogv'];
 
+const AUDIO_EXTENSIONS = [
+  '.mp3',
+  '.m4a',
+  '.aac',
+  '.ogg',
+  '.oga',
+  '.opus',
+  '.wav',
+  '.flac',
+];
+
 type InlineProfile = NonNullable<
   NonNullable<WebNostrPostProps['nostrInlineProfiles']>
 >[string];
 
 type WebNostrPostElementProps = {
   element: NostrPostElement;
-  runAction: (action: WebAction | undefined, entityKey?: string | null) => void;
+  runAction: RunPostAction;
 };
+
+type RunPostAction = (
+  action: WebAction | undefined,
+  entityKey?: string | null,
+  params?: RunWebActionParams,
+) => void;
 
 type PostActionItem = {
   label: string;
   ariaLabel?: string;
+  icon?: 'translate';
   action: WebAction | null;
   disabled: boolean;
   success: boolean;
@@ -60,7 +83,345 @@ type PostActionItem = {
 type ContentAttachment =
   | { type: 'image'; url: string }
   | { type: 'video'; url: string }
+  | { type: 'audio'; url: string }
   | { type: 'link'; url: string };
+
+type OpenImagePreview = (url: string, urls: string[]) => void;
+
+type ReferenceResolutionStatus = NonNullable<
+  WebNostrPostReference['resolutionStatus']
+>;
+
+function TranslateIcon(): JSX.Element {
+  return (
+    <svg
+      class="web-nostrPost__actionIcon"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M12.913 17H20.087M12.913 17L11 21M12.913 17L15.7783 11.009C16.0092 10.5263 16.1246 10.2849 16.2826 10.2086C16.4199 10.1423 16.5801 10.1423 16.7174 10.2086C16.8754 10.2849 16.9908 10.5263 17.2217 11.009L20.087 17M20.087 17L22 21M2 5H8M8 5H11.5M8 5V3M11.5 5H14M11.5 5C11.0039 7.95729 9.85259 10.6362 8.16555 12.8844M10 14C9.38747 13.7248 8.76265 13.3421 8.16555 12.8844M8.16555 12.8844C6.81302 11.8478 5.60276 10.4266 5 9M8.16555 12.8844C6.56086 15.0229 4.47143 16.7718 2 18"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
+function nodeText(node: WebNode): string {
+  if (node.type === 'text') {
+    return node.value;
+  }
+
+  return (node.children ?? []).map(nodeText).join('');
+}
+
+function translationContent(root: WebNodeRoot): string | null {
+  if (
+    root.meta.command !== 'translation' ||
+    root.meta.subcommand !== 'translate' ||
+    root.tree.type !== 'element'
+  ) {
+    return null;
+  }
+
+  const contentNode = root.tree.children?.[1];
+
+  return contentNode ? nodeText(contentNode) : null;
+}
+
+type PostTranslationController = {
+  pending: Accessor<boolean>;
+  content: Accessor<string | null>;
+  error: Accessor<string | null>;
+  visible: Accessor<boolean>;
+  setVisible: (visible: boolean) => void;
+  run: (action: WebAction | null) => void;
+};
+
+type CreatePostTranslationProps = {
+  runAction: RunPostAction;
+  entityKey: Accessor<string | null>;
+};
+
+function createPostTranslation({
+  runAction,
+  entityKey,
+}: CreatePostTranslationProps): PostTranslationController {
+  const [pending, setPending] = createSignal(false);
+  const [content, setContent] = createSignal<string | null>(null);
+  const [error, setError] = createSignal<string | null>(null);
+  const [visible, setVisible] = createSignal(false);
+
+  const run = (action: WebAction | null): void => {
+    if (action?.type !== 'capability') {
+      runAction(action ?? undefined, entityKey());
+
+      return;
+    }
+
+    if (content() !== null) {
+      setVisible(true);
+
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+
+    runAction(action, null, {
+      onCapabilityResult: (root) => {
+        const translated = translationContent(root);
+
+        if (translated === null) {
+          return false;
+        }
+
+        setContent(translated);
+        setVisible(true);
+
+        return true;
+      },
+      onCapabilityError: setError,
+      onCapabilitySettled: () => setPending(false),
+    });
+  };
+
+  return { pending, content, error, visible, setVisible, run };
+}
+
+function PostTranslationPanel(props: {
+  translation: PostTranslationController;
+}): JSX.Element {
+  return (
+    <Show
+      when={
+        props.translation.error() !== null ||
+        props.translation.content() !== null
+      }
+    >
+      <div class="web-nostrPost__translation">
+        <Show when={props.translation.content() !== null}>
+          <div
+            class="web-nostrPost__translationTabs"
+            role="group"
+            aria-label="Post language"
+          >
+            <button
+              type="button"
+              class="web-nostrPost__translationTab"
+              classList={{ active: !props.translation.visible() }}
+              aria-pressed={!props.translation.visible()}
+              onClick={() => props.translation.setVisible(false)}
+            >
+              Original
+            </button>
+            <button
+              type="button"
+              class="web-nostrPost__translationTab"
+              classList={{ active: props.translation.visible() }}
+              aria-pressed={props.translation.visible()}
+              onClick={() => props.translation.setVisible(true)}
+            >
+              Translated
+            </button>
+          </div>
+        </Show>
+        <Show when={props.translation.error()}>
+          {(message) => (
+            <div class="web-nostrPost__translationError" role="alert">
+              {message()}
+            </div>
+          )}
+        </Show>
+        <Show when={props.translation.visible() && props.translation.content()}>
+          {(translated) => (
+            <div class="web-nostrPost__translationContent">{translated()}</div>
+          )}
+        </Show>
+      </div>
+    </Show>
+  );
+}
+
+function referenceResolutionStatus(
+  reference: WebNostrPostReference,
+): ReferenceResolutionStatus {
+  return reference.resolutionStatus ?? 'resolved';
+}
+
+type EventContextRequest = Parameters<typeof resolveNostrEventContext>[0];
+type EventContextResponsePromise = ReturnType<typeof resolveNostrEventContext>;
+
+const pendingThreadContextRequests = new Map<
+  string,
+  EventContextResponsePromise
+>();
+
+function resolveThreadContextRequest(
+  input: EventContextRequest,
+): EventContextResponsePromise {
+  const existing = pendingThreadContextRequests.get(input.eventId);
+
+  if (existing) {
+    return existing;
+  }
+
+  const pending = resolveNostrEventContext(input).finally(() => {
+    if (pendingThreadContextRequests.get(input.eventId) === pending) {
+      pendingThreadContextRequests.delete(input.eventId);
+    }
+  });
+
+  pendingThreadContextRequests.set(input.eventId, pending);
+
+  return pending;
+}
+
+type ResolvedReferenceProps = {
+  reference: WebNostrPostReference;
+  event: Awaited<ReturnType<typeof resolveNostrEventContext>>['targetEvent'];
+  relayHints: string[];
+  profile: ResolvedAuthorProfile | null;
+};
+
+type ResolvedAuthorProfile = {
+  name: string | null;
+  displayName: string | null;
+  picture: string | null;
+  about: string | null;
+};
+
+function resolvedAuthorProfiles(
+  events: Awaited<ReturnType<typeof resolveNostrEventContext>>['profileEvents'],
+): Map<string, ResolvedAuthorProfile> {
+  return new Map(
+    events.flatMap((event) => {
+      try {
+        const content = JSON.parse(event.content) as Record<string, unknown>;
+
+        const stringValue = (value: unknown) =>
+          typeof value === 'string' && value.trim() ? value : null;
+
+        return [
+          [
+            event.pubkey,
+            {
+              name: stringValue(content.name),
+              displayName: stringValue(content.display_name),
+              picture: stringValue(content.picture),
+              about: stringValue(content.about),
+            },
+          ] as const,
+        ];
+      } catch {
+        return [];
+      }
+    }),
+  );
+}
+
+function resolvedReference({
+  reference,
+  event,
+  relayHints,
+  profile,
+}: ResolvedReferenceProps): WebNostrPostReference {
+  const resolvedRelayHints = [
+    ...new Set([...(reference.relayHints ?? []), ...relayHints]),
+  ];
+
+  const eventJson = JSON.stringify(event);
+
+  const rootTag = event.tags.find(
+    (tag) => tag[0] === 'e' && tag[3] === 'root' && tag[1],
+  );
+
+  const nrAlias =
+    reference.readAction?.type === 'command'
+      ? reference.readAction.command
+      : reference.archiveAction?.type === 'command'
+        ? reference.archiveAction.command
+        : 'nr';
+
+  const markActionWithEvent = (action: WebAction | null | undefined) =>
+    action?.type === 'command'
+      ? {
+          ...action,
+          options: { ...action.options, event_json: eventJson },
+        }
+      : action;
+
+  return {
+    ...reference,
+    type: 'event',
+    id: event.id,
+    pubkey: event.pubkey,
+    kind: event.kind,
+    createdAt: event.created_at,
+    content: event.content,
+    npub: nip19.npubEncode(event.pubkey),
+    authorName: profile?.displayName ?? undefined,
+    authorUsername: profile?.name ?? undefined,
+    authorPicture: profile?.picture ?? undefined,
+    authorAbout: profile?.about ?? undefined,
+    relayHints: resolvedRelayHints,
+    resolutionStatus: 'resolved',
+    readAction: markActionWithEvent(reference.readAction),
+    archiveAction: markActionWithEvent(reference.archiveAction),
+    likeAction: {
+      type: 'clientAction',
+      action: 'nostr.likeEvent',
+      payload: {
+        eventId: event.id,
+        eventPubkey: event.pubkey,
+        eventKind: event.kind,
+        nrAlias,
+        relayHints: resolvedRelayHints,
+      },
+    },
+    replyAction: {
+      type: 'clientAction',
+      action: 'nostr.openReplyPanel',
+      payload: {
+        eventId: event.id,
+        eventPubkey: event.pubkey,
+        eventKind: event.kind,
+        nrAlias,
+        eventCreatedAt: event.created_at,
+        eventContent: event.content,
+        eventAuthorName: profile?.displayName ?? null,
+        eventAuthorUsername: profile?.name ?? null,
+        eventAuthorPicture: profile?.picture ?? null,
+        eventRawJson: eventJson,
+        rootEventId: rootTag?.[1] ?? null,
+        rootPubkey: rootTag?.[4] ?? null,
+        relayHints: resolvedRelayHints,
+      },
+    },
+    repostAction: {
+      type: 'clientAction',
+      action: 'nostr.openRepostPanel',
+      payload: {
+        eventId: event.id,
+        eventPubkey: event.pubkey,
+        eventKind: event.kind,
+        nrAlias,
+        eventCreatedAt: event.created_at,
+        eventContent: event.content,
+        eventAuthorName: profile?.displayName ?? null,
+        eventAuthorUsername: profile?.name ?? null,
+        eventAuthorPicture: profile?.picture ?? null,
+        eventRawJson: eventJson,
+        relayHints: resolvedRelayHints,
+      },
+    },
+    showActions: true,
+  };
+}
 
 type LinkPreviewResponse = {
   ok: true;
@@ -292,6 +653,12 @@ function isVideoUrl(value: string): boolean {
   return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
 }
 
+function isAudioUrl(value: string): boolean {
+  const path = urlPath(value);
+
+  return AUDIO_EXTENSIONS.some((extension) => path.endsWith(extension));
+}
+
 function attachmentsFromContent(content: string): ContentAttachment[] {
   const seen = new Set<string>();
   const attachments: ContentAttachment[] = [];
@@ -309,6 +676,8 @@ function attachmentsFromContent(content: string): ContentAttachment[] {
       attachments.push({ type: 'image', url });
     } else if (isVideoUrl(url)) {
       attachments.push({ type: 'video', url });
+    } else if (isAudioUrl(url)) {
+      attachments.push({ type: 'audio', url });
     } else {
       attachments.push({ type: 'link', url });
     }
@@ -480,8 +849,13 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
 
 function AttachmentBlock(props: {
   attachments: ContentAttachment[];
-  onOpenImage: (url: string) => void;
+  onOpenImage: OpenImagePreview;
 }): JSX.Element {
+  const imageUrls = () =>
+    props.attachments
+      .filter((attachment) => attachment.type === 'image')
+      .map((attachment) => attachment.url);
+
   return (
     <Show when={props.attachments.length > 0}>
       <div class="web-nostrPost__attachments">
@@ -492,7 +866,19 @@ function AttachmentBlock(props: {
               fallback={
                 <Show
                   when={attachment.type === 'video'}
-                  fallback={<LinkPreviewCard url={attachment.url} />}
+                  fallback={
+                    <Show
+                      when={attachment.type === 'audio'}
+                      fallback={<LinkPreviewCard url={attachment.url} />}
+                    >
+                      <audio
+                        class="web-nostrPost__audio"
+                        src={attachment.url}
+                        controls
+                        preload="metadata"
+                      />
+                    </Show>
+                  }
                 >
                   <video
                     class="web-nostrPost__video"
@@ -503,7 +889,10 @@ function AttachmentBlock(props: {
                 </Show>
               }
             >
-              <ImagePreview url={attachment.url} onOpen={props.onOpenImage} />
+              <ImagePreview
+                url={attachment.url}
+                onOpen={(url) => props.onOpenImage(url, imageUrls())}
+              />
             </Show>
           )}
         </For>
@@ -542,7 +931,7 @@ function ImagePreview(props: {
 
 function AttachmentPreview(props: {
   attachments: ContentAttachment[];
-  onOpenImage: (url: string) => void;
+  onOpenImage: OpenImagePreview;
   showPreview?: boolean;
   onShowPreviewChange?: (show: boolean) => void;
 }): JSX.Element {
@@ -584,8 +973,29 @@ function AttachmentPreview(props: {
 
 function ImageLightbox(props: {
   url: string | null;
+  urls: string[];
+  onSelect: (url: string) => void;
   onClose: () => void;
 }): JSX.Element {
+  const currentIndex = createMemo(() => {
+    const url = props.url;
+
+    return url === null ? -1 : props.urls.indexOf(url);
+  });
+
+  const hasPrevious = () => currentIndex() > 0;
+
+  const hasNext = () =>
+    currentIndex() >= 0 && currentIndex() < props.urls.length - 1;
+
+  const selectOffset = (offset: -1 | 1) => {
+    const nextUrl = props.urls[currentIndex() + offset];
+
+    if (nextUrl) {
+      props.onSelect(nextUrl);
+    }
+  };
+
   return (
     <Show when={props.url}>
       {(url) => (
@@ -604,6 +1014,18 @@ function ImageLightbox(props: {
           >
             ✕
           </button>
+          <button
+            type="button"
+            class="web-nostrPost__lightboxNav web-nostrPost__lightboxNav--previous"
+            aria-label="Previous image"
+            disabled={!hasPrevious()}
+            onClick={(event) => {
+              event.stopPropagation();
+              selectOffset(-1);
+            }}
+          >
+            {'<'}
+          </button>
           <a
             class="web-nostrPost__lightboxImageLink"
             href={url()}
@@ -614,6 +1036,18 @@ function ImageLightbox(props: {
           >
             <img src={url()} alt="" />
           </a>
+          <button
+            type="button"
+            class="web-nostrPost__lightboxNav web-nostrPost__lightboxNav--next"
+            aria-label="Next image"
+            disabled={!hasNext()}
+            onClick={(event) => {
+              event.stopPropagation();
+              selectOffset(1);
+            }}
+          >
+            {'>'}
+          </button>
         </div>
       )}
     </Show>
@@ -640,14 +1074,18 @@ function ActionRow(props: {
               <button
                 type="button"
                 class="web-nostrPost__action"
-                classList={{ 'is-success': item.success }}
-                aria-label={item.ariaLabel}
+                classList={{
+                  'is-success': item.success,
+                  'web-nostrPost__action--icon': item.icon !== undefined,
+                }}
+                aria-label={item.ariaLabel ?? item.label}
+                title={item.ariaLabel ?? item.label}
                 disabled={item.disabled || props.disabled === true}
                 onClick={() =>
                   props.runAction(item.action ?? undefined, props.entityKey)
                 }
               >
-                {item.label}
+                {item.icon === 'translate' ? <TranslateIcon /> : item.label}
               </button>
             </>
           )}
@@ -726,6 +1164,7 @@ function referenceActionItems(
     items.push({
       label: trailingAction.label,
       ariaLabel: trailingAction.ariaLabel,
+      icon: trailingAction.icon,
       action: trailingAction.action,
       disabled: trailingAction.disabled === true,
       success: trailingAction.active === true,
@@ -738,8 +1177,9 @@ function referenceActionItems(
 
 function ReferenceCard(props: {
   reference: WebNostrPostReference;
-  runAction: (action: WebAction | undefined, entityKey?: string | null) => void;
-  onOpenImage: (url: string) => void;
+  runAction: RunPostAction;
+  onOpenImage: OpenImagePreview;
+  onRetryResolution?: () => void;
   currentUserPubkey: string | null;
 }): JSX.Element {
   const name = () => referenceDisplayName(props.reference);
@@ -764,124 +1204,217 @@ function ReferenceCard(props: {
       ? getEntityPending(props.reference.entityKey).pending
       : false;
 
+  const translation = createPostTranslation({
+    runAction: props.runAction,
+    entityKey: () => props.reference.entityKey ?? null,
+  });
+
+  const actionItems = createMemo(() =>
+    referenceActionItems(props.reference, props.currentUserPubkey),
+  );
+
+  const headerActionItems = createMemo(() =>
+    actionItems().filter((item) => item.icon !== undefined),
+  );
+
+  const footerActionItems = createMemo(() =>
+    actionItems()
+      .filter((item) => item.icon === undefined)
+      .map((item, index) =>
+        index === 0 ? { ...item, separatorBefore: undefined } : item,
+      ),
+  );
+
   const openProfile = () =>
     props.runAction(profileActionForReference(props.reference));
 
+  const resolutionStatus = () => referenceResolutionStatus(props.reference);
+
+  const resolutionLabel = () => {
+    const status = resolutionStatus();
+
+    if (status === 'missing') {
+      return 'Referenced post not found.';
+    }
+
+    if (status === 'error') {
+      return 'Could not load referenced post.';
+    }
+
+    return 'Waiting to load referenced post...';
+  };
+
+  const canRetryResolution = () =>
+    (resolutionStatus() === 'missing' || resolutionStatus() === 'error') &&
+    props.onRetryResolution !== undefined;
+
   return (
     <Show
-      when={props.reference.href}
+      when={resolutionStatus() === 'resolved'}
       fallback={
-        <article class="web-nostrPost web-nostrPost--nested">
-          <button
-            type="button"
-            class="web-nostrPost__avatar web-nostrPost__profileButton"
-            aria-label={`Open ${name()} profile`}
-            onClick={openProfile}
-            disabled={!props.reference.pubkey}
-          >
-            <Show
-              when={props.reference.authorPicture}
-              fallback={initials(name())}
+        <div
+          class="web-nostrPost__referenceStatus"
+          role="status"
+          aria-live="polite"
+        >
+          <span>{resolutionLabel()}</span>
+          <Show when={canRetryResolution()}>
+            <button
+              type="button"
+              class="web-nostrPost__action"
+              onClick={() => props.onRetryResolution?.()}
             >
-              {(src) => <img src={src()} alt="" />}
-            </Show>
-          </button>
-          <div class="web-nostrPost__main">
-            <div class="web-nostrPost__header">
-              <div class="web-nostrPost__author">
-                <button
-                  type="button"
-                  class="web-nostrPost__name web-nostrPost__authorButton"
-                  onClick={openProfile}
-                  disabled={!props.reference.pubkey}
-                >
-                  {name()}
-                </button>
-              </div>
-              <Show when={relativeTime(props.reference.createdAt, Date.now())}>
-                {(time) => <time class="web-nostrPost__time">{time()}</time>}
-              </Show>
-            </div>
-            <Show when={props.reference.content} fallback="(empty note)">
-              {(content) => (
-                <div class="web-nostrPost__embedContent">
-                  <InlineContent
-                    content={content()}
-                    inlineProfiles={props.reference.inlineProfiles ?? {}}
-                    embeds={embeddedReferenceMap()}
-                    runAction={props.runAction}
-                  />
-                </div>
-              )}
-            </Show>
-            <AttachmentPreview
-              attachments={attachments()}
-              onOpenImage={props.onOpenImage}
-            />
-            <Show when={embeddedReferences().length > 0}>
-              <div class="web-nostrPost__embeds">
-                <For each={embeddedReferences()}>
-                  {(reference) => (
-                    <ReferenceCard
-                      reference={reference}
-                      runAction={props.runAction}
-                      onOpenImage={props.onOpenImage}
-                      currentUserPubkey={props.currentUserPubkey}
-                    />
-                  )}
-                </For>
-              </div>
-            </Show>
-            <Show when={showActions()}>
-              <ActionRow
-                items={referenceActionItems(
-                  props.reference,
-                  props.currentUserPubkey,
-                )}
-                runAction={props.runAction}
-                disabled={referencePending()}
-                entityKey={props.reference.entityKey}
-              />
-            </Show>
-          </div>
-        </article>
+              Retry
+            </button>
+          </Show>
+        </div>
       }
     >
-      {(href) => (
-        <a
-          class="web-nostrPost__embed web-nostrPost__embed--link"
-          href={href()}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <div class="web-nostrPost__embedTitle">
-            {referenceTitle(props.reference)}
-          </div>
-          <Show when={referenceSubtitle(props.reference)}>
-            {(subtitle) => (
-              <div class="web-nostrPost__embedMeta">{subtitle()}</div>
-            )}
-          </Show>
-          <Show when={props.reference.content}>
-            {(content) => (
-              <>
-                <div class="web-nostrPost__embedContent">
-                  <InlineContent
-                    content={content()}
-                    inlineProfiles={props.reference.inlineProfiles ?? {}}
-                    embeds={embeddedReferenceMap()}
-                    runAction={props.runAction}
-                  />
+      <Show
+        when={props.reference.href}
+        fallback={
+          <article class="web-nostrPost web-nostrPost--nested">
+            <Show when={referencePending() || translation.pending()}>
+              <div class="web-nostrPost__pending" aria-hidden="true">
+                <span>
+                  {translation.pending() ? 'Translating...' : 'Updating...'}
+                </span>
+              </div>
+            </Show>
+            <button
+              type="button"
+              class="web-nostrPost__avatar web-nostrPost__profileButton"
+              aria-label={`Open ${name()} profile`}
+              onClick={openProfile}
+              disabled={!props.reference.pubkey}
+            >
+              <Show
+                when={props.reference.authorPicture}
+                fallback={initials(name())}
+              >
+                {(src) => <img src={src()} alt="" />}
+              </Show>
+            </button>
+            <div class="web-nostrPost__main">
+              <div class="web-nostrPost__header">
+                <div class="web-nostrPost__author">
+                  <button
+                    type="button"
+                    class="web-nostrPost__name web-nostrPost__authorButton"
+                    onClick={openProfile}
+                    disabled={!props.reference.pubkey}
+                  >
+                    {name()}
+                  </button>
                 </div>
-                <AttachmentPreview
-                  attachments={attachmentsFromContent(content())}
-                  onOpenImage={props.onOpenImage}
+                <div class="web-nostrPost__headerMeta">
+                  <For each={headerActionItems()}>
+                    {(item) => (
+                      <button
+                        type="button"
+                        class="web-nostrPost__headerAction"
+                        aria-label={item.ariaLabel ?? item.label}
+                        title={item.ariaLabel ?? item.label}
+                        disabled={
+                          item.disabled ||
+                          referencePending() ||
+                          translation.pending()
+                        }
+                        onClick={() => translation.run(item.action)}
+                      >
+                        <TranslateIcon />
+                      </button>
+                    )}
+                  </For>
+                  <Show
+                    when={relativeTime(props.reference.createdAt, Date.now())}
+                  >
+                    {(time) => (
+                      <time class="web-nostrPost__time">{time()}</time>
+                    )}
+                  </Show>
+                </div>
+              </div>
+              <Show when={props.reference.content} fallback="(empty note)">
+                {(content) => (
+                  <div class="web-nostrPost__embedContent">
+                    <InlineContent
+                      content={content()}
+                      inlineProfiles={props.reference.inlineProfiles ?? {}}
+                      embeds={embeddedReferenceMap()}
+                      runAction={props.runAction}
+                    />
+                  </div>
+                )}
+              </Show>
+              <PostTranslationPanel translation={translation} />
+              <AttachmentPreview
+                attachments={attachments()}
+                onOpenImage={props.onOpenImage}
+              />
+              <Show when={embeddedReferences().length > 0}>
+                <div class="web-nostrPost__embeds">
+                  <For each={embeddedReferences()}>
+                    {(reference) => (
+                      <ReferenceCard
+                        reference={reference}
+                        runAction={props.runAction}
+                        onOpenImage={props.onOpenImage}
+                        onRetryResolution={props.onRetryResolution}
+                        currentUserPubkey={props.currentUserPubkey}
+                      />
+                    )}
+                  </For>
+                </div>
+              </Show>
+              <Show when={showActions() && footerActionItems().length > 0}>
+                <ActionRow
+                  items={footerActionItems()}
+                  runAction={props.runAction}
+                  disabled={referencePending()}
+                  entityKey={props.reference.entityKey}
                 />
-              </>
-            )}
-          </Show>
-        </a>
-      )}
+              </Show>
+            </div>
+          </article>
+        }
+      >
+        {(href) => (
+          <a
+            class="web-nostrPost__embed web-nostrPost__embed--link"
+            href={href()}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div class="web-nostrPost__embedTitle">
+              {referenceTitle(props.reference)}
+            </div>
+            <Show when={referenceSubtitle(props.reference)}>
+              {(subtitle) => (
+                <div class="web-nostrPost__embedMeta">{subtitle()}</div>
+              )}
+            </Show>
+            <Show when={props.reference.content}>
+              {(content) => (
+                <>
+                  <div class="web-nostrPost__embedContent">
+                    <InlineContent
+                      content={content()}
+                      inlineProfiles={props.reference.inlineProfiles ?? {}}
+                      embeds={embeddedReferenceMap()}
+                      runAction={props.runAction}
+                    />
+                  </div>
+                  <AttachmentPreview
+                    attachments={attachmentsFromContent(content())}
+                    onOpenImage={props.onOpenImage}
+                  />
+                </>
+              )}
+            </Show>
+          </a>
+        )}
+      </Show>
     </Show>
   );
 }
@@ -891,8 +1424,14 @@ export function WebNostrPostElement(
 ): JSX.Element {
   const [nowMs, setNowMs] = createSignal(Date.now());
 
+  const initialReplyContext = props.element.props?.nostrReplyContext ?? [];
+
   const [showThreadContext, setShowThreadContext] = createSignal(
-    props.element.props?.nostrShowReplyContext === true,
+    props.element.props?.nostrShowReplyContext === true &&
+      initialReplyContext.length > 0 &&
+      initialReplyContext.every(
+        (reference) => referenceResolutionStatus(reference) === 'resolved',
+      ),
   );
 
   const [expanded, setExpanded] = createSignal(
@@ -905,14 +1444,37 @@ export function WebNostrPostElement(
     null,
   );
 
+  const [lightboxImageUrls, setLightboxImageUrls] = createSignal<string[]>([]);
+
+  const [replyContextOverrides, setReplyContextOverrides] = createSignal<
+    Record<string, WebNostrPostReference>
+  >({});
+
+  let contextResolution: Promise<void> | null = null;
+
+  const openLightboxImage: OpenImagePreview = (url, urls) => {
+    setLightboxImageUrl(url);
+    setLightboxImageUrls(urls);
+  };
+
   const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
 
   onCleanup(() => window.clearInterval(interval));
 
   onMount(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && lightboxImageUrl() !== null) {
+      if (lightboxImageUrl() === null) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
         setLightboxImageUrl(null);
+      } else if (event.key === 'ArrowLeft' || event.key === '<') {
+        event.preventDefault();
+        selectLightboxOffset(-1);
+      } else if (event.key === 'ArrowRight' || event.key === '>') {
+        event.preventDefault();
+        selectLightboxOffset(1);
       }
     };
 
@@ -921,6 +1483,12 @@ export function WebNostrPostElement(
   });
 
   const elementProps = () => props.element.props;
+
+  const translation = createPostTranslation({
+    runAction: props.runAction,
+    entityKey: () => elementProps()?.entityKey ?? null,
+  });
+
   const currentUserPubkey = useWebCurrentUserPubkey();
   const entityPending = useWebEntityPending();
   const name = () => displayName(elementProps());
@@ -940,12 +1508,177 @@ export function WebNostrPostElement(
       : content();
 
   const contentReferences = () => uniqueContentReferences(content(), embeds());
-  const replyContext = () => elementProps()?.nostrReplyContext ?? [];
+  const suppliedReplyContext = () => elementProps()?.nostrReplyContext ?? [];
+
+  const replyContext = () =>
+    suppliedReplyContext().map((reference) => {
+      if (referenceResolutionStatus(reference) === 'resolved') {
+        return reference;
+      }
+
+      return reference.id
+        ? (replyContextOverrides()[reference.id] ?? reference)
+        : reference;
+    });
+
+  const setPendingReferenceStatus = (
+    status: Extract<ReferenceResolutionStatus, 'loading' | 'error'>,
+  ) => {
+    const updates = Object.fromEntries(
+      replyContext().flatMap((reference) =>
+        reference.id && referenceResolutionStatus(reference) !== 'resolved'
+          ? [
+              [
+                reference.id,
+                {
+                  ...reference,
+                  resolutionStatus: status,
+                } satisfies WebNostrPostReference,
+              ],
+            ]
+          : [],
+      ),
+    );
+
+    setReplyContextOverrides((current) => ({ ...current, ...updates }));
+  };
+
+  const resolveThreadContext = (): Promise<void> => {
+    if (contextResolution) {
+      return contextResolution;
+    }
+
+    const unresolved = replyContext().filter(
+      (reference) => referenceResolutionStatus(reference) !== 'resolved',
+    );
+
+    if (unresolved.length === 0) {
+      return Promise.resolve();
+    }
+
+    const eventId = elementProps()?.nostrEventId;
+    const authorPubkey = elementProps()?.nostrPubkey;
+
+    if (!eventId || !authorPubkey) {
+      setPendingReferenceStatus('error');
+
+      return Promise.resolve();
+    }
+
+    setPendingReferenceStatus('loading');
+
+    contextResolution = resolveThreadContextRequest({
+      eventId,
+      authorPubkey,
+      address: null,
+      targetEvent: null,
+      relayHints: elementProps()?.nostrRelayHints ?? [],
+      fallbackRelays: [],
+      includeDirectReplies: false,
+      replyLimit: 1,
+      threadContextOnly: true,
+    })
+      .then((response) => {
+        const eventsById = new Map(
+          response.graph.events.map((event) => [event.id, event]),
+        );
+
+        const edgeRelayHints = new Map(
+          response.graph.edges.flatMap((edge) =>
+            edge.target.type === 'event'
+              ? [[edge.target.eventId, edge.relayHints] as const]
+              : [],
+          ),
+        );
+
+        const missingById = new Map(
+          response.graph.missing.flatMap((missing) =>
+            missing.edge.target.type === 'event'
+              ? [[missing.edge.target.eventId, missing.reason] as const]
+              : [],
+          ),
+        );
+
+        const profilesByPubkey = resolvedAuthorProfiles(response.profileEvents);
+
+        const updates = Object.fromEntries(
+          unresolved.flatMap((reference) => {
+            if (!reference.id) {
+              return [];
+            }
+
+            const event = eventsById.get(reference.id);
+
+            if (event) {
+              return [
+                [
+                  reference.id,
+                  resolvedReference({
+                    reference,
+                    event,
+                    relayHints: edgeRelayHints.get(reference.id) ?? [],
+                    profile: profilesByPubkey.get(event.pubkey) ?? null,
+                  }),
+                ],
+              ];
+            }
+
+            return [
+              [
+                reference.id,
+                {
+                  ...reference,
+                  resolutionStatus:
+                    missingById.get(reference.id) === 'missing'
+                      ? 'missing'
+                      : 'error',
+                } satisfies WebNostrPostReference,
+              ],
+            ];
+          }),
+        );
+
+        setReplyContextOverrides((current) => ({ ...current, ...updates }));
+      })
+      .catch(() => {
+        setPendingReferenceStatus('error');
+      })
+      .finally(() => {
+        contextResolution = null;
+      });
+
+    return contextResolution;
+  };
+
+  const toggleThreadContext = () => {
+    const next = !showThreadContext();
+
+    setShowThreadContext(next);
+
+    if (next) {
+      void resolveThreadContext();
+    }
+  };
 
   const attachments = () => [
     ...(elementProps()?.nostrMedia ?? []),
     ...attachmentsFromContent(content()),
   ];
+
+  const selectLightboxOffset = (offset: -1 | 1) => {
+    const currentUrl = lightboxImageUrl();
+
+    if (currentUrl === null) {
+      return;
+    }
+
+    const currentIndex = lightboxImageUrls().indexOf(currentUrl);
+    const nextUrl = lightboxImageUrls()[currentIndex + offset];
+
+    if (nextUrl) {
+      setLightboxImageUrl(nextUrl);
+    }
+  };
 
   const canPreviewImages = () => elementProps()?.nostrPreviewImages !== false;
   const showActions = () => elementProps()?.nostrShowActions !== false;
@@ -1008,6 +1741,7 @@ export function WebNostrPostElement(
       items.push({
         label: extraAction.label,
         ariaLabel: extraAction.ariaLabel,
+        icon: extraAction.icon,
         action: extraAction.action,
         disabled: extraAction.disabled === true,
         success: extraAction.active === true,
@@ -1057,6 +1791,7 @@ export function WebNostrPostElement(
       items.push({
         label: trailingAction.label,
         ariaLabel: trailingAction.ariaLabel,
+        icon: trailingAction.icon,
         action: trailingAction.action,
         disabled: trailingAction.disabled === true,
         success: trailingAction.active === true,
@@ -1067,16 +1802,44 @@ export function WebNostrPostElement(
     return items;
   });
 
+  const headerActionItems = createMemo(() =>
+    actionItems().filter((item) => item.icon !== undefined),
+  );
+
+  const footerActionItems = createMemo(() =>
+    actionItems()
+      .filter((item) => item.icon === undefined)
+      .map((item, index) =>
+        index === 0 ? { ...item, separatorBefore: undefined } : item,
+      ),
+  );
+
+  const runHeaderAction = (item: PostActionItem): void => {
+    if (item.icon !== 'translate' || item.action?.type !== 'capability') {
+      props.runAction(item.action ?? undefined);
+
+      return;
+    }
+
+    translation.run(item.action);
+  };
+
   return (
     <article
       class={elementClass(props.element)}
       data-ui={elementUi(props.element)}
       style={elementStyle(props.element)}
-      aria-busy={entityPending().pending ? 'true' : undefined}
+      aria-busy={
+        entityPending().pending || translation.pending() ? 'true' : undefined
+      }
     >
-      <Show when={entityPending().pending}>
+      <Show when={entityPending().pending || translation.pending()}>
         <div class="web-nostrPost__pending" aria-hidden="true">
-          <span>{entityPending().label ?? 'Updating...'}</span>
+          <span>
+            {translation.pending()
+              ? 'Translating...'
+              : (entityPending().label ?? 'Updating...')}
+          </span>
         </div>
       </Show>
       <For each={activityHeaders()}>
@@ -1126,9 +1889,29 @@ export function WebNostrPostElement(
               {name()}
             </button>
           </div>
-          <Show when={relativeTime(elementProps()?.nostrCreatedAt, nowMs())}>
-            {(time) => <time class="web-nostrPost__time">{time()}</time>}
-          </Show>
+          <div class="web-nostrPost__headerMeta">
+            <For each={headerActionItems()}>
+              {(item) => (
+                <button
+                  type="button"
+                  class="web-nostrPost__headerAction"
+                  aria-label={item.ariaLabel ?? item.label}
+                  title={item.ariaLabel ?? item.label}
+                  disabled={
+                    item.disabled ||
+                    entityPending().pending ||
+                    translation.pending()
+                  }
+                  onClick={() => runHeaderAction(item)}
+                >
+                  <TranslateIcon />
+                </button>
+              )}
+            </For>
+            <Show when={relativeTime(elementProps()?.nostrCreatedAt, nowMs())}>
+              {(time) => <time class="web-nostrPost__time">{time()}</time>}
+            </Show>
+          </div>
         </div>
       </div>
 
@@ -1138,7 +1921,7 @@ export function WebNostrPostElement(
             <button
               type="button"
               class="web-nostrPost__action web-nostrPost__contextToggle"
-              onClick={() => setShowThreadContext((current) => !current)}
+              onClick={toggleThreadContext}
             >
               {showThreadContext()
                 ? 'Hide thread context'
@@ -1151,7 +1934,8 @@ export function WebNostrPostElement(
                     <ReferenceCard
                       reference={reference}
                       runAction={props.runAction}
-                      onOpenImage={setLightboxImageUrl}
+                      onOpenImage={openLightboxImage}
+                      onRetryResolution={() => void resolveThreadContext()}
                       currentUserPubkey={currentUserPubkey()}
                     />
                   )}
@@ -1188,10 +1972,12 @@ export function WebNostrPostElement(
           </Show>
         </div>
 
+        <PostTranslationPanel translation={translation} />
+
         <Show when={canPreviewImages()}>
           <AttachmentPreview
             attachments={attachments()}
-            onOpenImage={setLightboxImageUrl}
+            onOpenImage={openLightboxImage}
             showPreview={showMediaPreview()}
             onShowPreviewChange={setShowMediaPreview}
           />
@@ -1204,7 +1990,7 @@ export function WebNostrPostElement(
                 <ReferenceCard
                   reference={embeds()[token]!}
                   runAction={props.runAction}
-                  onOpenImage={setLightboxImageUrl}
+                  onOpenImage={openLightboxImage}
                   currentUserPubkey={currentUserPubkey()}
                 />
               )}
@@ -1212,9 +1998,9 @@ export function WebNostrPostElement(
           </div>
         </Show>
 
-        <Show when={showActions() && actionItems().length > 0}>
+        <Show when={showActions() && footerActionItems().length > 0}>
           <ActionRow
-            items={actionItems()}
+            items={footerActionItems()}
             runAction={props.runAction}
             disabled={entityPending().pending}
           />
@@ -1222,6 +2008,8 @@ export function WebNostrPostElement(
       </div>
       <ImageLightbox
         url={lightboxImageUrl()}
+        urls={lightboxImageUrls()}
+        onSelect={setLightboxImageUrl}
         onClose={() => setLightboxImageUrl(null)}
       />
     </article>

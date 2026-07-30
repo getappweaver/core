@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js';
 
 export type BackgroundCommandStatus = {
   state: 'idle' | 'pending' | 'success' | 'error';
+  activeTargetId: string | null;
   message: string | null;
   output: string | null;
   progress: number | null;
@@ -31,12 +32,14 @@ export function backgroundCommandStatus(
 export function setBackgroundCommandStatus({
   id,
   state,
+  activeTargetId,
   message,
   output,
   progress,
 }: {
   id: string;
   state: BackgroundCommandStatus['state'];
+  activeTargetId?: string | null;
   message: string | null;
   output: string | null;
   progress: number | null;
@@ -45,6 +48,10 @@ export function setBackgroundCommandStatus({
     ...current,
     [id]: {
       state,
+      activeTargetId:
+        activeTargetId === undefined
+          ? (current[id]?.activeTargetId ?? null)
+          : activeTargetId,
       message,
       output,
       progress,

@@ -9,9 +9,12 @@ import type {
   WebAction,
   WebNode,
   WebNodeRoot,
+  WebOptimisticCommandPayload,
+  WebOptimisticMutation,
 } from '@src/web/ui-schema';
 
 import { getEditableTextSnapshot } from '../editableTextRegistry';
+import { afterNextPaint, createBrowserTrace } from '../monitoring';
 import type { NostrInteractionRecordResult } from '../nostr/interactionState';
 import { handleNostrLikeEventAction } from '../nostr/likeEventAction';
 import {
@@ -158,6 +161,127 @@ function timelineEventOutputToItem(
 
 function assertUnreachable(value: never): never {
   throw new Error(`Unreachable: ${String(value)}`);
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringRecordValue(value: unknown): Record<string, unknown> {
+  return recordValue(value) ?? {};
+}
+
+function parseOptimisticMutation(value: unknown): WebOptimisticMutation | null {
+  const record = recordValue(value);
+
+  if (!record || typeof record.type !== 'string') {
+    return null;
+  }
+
+  if (record.type === 'removeEntity' && typeof record.entityKey === 'string') {
+    return {
+      type: 'removeEntity',
+      entityKey: record.entityKey,
+      pruneEmptyParents:
+        typeof record.pruneEmptyParents === 'boolean'
+          ? record.pruneEmptyParents
+          : true,
+      updateCounts:
+        typeof record.updateCounts === 'boolean' ? record.updateCounts : true,
+    };
+  }
+
+  if (
+    record.type === 'patchEntityProps' &&
+    typeof record.entityKey === 'string'
+  ) {
+    return {
+      type: 'patchEntityProps',
+      entityKey: record.entityKey,
+      props: stringRecordValue(record.props),
+    };
+  }
+
+  if (
+    record.type === 'patchEntityActions' &&
+    typeof record.entityKey === 'string' &&
+    Array.isArray(record.actions)
+  ) {
+    return {
+      type: 'patchEntityActions',
+      entityKey: record.entityKey,
+      actions: record.actions.flatMap((entry) => {
+        const actionRecord = recordValue(entry);
+
+        if (!actionRecord || typeof actionRecord.key !== 'string') {
+          return [];
+        }
+
+        return [
+          {
+            key: actionRecord.key,
+            ...(typeof actionRecord.label === 'string'
+              ? { label: actionRecord.label }
+              : {}),
+            ...(typeof actionRecord.ariaLabel === 'string'
+              ? { ariaLabel: actionRecord.ariaLabel }
+              : {}),
+            ...(typeof actionRecord.active === 'boolean'
+              ? { active: actionRecord.active }
+              : {}),
+            ...(typeof actionRecord.disabled === 'boolean'
+              ? { disabled: actionRecord.disabled }
+              : {}),
+          },
+        ];
+      }),
+    };
+  }
+
+  return null;
+}
+
+function parseOptimisticCommandPayload(
+  value: unknown,
+): WebOptimisticCommandPayload | null {
+  const record = recordValue(value);
+  const command = recordValue(record?.command);
+
+  const mutations = Array.isArray(record?.mutations)
+    ? record.mutations.flatMap((entry) => {
+        const mutation = parseOptimisticMutation(entry);
+
+        return mutation ? [mutation] : [];
+      })
+    : [];
+
+  if (
+    !command ||
+    mutations.length === 0 ||
+    typeof command.command !== 'string' ||
+    typeof command.subcommand !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    mutations,
+    command: {
+      command: command.command,
+      subcommand: command.subcommand,
+      arguments: stringRecordValue(command.arguments),
+      options: stringRecordValue(command.options),
+      ...(recordValue(command.monitoring)
+        ? {
+            monitoring:
+              command.monitoring as WebOptimisticCommandPayload['command']['monitoring'],
+          }
+        : {}),
+    },
+    onError: 'log',
+  };
 }
 
 function appendClassName(
@@ -381,18 +505,19 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
   }
 
   function settleRefreshGeneration(sourceId: string, generation: number): void {
-    if (refreshGenerationBySource.get(sourceId) !== generation) {
-      return;
-    }
-
     const releases = pendingReleasesBySource.get(sourceId);
 
     if (!releases) {
       return;
     }
 
+    const isLatest = refreshGenerationBySource.get(sourceId) === generation;
+
     for (const [releaseGeneration, generationReleases] of releases) {
-      if (releaseGeneration > generation) {
+      if (
+        releaseGeneration !== generation &&
+        (!isLatest || releaseGeneration > generation)
+      ) {
         continue;
       }
 
@@ -623,7 +748,62 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           });
       };
 
-      if (clientActionName === 'web.openUrl') {
+      if (clientActionName === 'web.optimisticCommand') {
+        const optimisticPayload = parseOptimisticCommandPayload(action.payload);
+
+        if (!optimisticPayload) {
+          adapters.appendSystemMessage('Invalid optimistic command payload.');
+
+          return;
+        }
+
+        params?.applyOptimisticMutations?.(optimisticPayload.mutations);
+
+        if (params?.webCommandSourceId) {
+          adapters.endWebUiBusy(params.webCommandSourceId);
+
+          if (params.webCommandSourceEntityKey) {
+            adapters.endWebEntityPending(
+              params.webCommandSourceId,
+              params.webCommandSourceEntityKey,
+            );
+          }
+        }
+
+        const requestId = adapters.createId();
+        const command = optimisticPayload.command;
+
+        adapters.pendingRequests.set(requestId, {
+          recordInTimeline: false,
+          onCommandResult: () => {},
+          onError: (message) => {
+            adapters.appendSystemMessage(
+              `Optimistic command failed: ${message.message}`,
+            );
+          },
+        });
+
+        try {
+          adapters.sendSocketMessage({
+            type: 'run_command',
+            requestId,
+            timelineId: adapters.timelineId(),
+            command: command.command,
+            subcommand: command.subcommand,
+            payload: {
+              arguments: command.arguments ?? {},
+              options: command.options ?? {},
+            },
+            recordInTimeline: false,
+          });
+        } catch (err) {
+          adapters.pendingRequests.delete(requestId);
+
+          adapters.appendSystemMessage(
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      } else if (clientActionName === 'web.openUrl') {
         const url =
           typeof action.payload.url === 'string' ? action.payload.url : '';
 
@@ -641,6 +821,23 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         if (text.length > 0) {
           void navigator.clipboard.writeText(text).catch(() => {
             adapters.appendSystemMessage('Unable to copy text to clipboard.');
+          });
+        }
+      } else if (clientActionName === 'plugins.openCatalog') {
+        const filter =
+          typeof action.payload.filter === 'string'
+            ? action.payload.filter
+            : '';
+
+        if (filter.length > 0) {
+          runWebAction({
+            type: 'command',
+            command: 'plugins',
+            subcommand: 'install',
+            arguments: { target: filter },
+            options: {},
+            recordInTimeline: false,
+            surface: 'timeline',
           });
         }
       } else if (clientActionName === 'roadmap.openFund') {
@@ -1104,6 +1301,152 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       return;
     }
 
+    if (action.type === 'capability') {
+      if (!adapters.wsConnected()) {
+        const message = 'WebSocket is not connected.';
+
+        params?.onCapabilityError?.(message);
+        params?.onCapabilitySettled?.();
+        adapters.appendSystemMessage(message);
+
+        return;
+      }
+
+      const requestId = adapters.createId();
+
+      const sourceId = params?.onCapabilityResult
+        ? undefined
+        : params?.webCommandSourceId;
+
+      let receivedOutput = false;
+      let settled = false;
+
+      if (action.surface === 'modal' && !params?.onCapabilityResult) {
+        adapters.setChromeModal({
+          command: action.consumerAlias,
+          subcommand: action.operation,
+          title: action.modalTitle ?? 'Capability Output',
+        });
+
+        adapters.setChromeLoading(true);
+        adapters.setChromeError(null);
+        adapters.setChromeText(null);
+        adapters.setChromeWeb(null);
+      }
+
+      if (sourceId) {
+        adapters.beginWebUiBusy(sourceId);
+      }
+
+      const settle = (): void => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        params?.onCapabilitySettled?.();
+
+        if (sourceId) {
+          adapters.endWebUiBusy(sourceId);
+        }
+
+        if (action.surface === 'modal' && !params?.onCapabilityResult) {
+          adapters.setChromeLoading(false);
+
+          if (!receivedOutput) {
+            adapters.setChromeText('Completed.');
+          }
+        }
+      };
+
+      adapters.pendingRequests.set(requestId, {
+        recordInTimeline: action.surface === 'timeline',
+        onCommandResult: (message) => {
+          const output = splitCommandOutput(message.output);
+
+          if (!output.web) {
+            return;
+          }
+
+          receivedOutput = true;
+
+          if (params?.onCapabilityResult?.(output.web)) {
+            return;
+          }
+
+          if (action.surface === 'modal') {
+            adapters.setChromeModal({
+              command: action.consumerAlias,
+              subcommand: action.operation,
+              title: action.modalTitle ?? 'Capability Output',
+            });
+
+            adapters.setChromeLoading(false);
+            adapters.setChromeError(null);
+            adapters.setChromeText(null);
+            adapters.setChromeWeb(output.web);
+
+            return;
+          }
+
+          if (action.surface !== 'timeline' && params?.onReplaceRoot) {
+            params.onReplaceRoot(output.web);
+
+            return;
+          }
+
+          adapters.setTimeline((prev) => [
+            ...prev,
+            {
+              id: adapters.createId(),
+              type: 'command_result',
+              command: action.consumerAlias,
+              subcommand: action.operation,
+              subcommandTag: action.operation,
+              values: null,
+              text: null,
+              web: output.web,
+              clientView: null,
+            },
+          ]);
+        },
+        onDone: settle,
+        onError: (message) => {
+          params?.onCapabilityError?.(message.message);
+
+          if (action.surface === 'modal' && !params?.onCapabilityResult) {
+            adapters.setChromeError(message.message);
+          }
+
+          settle();
+        },
+      });
+
+      try {
+        adapters.sendSocketMessage({
+          type: 'run_capability',
+          requestId,
+          timelineId: adapters.timelineId(),
+          operation: action.operation,
+          input: action.input,
+          consumerAlias: action.consumerAlias,
+          providerId: action.providerId,
+          selection: action.selection,
+          surface: action.surface,
+          modalTitle: action.modalTitle,
+        });
+      } catch (err) {
+        adapters.pendingRequests.delete(requestId);
+        settle();
+
+        adapters.appendSystemMessage(
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      return;
+    }
+
     if (action.type !== 'command') {
       return;
     }
@@ -1200,6 +1543,45 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const requestId = adapters.createId();
     const uiExecutionPolicy = params?.uiExecutionPolicy;
 
+    const browserTrace = commandAction.monitoring
+      ? createBrowserTrace({
+          name: commandAction.monitoring.name,
+          attributes: commandAction.monitoring.attributes,
+        })
+      : null;
+
+    const commandRoundTrip = browserTrace?.startSpan({
+      name: `${commandAction.monitoring?.name ?? 'command'}.roundtrip`,
+      attributes: {},
+      parentSpanId: browserTrace.rootSpanId,
+    });
+
+    let commandRoundTripEnded = false;
+    let refreshRoundTrip: ReturnType<
+      NonNullable<typeof browserTrace>['startSpan']
+    > | null = null;
+    let browserTraceFinished = false;
+
+    const finishBrowserTrace = (status: 'ok' | 'error'): void => {
+      if (!browserTrace || browserTraceFinished) {
+        return;
+      }
+
+      browserTraceFinished = true;
+      commandRoundTrip?.end(status);
+      refreshRoundTrip?.end(status);
+
+      const spans = browserTrace.finish(status);
+
+      if (spans.length > 0) {
+        adapters.sendSocketMessage({
+          type: 'record_monitoring_spans',
+          requestId: adapters.createId(),
+          spans,
+        });
+      }
+    };
+
     if (commandAction.clientStatus?.pending) {
       if (!commandAction.clientStatus.statusTargetId) {
         adapters.appendSystemMessage(commandAction.clientStatus.pending);
@@ -1245,6 +1627,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
     const sourceId = params?.webCommandSourceId;
     const sourceEntityKey = params?.webCommandSourceEntityKey;
+
     const runsInBackground = commandAction.clientStatus?.background === true;
 
     const pendingPresentation =
@@ -1256,6 +1639,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       setBackgroundCommandStatus({
         id: statusTargetId,
         state: 'pending',
+        activeTargetId: commandAction.clientStatus.activeTargetId ?? null,
         message: commandAction.clientStatus.pending,
         output: null,
         progress: null,
@@ -1362,6 +1746,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       }
 
       const refreshRequestId = adapters.createId();
+      let refreshRendered = false;
+
+      refreshRoundTrip = browserTrace?.startSpan({
+        name: `${commandAction.monitoring?.name ?? 'command'}.refresh-roundtrip`,
+        attributes: {},
+        parentSpanId: browserTrace.rootSpanId,
+      });
 
       const refreshGeneration = sourceId
         ? beginRefreshGeneration(sourceId, endUserPendingOnce)
@@ -1383,15 +1774,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               )
             : null;
 
-          if (
-            sourceId &&
-            refreshGeneration !== null &&
-            refreshGenerationBySource.get(sourceId) !== refreshGeneration
-          ) {
-            return;
-          }
-
           if (refreshesTaskbar) {
+            if (
+              sourceId &&
+              refreshGeneration !== null &&
+              refreshGenerationBySource.get(sourceId) !== refreshGeneration
+            ) {
+              return;
+            }
+
             adapters.setTaskbarDockResult({
               command: refresh.command,
               subcommand: refresh.subcommand,
@@ -1403,7 +1794,29 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               visible: true,
             });
           } else if (highlightedWeb) {
+            refreshRendered = true;
+            refreshRoundTrip?.end();
+
+            const renderSpan = browserTrace?.startSpan({
+              name: `${commandAction.monitoring?.name ?? 'command'}.frontend-render`,
+              attributes: {},
+              parentSpanId: browserTrace.rootSpanId,
+            });
+
+            const updateSpan = browserTrace?.startSpan({
+              name: `${commandAction.monitoring?.name ?? 'command'}.frontend-update`,
+              attributes: {},
+              parentSpanId:
+                renderSpan?.spanId ?? browserTrace?.rootSpanId ?? null,
+            });
+
             params?.onReplaceRoot?.(highlightedWeb);
+            updateSpan?.end();
+
+            afterNextPaint(() => {
+              renderSpan?.end();
+              finishBrowserTrace('ok');
+            });
           }
         },
         onDone: () => {
@@ -1417,8 +1830,14 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           } else {
             endUserPendingOnce();
           }
+
+          if (!refreshRendered) {
+            finishBrowserTrace('ok');
+          }
         },
         onError: () => {
+          finishBrowserTrace('error');
+
           if (sourceId && refreshGeneration !== null) {
             settleRefreshGeneration(sourceId, refreshGeneration);
           } else {
@@ -1439,11 +1858,19 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             options: refresh.options ?? {},
           },
           recordInTimeline: refreshRecordTl,
+          traceContext: browserTrace
+            ? {
+                traceId: browserTrace.traceId,
+                parentSpanId:
+                  refreshRoundTrip?.spanId ?? browserTrace.rootSpanId,
+              }
+            : undefined,
         });
 
         refreshChildInFlight = true;
       } catch (err) {
         adapters.pendingRequests.delete(refreshRequestId);
+        finishBrowserTrace('error');
 
         adapters.appendSystemMessage(
           err instanceof Error ? err.message : String(err),
@@ -1460,6 +1887,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.pendingRequests.set(requestId, {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
+        if (!commandRoundTripEnded) {
+          commandRoundTripEnded = true;
+          commandRoundTrip?.end();
+        }
+
         if (typeof message.output === 'string') {
           const statusUpdate = parseBackgroundCommandStatus(message.output);
 
@@ -1569,6 +2001,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         // stop showing its long-running busy overlay while waiting for input.
         if (!refreshChildInFlight) {
           endUserPendingOnce();
+          finishBrowserTrace('ok');
         }
 
         if (!recordTl) {
@@ -1650,6 +2083,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onError: () => {
+        finishBrowserTrace('error');
+
         if (statusTargetId) {
           setBackgroundCommandStatus({
             id: statusTargetId,
@@ -1706,11 +2141,18 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           options: commandAction.options ?? {},
         },
         recordInTimeline: recordTl,
+        traceContext: browserTrace
+          ? {
+              traceId: browserTrace.traceId,
+              parentSpanId: commandRoundTrip?.spanId ?? browserTrace.rootSpanId,
+            }
+          : undefined,
       });
     } catch (err) {
       clearPluginInstallRestartStatus();
       endUserPendingOnce();
       adapters.pendingRequests.delete(requestId);
+      finishBrowserTrace('error');
 
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),
@@ -1725,6 +2167,39 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
   ): Promise<void> {
     const requestId = adapters.createId();
     const isTaskbar = adapters.isTaskbarSubcommand(command, subcommand.name);
+
+    const browserTrace = subcommand.monitoring
+      ? createBrowserTrace({
+          name: subcommand.monitoring.name,
+          attributes: subcommand.monitoring.attributes,
+        })
+      : null;
+
+    const roundTrip = browserTrace?.startSpan({
+      name: `${subcommand.monitoring?.name ?? 'command'}.roundtrip`,
+      attributes: {},
+      parentSpanId: browserTrace.rootSpanId,
+    });
+
+    let resultReceived = false;
+    let traceFinished = false;
+
+    const finishTrace = (status: 'ok' | 'error'): void => {
+      if (!browserTrace || traceFinished) {
+        return;
+      }
+
+      traceFinished = true;
+      roundTrip?.end(status);
+
+      const spans = browserTrace.finish(status);
+
+      adapters.sendSocketMessage({
+        type: 'record_monitoring_spans',
+        requestId: adapters.createId(),
+        spans,
+      });
+    };
 
     if (isTaskbar) {
       adapters.setTaskbarDockResult({
@@ -1754,7 +2229,22 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.pendingRequests.set(requestId, {
       recordInTimeline: !isTaskbar,
       onCommandResult: (message) => {
+        resultReceived = true;
+        roundTrip?.end();
+
         const output = splitCommandOutput(message.output);
+
+        const renderSpan = browserTrace?.startSpan({
+          name: `${subcommand.monitoring?.name ?? 'command'}.frontend-render`,
+          attributes: {},
+          parentSpanId: browserTrace.rootSpanId,
+        });
+
+        const updateSpan = browserTrace?.startSpan({
+          name: `${subcommand.monitoring?.name ?? 'command'}.frontend-update`,
+          attributes: {},
+          parentSpanId: renderSpan?.spanId ?? browserTrace?.rootSpanId ?? null,
+        });
 
         if (isTaskbar) {
           adapters.setTaskbarDockResult({
@@ -1784,6 +2274,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             },
           ]);
         }
+
+        updateSpan?.end();
+
+        afterNextPaint(() => {
+          renderSpan?.end();
+          finishTrace('ok');
+        });
       },
       onPrompt: (message) => {
         const prompt = splitPromptPayload(message.prompt);
@@ -1804,6 +2301,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onDone: () => {
+        if (!resultReceived) {
+          finishTrace('ok');
+        }
+
         if (shouldRefreshComposerAiState(command, subcommand.name)) {
           void refreshComposerAiState();
         }
@@ -1817,6 +2318,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onError: () => {
+        finishTrace('error');
+
         if (adapters.pendingPromptRequestId() === requestId) {
           adapters.setPendingPromptRequestId(null);
         }
@@ -1832,9 +2335,16 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         subcommand: subcommand.name,
         payload: values,
         recordInTimeline: !isTaskbar,
+        traceContext: browserTrace
+          ? {
+              traceId: browserTrace.traceId,
+              parentSpanId: roundTrip?.spanId ?? browserTrace.rootSpanId,
+            }
+          : undefined,
       });
     } catch (err) {
       adapters.pendingRequests.delete(requestId);
+      finishTrace('error');
 
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),

@@ -137,6 +137,14 @@ type FetchProfileMetadataProps = {
   relays: string[];
 };
 
+function jsonWireValue(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value)) as unknown;
+}
+
+function parseProfilePayload(value: unknown): ProfilePayload {
+  return ProfilePayloadSchema.parse(jsonWireValue(value));
+}
+
 type MergeProfilePayloadProps = {
   payload: ProfilePayload;
   metadata: ProfileMetadata | null;
@@ -317,7 +325,7 @@ function mergeProfilePayload({
     return payload;
   }
 
-  return ProfilePayloadSchema.parse({
+  return parseProfilePayload({
     ...payload,
     name: metadata.name ?? payload.name,
     username: metadata.username ?? payload.username,
@@ -1466,7 +1474,7 @@ export async function handleNostrOpenProfilePanelAction({
   setChromeError(null);
   setChromeText(null);
 
-  const payload = ProfilePayloadSchema.parse(action.payload ?? {});
+  const payload = parseProfilePayload(action.payload ?? {});
 
   const followedByFollowsPromise = fetchFollowedByFollowsCount(
     payload.pubkey,
@@ -1612,7 +1620,7 @@ export async function handleNostrFollowProfileAction({
   try {
     const payload = ProfilePayloadSchema.extend({
       mode: z.enum(['follow', 'unfollow']),
-    }).parse(action.payload ?? {});
+    }).parse(jsonWireValue(action.payload ?? {}));
 
     if (!currentUserPubkey) {
       throw new Error('Connect or unlock a Nostr signer to follow profiles.');
@@ -1703,7 +1711,7 @@ export function buildNostrProfileActionPayload({
   profileActions,
   sharePrefixes,
 }: BuildNostrProfileActionPayloadProps): ProfilePayload {
-  return ProfilePayloadSchema.parse({
+  return parseProfilePayload({
     pubkey,
     npub,
     name,
