@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v10.1.2] - 2026-08-02
+
+- chore: add Nostr publish diagnostics (ce7a802)
+
 ## [v10.1.1] - 2026-08-02
 
-- fix: improve X link previews (cf4b809)
+- fix: improve X link previews (29605e8)
 
 ## [v10.1.0] - 2026-07-30
 

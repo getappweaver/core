@@ -112,13 +112,35 @@ function publishEvent(relays: string[], event: NostrEvent): Promise<string[]> {
   const pool = new SimplePool();
 
   return Promise.allSettled(pool.publish(relays, event))
-    .then((results) =>
-      results
+    .then((results) => {
+      const acceptedRelays = results
         .map((result, index) =>
           result.status === 'fulfilled' ? relays[index] : null,
         )
-        .filter((relay): relay is string => relay !== null),
-    )
+        .filter((relay): relay is string => relay !== null);
+
+      const rejectedRelays = results.flatMap((result, index) =>
+        result.status === 'rejected'
+          ? [
+              {
+                relay: relays[index],
+                reason:
+                  result.reason instanceof Error
+                    ? result.reason.message
+                    : String(result.reason),
+              },
+            ]
+          : [],
+      );
+
+      console.info('[nostr.publishKind1] Relay publish completed', {
+        eventId: event.id,
+        acceptedRelays,
+        rejectedRelays,
+      });
+
+      return acceptedRelays;
+    })
     .finally(() => {
       pool.close(relays);
     });
@@ -141,6 +163,14 @@ export async function handleNostrPublishKind1Action({
   try {
     const payload = PublishKind1PayloadSchema.parse(action.payload ?? {});
 
+    console.info('[nostr.publishKind1] Publish started', {
+      kind: payload.kind,
+      contentLength: payload.content.length,
+      tagCount: payload.tags.length,
+      hasCurrentUser: currentUserPubkey !== null,
+      fallbackRelays: payload.fallbackRelays,
+    });
+
     if (!currentUserPubkey) {
       throw new Error('Connect or unlock a Nostr signer to publish.');
     }
@@ -160,10 +190,20 @@ export async function handleNostrPublishKind1Action({
       throw new Error('Connect or unlock a Nostr signer to publish.');
     }
 
+    console.info('[nostr.publishKind1] Event signed', {
+      eventId: signed.id,
+      pubkey: signed.pubkey,
+    });
+
     const relays = await fetchUserWriteRelays(
       signed.pubkey,
       payload.fallbackRelays,
     );
+
+    console.info('[nostr.publishKind1] Resolved write relays', {
+      eventId: signed.id,
+      relays,
+    });
 
     const acceptedRelays = await publishEvent(relays, signed);
 
@@ -185,11 +225,18 @@ export async function handleNostrPublishKind1Action({
 
     appendSystemMessage(payload.statusTitle);
 
+    console.info('[nostr.publishKind1] Publish succeeded', {
+      eventId: signed.id,
+      nostrUrl,
+      acceptedRelays,
+    });
+
     return {
       onSuccessCommand: payload.onSuccessCommand,
       nostrUrl,
     };
   } catch (error) {
+    console.error('[nostr.publishKind1] Publish failed', error);
     setChromeError(error instanceof Error ? error.message : String(error));
 
     return null;
