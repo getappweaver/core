@@ -38,6 +38,46 @@ select {
   font: inherit;
 }
 
+.web-tree-time-filter-status {
+  color: var(--color-warning);
+  font-size: 0.76rem;
+}
+
+.web-tree-time-filter-status__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.web-tree-time-filter-status__summary > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.web-tree-time-filter-status button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.web-tree-time-filter-status__ranges {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.3rem;
+  padding-left: 0.5rem;
+}
+
+.web-tree-time-filter-status__ranges button {
+  width: fit-content;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
 .web-node {
   color: var(--color-text);
   min-width: 0;

@@ -31,7 +31,10 @@ import {
   TreeExpandRequestContext,
   TreeExpandRequestSetterContext,
   TreeBulkExpandContext,
+  TreeDirectChildCountContext,
+  TreeRootItemCountContext,
   TreeFilterStateContext,
+  TreeTimeFilterStateContext,
   useWebRenderMeta,
 } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
@@ -43,6 +46,9 @@ import {
   EMPTY_TREE_FILTER_INDEX,
 } from './tree-filter';
 import { runLocalWebAction } from './tree-state';
+
+const TREE_FILTER_DEBOUNCE_MS = 1_000;
+const TREE_FILTER_MIN_QUERY_LENGTH = 3;
 
 type WebTreeItemProps = {
   element: WebElementNode;
@@ -81,8 +87,8 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
   const filterState = useContext(TreeFilterStateContext);
   const treeItemId = () => props.element.props?.id ?? null;
 
-  const activeFilter = () =>
-    normalizedFilterQuery(filterState !== null ? filterState.query() : '');
+  const hasActiveTextFilter = () =>
+    normalizedFilterQuery(filterState?.query() ?? '').length > 0;
 
   const isFilterVisible = () => {
     const visibleIds = filterState?.visibleIds() ?? null;
@@ -105,6 +111,11 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
 
   const [expanded, setExpanded] = createSignal(initialExpanded());
   const [lazyLoading, setLazyLoading] = createSignal(false);
+
+  const directTreeItemCount = () =>
+    body().filter(
+      (child) => child.type === 'element' && child.tag === 'treeItem',
+    ).length;
 
   const bulkExpand = useContext(TreeBulkExpandContext);
   let lastBulkEpochApplied = 0;
@@ -139,7 +150,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
   }
 
   function toggleExpanded(): void {
-    if (activeFilter().length > 0) {
+    if (hasActiveTextFilter()) {
       return;
     }
 
@@ -196,74 +207,72 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
   });
 
   return (
-    <Show when={isFilterVisible()}>
-      <div
-        class={elementClass(props.element)}
-        data-ui={elementUi(props.element)}
-        data-web-node-id={treeItemId() ?? undefined}
-      >
+    <TreeDirectChildCountContext.Provider value={directTreeItemCount}>
+      <Show when={isFilterVisible()}>
         <div
-          class="web-tree-item-summary"
-          onClick={handleSummaryClick}
-          style={{
-            cursor:
-              hasChildren() && activeFilter().length === 0
-                ? 'pointer'
-                : 'default',
-          }}
+          class={elementClass(props.element)}
+          data-ui={elementUi(props.element)}
+          data-web-node-id={treeItemId() ?? undefined}
         >
-          <Show
-            when={hasChildren()}
-            fallback={<span class="web-tree-toggle-spacer" />}
+          <div
+            class="web-tree-item-summary"
+            onClick={handleSummaryClick}
+            style={{
+              cursor:
+                hasChildren() && !hasActiveTextFilter() ? 'pointer' : 'default',
+            }}
           >
-            <button
-              type="button"
-              class="web-tree-toggle"
-              data-ui="tree-item-toggle"
-              data-story-target={props.element.props?.storyTargetId}
-              ref={(el) =>
-                props.element.props?.storyTargetId
-                  ? registerStoryDomTarget(
-                      props.element.props.storyTargetId,
-                      el,
-                    )
-                  : undefined
-              }
-              aria-expanded={expanded()}
-              onClick={(e) => {
-                e.stopPropagation();
-
-                if (props.element.props?.storyTargetId) {
-                  emitStoryTargetClicked(props.element.props.storyTargetId);
-                }
-
-                toggleExpanded();
-              }}
+            <Show
+              when={hasChildren()}
+              fallback={<span class="web-tree-toggle-spacer" />}
             >
-              {expanded() ? '▾' : '▸'}
-            </button>
-          </Show>
-          <Show when={summary()}>{(node) => props.renderChild(node())}</Show>
-        </div>
-        <Show
-          when={activeFilter().length === 0 && (!hasChildren() || expanded())}
-        >
-          <div class="web-tree-item-children is-children">
-            <Show when={lazyLoading() && body().length === 0}>
-              <div class="web-tree-item-loading">
-                {props.element.props?.lazyLoadingLabel ?? 'Loading…'}
-              </div>
+              <button
+                type="button"
+                class="web-tree-toggle"
+                data-ui="tree-item-toggle"
+                data-story-target={props.element.props?.storyTargetId}
+                ref={(el) =>
+                  props.element.props?.storyTargetId
+                    ? registerStoryDomTarget(
+                        props.element.props.storyTargetId,
+                        el,
+                      )
+                    : undefined
+                }
+                aria-expanded={expanded()}
+                onClick={(e) => {
+                  e.stopPropagation();
+
+                  if (props.element.props?.storyTargetId) {
+                    emitStoryTargetClicked(props.element.props.storyTargetId);
+                  }
+
+                  toggleExpanded();
+                }}
+              >
+                {expanded() ? '▾' : '▸'}
+              </button>
             </Show>
-            <For each={body()}>{(child) => props.renderChild(child)}</For>
+            <Show when={summary()}>{(node) => props.renderChild(node())}</Show>
           </div>
-        </Show>
-        <Show when={hasChildren() && activeFilter().length > 0}>
-          <div class="web-tree-item-children is-children is-filtered">
-            <For each={body()}>{(child) => props.renderChild(child)}</For>
-          </div>
-        </Show>
-      </div>
-    </Show>
+          <Show when={!hasActiveTextFilter() && (!hasChildren() || expanded())}>
+            <div class="web-tree-item-children is-children">
+              <Show when={lazyLoading() && body().length === 0}>
+                <div class="web-tree-item-loading">
+                  {props.element.props?.lazyLoadingLabel ?? 'Loading…'}
+                </div>
+              </Show>
+              <For each={body()}>{(child) => props.renderChild(child)}</For>
+            </div>
+          </Show>
+          <Show when={hasChildren() && hasActiveTextFilter()}>
+            <div class="web-tree-item-children is-children is-filtered">
+              <For each={body()}>{(child) => props.renderChild(child)}</For>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </TreeDirectChildCountContext.Provider>
   );
 }
 
@@ -294,6 +303,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
   const reportTreeHeaderEl = useContext(WebTreeHeaderElCallbackContext);
   const revealContext = useContext(WebRevealContext);
   const toggleContext = useContext(WebToggleContext);
+  const timeFilterState = useContext(TreeTimeFilterStateContext);
 
   const expandedById =
     useContext(TreeItemExpandedStateContext) ?? new Map<string, boolean>();
@@ -326,12 +336,41 @@ export function WebTreeElement(props: WebTreeElementProps) {
       : EMPTY_TREE_FILTER_INDEX,
   );
 
+  const timeFilterGroup = () => props.element.props?.timeFilterGroup ?? null;
+
+  const selectedTimeRanges = () => {
+    const group = timeFilterGroup();
+
+    return group ? (timeFilterState?.ranges(group) ?? []) : [];
+  };
+
+  const directRootTreeItemCount = () =>
+    (props.element.children ?? []).filter(
+      (child) => child.type === 'element' && child.tag === 'treeItem',
+    ).length;
+
   const visibleFilterIds = createMemo<Set<string> | null>(() => {
-    if (normalizedFilterQuery(filterQuery()).length === 0) {
+    const hasTextFilter = normalizedFilterQuery(filterQuery()).length > 0;
+    const ranges = selectedTimeRanges();
+
+    if (!hasTextFilter && ranges.length === 0) {
       return null;
     }
 
-    return filterIndex().search(filterQuery());
+    const textIds = hasTextFilter ? filterIndex().search(filterQuery()) : null;
+
+    const timeIds =
+      ranges.length > 0 ? filterIndex().searchTimeRanges(ranges) : null;
+
+    if (textIds === null) {
+      return timeIds;
+    }
+
+    if (timeIds === null) {
+      return textIds;
+    }
+
+    return new Set([...textIds].filter((id) => timeIds.has(id)));
   });
 
   createEffect(() => {
@@ -356,15 +395,26 @@ export function WebTreeElement(props: WebTreeElementProps) {
     onCleanup(() => clearTimeout(timeoutId));
   });
 
-  function setDebouncedFilterQuery(value: string): void {
+  function clearFilterDebounceTimer(): void {
     if (filterDebounceTimer !== undefined) {
       clearTimeout(filterDebounceTimer);
+      filterDebounceTimer = undefined;
+    }
+  }
+
+  function setDebouncedFilterQuery(value: string): void {
+    clearFilterDebounceTimer();
+
+    if (normalizedFilterQuery(value).length < TREE_FILTER_MIN_QUERY_LENGTH) {
+      setFilterQuery('');
+
+      return;
     }
 
     filterDebounceTimer = setTimeout(() => {
       setFilterQuery(value);
       filterDebounceTimer = undefined;
-    }, 140);
+    }, TREE_FILTER_DEBOUNCE_MS);
   }
 
   function setTreeFilterValue(value: string): void {
@@ -384,9 +434,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
   }
 
   onCleanup(() => {
-    if (filterDebounceTimer !== undefined) {
-      clearTimeout(filterDebounceTimer);
-    }
+    clearFilterDebounceTimer();
   });
 
   const runRefreshCommand = () => {
@@ -421,6 +469,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
         revealContext,
         toggleContext,
         filterState: null,
+        timeFilterState,
       })
     ) {
       return;
@@ -506,118 +555,114 @@ export function WebTreeElement(props: WebTreeElementProps) {
                 setValue: setTreeFilterValue,
               }}
             >
-              <div
-                class={elementClass(props.element)}
-                data-ui={elementUi(props.element)}
-                style={elementStyle(props.element)}
+              <TreeRootItemCountContext.Provider
+                value={directRootTreeItemCount}
               >
-                <Show when={showInlineHeader()}>
-                  <div
-                    class="web-tree-header"
-                    ref={(el) => {
-                      reportTreeHeaderEl?.(el ?? null);
-                    }}
-                  >
-                    <Show when={filterEnabled()}>
-                      <div
-                        class="web-tree-filter"
-                        classList={{
-                          'is-open': filterOpen() || hasFilterValue(),
-                        }}
-                      >
-                        <WebButton
-                          type="button"
-                          class="web-button web-button--link web-tree-filter-toggle"
-                          data-ui="tree-filter-toggle"
-                          aria-label="Filter tree"
-                          title="Filter"
-                          onClick={() => {
-                            setFilterOpen((open) => !open);
-                            queueMicrotask(() => filterInputEl?.focus());
+                <div
+                  class={elementClass(props.element)}
+                  data-ui={elementUi(props.element)}
+                  style={elementStyle(props.element)}
+                >
+                  <Show when={showInlineHeader()}>
+                    <div
+                      class="web-tree-header"
+                      ref={(el) => {
+                        reportTreeHeaderEl?.(el ?? null);
+                      }}
+                    >
+                      <Show when={filterEnabled()}>
+                        <div
+                          class="web-tree-filter"
+                          classList={{
+                            'is-open': filterOpen() || hasFilterValue(),
                           }}
                         >
-                          Search
-                        </WebButton>
-                        <Show when={filterOpen() || hasFilterValue()}>
-                          <input
-                            ref={(el) => {
-                              filterInputEl = el;
+                          <WebButton
+                            type="button"
+                            class="web-button web-button--link web-tree-filter-toggle"
+                            data-ui="tree-filter-toggle"
+                            aria-label="Filter tree"
+                            title="Filter"
+                            onClick={() => {
+                              setFilterOpen((open) => !open);
+                              queueMicrotask(() => filterInputEl?.focus());
                             }}
-                            class="web-tree-filter-input"
-                            type="search"
-                            value={filterInput()}
-                            placeholder={
-                              props.element.props?.filterPlaceholder ?? 'Filter'
-                            }
-                            onInput={(event) => {
-                              const value = event.currentTarget.value;
-
-                              setFilterInput(value);
-                              setDebouncedFilterQuery(value);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Escape') {
-                                if (filterDebounceTimer !== undefined) {
-                                  clearTimeout(filterDebounceTimer);
-                                  filterDebounceTimer = undefined;
-                                }
-
-                                setFilterInput('');
-                                setFilterQuery('');
-                                setFilterOpen(false);
+                          >
+                            Search
+                          </WebButton>
+                          <Show when={filterOpen() || hasFilterValue()}>
+                            <input
+                              ref={(el) => {
+                                filterInputEl = el;
+                              }}
+                              class="web-tree-filter-input"
+                              type="search"
+                              value={filterInput()}
+                              placeholder={
+                                props.element.props?.filterPlaceholder ??
+                                'Filter'
                               }
-                            }}
-                          />
-                        </Show>
-                      </div>
-                    </Show>
-                    <WebButton
-                      type="button"
-                      class="web-button web-button--link"
-                      data-ui="tree-collapse-all"
-                      aria-label="Collapse all tree branches"
-                      onClick={() =>
-                        setBulk((prev) => ({
-                          epoch: prev.epoch + 1,
-                          expanded: false,
-                        }))
-                      }
-                    >
-                      Collapse all
-                    </WebButton>
-                    <WebButton
-                      type="button"
-                      class="web-button web-button--link"
-                      data-ui="tree-expand-all"
-                      aria-label="Expand all tree branches"
-                      onClick={() =>
-                        setBulk((prev) => ({
-                          epoch: prev.epoch + 1,
-                          expanded: true,
-                        }))
-                      }
-                    >
-                      Expand all
-                    </WebButton>
-                    <Show when={renderMeta()}>
+                              onInput={(event) => {
+                                setTreeFilterValue(event.currentTarget.value);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                  setTreeFilterValue('');
+                                  setFilterOpen(false);
+                                }
+                              }}
+                            />
+                          </Show>
+                        </div>
+                      </Show>
                       <WebButton
                         type="button"
                         class="web-button web-button--link"
-                        data-ui="tree-refresh"
-                        aria-label="Refresh list"
-                        onClick={() => {
-                          runRefreshCommand();
-                        }}
+                        data-ui="tree-collapse-all"
+                        aria-label="Collapse all tree branches"
+                        onClick={() =>
+                          setBulk((prev) => ({
+                            epoch: prev.epoch + 1,
+                            expanded: false,
+                          }))
+                        }
                       >
-                        Refresh
+                        Collapse all
                       </WebButton>
-                    </Show>
-                  </div>
-                </Show>
-                <For each={props.element.children ?? []}>
-                  {(child) => props.renderChild(child)}
-                </For>
-              </div>
+                      <WebButton
+                        type="button"
+                        class="web-button web-button--link"
+                        data-ui="tree-expand-all"
+                        aria-label="Expand all tree branches"
+                        onClick={() =>
+                          setBulk((prev) => ({
+                            epoch: prev.epoch + 1,
+                            expanded: true,
+                          }))
+                        }
+                      >
+                        Expand all
+                      </WebButton>
+                      <Show when={renderMeta()}>
+                        <WebButton
+                          type="button"
+                          class="web-button web-button--link"
+                          data-ui="tree-refresh"
+                          aria-label="Refresh list"
+                          onClick={() => {
+                            runRefreshCommand();
+                          }}
+                        >
+                          Refresh
+                        </WebButton>
+                      </Show>
+                    </div>
+                  </Show>
+                  <For each={props.element.children ?? []}>
+                    {(child) => props.renderChild(child)}
+                  </For>
+                </div>
+              </TreeRootItemCountContext.Provider>
             </TreeFilterStateContext.Provider>
           </TreeBulkExpandContext.Provider>
         </TreeExpandRequestSetterContext.Provider>

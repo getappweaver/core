@@ -29,6 +29,7 @@ import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import {
   getTreeItemExpandedStateForScope,
   TreeItemExpandedStateContext,
+  TreeTimeFilterStateContext,
   WebNodeRenderer,
   WebRevealContext,
   WebCurrentUserPubkeyContext,
@@ -41,6 +42,8 @@ import {
   WebTreeToolbarRegisterContext,
   type WebTreeToolbarRegistration,
   WebPendingEntityContext,
+  type TreeTimeFilterState,
+  type TreeTimeRange,
 } from './WebNodeRenderer';
 
 type WebNodeShadowRootProps = {
@@ -134,6 +137,109 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     new Set(),
   );
 
+  const initializedTimeFilterGroups = new Set<string>();
+  const initialTimeRangesByGroup = new Map<string, TreeTimeRange[]>();
+
+  function sortedTimeRanges(ranges: TreeTimeRange[]): TreeTimeRange[] {
+    return ranges
+      .map((range) => ({ ...range }))
+      .sort((left, right) => right.since - left.since);
+  }
+
+  function initializeTimeFilterGroups(root: WebNodeRoot): void {
+    for (const [group, ranges] of Object.entries(
+      root.initialTreeTimeRanges ?? {},
+    )) {
+      if (initializedTimeFilterGroups.has(group)) {
+        continue;
+      }
+
+      initializedTimeFilterGroups.add(group);
+
+      if (ranges.length > 0) {
+        initialTimeRangesByGroup.set(group, sortedTimeRanges(ranges));
+      }
+    }
+  }
+
+  initializeTimeFilterGroups(props.root);
+
+  for (const [group, ranges] of Object.entries(
+    props.root.selectedTreeTimeRanges ?? {},
+  )) {
+    initializedTimeFilterGroups.add(group);
+
+    if (ranges.length > 0) {
+      initialTimeRangesByGroup.set(group, sortedTimeRanges(ranges));
+    } else {
+      initialTimeRangesByGroup.delete(group);
+    }
+  }
+
+  const [timeRangesByGroup, setTimeRangesByGroup] = createSignal(
+    initialTimeRangesByGroup,
+  );
+
+  const timeFilterState: TreeTimeFilterState = {
+    ranges: (group) => timeRangesByGroup().get(group) ?? [],
+    isActive: (group, key) =>
+      (timeRangesByGroup().get(group) ?? []).some((range) => range.key === key),
+    toggle: (group, range) => {
+      initializedTimeFilterGroups.add(group);
+
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+        const ranges = next.get(group) ?? [];
+        const exists = ranges.some((entry) => entry.key === range.key);
+
+        next.set(
+          group,
+          exists
+            ? ranges.filter((entry) => entry.key !== range.key)
+            : [...ranges, range].sort(
+                (left, right) => right.since - left.since,
+              ),
+        );
+
+        return next;
+      });
+    },
+    setOnly: (group, range) => {
+      initializedTimeFilterGroups.add(group);
+
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+        next.set(group, [range]);
+
+        return next;
+      });
+    },
+    remove: (group, key) => {
+      initializedTimeFilterGroups.add(group);
+
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+
+        next.set(
+          group,
+          (next.get(group) ?? []).filter((range) => range.key !== key),
+        );
+
+        return next;
+      });
+    },
+    clear: (group) => {
+      initializedTimeFilterGroups.add(group);
+
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+        next.delete(group);
+
+        return next;
+      });
+    },
+  };
+
   const revealContext: WebRevealContextValue = {
     isRevealed: (id) => revealedIds().has(id),
     reveal: (id) => {
@@ -221,6 +327,44 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   });
 
   createEffect(() => {
+    const previousInitialRanges = new Map(initialTimeRangesByGroup);
+
+    initializeTimeFilterGroups(props.root);
+
+    if (initialTimeRangesByGroup.size > previousInitialRanges.size) {
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+
+        for (const [group, ranges] of initialTimeRangesByGroup) {
+          if (!previousInitialRanges.has(group)) {
+            next.set(group, ranges);
+          }
+        }
+
+        return next;
+      });
+    }
+
+    const selectedTreeTimeRanges = props.root.selectedTreeTimeRanges;
+
+    if (selectedTreeTimeRanges !== undefined) {
+      setTimeRangesByGroup((previous) => {
+        const next = new Map(previous);
+
+        for (const [group, ranges] of Object.entries(selectedTreeTimeRanges)) {
+          initializedTimeFilterGroups.add(group);
+
+          if (ranges.length > 0) {
+            next.set(group, sortedTimeRanges(ranges));
+          } else {
+            next.delete(group);
+          }
+        }
+
+        return next;
+      });
+    }
+
     setCurrentRoot(reconcileWebNodeRoot(props.root));
   });
 
@@ -265,6 +409,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
             revealContext,
             toggleContext,
             filterState: null,
+            timeFilterState,
           })
         ) {
           return;
@@ -361,35 +506,39 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                     >
                       <WebRevealContext.Provider value={revealContext}>
                         <WebToggleContext.Provider value={toggleContext}>
-                          <WebPendingEntityContext.Provider
-                            value={(entityKey) =>
-                              props.getEntityPending?.(entityKey) ?? {
-                                pending: false,
-                                label: null,
-                              }
-                            }
+                          <TreeTimeFilterStateContext.Provider
+                            value={timeFilterState}
                           >
-                            <WebNodeRenderer
-                              root={currentRoot}
-                              onReplaceRoot={props.onReplaceRoot}
-                              onError={props.onError}
-                              promptRequestId={props.promptRequestId}
-                              speechSentences={speechSentences}
-                              activeSpeechSentenceIndex={
-                                activeSpeechSentenceIndex
+                            <WebPendingEntityContext.Provider
+                              value={(entityKey) =>
+                                props.getEntityPending?.(entityKey) ?? {
+                                  pending: false,
+                                  label: null,
+                                }
                               }
-                              onSpeechSentenceClick={onSpeechSentenceClick}
-                              onRunAction={(action, params) =>
-                                props.onRunAction?.(action, {
-                                  ...params,
-                                  getWebRoot: () => currentRoot,
-                                  applyOptimisticMutations:
-                                    applyLocalOptimisticMutations,
-                                  webTargetRoot: c.shadow,
-                                })
-                              }
-                            />
-                          </WebPendingEntityContext.Provider>
+                            >
+                              <WebNodeRenderer
+                                root={currentRoot}
+                                onReplaceRoot={props.onReplaceRoot}
+                                onError={props.onError}
+                                promptRequestId={props.promptRequestId}
+                                speechSentences={speechSentences}
+                                activeSpeechSentenceIndex={
+                                  activeSpeechSentenceIndex
+                                }
+                                onSpeechSentenceClick={onSpeechSentenceClick}
+                                onRunAction={(action, params) =>
+                                  props.onRunAction?.(action, {
+                                    ...params,
+                                    getWebRoot: () => currentRoot,
+                                    applyOptimisticMutations:
+                                      applyLocalOptimisticMutations,
+                                    webTargetRoot: c.shadow,
+                                  })
+                                }
+                              />
+                            </WebPendingEntityContext.Provider>
+                          </TreeTimeFilterStateContext.Provider>
                         </WebToggleContext.Provider>
                       </WebRevealContext.Provider>
                     </WebCurrentUserPubkeyContext.Provider>

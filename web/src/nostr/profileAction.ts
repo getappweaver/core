@@ -1,6 +1,5 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
-import { SimplePool } from 'nostr-tools/pool';
 import { createSignal } from 'solid-js';
 import { z } from 'zod';
 
@@ -12,6 +11,7 @@ import { PROFILE_RELAYS_FOR_QUERY, uniqueRelays } from '@src/nostr/nip65';
 import {
   NostrProfilePostsRequestSchema,
   NostrProfilePostsResponseSchema,
+  NostrReplaceableResponseSchema,
   type NostrProfilePostsRequest,
   type NostrProfilePostsResponse,
 } from '@src/web/nostr-resolution-schema';
@@ -24,8 +24,10 @@ import type {
   WebNode,
   WebNodeRoot,
   WebNostrPostReference,
+  WebOptimisticMutation,
 } from '@src/web/ui-schema';
 import {
+  WebActionSchema,
   WebNostrPostExtraActionSchema,
   type WebNostrPostExtraAction,
 } from '@src/web/ui-schema';
@@ -33,6 +35,7 @@ import {
 import type { ChromeModalState } from '../chrome/types';
 import { fetchJson, postJson } from '../utils';
 
+import { ProfileMemoryCache } from './profileCache';
 import { fetchUserWriteRelays, publishEvent } from './relayLists';
 
 const ProfilePayloadSchema = z.object({
@@ -49,6 +52,7 @@ const ProfilePayloadSchema = z.object({
     nprofile: z.string().min(1),
   }),
   profileActions: z.array(WebNostrPostExtraActionSchema).default([]),
+  profileActionsReadAction: WebActionSchema.nullable().default(null),
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
@@ -69,6 +73,9 @@ type ProfileActionDeps = {
   setChromeError: (text: string | null) => void;
   setChromeLoading: (loading: boolean) => void;
   appendSystemMessage: (text: string) => void;
+  executeCommandAction: (
+    action: Extract<WebAction, { type: 'command' }>,
+  ) => Promise<unknown>;
 };
 
 type ContactListState = {
@@ -105,6 +112,7 @@ type InlineProfile = {
   authorPicture: string | undefined;
   authorAbout: string | undefined;
   relayHints: string[];
+  sharePrefixes: NostrSharePrefixes;
 };
 
 type LatestProfilePostReference = {
@@ -118,6 +126,7 @@ type LatestProfilePostReference = {
   authorPicture: string | undefined;
   authorAbout: string | undefined;
   relayHints: string[];
+  sharePrefixes: NostrSharePrefixes;
   createdAt: number;
   content: string;
   replyAction: WebAction;
@@ -135,6 +144,12 @@ export type WotFetchProfileResult = {
 type FetchProfileMetadataProps = {
   pubkey: string;
   relays: string[];
+};
+
+type FetchContactListProps = {
+  pubkey: string;
+  relays: string[];
+  forceRefresh: boolean;
 };
 
 function jsonWireValue(value: unknown): unknown {
@@ -164,6 +179,24 @@ const FollowedByFollowsResponseSchema = z.object({
   pubkeys: z.array(z.string()),
 });
 
+const ProfileActionListPayloadSchema = z.object({
+  actions: z.array(WebNostrPostExtraActionSchema),
+});
+
+const ProfileActionMutationPayloadSchema = z.object({
+  profile: ProfilePayloadSchema,
+  actionKey: z.string().min(1),
+});
+
+type ProfileActionMutationDeps = {
+  action: Extract<WebAction, { type: 'clientAction' }>;
+  executeCommandAction: (
+    action: Extract<WebAction, { type: 'command' }>,
+  ) => Promise<unknown>;
+  applyOptimisticMutations: (mutations: WebOptimisticMutation[]) => void;
+  setChromeError: (text: string | null) => void;
+};
+
 type FetchLatestProfilePostsProps = {
   pubkey: string;
   profile: ProfilePayload;
@@ -178,6 +211,7 @@ type BuildNostrProfileActionPayloadProps = {
   about: string | null;
   relayHints: string[];
   profileActions: WebNostrPostExtraAction[];
+  profileActionsReadAction: WebAction | null;
   sharePrefixes: NostrSharePrefixes;
 };
 
@@ -238,6 +272,21 @@ const followedByFollowsState = createSignal<Record<string, number | null>>({});
 
 const getFollowedByFollowsState = followedByFollowsState[0];
 const setFollowedByFollowsState = followedByFollowsState[1];
+
+const PROFILE_METADATA_FRESH_TTL_MS = 15 * 60_000;
+const PROFILE_METADATA_STALE_TTL_MS = 24 * 60 * 60_000;
+const FOLLOWED_BY_FOLLOWS_FRESH_TTL_MS = 5 * 60_000;
+const FOLLOWED_BY_FOLLOWS_STALE_TTL_MS = 30 * 60_000;
+const CONTACT_LIST_FRESH_TTL_MS = 60_000;
+const CONTACT_LIST_STALE_TTL_MS = 15 * 60_000;
+const PROFILE_POSTS_FRESH_TTL_MS = 60_000;
+const PROFILE_POSTS_STALE_TTL_MS = 15 * 60_000;
+
+const profileMetadataCache = new ProfileMemoryCache<ProfileMetadata | null>();
+const followedByFollowsCache = new ProfileMemoryCache<number | null>();
+const contactListCache = new ProfileMemoryCache<ContactListState>();
+const profilePostsCache = new ProfileMemoryCache<LatestProfilePost[]>();
+let activeProfilePanelRequest = 0;
 const NOSTR_REFERENCE_RE = /nostr:([a-z0-9]+)/gi;
 
 function text(value: string): WebNode {
@@ -338,20 +387,25 @@ async function fetchProfileMetadata({
   pubkey,
   relays,
 }: FetchProfileMetadataProps): Promise<ProfileMetadata | null> {
-  const pool = new SimplePool();
-  const normalizedRelays = uniqueRelays(relays);
+  return profileMetadataCache.read({
+    key: pubkey.toLowerCase(),
+    freshTtlMs: PROFILE_METADATA_FRESH_TTL_MS,
+    staleTtlMs: PROFILE_METADATA_STALE_TTL_MS,
+    forceRefresh: false,
+    load: async () => {
+      const response = NostrReplaceableResponseSchema.parse(
+        await postJson<unknown>('/api/nostr/replaceable', {
+          kind: 0,
+          pubkey,
+          relayHints: uniqueRelays(relays).slice(0, 8),
+          fallbackRelays: [...PROFILE_RELAYS_FOR_QUERY],
+          requireFresh: false,
+        }),
+      );
 
-  try {
-    const event = await pool.get(normalizedRelays, {
-      kinds: [0],
-      authors: [pubkey],
-      limit: 1,
-    });
-
-    return parseProfileMetadata(event);
-  } finally {
-    pool.close(normalizedRelays);
-  }
+      return parseProfileMetadata(response.event);
+    },
+  });
 }
 
 function profileAction(payload: ProfilePayload): WebAction {
@@ -365,13 +419,21 @@ function profileAction(payload: ProfilePayload): WebAction {
 async function fetchFollowedByFollowsCount(
   pubkey: string,
 ): Promise<number | null> {
-  const response = FollowedByFollowsResponseSchema.parse(
-    await fetchJson<unknown>(
-      `/api/nostr/followed-by-follows?pubkey=${encodeURIComponent(pubkey)}`,
-    ),
-  );
+  return followedByFollowsCache.read({
+    key: pubkey.toLowerCase(),
+    freshTtlMs: FOLLOWED_BY_FOLLOWS_FRESH_TTL_MS,
+    staleTtlMs: FOLLOWED_BY_FOLLOWS_STALE_TTL_MS,
+    forceRefresh: false,
+    load: async () => {
+      const response = FollowedByFollowsResponseSchema.parse(
+        await fetchJson<unknown>(
+          `/api/nostr/followed-by-follows?pubkey=${encodeURIComponent(pubkey)}`,
+        ),
+      );
 
-  return response.available ? response.count : null;
+      return response.available ? response.count : null;
+    },
+  });
 }
 
 function followAction(
@@ -395,6 +457,158 @@ function copyNprofileAction(nprofile: string): WebAction {
     action: 'web.copyText',
     payload: { text: nprofile },
   };
+}
+
+function profileExtraActionEntityKey(
+  payload: ProfilePayload,
+  actionKey: string,
+): string {
+  return `nostr-profile-action:${payload.pubkey.toLowerCase()}:${actionKey}`;
+}
+
+function profileExtraActionClientAction({
+  payload,
+  action,
+}: {
+  payload: ProfilePayload;
+  action: WebNostrPostExtraAction;
+}): WebAction | null {
+  if (
+    !action.optimisticKey ||
+    !action.inactiveLabel ||
+    !action.activeLabel ||
+    action.action?.type !== 'command' ||
+    payload.profileActionsReadAction?.type !== 'command'
+  ) {
+    return action.action;
+  }
+
+  return {
+    type: 'clientAction',
+    action: 'nostr.runProfileAction',
+    payload: {
+      profile: payload,
+      actionKey: action.optimisticKey,
+    },
+  };
+}
+
+function profileExtraActionMutations({
+  payload,
+  actions,
+}: {
+  payload: ProfilePayload;
+  actions: WebNostrPostExtraAction[];
+}): WebOptimisticMutation[] {
+  const nextPayload = { ...payload, profileActions: actions };
+
+  return actions.flatMap((action) =>
+    action.optimisticKey
+      ? [
+          {
+            type: 'patchEntityProps' as const,
+            entityKey: profileExtraActionEntityKey(
+              payload,
+              action.optimisticKey,
+            ),
+            props: {
+              label: action.label,
+              title: action.ariaLabel,
+              action: profileExtraActionClientAction({
+                payload: nextPayload,
+                action,
+              }),
+              disabled: action.disabled,
+              className: action.active ? 'web-button active' : 'web-button',
+            },
+          },
+        ]
+      : [],
+  );
+}
+
+function optimisticProfileExtraActions({
+  actions,
+  actionKey,
+}: {
+  actions: WebNostrPostExtraAction[];
+  actionKey: string;
+}): WebNostrPostExtraAction[] {
+  const clicked = actions.find((action) => action.optimisticKey === actionKey);
+  const nextActive = clicked?.active !== true;
+
+  return actions.map((action) => {
+    const active =
+      action.optimisticKey === actionKey
+        ? nextActive
+        : nextActive
+          ? false
+          : action.active === true;
+
+    return {
+      ...action,
+      active,
+      disabled: true,
+      label: active
+        ? (action.activeLabel ?? action.label)
+        : (action.inactiveLabel ?? action.label),
+    };
+  });
+}
+
+export async function handleNostrRunProfileAction({
+  action,
+  executeCommandAction,
+  applyOptimisticMutations,
+  setChromeError,
+}: ProfileActionMutationDeps): Promise<void> {
+  const { profile, actionKey } = ProfileActionMutationPayloadSchema.parse(
+    jsonWireValue(action.payload ?? {}),
+  );
+
+  const selected = profile.profileActions.find(
+    (profileAction) => profileAction.optimisticKey === actionKey,
+  );
+
+  const readAction = profile.profileActionsReadAction;
+
+  if (selected?.action?.type !== 'command' || readAction?.type !== 'command') {
+    throw new Error('Profile action is unavailable.');
+  }
+
+  const optimisticActions = optimisticProfileExtraActions({
+    actions: profile.profileActions,
+    actionKey,
+  });
+
+  applyOptimisticMutations(
+    profileExtraActionMutations({
+      payload: profile,
+      actions: optimisticActions,
+    }),
+  );
+
+  setChromeError(null);
+
+  try {
+    await executeCommandAction(selected.action);
+
+    const result = await executeCommandAction(readAction);
+    const actions = ProfileActionListPayloadSchema.parse(result).actions;
+
+    applyOptimisticMutations(
+      profileExtraActionMutations({ payload: profile, actions }),
+    );
+  } catch (error) {
+    applyOptimisticMutations(
+      profileExtraActionMutations({
+        payload: profile,
+        actions: profile.profileActions,
+      }),
+    );
+
+    setChromeError(error instanceof Error ? error.message : String(error));
+  }
 }
 
 function rootReferenceFromEvent(event: NostrEvent): {
@@ -502,9 +716,11 @@ function eventProfileMetadata({
 function inlineProfileForPubkey({
   pubkey,
   profileByPubkey,
+  sharePrefixes,
 }: {
   pubkey: string;
   profileByPubkey: Map<string, ProfileMetadata>;
+  sharePrefixes: NostrSharePrefixes;
 }): InlineProfile {
   const profile = profileByPubkey.get(pubkey.toLowerCase());
 
@@ -516,15 +732,18 @@ function inlineProfileForPubkey({
     authorPicture: profile?.picture ?? undefined,
     authorAbout: profile?.about ?? undefined,
     relayHints: [],
+    sharePrefixes,
   };
 }
 
 function inlineProfilesFromEvent({
   event,
   profileByPubkey,
+  sharePrefixes,
 }: {
   event: NostrEvent;
   profileByPubkey: Map<string, ProfileMetadata>;
+  sharePrefixes: NostrSharePrefixes;
 }): Record<string, InlineProfile> {
   const inlineProfiles: Record<string, InlineProfile> = {};
 
@@ -548,6 +767,7 @@ function inlineProfilesFromEvent({
       inlineProfiles[token] = inlineProfileForPubkey({
         pubkey,
         profileByPubkey,
+        sharePrefixes,
       });
     } catch {
       continue;
@@ -611,6 +831,7 @@ function addressReferencesForContent({
         kind: decoded.data.kind,
         npub: npubForPubkey(decoded.data.pubkey) ?? undefined,
         relayHints: decoded.data.relays ?? [],
+        sharePrefixes: viewedProfile.sharePrefixes,
         authorName: profile?.name ?? undefined,
         authorUsername: profile?.username ?? undefined,
         authorPicture: profile?.picture ?? undefined,
@@ -633,11 +854,17 @@ function addressReferencesForContent({
 function inlineProfilesForDisplayEvent({
   event,
   profileByPubkey,
+  sharePrefixes,
 }: {
   event: NostrEvent;
   profileByPubkey: Map<string, ProfileMetadata>;
+  sharePrefixes: NostrSharePrefixes;
 }): Record<string, InlineProfile> {
-  const inlineProfiles = inlineProfilesFromEvent({ event, profileByPubkey });
+  const inlineProfiles = inlineProfilesFromEvent({
+    event,
+    profileByPubkey,
+    sharePrefixes,
+  });
 
   for (const tag of event.tags) {
     if (tag[0] !== 'p' || !tag[1]) {
@@ -653,6 +880,7 @@ function inlineProfilesForDisplayEvent({
     inlineProfiles[`nostr:${npub}`] = inlineProfileForPubkey({
       pubkey: tag[1],
       profileByPubkey,
+      sharePrefixes,
     });
   }
 
@@ -781,9 +1009,13 @@ function profileRoot({
         props: {
           label: action.label,
           title: action.ariaLabel,
-          action: action.action ?? undefined,
+          action:
+            profileExtraActionClientAction({ payload, action }) ?? undefined,
           disabled: action.disabled,
           className: action.active ? 'web-button active' : 'web-button',
+          entityKey: action.optimisticKey
+            ? profileExtraActionEntityKey(payload, action.optimisticKey)
+            : undefined,
         },
         children: [],
       }),
@@ -791,7 +1023,7 @@ function profileRoot({
     el({
       tag: 'button',
       props: {
-        label: 'Open in nostr',
+        label: 'Open profile',
         action: openNostrShareAction({
           type: 'nprofile',
           identifier: nprofile,
@@ -955,31 +1187,36 @@ function profileRoot({
 async function fetchContactList({
   pubkey,
   relays,
-}: {
-  pubkey: string;
-  relays: string[];
-}): Promise<ContactListState> {
-  const pool = new SimplePool();
-  const normalizedRelays = uniqueRelays(relays);
+  forceRefresh,
+}: FetchContactListProps): Promise<ContactListState> {
+  return contactListCache.read({
+    key: pubkey.toLowerCase(),
+    freshTtlMs: CONTACT_LIST_FRESH_TTL_MS,
+    staleTtlMs: CONTACT_LIST_STALE_TTL_MS,
+    forceRefresh,
+    load: async () => {
+      const response = NostrReplaceableResponseSchema.parse(
+        await postJson<unknown>('/api/nostr/replaceable', {
+          kind: 3,
+          pubkey,
+          relayHints: uniqueRelays(relays).slice(0, 8),
+          fallbackRelays: [...PROFILE_RELAYS_FOR_QUERY],
+          requireFresh: forceRefresh,
+        }),
+      );
 
-  try {
-    const event = await pool.get(normalizedRelays, {
-      kinds: [3],
-      authors: [pubkey],
-      limit: 1,
-    });
+      const event = response.event;
 
-    return {
-      event,
-      follows: new Set(
-        (event?.tags ?? [])
-          .filter((tag) => tag[0] === 'p' && tag[1])
-          .map((tag) => tag[1]!.toLowerCase()),
-      ),
-    };
-  } finally {
-    pool.close(normalizedRelays);
-  }
+      return {
+        event,
+        follows: new Set(
+          (event?.tags ?? [])
+            .filter((tag) => tag[0] === 'p' && tag[1])
+            .map((tag) => tag[1]!.toLowerCase()),
+        ),
+      };
+    },
+  });
 }
 
 function replyContextFromEvent({
@@ -1005,12 +1242,17 @@ function replyContextFromEvent({
     authorPicture: profile?.picture ?? undefined,
     authorAbout: profile?.about ?? undefined,
     relayHints,
+    sharePrefixes: viewedProfile.sharePrefixes,
     createdAt: event.created_at,
     content: displayContentForEvent(event),
     replyAction: replyEventAction({ event, profile, relayHints }),
     repostAction: repostEventAction({ event, profile, relayHints }),
     showActions: true,
-    inlineProfiles: inlineProfilesForDisplayEvent({ event, profileByPubkey }),
+    inlineProfiles: inlineProfilesForDisplayEvent({
+      event,
+      profileByPubkey,
+      sharePrefixes: viewedProfile.sharePrefixes,
+    }),
     embeddedReferences: addressReferencesForContent({
       content: displayContentForEvent(event),
       viewedProfile,
@@ -1180,6 +1422,7 @@ function resolvedReferencesForEvent({
         inlineProfiles: inlineProfilesForDisplayEvent({
           event: resolvedEvent,
           profileByPubkey,
+          sharePrefixes: viewedProfile.sharePrefixes,
         }),
         embeddedReferences:
           depth < 2 && !visitedEventIds.has(resolvedEvent.id)
@@ -1310,7 +1553,11 @@ function latestProfilePostFromEvent({
     createdAt: event.created_at,
     content,
     event,
-    inlineProfiles: inlineProfilesForDisplayEvent({ event, profileByPubkey }),
+    inlineProfiles: inlineProfilesForDisplayEvent({
+      event,
+      profileByPubkey,
+      sharePrefixes: viewedProfile.sharePrefixes,
+    }),
     replyContext: replyContextFromGraph({
       event,
       viewedProfile,
@@ -1394,45 +1641,54 @@ async function fetchLatestProfilePosts({
   profile,
 }: FetchLatestProfilePostsProps): Promise<LatestProfilePost[]> {
   const request = buildProfilePostsRequest({ pubkey, profile });
+  const key = JSON.stringify(request);
 
-  const response = NostrProfilePostsResponseSchema.parse(
-    await postJson<unknown>('/api/nostr/profile-posts', request),
-  );
+  return profilePostsCache.read({
+    key,
+    freshTtlMs: PROFILE_POSTS_FRESH_TTL_MS,
+    staleTtlMs: PROFILE_POSTS_STALE_TTL_MS,
+    forceRefresh: false,
+    load: async () => {
+      const response = NostrProfilePostsResponseSchema.parse(
+        await postJson<unknown>('/api/nostr/profile-posts', request),
+      );
 
-  const profilePubkeys = collectGraphProfilePubkeys({
-    response,
-    viewedPubkey: pubkey,
-  });
+      const profilePubkeys = collectGraphProfilePubkeys({
+        response,
+        viewedPubkey: pubkey,
+      });
 
-  const profileMetadataResults = await Promise.allSettled(
-    profilePubkeys.map(
-      async (profilePubkey) =>
-        [
-          profilePubkey.toLowerCase(),
-          await fetchProfileMetadata({
-            pubkey: profilePubkey,
-            relays: PROFILE_RELAYS_FOR_QUERY as string[],
-          }),
-        ] as const,
-    ),
-  );
+      const profileMetadataResults = await Promise.allSettled(
+        profilePubkeys.map(
+          async (profilePubkey) =>
+            [
+              profilePubkey.toLowerCase(),
+              await fetchProfileMetadata({
+                pubkey: profilePubkey,
+                relays: PROFILE_RELAYS_FOR_QUERY as string[],
+              }),
+            ] as const,
+        ),
+      );
 
-  const profileByPubkey = new Map(
-    profileMetadataResults.flatMap((result) =>
-      result.status === 'fulfilled' && result.value[1] !== null
-        ? [result.value as readonly [string, ProfileMetadata]]
-        : [],
-    ),
-  );
+      const profileByPubkey = new Map(
+        profileMetadataResults.flatMap((result) =>
+          result.status === 'fulfilled' && result.value[1] !== null
+            ? [result.value as readonly [string, ProfileMetadata]]
+            : [],
+        ),
+      );
 
-  return buildLatestProfilePostsFromResolution({
-    response,
-    viewedProfile: profile,
-    profileByPubkey,
-    defaultRelayHints: uniqueRelays([
-      ...request.relayHints,
-      ...request.fallbackRelays,
-    ]),
+      return buildLatestProfilePostsFromResolution({
+        response,
+        viewedProfile: profile,
+        profileByPubkey,
+        defaultRelayHints: uniqueRelays([
+          ...request.relayHints,
+          ...request.fallbackRelays,
+        ]),
+      });
+    },
   });
 }
 
@@ -1469,7 +1725,10 @@ export async function handleNostrOpenProfilePanelAction({
   setChromeText,
   setChromeError,
   setChromeLoading,
+  executeCommandAction,
 }: ProfileActionDeps): Promise<WotFetchProfileResult | void> {
+  const requestId = ++activeProfilePanelRequest;
+
   setChromeLoading(true);
   setChromeError(null);
   setChromeText(null);
@@ -1499,25 +1758,63 @@ export async function handleNostrOpenProfilePanelAction({
     }),
   );
 
-  try {
-    fetchedMetadata = await fetchProfileMetadata({
-      pubkey: payload.pubkey,
-      relays: uniqueRelays([
-        ...PROFILE_RELAYS_FOR_QUERY,
-        ...payload.relayHints,
-        ...payload.fallbackRelays,
-      ]),
-    });
+  setChromeLoading(false);
 
-    renderedPayload = mergeProfilePayload({
-      payload,
-      metadata: fetchedMetadata,
-    });
-  } catch {
-    renderedPayload = payload;
+  const profileActionsPromise = (async () => {
+    const readAction = payload.profileActionsReadAction;
+
+    if (readAction?.type !== 'command') {
+      return payload.profileActions;
+    }
+
+    const result = await executeCommandAction(readAction);
+
+    return ProfileActionListPayloadSchema.parse(result).actions;
+  })().catch(() => payload.profileActions);
+
+  const metadataPromise = fetchProfileMetadata({
+    pubkey: payload.pubkey,
+    relays: uniqueRelays([
+      ...PROFILE_RELAYS_FOR_QUERY,
+      ...payload.relayHints,
+      ...payload.fallbackRelays,
+    ]),
+  }).catch(() => null);
+
+  renderedPayload = {
+    ...payload,
+    profileActions: await profileActionsPromise,
+  };
+
+  if (requestId !== activeProfilePanelRequest) {
+    return undefined;
   }
 
+  setChromeWeb(
+    profileRoot({
+      payload: renderedPayload,
+      currentUserPubkey,
+      activeTab: renderedPayload.tab,
+      latestPosts,
+    }),
+  );
+
+  fetchedMetadata = await metadataPromise;
+
+  if (requestId !== activeProfilePanelRequest) {
+    return undefined;
+  }
+
+  renderedPayload = mergeProfilePayload({
+    payload: renderedPayload,
+    metadata: fetchedMetadata,
+  });
+
   const followedByFollowsCount = await followedByFollowsPromise;
+
+  if (requestId !== activeProfilePanelRequest) {
+    return undefined;
+  }
 
   if (followedByFollowsCount !== undefined) {
     setFollowedByFollowsState((current) => ({
@@ -1544,6 +1841,10 @@ export async function handleNostrOpenProfilePanelAction({
     } catch (error) {
       setChromeError(error instanceof Error ? error.message : String(error));
       latestPosts = [];
+    }
+
+    if (requestId !== activeProfilePanelRequest) {
+      return undefined;
     }
 
     setChromeWeb(
@@ -1576,7 +1877,12 @@ export async function handleNostrOpenProfilePanelAction({
         ...PROFILE_RELAYS_FOR_QUERY,
         ...renderedPayload.fallbackRelays,
       ]),
+      forceRefresh: false,
     });
+
+    if (requestId !== activeProfilePanelRequest) {
+      return fetchProfileResult;
+    }
 
     const followKey =
       `${currentUserPubkey}:${renderedPayload.pubkey}`.toLowerCase();
@@ -1636,6 +1942,7 @@ export async function handleNostrFollowProfileAction({
     const { event: existing } = await fetchContactList({
       pubkey: currentUserPubkey,
       relays: lookupRelays,
+      forceRefresh: true,
     });
 
     const relayHint = uniqueRelays(payload.relayHints)[0] ?? '';
@@ -1676,6 +1983,20 @@ export async function handleNostrFollowProfileAction({
 
     const followKey = `${signed.pubkey}:${payload.pubkey}`.toLowerCase();
 
+    contactListCache.set({
+      key: signed.pubkey.toLowerCase(),
+      value: {
+        event: signed,
+        follows: new Set(
+          signed.tags
+            .filter((tag) => tag[0] === 'p' && tag[1])
+            .map((tag) => tag[1]!.toLowerCase()),
+        ),
+      },
+    });
+
+    followedByFollowsCache.clear();
+
     setFollowState((current) => ({
       ...current,
       [followKey]: payload.mode === 'follow',
@@ -1709,6 +2030,7 @@ export function buildNostrProfileActionPayload({
   about,
   relayHints,
   profileActions,
+  profileActionsReadAction,
   sharePrefixes,
 }: BuildNostrProfileActionPayloadProps): ProfilePayload {
   return parseProfilePayload({
@@ -1720,6 +2042,7 @@ export function buildNostrProfileActionPayload({
     about,
     relayHints,
     profileActions,
+    profileActionsReadAction,
     sharePrefixes,
   });
 }

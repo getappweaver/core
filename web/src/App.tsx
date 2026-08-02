@@ -1274,6 +1274,24 @@ function AppInner(): JSX.Element {
     );
   }
 
+  function getTaskbarDockValues(
+    command: string,
+    subcommand: string,
+  ): CommandPayload | null {
+    const key = taskbarDockKey(command, subcommand);
+
+    if (dockVisible()) {
+      return dockWidgetItemsByKey()[key]?.values ?? null;
+    }
+
+    const item = timeline().find(
+      (entry) =>
+        entry.type === 'command_result' && entry.timelineSingletonKey === key,
+    );
+
+    return item?.type === 'command_result' ? item.values : null;
+  }
+
   function hasTaskbarItem(key: string, entry: SingletonWidgetEntry): boolean {
     if (dockVisible()) {
       return dockWidgetItemsByKey()[key]?.id === entry.itemId;
@@ -2066,6 +2084,7 @@ function AppInner(): JSX.Element {
     runOpenCommandFormFromWebCommand: (action) =>
       openCommandFormFromWebCommand(action),
     isTaskbarSubcommand,
+    getTaskbarDockValues,
     setTaskbarDockResult,
   });
 

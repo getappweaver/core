@@ -20,6 +20,7 @@ import { handleNostrLikeEventAction } from '../nostr/likeEventAction';
 import {
   handleNostrFollowProfileAction,
   handleNostrOpenProfilePanelAction,
+  handleNostrRunProfileAction,
   type WotFetchProfileResult,
 } from '../nostr/profileAction';
 import { handleNostrPublishKind1Action } from '../nostr/publishKind1Action';
@@ -188,8 +189,6 @@ function parseOptimisticMutation(value: unknown): WebOptimisticMutation | null {
         typeof record.pruneEmptyParents === 'boolean'
           ? record.pruneEmptyParents
           : true,
-      updateCounts:
-        typeof record.updateCounts === 'boolean' ? record.updateCounts : true,
     };
   }
 
@@ -646,8 +645,31 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.setChromePromptSession(null);
   }
 
-  function runWebAction(
-    action: import('@src/web/ui-schema').WebAction,
+  async function executeCommandAction(
+    action: Extract<WebAction, { type: 'command' }>,
+  ): Promise<unknown> {
+    const output = await runJsonCommandOutput({
+      command: action.command,
+      subcommand: action.subcommand,
+      payload: {
+        arguments: action.arguments,
+        options: action.options,
+      },
+    });
+
+    return output.clientView?.view === 'web.action-list'
+      ? output.clientView.payload
+      : null;
+  }
+
+  function runWebAction(action: WebAction, params?: RunWebActionParams): void {
+    const wireAction = JSON.parse(JSON.stringify(action)) as WebAction;
+
+    runWireWebAction(wireAction, params);
+  }
+
+  function runWireWebAction(
+    action: WebAction,
     params?: RunWebActionParams,
   ): void {
     if (action.type === 'prompt_answer') {
@@ -1117,6 +1139,21 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
+      } else if (clientActionName === 'nostr.runProfileAction') {
+        if (!params?.applyOptimisticMutations) {
+          adapters.appendSystemMessage('Profile action UI is unavailable.');
+
+          return;
+        }
+
+        runClientAction(
+          handleNostrRunProfileAction({
+            action,
+            executeCommandAction,
+            applyOptimisticMutations: params.applyOptimisticMutations,
+            setChromeError: adapters.setChromeError,
+          }),
+        );
       } else if (clientActionName === 'nostr.openProfilePanel') {
         runClientAction(
           handleNostrOpenProfilePanelAction({
@@ -1129,6 +1166,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             setChromeError: adapters.setChromeError,
             setChromeLoading: adapters.setChromeLoading,
             appendSystemMessage: adapters.appendSystemMessage,
+            executeCommandAction,
           }),
         );
       } else if (clientActionName === 'nostr.followProfile') {
@@ -1143,6 +1181,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             setChromeError: adapters.setChromeError,
             setChromeLoading: adapters.setChromeLoading,
             appendSystemMessage: adapters.appendSystemMessage,
+            executeCommandAction,
           }),
         );
       } else if (clientActionName === 'nostr.openReplyPanel') {
@@ -1734,10 +1773,28 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         finalRefreshDispatchAttempted = true;
       }
 
-      const refreshesTaskbar = adapters.isTaskbarSubcommand(
-        refresh.command,
-        refresh.subcommand,
-      );
+      const refreshesTaskbar =
+        refresh.target === 'taskbar' ||
+        adapters.isTaskbarSubcommand(refresh.command, refresh.subcommand);
+
+      const currentMeta = params?.getWebRoot?.().meta;
+
+      const taskbarOptions = refreshesTaskbar
+        ? adapters.getTaskbarDockValues(refresh.command, refresh.subcommand)
+            ?.options
+        : null;
+
+      const inheritedOptions =
+        taskbarOptions ??
+        (currentMeta?.command === refresh.command &&
+        currentMeta.subcommand === refresh.subcommand
+          ? (currentMeta.options ?? {})
+          : {});
+
+      const refreshOptions = {
+        ...inheritedOptions,
+        ...(refresh.options ?? {}),
+      };
 
       const refreshRecordTl = refresh.recordInTimeline ?? recordTl;
 
@@ -1788,7 +1845,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               subcommand: refresh.subcommand,
               values: {
                 arguments: refresh.arguments ?? {},
-                options: refresh.options ?? {},
+                options: refreshOptions,
               },
               output: { ...refreshOutput, web: highlightedWeb },
               visible: true,
@@ -1855,7 +1912,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           subcommand: refresh.subcommand,
           payload: {
             arguments: refresh.arguments ?? {},
-            options: refresh.options ?? {},
+            options: refreshOptions,
           },
           recordInTimeline: refreshRecordTl,
           traceContext: browserTrace
@@ -1918,6 +1975,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
           dispatchRefreshOnce({ refreshStage: 'final' });
 
+          if (!commandAction.refresh) {
+            endUserPendingOnce();
+          }
+
           return;
         }
 
@@ -1934,6 +1995,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           });
 
           dispatchRefreshOnce({ refreshStage: 'final' });
+
+          if (!commandAction.refresh) {
+            endUserPendingOnce();
+          }
 
           return;
         }
@@ -1989,6 +2054,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
 
         dispatchRefreshOnce({ refreshStage: 'final' });
+
+        if (!commandAction.refresh) {
+          endUserPendingOnce();
+        }
       },
       onPrompt: (message) => {
         const prompt = splitPromptPayload(message.prompt);

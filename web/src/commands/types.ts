@@ -112,6 +112,10 @@ export type CommandsAdapters = {
   sendSocketMessage: (message: unknown) => void;
   runOpenCommandFormFromWebCommand: (action: CommandWebAction) => Promise<void>;
   isTaskbarSubcommand: (command: string, subcommand: string) => boolean;
+  getTaskbarDockValues: (
+    command: string,
+    subcommand: string,
+  ) => CommandPayload | null;
   setTaskbarDockResult: (params: {
     command: string;
     subcommand: string;

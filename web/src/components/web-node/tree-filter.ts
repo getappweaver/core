@@ -1,5 +1,7 @@
 import type { WebElementNode, WebNode } from '@src/web/ui-schema';
 
+import type { TreeTimeRange } from './contexts';
+
 // ---------------------------------------------------------------------------
 // Tree item utilities
 // ---------------------------------------------------------------------------
@@ -83,11 +85,13 @@ type TreeFilterIndexEntry = {
   path: string;
   ancestorIds: string[];
   descendantIds: string[];
+  timestamps: number[];
 };
 
 export type TreeFilterIndex = {
   entries: TreeFilterIndexEntry[];
   search: (query: string) => Set<string>;
+  searchTimeRanges: (ranges: TreeTimeRange[]) => Set<string>;
 };
 
 const treeFilterIndexCache = new Map<string, TreeFilterIndex>();
@@ -96,6 +100,7 @@ const MAX_TREE_FILTER_INDEX_CACHE_SIZE = 20;
 export const EMPTY_TREE_FILTER_INDEX: TreeFilterIndex = {
   entries: [],
   search: () => new Set(),
+  searchTimeRanges: () => new Set(),
 };
 
 export function buildTreeFilterIndex(tree: WebElementNode): TreeFilterIndex {
@@ -124,6 +129,7 @@ export function buildTreeFilterIndex(tree: WebElementNode): TreeFilterIndex {
       path: path.toLowerCase(),
       ancestorIds,
       descendantIds,
+      timestamps: item.props?.filterTimestamps ?? [],
     });
 
     return [id, ...descendantIds];
@@ -156,6 +162,33 @@ export function buildTreeFilterIndex(tree: WebElementNode): TreeFilterIndex {
               ? globRegex.test(entry.path)
               : globRegex.test(entry.name)
             : entry.text.includes(normalized);
+
+        if (!matched) {
+          continue;
+        }
+
+        visibleIds.add(entry.id);
+
+        for (const ancestorId of entry.ancestorIds) {
+          visibleIds.add(ancestorId);
+        }
+
+        for (const descendantId of entry.descendantIds) {
+          visibleIds.add(descendantId);
+        }
+      }
+
+      return visibleIds;
+    },
+    searchTimeRanges(ranges: TreeTimeRange[]): Set<string> {
+      const visibleIds = new Set<string>();
+
+      for (const entry of entries) {
+        const matched = entry.timestamps.some((timestamp) =>
+          ranges.some(
+            (range) => timestamp >= range.since && timestamp < range.until,
+          ),
+        );
 
         if (!matched) {
           continue;

@@ -9,56 +9,10 @@ function isElement(node: WebNode): node is WebElementNode {
   return node.type === 'element';
 }
 
-function countLabel(label: string, count: number): string {
-  return `${label} (${count})`;
-}
-
-function patchCountText(node: WebNode, label: string, count: number): void {
-  if (!isElement(node)) {
-    return;
-  }
-
-  if (node.props?.optimisticCountText === true) {
-    node.children = [{ type: 'text', value: countLabel(label, count) }];
-
-    return;
-  }
-
-  if (node.summary) {
-    patchCountText(node.summary, label, count);
-  }
-
-  for (const child of node.children ?? []) {
-    patchCountText(child, label, count);
-  }
-}
-
-function recomputeOptimisticCount(node: WebElementNode): number | null {
-  const label = node.props?.optimisticCountLabel;
-
-  if (typeof label !== 'string') {
-    return null;
-  }
-
-  const children = node.children ?? [];
-
-  const count = children.reduce((sum, child) => {
-    if (!isElement(child)) {
-      return sum;
-    }
-
-    const childCount = child.props?.optimisticCountValue;
-
-    return sum + (typeof childCount === 'number' ? childCount : 1);
-  }, 0);
-
-  node.props = { ...node.props, optimisticCountValue: count };
-
-  if (node.summary) {
-    patchCountText(node.summary, label, count);
-  }
-
-  return count;
+function directTreeItemCount(node: WebElementNode): number {
+  return (node.children ?? []).filter(
+    (child) => isElement(child) && child.tag === 'treeItem',
+  ).length;
 }
 
 function patchOptimisticActions(
@@ -156,8 +110,6 @@ function applyToNode(
     }
   }
 
-  const count = recomputeOptimisticCount(node);
-
   const shouldPrune = mutations.some(
     (mutation) =>
       mutation.type === 'removeEntity' && mutation.pruneEmptyParents,
@@ -165,8 +117,8 @@ function applyToNode(
 
   if (
     shouldPrune &&
-    count === 0 &&
-    node.props?.optimisticPruneWhenEmpty === true
+    node.props?.pruneWhenNoTreeItems === true &&
+    directTreeItemCount(node) === 0
   ) {
     return null;
   }

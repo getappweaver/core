@@ -16,7 +16,11 @@ import { emitStoryTargetClicked } from '../../story/events';
 import { WebShadowUiBusyContext } from '../web-shadow-ui-busy-context';
 import { WebButton } from '../WebButton';
 
-import { useWebEntityPending } from './contexts';
+import {
+  isTreeTimeRangeActionActive,
+  TreeTimeFilterStateContext,
+  useWebEntityPending,
+} from './contexts';
 import {
   elementClass,
   elementStyle,
@@ -118,6 +122,7 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
   const [flipRight, setFlipRight] = createSignal(false);
   const getBusy = useContext(WebShadowUiBusyContext);
   const entityPending = useWebEntityPending();
+  const timeFilterState = useContext(TreeTimeFilterStateContext);
   let rootEl: HTMLDivElement | undefined;
   let panelEl: HTMLDivElement | undefined;
   const triggerProps = () => props.element.props;
@@ -279,6 +284,15 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
           <WebButton
             type="button"
             class={`web-overflow-trigger ${elementClass(triggerPresentation)}`}
+            classList={{
+              'is-tree-time-filter-active':
+                typeof props.element.props?.timeFilterGroup === 'string' &&
+                typeof props.element.props?.timeFilterRangeKey === 'string' &&
+                timeFilterState?.isActive(
+                  props.element.props.timeFilterGroup,
+                  props.element.props.timeFilterRangeKey,
+                ) === true,
+            }}
             data-ui={props.element.props?.ui ?? 'three-dot-item-button'}
             data-story-target={props.element.props?.storyTargetId}
             ref={(el) =>
@@ -289,7 +303,12 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
             style={elementStyle(props.element)}
             aria-expanded={open()}
             aria-haspopup="true"
-            aria-label={props.element.props?.label ?? 'More actions'}
+            aria-label={
+              props.element.props?.ariaLabel ??
+              props.element.props?.label ??
+              'More actions'
+            }
+            title={props.element.props?.title}
             disabled={getBusy() || entityPending().pending}
             onClick={(e) => {
               e.stopPropagation();
@@ -378,7 +397,12 @@ export function WebOverflowMenuElement(props: WebOverflowMenuProps) {
                         props.runAction(mi.props?.action);
                       }}
                     >
-                      {content}
+                      {isTreeTimeRangeActionActive(
+                        mi.props?.action,
+                        timeFilterState,
+                      ) && mi.props?.activeLabel
+                        ? mi.props.activeLabel
+                        : content}
                     </WebButton>
                   }
                 >

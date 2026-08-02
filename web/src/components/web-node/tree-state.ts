@@ -4,6 +4,7 @@ import { writeClipboardText } from '../../utils/clipboard';
 
 import type {
   TreeFilterState,
+  TreeTimeFilterState,
   WebRevealContextValue,
   WebToggleContextValue,
 } from './contexts';
@@ -100,6 +101,7 @@ type RunLocalWebActionProps = {
   revealContext: WebRevealContextValue | null;
   toggleContext: WebToggleContextValue | null;
   filterState: TreeFilterState | null;
+  timeFilterState: TreeTimeFilterState | null;
 };
 
 export function runLocalWebAction({
@@ -109,6 +111,7 @@ export function runLocalWebAction({
   revealContext,
   toggleContext,
   filterState,
+  timeFilterState,
 }: RunLocalWebActionProps): boolean {
   expandTreeItemsForAction(action, expandedById, expandTreeItems);
 
@@ -158,6 +161,54 @@ export function runLocalWebAction({
 
       if (typeof value === 'string') {
         filterState?.setValue(value);
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'web.toggleTreeTimeRange') {
+      const group = action.payload?.group;
+      const key = action.payload?.key;
+      const since = action.payload?.since;
+      const until = action.payload?.until;
+
+      if (
+        typeof group === 'string' &&
+        typeof key === 'string' &&
+        typeof since === 'number' &&
+        typeof until === 'number' &&
+        until > since
+      ) {
+        timeFilterState?.toggle(group, { key, since, until });
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'web.setTreeTimeRange') {
+      const group = action.payload?.group;
+      const key = action.payload?.key;
+      const since = action.payload?.since;
+      const until = action.payload?.until;
+
+      if (
+        typeof group === 'string' &&
+        typeof key === 'string' &&
+        typeof since === 'number' &&
+        typeof until === 'number' &&
+        until > since
+      ) {
+        timeFilterState?.setOnly(group, { key, since, until });
+      }
+
+      return true;
+    }
+
+    if (clientActionName === 'web.clearTreeTimeRanges') {
+      const group = action.payload?.group;
+
+      if (typeof group === 'string') {
+        timeFilterState?.clear(group);
       }
 
       return true;

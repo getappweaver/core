@@ -26,7 +26,6 @@ import {
   listConnections,
   saveConnection,
 } from '@src/nostr/connections';
-import { DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS } from '@src/nostr/event-resolver';
 import { uniqueRelays } from '@src/nostr/nip65';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import type { WotServices } from '@src/nostr/wot-service';
@@ -52,6 +51,8 @@ import {
   NostrInteractionRelaysResponseSchema,
   NostrProfilePostsRequestSchema,
   NostrProfilePostsResponseSchema,
+  NostrReplaceableRequestSchema,
+  NostrReplaceableResponseSchema,
 } from './nostr-resolution-schema';
 import {
   PushSubscriptionBodySchema,
@@ -186,6 +187,64 @@ type ResolveNostrProfilePostsProps = {
   nowMs: () => number;
 };
 
+const PROFILE_POSTS_REFRESH_INTERVAL_MS = 60_000;
+const PROFILE_METADATA_REFRESH_INTERVAL_MS = 15 * 60_000;
+const CONTACT_LIST_REFRESH_INTERVAL_MS = 60_000;
+
+async function resolveNostrReplaceable({
+  req,
+  service,
+  contextRelays,
+  nowMs,
+}: ResolveNostrProfilePostsProps): Promise<Response> {
+  try {
+    const payload = await parseLimitedJsonBody({
+      req,
+      maxBytes: MAX_NOSTR_PROFILE_POSTS_BODY_BYTES,
+    });
+
+    const input = NostrReplaceableRequestSchema.parse(payload);
+
+    const result = await service.resolveReplaceableEvent({
+      kind: input.kind,
+      pubkey: input.pubkey,
+      identifier: null,
+      relayHints: input.relayHints,
+      contextRelays,
+      fallbackRelays: input.fallbackRelays,
+      refreshMode: input.requireFresh
+        ? 'require-fresh'
+        : 'stale-while-revalidate',
+      refreshIntervalMs: input.requireFresh
+        ? 0
+        : input.kind === 0
+          ? PROFILE_METADATA_REFRESH_INTERVAL_MS
+          : CONTACT_LIST_REFRESH_INTERVAL_MS,
+      deadlineAtMs: nowMs() + 8_000,
+    });
+
+    return jsonResponse(
+      NostrReplaceableResponseSchema.parse({ ok: true, event: result.event }),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    return jsonResponse(
+      { error: message },
+      {
+        status:
+          message === 'request_body_too_large'
+            ? 413
+            : message === 'invalid_json' || err instanceof ZodError
+              ? 400
+              : message === 'nostr_resolution_unavailable'
+                ? 503
+                : 500,
+      },
+    );
+  }
+}
+
 async function resolveNostrProfilePosts({
   req,
   service,
@@ -208,8 +267,8 @@ async function resolveNostrProfilePosts({
       contextRelays,
       fallbackRelays: input.fallbackRelays,
       limit: input.limit,
-      refreshMode: 'require-fresh',
-      refreshIntervalMs: DEFAULT_REPLACEABLE_REFRESH_INTERVAL_MS,
+      refreshMode: 'stale-while-revalidate',
+      refreshIntervalMs: PROFILE_POSTS_REFRESH_INTERVAL_MS,
       deadlineAtMs,
     });
 
@@ -1018,6 +1077,7 @@ export function createWebFetchHandler(
       req.method === 'POST' &&
       [
         '/api/nostr/profile-posts',
+        '/api/nostr/replaceable',
         '/api/nostr/event-context',
         '/api/nostr/interaction-relays',
       ].includes(path) &&
@@ -1042,6 +1102,15 @@ export function createWebFetchHandler(
 
     if (req.method === 'POST' && path === '/api/nostr/profile-posts') {
       return resolveNostrProfilePosts({
+        req,
+        service: ctx.nostrResolution!,
+        contextRelays: ctx.botRelayUrls,
+        nowMs: Date.now,
+      });
+    }
+
+    if (req.method === 'POST' && path === '/api/nostr/replaceable') {
+      return resolveNostrReplaceable({
         req,
         service: ctx.nostrResolution!,
         contextRelays: ctx.botRelayUrls,

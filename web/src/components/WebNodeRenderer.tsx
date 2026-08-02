@@ -19,7 +19,11 @@ import {
 import type { WebNodeRendererProps } from './web-node/contexts';
 import {
   TreeExpandRequestSetterContext,
+  TreeDirectChildCountContext,
+  TreeRootItemCountContext,
   TreeFilterStateContext,
+  TreeTimeFilterStateContext,
+  isTreeTimeRangeActionActive,
   TreeItemExpandedStateContext,
   useWebEntityKey,
   useWebCurrentUserPubkey,
@@ -42,6 +46,7 @@ import {
 import { runLocalWebAction } from './web-node/tree-state';
 import { WebCheckboxControl } from './web-node/WebCheckboxControl';
 import { WebCommandStatusElement } from './web-node/WebCommandStatusElement';
+import { WebCountdownElement } from './web-node/WebCountdownElement';
 import {
   WebChoiceFieldNode,
   WebFormElement,
@@ -52,6 +57,7 @@ import {
 import { WebNostrPostElement } from './web-node/WebNostrPostElement';
 import { WebTabsElement } from './web-node/WebTabsElement';
 import { WebTreeElement, WebTreeItemElement } from './web-node/WebTreeElement';
+import { WebTreeTimeFilterStatusElement } from './web-node/WebTreeTimeFilterStatusElement';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import { WebButton } from './WebButton';
 import { WebEditableText } from './WebEditableText';
@@ -147,6 +153,9 @@ function renderElement({
   };
 
   const filterState = useContext(TreeFilterStateContext);
+  const timeFilterState = useContext(TreeTimeFilterStateContext);
+  const directTreeItemCount = useContext(TreeDirectChildCountContext);
+  const rootTreeItemCount = useContext(TreeRootItemCountContext);
 
   return (
     <Switch>
@@ -191,6 +200,8 @@ function renderElement({
                 }
                 style={elementStyle(element)}
                 disabled={disabled()}
+                aria-label={element.props?.ariaLabel}
+                title={element.props?.title}
                 data-web-submit-action={
                   submitAction() ? JSON.stringify(submitAction()) : undefined
                 }
@@ -218,6 +229,10 @@ function renderElement({
               classList={{
                 'is-background-command-active':
                   isBackgroundCommandTargetActive(element),
+                'is-tree-time-filter-active': isTreeTimeRangeActionActive(
+                  element.props?.action,
+                  timeFilterState,
+                ),
               }}
               data-ui={elementUi(element)}
               data-story-target={element.props?.storyTargetId}
@@ -228,6 +243,17 @@ function renderElement({
               }
               style={elementStyle(element)}
               disabled={disabled()}
+              aria-label={element.props?.ariaLabel}
+              title={element.props?.title}
+              aria-pressed={
+                element.props?.action?.type === 'clientAction' &&
+                element.props.action.action === 'web.toggleTreeTimeRange'
+                  ? isTreeTimeRangeActionActive(
+                      element.props.action,
+                      timeFilterState,
+                    )
+                  : undefined
+              }
               data-web-submit-action={
                 submitAction() ? JSON.stringify(submitAction()) : undefined
               }
@@ -279,6 +305,39 @@ function renderElement({
             )}
           </Show>
         </span>
+      </Match>
+
+      <Match when={element.tag === 'countdown'}>
+        <WebCountdownElement element={element} />
+      </Match>
+
+      <Match when={element.tag === 'countLabel'}>
+        <span
+          class={elementClass(element)}
+          data-ui={elementUi(element)}
+          style={elementStyle(element)}
+        >
+          {element.props?.label ?? ''} ({directTreeItemCount?.() ?? 0})
+        </span>
+      </Match>
+
+      <Match when={element.tag === 'treeEmpty'}>
+        <Show when={(rootTreeItemCount?.() ?? 0) === 0}>
+          <div
+            class={elementClass(element)}
+            data-ui={elementUi(element)}
+            style={elementStyle(element)}
+          >
+            <For each={element.children ?? []}>{renderChild}</For>
+          </div>
+        </Show>
+      </Match>
+
+      <Match when={element.tag === 'treeTimeFilterStatus'}>
+        <WebTreeTimeFilterStatusElement
+          element={element}
+          runAction={runAction}
+        />
       </Match>
 
       <Match when={element.tag === 'link'}>
@@ -607,6 +666,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
   const revealContext = useContext(WebRevealContext);
   const toggleContext = useContext(WebToggleContext);
   const filterState = useContext(TreeFilterStateContext);
+  const timeFilterState = useContext(TreeTimeFilterStateContext);
   const currentUserPubkey = useWebCurrentUserPubkey();
   const expandedById = useContext(TreeItemExpandedStateContext);
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
@@ -648,6 +708,7 @@ export function WebNodeRenderer(props: WebNodeRendererProps) {
         revealContext,
         toggleContext,
         filterState,
+        timeFilterState,
       })
     ) {
       return;

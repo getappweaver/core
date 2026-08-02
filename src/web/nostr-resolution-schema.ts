@@ -40,6 +40,21 @@ export const NostrProfilePostsRequestSchema = z
   })
   .strict();
 
+export const NostrReplaceableRequestSchema = z
+  .object({
+    kind: z.union([z.literal(0), z.literal(3)]),
+    pubkey: hex64Schema,
+    relayHints: relayListSchema,
+    fallbackRelays: relayListSchema,
+    requireFresh: z.boolean(),
+  })
+  .strict();
+
+export const NostrReplaceableResponseSchema = z.object({
+  ok: z.literal(true),
+  event: nostrEventSchema.nullable(),
+});
+
 const resolutionDiagnosticSchema = z.object({
   code: z.enum([
     'cache-hit',
@@ -149,6 +164,12 @@ export const NostrInteractionRelaysResponseSchema = z.object({
 
 export type NostrProfilePostsRequest = z.infer<
   typeof NostrProfilePostsRequestSchema
+>;
+export type NostrReplaceableRequest = z.infer<
+  typeof NostrReplaceableRequestSchema
+>;
+export type NostrReplaceableResponse = z.infer<
+  typeof NostrReplaceableResponseSchema
 >;
 
 export type NostrProfilePostsResponse = z.infer<

@@ -7,6 +7,7 @@ import type {
   WebNode,
   WebNodeRoot,
   WebRenderMeta,
+  WebTreeTimeRange,
 } from '@src/web/ui-schema';
 
 import type {
@@ -125,6 +126,48 @@ export type TreeFilterState = {
 export const TreeFilterStateContext = createContext<TreeFilterState | null>(
   null,
 );
+
+export const TreeDirectChildCountContext =
+  createContext<Accessor<number> | null>(null);
+
+export const TreeRootItemCountContext = createContext<Accessor<number> | null>(
+  null,
+);
+
+export type TreeTimeRange = WebTreeTimeRange;
+
+export type TreeTimeFilterState = {
+  ranges: (group: string) => TreeTimeRange[];
+  isActive: (group: string, key: string) => boolean;
+  toggle: (group: string, range: TreeTimeRange) => void;
+  setOnly: (group: string, range: TreeTimeRange) => void;
+  remove: (group: string, key: string) => void;
+  clear: (group: string) => void;
+};
+
+export const TreeTimeFilterStateContext =
+  createContext<TreeTimeFilterState | null>(null);
+
+export function isTreeTimeRangeActionActive(
+  action: WebAction | undefined,
+  state: TreeTimeFilterState | null,
+): boolean {
+  if (
+    action?.type !== 'clientAction' ||
+    action.action !== 'web.toggleTreeTimeRange'
+  ) {
+    return false;
+  }
+
+  const group = action.payload?.group;
+  const key = action.payload?.key;
+
+  return (
+    typeof group === 'string' &&
+    typeof key === 'string' &&
+    state?.isActive(group, key) === true
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Render meta / surface / user pubkey

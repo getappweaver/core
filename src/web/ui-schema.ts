@@ -42,6 +42,8 @@ export const WebRefreshSchema = z.object({
       template: z.string().min(1),
     })
     .optional(),
+  /** Force an authoritative widget refresh instead of replacing the invoking modal/root. */
+  target: z.enum(['taskbar']).optional(),
 });
 
 export const WebCommandStatusSchema = z.object({
@@ -79,7 +81,6 @@ export const WebOptimisticMutationSchema = z.discriminatedUnion('type', [
     type: z.literal('removeEntity'),
     entityKey: z.string().min(1),
     pruneEmptyParents: z.boolean().optional().default(true),
-    updateCounts: z.boolean().optional().default(true),
   }),
   z.object({
     type: z.literal('patchEntityProps'),
@@ -276,6 +277,8 @@ export const WebNostrPostExtraActionSchema = z.object({
   /** Stable key used by generic optimistic mutations to update action display state. */
   optimisticKey: z.string().min(1).optional(),
   label: z.string().min(1),
+  inactiveLabel: z.string().min(1).optional(),
+  activeLabel: z.string().min(1).optional(),
   ariaLabel: z.string().min(1).optional(),
   icon: z.enum(['translate']).optional(),
   action: WebActionSchema.nullable(),
@@ -301,6 +304,7 @@ const WebNostrPostReferenceBaseSchema = z.object({
   kind: z.number().int().optional(),
   npub: z.string().min(1).optional(),
   relayHints: z.array(z.string().min(1)).optional(),
+  sharePrefixes: WebNostrSharePrefixesSchema.optional(),
   authorName: z.string().min(1).optional(),
   authorUsername: z.string().min(1).optional(),
   authorPicture: z.string().min(1).optional(),
@@ -328,6 +332,7 @@ const WebNostrPostReferenceBaseSchema = z.object({
         pubkey: z.string().min(1).optional(),
         npub: z.string().min(1).optional(),
         relayHints: z.array(z.string().min(1)).optional(),
+        sharePrefixes: WebNostrSharePrefixesSchema.optional(),
         authorName: z.string().min(1).optional(),
         authorUsername: z.string().min(1).optional(),
         authorPicture: z.string().min(1).optional(),
@@ -354,6 +359,7 @@ export const WebNostrInlineProfilesSchema = z.record(
     pubkey: z.string().min(1).optional(),
     npub: z.string().min(1).optional(),
     relayHints: z.array(z.string().min(1)).optional(),
+    sharePrefixes: WebNostrSharePrefixesSchema.optional(),
     authorName: z.string().min(1).optional(),
     authorUsername: z.string().min(1).optional(),
     authorPicture: z.string().min(1).optional(),
@@ -409,6 +415,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrTrailingActions: z.array(WebNostrPostExtraActionSchema).optional(),
   /** Additional plugin-owned actions shown in the author's profile modal. */
   nostrProfileActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  /** Optional read action that resolves current plugin-owned profile actions when the modal opens. */
+  nostrProfileActionsReadAction: WebActionSchema.nullable().optional(),
   /** Optional command/client action for plugin-owned archive behavior. */
   nostrArchiveAction: WebActionSchema.nullable().optional(),
   /** True when plugin-owned archive state is active. */
@@ -458,6 +466,20 @@ export const WebItemAlignSchema = z.enum([
 
 export const WebButtonVariantSchema = z.enum(['default', 'icon']);
 
+export const WebTreeTimeRangeSchema = z
+  .object({
+    key: z.string().min(1),
+    since: z.number().int(),
+    until: z.number().int(),
+    /** Optional server action used to remove this selected range. */
+    removeAction: WebActionSchema.optional(),
+  })
+  .refine((range) => range.until > range.since, {
+    message: 'Tree time range until must be greater than since.',
+  });
+
+export type WebTreeTimeRange = z.infer<typeof WebTreeTimeRangeSchema>;
+
 export const WebBasePropsSchema = z.object({
   id: z.string().min(1).optional(),
   /** Shared logical identity; unlike `renderKey`, duplicates are intentional. */
@@ -494,10 +516,28 @@ export const WebBasePropsSchema = z.object({
   defaultActiveTabId: z.string().min(1).optional(),
   /** Cache key for a client-built filter index. */
   filterIndexKey: z.string().optional(),
+  /** Tree-local time filter group shared by range controls and timestamped items. */
+  timeFilterGroup: z.string().min(1).optional(),
+  /** Unix timestamps (seconds) used by a parent tree's selected time ranges. */
+  filterTimestamps: z.array(z.number().int()).optional(),
+  /** Unix timestamp (seconds) targeted by a live `countdown` element. */
+  targetTimestamp: z.number().int().optional(),
+  /** Stable range identity used to display selected state on controls. */
+  timeFilterRangeKey: z.string().min(1).optional(),
+  /** Range keys currently represented by a moving timeline/status control. */
+  timeFilterVisibleRangeKeys: z.array(z.string().min(1)).optional(),
+  /** Human-readable plural unit used by `treeTimeFilterStatus`. */
+  timeFilterUnitLabel: z.string().min(1).optional(),
   /** Placeholder for built-in filter inputs. */
   filterPlaceholder: z.string().optional(),
   defaultExpanded: z.boolean().optional(),
   label: z.string().optional(),
+  /** Accessible label when visible control text is intentionally compact or omitted. */
+  ariaLabel: z.string().min(1).optional(),
+  /** Native hover tooltip text. */
+  title: z.string().min(1).optional(),
+  /** Alternate label while a local toggle action is active. */
+  activeLabel: z.string().optional(),
   src: z.string().min(1).optional(),
   alt: z.string().optional(),
   checked: z.boolean().optional(),
@@ -569,14 +609,8 @@ export const WebBasePropsSchema = z.object({
   formOptionFieldNames: z.array(z.string().min(1)).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */
   ttsText: z.string().optional(),
-  /** Label used by optimistic tree mutations when recomputing a child count. */
-  optimisticCountLabel: z.string().min(1).optional(),
-  /** Stores the latest optimistic child count for parent aggregation. */
-  optimisticCountValue: z.number().int().nonnegative().optional(),
-  /** Marks a text element as the display target for the nearest optimistic count label. */
-  optimisticCountText: z.literal(true).optional(),
-  /** Remove this parent when optimistic child count reaches zero. */
-  optimisticPruneWhenEmpty: z.literal(true).optional(),
+  /** Remove this node after an optimistic removal leaves it with no direct `treeItem` children. */
+  pruneWhenNoTreeItems: z.literal(true).optional(),
 });
 
 export const WebNostrPostElementPropsSchema = WebBasePropsSchema.extend(
@@ -613,6 +647,14 @@ export const WebElementTagSchema = z.enum([
   'tree',
   /** Reads the nearest tree filter and shows a clear action when filtering. */
   'treeFilterStatus',
+  /** Inline client-updated time remaining until `targetTimestamp`. */
+  'countdown',
+  /** Displays a label with the nearest tree item's live direct-child count. */
+  'countLabel',
+  /** Displays children when the nearest root tree has no direct `treeItem` children. */
+  'treeEmpty',
+  /** Shows and manages selected browser-local tree time ranges. */
+  'treeTimeFilterStatus',
   /** Hierarchical item. Prefer `summary` for the row and `children` for child items. */
   'treeItem',
   /** Generic tab list; direct children should be `tabPanel` elements. */
@@ -654,6 +696,10 @@ export const WebGenericElementTagSchema = z.enum([
   'menuItem',
   'tree',
   'treeFilterStatus',
+  'countdown',
+  'countLabel',
+  'treeEmpty',
+  'treeTimeFilterStatus',
   'treeItem',
   'tabs',
   'tabPanel',
@@ -763,6 +809,14 @@ export const WebRenderResultSchema = z.object({
   stylesheets: z.array(WebStyleSheetSchema).optional(),
   widgetHelp: WebWidgetHelpSchema.optional(),
   initialRevealedIds: z.array(z.string().min(1)).optional(),
+  /** One-time browser-local initial selections keyed by tree time-filter group. */
+  initialTreeTimeRanges: z
+    .record(z.string().min(1), z.array(WebTreeTimeRangeSchema))
+    .optional(),
+  /** Server-authoritative selections; listed groups replace local state on every root update. */
+  selectedTreeTimeRanges: z
+    .record(z.string().min(1), z.array(WebTreeTimeRangeSchema))
+    .optional(),
   shadowMountOverflow: WebShadowMountOverflowSchema.optional(),
 });
 

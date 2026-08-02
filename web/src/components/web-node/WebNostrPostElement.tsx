@@ -558,7 +558,11 @@ function profileActionForInlineProfile(
       about: profile.authorAbout ?? null,
       relayHints: profile.relayHints ?? [],
       profileActions: [],
-      sharePrefixes: { nevent: 'nostr://', nprofile: 'nostr://' },
+      profileActionsReadAction: null,
+      sharePrefixes: profile.sharePrefixes ?? {
+        nevent: 'nostr://',
+        nprofile: 'nostr://',
+      },
     }),
   );
 }
@@ -580,7 +584,11 @@ function profileActionForReference(
       about: reference.authorAbout ?? null,
       relayHints: reference.relayHints ?? [],
       profileActions: [],
-      sharePrefixes: { nevent: 'nostr://', nprofile: 'nostr://' },
+      profileActionsReadAction: null,
+      sharePrefixes: reference.sharePrefixes ?? {
+        nevent: 'nostr://',
+        nprofile: 'nostr://',
+      },
     }),
   );
 }
@@ -602,6 +610,8 @@ function profileActionForElement(
       about: elementProps.nostrAuthorAbout ?? null,
       relayHints: elementProps.nostrRelayHints ?? [],
       profileActions: elementProps.nostrProfileActions ?? [],
+      profileActionsReadAction:
+        elementProps.nostrProfileActionsReadAction ?? null,
       sharePrefixes: elementProps.nostrSharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
