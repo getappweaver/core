@@ -124,19 +124,10 @@ function titleCase(value: string | null): string | null {
   return value ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : null;
 }
 
-function previewUrlFor(url: URL): URL {
-  const hostname = url.hostname.toLowerCase();
-
-  if (hostname !== 'x.com' && hostname !== 'www.x.com') {
-    return url;
-  }
-
-  const nitterUrl = new URL(url.toString());
-
-  nitterUrl.protocol = 'https:';
-  nitterUrl.hostname = 'nitter.net';
-
-  return nitterUrl;
+function prefersHtmlPreview(url: URL): boolean {
+  return ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'].includes(
+    url.hostname.toLowerCase(),
+  );
 }
 
 function recordField(value: unknown, key: string): unknown {
@@ -300,7 +291,8 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
     throw new Error('unsupported_url_protocol');
   }
 
-  const parsed = previewUrlFor(originalUrl);
+  const parsed = originalUrl;
+  const preferHtml = prefersHtmlPreview(parsed);
 
   const fallback: LinkPreview = {
     url: parsed.toString(),
@@ -314,10 +306,12 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
   const timeout = setTimeout(() => controller.abort(), LINK_PREVIEW_TIMEOUT_MS);
 
   try {
-    const oembedPreview = await fetchOembedPreview({
-      url: parsed,
-      fallback,
-    });
+    const oembedPreview = preferHtml
+      ? null
+      : await fetchOembedPreview({
+          url: parsed,
+          fallback,
+        });
 
     if (oembedPreview) {
       return oembedPreview;
@@ -329,7 +323,9 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
     });
 
     if (!response.ok) {
-      return fallback;
+      return preferHtml
+        ? ((await fetchOembedPreview({ url: parsed, fallback })) ?? fallback)
+        : fallback;
     }
 
     const contentType = response.headers.get('content-type') ?? '';
@@ -344,6 +340,15 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview> {
       html: html.slice(0, LINK_PREVIEW_MAX_HTML_CHARS),
       url: parsed.toString(),
     });
+
+    if (
+      preferHtml &&
+      preview.title === null &&
+      preview.description === null &&
+      preview.image === null
+    ) {
+      return (await fetchOembedPreview({ url: parsed, fallback })) ?? fallback;
+    }
 
     return {
       ...preview,
