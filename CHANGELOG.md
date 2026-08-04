@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.0.3] - 2026-08-04
+
+- fix: make textarea resizable (6d3ebae)
+
 ## [v11.0.2] - 2026-08-04
 
-- fix: web push (26f661b)
+- fix: web push (3d205ae)
 
 ## [v11.0.1] - 2026-08-04
 

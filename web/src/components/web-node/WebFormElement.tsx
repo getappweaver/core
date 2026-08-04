@@ -400,14 +400,56 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   const name = () => props.element.props?.formFieldName;
   const maxRows = () => props.element.props?.maxRows ?? 4;
   let textareaEl: HTMLTextAreaElement | undefined;
+  let manuallyResized = false;
+  let stopResizeGesture: (() => void) | null = null;
 
   const resize = () => {
-    if (!textareaEl) {
+    if (!textareaEl || manuallyResized) {
       return;
     }
 
     resizeAutoGrowTextArea(textareaEl, maxRows());
   };
+
+  const watchManualResize = (event: PointerEvent) => {
+    if (!textareaEl || window.getComputedStyle(textareaEl).resize === 'none') {
+      return;
+    }
+
+    const rect = textareaEl.getBoundingClientRect();
+    const handleSize = 20;
+
+    if (
+      event.clientX < rect.right - handleSize ||
+      event.clientY < rect.bottom - handleSize
+    ) {
+      return;
+    }
+
+    const initialHeight = rect.height;
+
+    stopResizeGesture?.();
+
+    const finish = () => {
+      if (
+        textareaEl &&
+        Math.abs(textareaEl.getBoundingClientRect().height - initialHeight) > 1
+      ) {
+        manuallyResized = true;
+      }
+
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      stopResizeGesture = null;
+    };
+
+    window.addEventListener('pointerup', finish, { once: true });
+    window.addEventListener('pointercancel', finish, { once: true });
+
+    stopResizeGesture = finish;
+  };
+
+  onCleanup(() => stopResizeGesture?.());
 
   createEffect(() => {
     const targetId = props.element.props?.storyTargetId;
@@ -486,6 +528,7 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
           }
           readOnly={isReadOnlyTextArea()}
           autocomplete="off"
+          onPointerDown={watchManualResize}
           onInput={resize}
         />
       </div>
@@ -581,8 +624,8 @@ export function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
         return retained.size > 0
           ? retained
           : choices()[0]
-            ? new Set([choices()[0]!])
-            : new Set();
+            ? new Set<string>([choices()[0]!])
+            : new Set<string>();
       });
 
       return;
@@ -660,7 +703,7 @@ export function WebChoiceFieldNode(props: WebTextFieldNodeProps): JSX.Element {
             customInputEl = el;
           }}
           class="web-choiceField__custom-input"
-          name={name}
+          name={name()}
           type="number"
           min="1"
           inputMode="numeric"
