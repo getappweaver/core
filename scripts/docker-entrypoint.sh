@@ -19,7 +19,7 @@ if [ ! -f package.json ]; then
     exit 1
   fi
 
-  git clone --branch "${APPWEAVER_GIT_REF}" "${APPWEAVER_REPO_URL}" .
+  git clone --depth=1 --branch "${APPWEAVER_GIT_REF}" "${APPWEAVER_REPO_URL}" .
 fi
 
 bun install --frozen-lockfile

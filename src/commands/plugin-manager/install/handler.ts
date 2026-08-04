@@ -1085,7 +1085,11 @@ export async function handlePluginsInstall(
   }
 
   const entries = attachInstalledState({
-    entries: await queryPluginCatalog(ctx, undefined, capabilityFilter ?? undefined),
+    entries: await queryPluginCatalog(
+      ctx,
+      undefined,
+      capabilityFilter ?? undefined,
+    ),
     installedPlugins,
     coreVersion,
     coreUpdate,

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.0.1] - 2026-08-04
+
+- nit: added --depth=1 to git clone commands (84bc6ae)
+
 ## [v11.0.0] - 2026-08-02
 
-- feat: expand WebNode interactions and profile workflows (447566c)
+- feat: expand WebNode interactions and profile workflows (96f8325)
 
 ## [v10.1.2] - 2026-08-02
 

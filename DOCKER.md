@@ -5,7 +5,7 @@ Docker is the recommended VPS deployment path. The Docker image is a runtime env
 Clone AppWeaver on the host if you have not already:
 
 ```bash
-git clone https://github.com/getappweaver/core.git appweaver
+git clone --depth=1 https://github.com/getappweaver/core.git appweaver
 cd appweaver
 ```
 

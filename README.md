@@ -29,7 +29,7 @@ AppWeaver is meant to live inside the project or workspace you want it to operat
 You can install AppWeaver natively, or use [Docker](DOCKER.md) if you want the runtime dependencies packaged for you.
 
 ```bash
-git clone https://github.com/getappweaver/core.git appweaver
+git clone --depth=1 https://github.com/getappweaver/core.git appweaver
 cd appweaver
 bun install
 bun run start
