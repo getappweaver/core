@@ -41,6 +41,24 @@ function decodeBase64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+function matchingApplicationServerKey(
+  subscription: PushSubscription,
+  expected: Uint8Array<ArrayBuffer>,
+): boolean {
+  const current = subscription.options.applicationServerKey;
+
+  if (current === null) {
+    return false;
+  }
+
+  const bytes = new Uint8Array(current);
+
+  return (
+    bytes.length === expected.length &&
+    bytes.every((value, index) => value === expected[index])
+  );
+}
+
 function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(async () => {
@@ -119,6 +137,18 @@ export async function registerWebPushNotifications(): Promise<RegisterWebPushOut
     return { status: 'disabled' };
   }
 
+  let applicationServerKey: Uint8Array<ArrayBuffer>;
+
+  try {
+    applicationServerKey = decodeBase64UrlToUint8Array(vapid.publicKey);
+
+    if (applicationServerKey.length !== 65 || applicationServerKey[0] !== 4) {
+      throw new Error('VAPID public key is not a valid P-256 public key.');
+    }
+  } catch (err) {
+    return errorOutcome('vapid_key', err);
+  }
+
   const permission = await Notification.requestPermission().catch(
     (err: unknown) => errorOutcome('permission', err),
   );
@@ -147,25 +177,44 @@ export async function registerWebPushNotifications(): Promise<RegisterWebPushOut
     return existing;
   }
 
-  if (existing) {
-    const unsubscribed = await existing
-      .unsubscribe()
-      .catch((err: unknown) => errorOutcome('existing_subscription', err));
+  let sub: PushSubscription;
 
-    if (isErrorOutcome(unsubscribed)) {
-      return unsubscribed;
+  if (
+    existing &&
+    matchingApplicationServerKey(existing, applicationServerKey)
+  ) {
+    sub = existing;
+  } else {
+    if (existing) {
+      const endpoint = existing.toJSON().endpoint;
+
+      if (endpoint) {
+        await deleteJson('/api/push/subscribe', { endpoint }).catch(
+          () => undefined,
+        );
+      }
+
+      const unsubscribed = await existing
+        .unsubscribe()
+        .catch((err: unknown) => errorOutcome('existing_subscription', err));
+
+      if (isErrorOutcome(unsubscribed)) {
+        return unsubscribed;
+      }
     }
-  }
 
-  const sub = await registration.pushManager
-    .subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: decodeBase64UrlToUint8Array(vapid.publicKey),
-    })
-    .catch((err: unknown) => errorOutcome('browser_push_service', err));
+    const created = await registration.pushManager
+      .subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      })
+      .catch((err: unknown) => errorOutcome('browser_push_service', err));
 
-  if (isErrorOutcome(sub)) {
-    return sub;
+    if (isErrorOutcome(created)) {
+      return created;
+    }
+
+    sub = created;
   }
 
   const json = sub.toJSON();

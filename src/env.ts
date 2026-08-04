@@ -102,6 +102,19 @@ export function loadFileShareNostrConfig(): FileShareNostrConfig {
 }
 
 const VAPID_SUBJECT_PROTOCOLS = new Set(['mailto:', 'https:', 'http:']);
+const BASE64_URL_RE = /^[A-Za-z0-9_-]+$/;
+
+function decodeVapidKey(value: string): Uint8Array | null {
+  if (!BASE64_URL_RE.test(value)) {
+    return null;
+  }
+
+  try {
+    return Buffer.from(value, 'base64url');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * VAPID `subject` must be a URI per RFC 8292 (`mailto:` or `https:` is typical).
@@ -155,6 +168,21 @@ export function loadWebPushConfig(): WebPushConfig | null {
   const subject = normalizeVapidSubject(subjectRaw);
 
   if (!subject) {
+    return null;
+  }
+
+  const publicKeyBytes = decodeVapidKey(publicKey);
+  const privateKeyBytes = decodeVapidKey(privateKey);
+
+  if (
+    publicKeyBytes?.length !== 65 ||
+    publicKeyBytes[0] !== 4 ||
+    privateKeyBytes?.length !== 32
+  ) {
+    log.warn(
+      'BOT_WEB_PUSH_PUBLIC_KEY or BOT_WEB_PUSH_PRIVATE_KEY is not a valid VAPID P-256 key. Web Push disabled until fixed.',
+    );
+
     return null;
   }
 

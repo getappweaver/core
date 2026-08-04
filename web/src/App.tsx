@@ -164,7 +164,7 @@ type CoreUpdateResponse = {
   } | null;
 };
 
-type DemoWidgetQuery = {
+type WidgetQuery = {
   commandToken: string;
   subcommandToken: string | null;
 };
@@ -182,7 +182,7 @@ function cleanQueryToken(value: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseDemoWidgetQuery(search: string): DemoWidgetQuery | null {
+function parseWidgetQuery(search: string): WidgetQuery | null {
   const params = new URLSearchParams(search);
 
   const commandToken = cleanQueryToken(
@@ -246,9 +246,7 @@ function AppInner(): JSX.Element {
 
   const auth = useNostrAuth();
 
-  const demoWidgetQuery = isWebDemoMode()
-    ? parseDemoWidgetQuery(window.location.search)
-    : null;
+  const widgetQuery = parseWidgetQuery(window.location.search);
 
   const [composerAiState, setComposerAiState] =
     createSignal<ComposerAiState | null>(null);
@@ -341,7 +339,7 @@ function AppInner(): JSX.Element {
   const [desktopLayoutEnabled, setDesktopLayoutEnabled] = createSignal(false);
   const [desktopLayoutReady, setDesktopLayoutReady] = createSignal(false);
 
-  const [demoQueryWidgetOpenedKey, setDemoQueryWidgetOpenedKey] = createSignal<
+  const [queryWidgetOpenedKey, setQueryWidgetOpenedKey] = createSignal<
     string | null
   >(null);
 
@@ -574,7 +572,7 @@ function AppInner(): JSX.Element {
     return value?.toLowerCase() === token.toLowerCase();
   }
 
-  function resolveDemoQueryWidget(query: DemoWidgetQuery): HeaderWidget | null {
+  function resolveQueryWidget(query: WidgetQuery): HeaderWidget | null {
     const command = commands().find(
       (entry) =>
         tokenMatches(entry.name, query.commandToken) ||
@@ -2301,7 +2299,7 @@ function AppInner(): JSX.Element {
 
   createEffect(() => {
     if (
-      !demoWidgetQuery ||
+      !widgetQuery ||
       !wsConnected() ||
       loadingCommands() ||
       !desktopLayoutReady()
@@ -2309,7 +2307,7 @@ function AppInner(): JSX.Element {
       return;
     }
 
-    const widget = resolveDemoQueryWidget(demoWidgetQuery);
+    const widget = resolveQueryWidget(widgetQuery);
 
     if (!widget) {
       return;
@@ -2317,11 +2315,11 @@ function AppInner(): JSX.Element {
 
     const key = taskbarDockKey(widget.command, widget.subcommand);
 
-    if (demoQueryWidgetOpenedKey() === key) {
+    if (queryWidgetOpenedKey() === key) {
       return;
     }
 
-    setDemoQueryWidgetOpenedKey(key);
+    setQueryWidgetOpenedKey(key);
     void openHeaderWidget(widget);
   });
 
@@ -2531,6 +2529,10 @@ function AppInner(): JSX.Element {
           `Push: failed during ${result.stage} — ${result.message}.`,
         );
       }
+    } catch (err) {
+      appendSystemMessage(
+        `Push: registration failed unexpectedly — ${err instanceof Error ? err.message : String(err)}.`,
+      );
     } finally {
       setPushBusy(false);
     }

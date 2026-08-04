@@ -1441,7 +1441,8 @@ export function createWebFetchHandler(
           const message = err instanceof Error ? err.message : String(err);
 
           const status =
-            message === 'invalid_json' || message === 'invalid_subscription'
+            message === 'invalid_json' ||
+            message.startsWith('invalid_subscription')
               ? 400
               : 500;
 

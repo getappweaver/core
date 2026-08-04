@@ -524,6 +524,21 @@ async function main() {
         message,
         signAuthEvent,
       }),
+    sendWebPush: async ({ title, body, url }) => {
+      if (config.webPush === null) {
+        return { status: 'disabled' as const };
+      }
+
+      const summary = await notifyAllWebPushSubscriptions({
+        db: seenDb,
+        config: config.webPush,
+        title,
+        body,
+        url,
+      });
+
+      return { status: 'complete' as const, ...summary };
+    },
     promptFn: async (message: string | PromptPayload): Promise<string> => {
       await sendReplyForSource(replySource, getPromptPayloadValue(message));
 
@@ -589,12 +604,14 @@ async function main() {
           ? `${preview.slice(0, max)}…`
           : preview || '(empty)';
 
-      notifyAllWebPushSubscriptions({
+      void notifyAllWebPushSubscriptions({
         db: seenDb,
         config: config.webPush,
         title: 'AppWeaver',
         body,
         url: '/',
+      }).catch((err: unknown) => {
+        log.warn(`Web push failed for incoming Nostr message: ${String(err)}`);
       });
     }
 

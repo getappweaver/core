@@ -48,6 +48,26 @@ export type WebPromptPayload = {
 export type PromptPayload = TextPromptPayload | WebPromptPayload;
 export type PromptFn = (message: string | PromptPayload) => Promise<string>;
 
+export type SendWebPushNotificationProps = {
+  title: string;
+  body: string;
+  url: string;
+};
+
+export type SendWebPushNotificationResult =
+  | { status: 'disabled' }
+  | {
+      status: 'complete';
+      attempted: number;
+      accepted: number;
+      failed: number;
+      removed: number;
+    };
+
+export type SendWebPushNotificationFn = (
+  notification: SendWebPushNotificationProps,
+) => Promise<SendWebPushNotificationResult>;
+
 export function createTextPrompt(value: string): TextPromptPayload {
   return {
     type: 'text-prompt',
@@ -93,6 +113,7 @@ export type PluginContext = {
   runAgent: RunAgentFn | null;
   sendReply: SendReplyFn;
   sendDm: SendReplyFn;
+  sendWebPush: SendWebPushNotificationFn;
   promptFn: PromptFn;
   wot: WotServices;
   nostrResolution: NostrResolutionService;
