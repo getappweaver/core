@@ -36,36 +36,50 @@ function toggleAction(skill: ManagedSkill): WebAction {
 function skillRow(skill: ManagedSkill): WebNode {
   return {
     type: 'element',
-    tag: 'row',
+    tag: 'stack',
     props: {
-      itemAlign: 'center',
+      gap: 'xs',
       className: 'skills-manager-row',
       entityKey: `skill:${skill.name}`,
     },
     children: [
       {
         type: 'element',
-        tag: 'stack',
-        props: { gap: 'xs', className: 'skills-manager-copy' },
+        tag: 'text',
+        props: { weight: 'bold', className: 'skills-manager-name' },
+        children: [textNode(skill.name)],
+      },
+      ...(skill.description ? [textBlock(skill.description, 'muted')] : []),
+      {
+        type: 'element',
+        tag: 'row',
+        props: {
+          gap: 'xs',
+          itemAlign: 'center',
+          className: 'skills-manager-toggle-row',
+        },
         children: [
           {
             type: 'element',
-            tag: 'text',
-            props: { weight: 'bold', className: 'skills-manager-name' },
-            children: [textNode(skill.name)],
+            tag: 'checkbox',
+            props: {
+              checked: skill.enabled,
+              ariaLabel: `${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`,
+              title: `${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`,
+              className: 'web-checkbox--retro skills-manager-checkbox',
+              action: toggleAction(skill),
+            },
           },
-          ...(skill.description ? [textBlock(skill.description, 'muted')] : []),
+          {
+            type: 'element',
+            tag: 'text',
+            props: {
+              tone: 'muted',
+              className: 'skills-manager-status',
+            },
+            children: [textNode(skill.enabled ? 'Enabled' : 'Disabled')],
+          },
         ],
-      },
-      {
-        type: 'element',
-        tag: 'button',
-        props: {
-          label: skill.enabled ? 'Disable' : 'Enable',
-          ariaLabel: `${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`,
-          className: `web-button skills-manager-toggle ${skill.enabled ? 'skills-manager-toggle--enabled' : 'skills-manager-toggle--disabled'}`,
-          action: toggleAction(skill),
-        },
       },
     ],
   };
@@ -80,57 +94,28 @@ function renderSkillsManager(skills: ManagedSkill[]): WebHandlerResult {
       {
         id: 'skills-manager',
         cssText: `
-          .web-row.skills-manager-row {
-            align-items: center;
-            gap: 0.8rem;
+          .web-stack.skills-manager-row {
             padding: 0.55rem 0;
             border-bottom: 1px solid color-mix(in srgb, var(--color-border, currentColor) 55%, transparent);
           }
 
-          .web-row.skills-manager-row:first-child {
+          .web-stack.skills-manager-row:first-child {
             padding-top: 0;
           }
 
-          .web-row.skills-manager-row:last-child {
+          .web-stack.skills-manager-row:last-child {
             padding-bottom: 0;
             border-bottom: 0;
-          }
-
-          .web-stack.skills-manager-copy {
-            flex: 1 1 auto;
-            min-width: 0;
           }
 
           .web-text.skills-manager-name {
             color: var(--color-warning);
           }
 
-          .web-button.skills-manager-toggle {
-            min-width: 5.8rem;
-            flex: 0 0 auto;
-            padding: 0.2rem 0.65rem;
-            border: 2px solid #000;
-            box-shadow: 4px 4px 0 var(--color-panel-shadow);
+          .web-text.skills-manager-status {
+            font-size: 0.82rem;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
-          }
-
-          .web-button.skills-manager-toggle--enabled {
-            background: var(--color-silver);
-          }
-
-          .web-button.skills-manager-toggle--disabled {
-            background: var(--color-warning);
-          }
-
-          @media (max-width: 520px) {
-            .web-row.skills-manager-row {
-              align-items: flex-start;
-            }
-
-            .web-button.skills-manager-toggle {
-              min-width: 5.2rem;
-            }
+            letter-spacing: 0.06em;
           }
         `.trim(),
       },
