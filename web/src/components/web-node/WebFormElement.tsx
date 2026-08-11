@@ -183,8 +183,18 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
       };
 
       for (const [key, value] of fd.entries()) {
-        if (typeof value === 'string') {
+        if (typeof value !== 'string') {
+          continue;
+        }
+
+        const existing = mergedPayload[key];
+
+        if (existing === undefined) {
           mergedPayload[key] = value;
+        } else if (Array.isArray(existing)) {
+          existing.push(value);
+        } else {
+          mergedPayload[key] = [existing, value];
         }
       }
 

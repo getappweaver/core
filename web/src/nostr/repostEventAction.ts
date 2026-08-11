@@ -18,6 +18,19 @@ import {
 } from './interactionState';
 import { publishEvent } from './relayLists';
 
+const SignalReviewPayloadSchema = z
+  .object({
+    actionCategory: z.literal('repost_quote'),
+    targetAuthorPubkey: z.string().min(1).nullable().default(null),
+    targetAuthorLabel: z.string().min(1).default('Target author'),
+    candidateTopics: z.array(z.string()).default([]),
+    allowRemember: z.boolean().default(true),
+    mode: z.enum(['ask', 'always', 'never']).default('ask'),
+    targetEventJson: z.string().nullable().default(null),
+  })
+  .nullable()
+  .default(null);
+
 const RepostPayloadSchema = z.object({
   eventId: z.string().min(1),
   eventPubkey: z.string().min(1),
@@ -33,10 +46,15 @@ const RepostPayloadSchema = z.object({
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
+  signalReview: SignalReviewPayloadSchema,
 });
 
 const SendRepostPayloadSchema = RepostPayloadSchema.extend({
   content: z.string().default(''),
+  signal_outcome: z.enum(['create', 'without_signal']).optional(),
+  signal_topics: z.union([z.string(), z.array(z.string())]).optional(),
+  signal_author_pubkey: z.string().nullable().optional(),
+  signal_remember: z.union([z.boolean(), z.string()]).optional(),
 });
 
 type RepostDeps = {
@@ -120,6 +138,126 @@ function neventForPayload(
     kind: payload.eventKind,
     relays: relays.slice(0, 4),
   });
+}
+
+function signalReviewCheckbox({
+  fieldName,
+  value,
+  label,
+  checked,
+}: {
+  fieldName: string;
+  value: string;
+  label: string;
+  checked: boolean;
+}): WebNode {
+  return el({
+    tag: 'row',
+    props: { gap: 'xs', itemAlign: 'center' },
+    children: [
+      el({
+        tag: 'checkbox',
+        props: {
+          formFieldName: fieldName,
+          value,
+          checked,
+          className: 'web-checkbox--retro',
+        },
+        children: [],
+      }),
+      text(label),
+    ],
+  });
+}
+
+function signalReviewNodes(
+  review: z.infer<typeof SignalReviewPayloadSchema>,
+): WebNode[] {
+  if (!review || review.mode !== 'ask') {
+    return [];
+  }
+
+  return [
+    el({
+      tag: 'text',
+      props: { weight: 'semibold', size: 'sm' },
+      children: [text('Signal review')],
+    }),
+    el({
+      tag: 'text',
+      props: { weight: 'semibold', size: 'sm' },
+      children: [text('Author')],
+    }),
+    ...(review.targetAuthorPubkey
+      ? [
+          signalReviewCheckbox({
+            fieldName: 'signal_author_pubkey',
+            value: review.targetAuthorPubkey,
+            label: review.targetAuthorLabel,
+            checked: true,
+          }),
+        ]
+      : [
+          el({
+            tag: 'text',
+            props: { tone: 'muted', size: 'sm' },
+            children: [text('No cached author')],
+          }),
+        ]),
+    el({
+      tag: 'text',
+      props: { weight: 'semibold', size: 'sm' },
+      children: [text('Topics')],
+    }),
+    ...(review.candidateTopics.length > 0
+      ? review.candidateTopics.map((topic) =>
+          signalReviewCheckbox({
+            fieldName: 'signal_topics',
+            value: topic,
+            label: topic,
+            checked: true,
+          }),
+        )
+      : [
+          el({
+            tag: 'text',
+            props: { tone: 'muted', size: 'sm' },
+            children: [text('No topics')],
+          }),
+        ]),
+    ...(review.allowRemember
+      ? [
+          el({
+            tag: 'divider',
+            props: { className: 'web-form__section-divider' },
+            children: [],
+          }),
+          signalReviewCheckbox({
+            fieldName: 'signal_remember',
+            value: 'true',
+            label: "Don't ask again for Repost / Quote",
+            checked: false,
+          }),
+        ]
+      : []),
+  ];
+}
+
+function withSignalOutcome({
+  action,
+  outcome,
+}: {
+  action: Extract<WebAction, { type: 'clientAction' }>;
+  outcome: 'create' | 'without_signal';
+}): Extract<WebAction, { type: 'clientAction' }> {
+  return {
+    ...action,
+    payload: {
+      ...(action.payload ?? {}),
+      signal_outcome: outcome,
+      signal_topics: [],
+    },
+  };
 }
 
 function statusRoot(title: string, body: string): WebNodeRoot {
@@ -218,6 +356,81 @@ function nostrPostNode(post: NostrPostView): WebNode {
   });
 }
 
+function signalTopics(
+  value: z.infer<typeof SendRepostPayloadSchema>['signal_topics'],
+): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string');
+  }
+
+  return typeof value === 'string' ? [value] : [];
+}
+
+function signalRemember(
+  value: z.infer<typeof SendRepostPayloadSchema>['signal_remember'],
+): boolean {
+  return value === true || value === 'true' || value === '1';
+}
+
+function repostAfterRecordCommands({
+  payload,
+  isQuote,
+}: {
+  payload: z.infer<typeof SendRepostPayloadSchema>;
+  isQuote: boolean;
+}): Array<Extract<WebAction, { type: 'command' }>> {
+  const review = payload.signalReview;
+
+  if (!review) {
+    return [];
+  }
+
+  const outcome =
+    review.mode === 'always'
+      ? 'create'
+      : review.mode === 'never'
+        ? 'without_signal'
+        : (payload.signal_outcome ?? 'without_signal');
+
+  const remember =
+    review.mode === 'ask' && signalRemember(payload.signal_remember);
+
+  if (outcome === 'without_signal' && !remember) {
+    return [];
+  }
+
+  return [
+    {
+      type: 'command',
+      command: payload.nrAlias,
+      subcommand: 'signal-record',
+      arguments: {},
+      options: {
+        target_event_id: payload.eventId,
+        action_category: 'repost_quote',
+        signal_type: isQuote ? 'quote' : 'repost',
+        signal_outcome: outcome,
+        signal_topics:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.candidateTopics
+              : signalTopics(payload.signal_topics)
+            : [],
+        signal_author_pubkey:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.targetAuthorPubkey
+              : (payload.signal_author_pubkey ?? null)
+            : null,
+        signal_remember: remember,
+        target_event_json: review.targetEventJson,
+        candidate_topics: review.candidateTopics,
+      },
+      recordInTimeline: false,
+    },
+  ];
+}
+
 function repostPanelRoot({ payload }: PanelRootProps): WebNodeRoot {
   const action = {
     type: 'clientAction' as const,
@@ -262,16 +475,45 @@ function repostPanelRoot({ payload }: PanelRootProps): WebNodeRoot {
                 text('Empty sends a NIP-18 repost. Text sends a quote post.'),
               ],
             }),
+            ...signalReviewNodes(payload.signalReview),
             el({
               tag: 'row',
-              props: { className: 'web-form__actions' },
-              children: [
-                el({
-                  tag: 'button',
-                  props: { label: 'Send', htmlType: 'submit' },
-                  children: [],
-                }),
-              ],
+              props: { className: 'web-form__actions', gap: 'xs' },
+              children:
+                payload.signalReview?.mode === 'ask'
+                  ? [
+                      el({
+                        tag: 'button',
+                        props: {
+                          label: 'Create signal + send',
+                          htmlType: 'submit',
+                          submitAction: withSignalOutcome({
+                            action,
+                            outcome: 'create',
+                          }),
+                        },
+                        children: [],
+                      }),
+                      el({
+                        tag: 'button',
+                        props: {
+                          label: 'Send without signal',
+                          htmlType: 'submit',
+                          submitAction: withSignalOutcome({
+                            action,
+                            outcome: 'without_signal',
+                          }),
+                        },
+                        children: [],
+                      }),
+                    ]
+                  : [
+                      el({
+                        tag: 'button',
+                        props: { label: 'Send', htmlType: 'submit' },
+                        children: [],
+                      }),
+                    ],
             }),
           ],
         }),
@@ -473,6 +715,7 @@ export async function handleNostrSendRepostOrQuoteAction({
       userPubkey: signed.pubkey,
       interactionType: isQuote ? 'quoted' : 'reposted',
       interactionCreatedAt: signed.created_at,
+      afterRecordCommands: repostAfterRecordCommands({ payload, isQuote }),
     };
   } catch (error) {
     setChromeError(error instanceof Error ? error.message : String(error));

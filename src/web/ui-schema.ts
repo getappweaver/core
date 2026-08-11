@@ -325,6 +325,8 @@ const WebNostrPostReferenceBaseSchema = z.object({
   quoted: z.boolean().optional(),
   showActions: z.boolean().optional(),
   trailingActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  profileActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  profileActionsReadAction: WebActionSchema.nullable().optional(),
   inlineProfiles: z
     .record(
       z.string(),
@@ -337,6 +339,8 @@ const WebNostrPostReferenceBaseSchema = z.object({
         authorUsername: z.string().min(1).optional(),
         authorPicture: z.string().min(1).optional(),
         authorAbout: z.string().optional(),
+        profileActions: z.array(WebNostrPostExtraActionSchema).optional(),
+        profileActionsReadAction: WebActionSchema.nullable().optional(),
       }),
     )
     .optional(),
@@ -364,6 +368,8 @@ export const WebNostrInlineProfilesSchema = z.record(
     authorUsername: z.string().min(1).optional(),
     authorPicture: z.string().min(1).optional(),
     authorAbout: z.string().optional(),
+    profileActions: z.array(WebNostrPostExtraActionSchema).optional(),
+    profileActionsReadAction: WebActionSchema.nullable().optional(),
   }),
 );
 
@@ -376,6 +382,8 @@ export const WebNostrPostActivityHeaderSchema = z.object({
   actorPicture: z.string().min(1).optional(),
   actorAbout: z.string().optional(),
   createdAt: z.number().int(),
+  profileActions: z.array(WebNostrPostExtraActionSchema).optional(),
+  profileActionsReadAction: WebActionSchema.nullable().optional(),
 });
 
 export const WebNostrPostPropsSchema = z.object({

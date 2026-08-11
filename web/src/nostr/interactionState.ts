@@ -1,5 +1,7 @@
 import { createSignal } from 'solid-js';
 
+import type { WebAction } from '@src/web/ui-schema';
+
 export type NostrInteractionKind = 'liked' | 'replied' | 'reposted' | 'quoted';
 
 export type NostrInteractionFlags = Record<NostrInteractionKind, boolean>;
@@ -18,6 +20,7 @@ export type NostrInteractionRecordResult = {
   userPubkey: string;
   interactionType: NostrInteractionKind;
   interactionCreatedAt: number;
+  afterRecordCommands?: Array<Extract<WebAction, { type: 'command' }>>;
 };
 
 const EMPTY_FLAGS: NostrInteractionFlags = {

@@ -557,8 +557,8 @@ function profileActionForInlineProfile(
       picture: profile.authorPicture ?? null,
       about: profile.authorAbout ?? null,
       relayHints: profile.relayHints ?? [],
-      profileActions: [],
-      profileActionsReadAction: null,
+      profileActions: profile.profileActions ?? [],
+      profileActionsReadAction: profile.profileActionsReadAction ?? null,
       sharePrefixes: profile.sharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
@@ -583,8 +583,8 @@ function profileActionForReference(
       picture: reference.authorPicture ?? null,
       about: reference.authorAbout ?? null,
       relayHints: reference.relayHints ?? [],
-      profileActions: [],
-      profileActionsReadAction: null,
+      profileActions: reference.profileActions ?? [],
+      profileActionsReadAction: reference.profileActionsReadAction ?? null,
       sharePrefixes: reference.sharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
@@ -1711,6 +1711,8 @@ export function WebNostrPostElement(
         authorPicture: activity.actorPicture,
         authorAbout: activity.actorAbout,
         relayHints: [],
+        profileActions: activity.profileActions,
+        profileActionsReadAction: activity.profileActionsReadAction,
       }),
     );
   };

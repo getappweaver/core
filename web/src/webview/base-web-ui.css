@@ -594,6 +594,7 @@ select {
 
 .web-overflow-trigger.web-nostrProfile__latestPostMenu {
   margin-right: 0;
+  opacity: 1;
 }
 
 .web-nostrProfile__latestPost .web-nostrPost__profileHeader {
@@ -1323,6 +1324,13 @@ select {
 .web-form--stacked {
   display: grid;
   gap: 0.55rem;
+}
+
+.web-form__section-divider {
+  width: 100%;
+  margin: 0.35rem 0 0.1rem;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
 }
 
 .web-form--stacked .web-form__actions {

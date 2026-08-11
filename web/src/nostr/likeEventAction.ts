@@ -15,6 +15,17 @@ import {
 } from './interactionState';
 import { publishEvent } from './relayLists';
 
+const SignalReviewPayloadSchema = z
+  .object({
+    actionCategory: z.literal('like'),
+    targetAuthorPubkey: z.string().min(1).nullable().default(null),
+    candidateTopics: z.array(z.string()).default([]),
+    mode: z.enum(['ask', 'always', 'never']).default('ask'),
+    targetEventJson: z.string().nullable().default(null),
+  })
+  .nullable()
+  .default(null);
+
 const LikeEventPayloadSchema = z.object({
   eventId: z.string().min(1),
   eventPubkey: z.string().min(1),
@@ -24,6 +35,11 @@ const LikeEventPayloadSchema = z.object({
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
+  signalReview: SignalReviewPayloadSchema,
+  signal_outcome: z.enum(['create', 'without_signal']).optional(),
+  signal_topics: z.union([z.string(), z.array(z.string())]).optional(),
+  signal_author_pubkey: z.string().nullable().optional(),
+  signal_remember: z.union([z.boolean(), z.string()]).optional(),
 });
 
 type LikeEventDeps = {
@@ -39,6 +55,79 @@ type LikeEventDeps = {
   setChromeLoading: (loading: boolean) => void;
   appendSystemMessage: (text: string) => void;
 };
+
+function signalTopics(
+  value: z.infer<typeof LikeEventPayloadSchema>['signal_topics'],
+): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string');
+  }
+
+  return typeof value === 'string' ? [value] : [];
+}
+
+function signalRemember(
+  value: z.infer<typeof LikeEventPayloadSchema>['signal_remember'],
+): boolean {
+  return value === true || value === 'true' || value === '1';
+}
+
+function likeAfterRecordCommands({
+  payload,
+}: {
+  payload: z.infer<typeof LikeEventPayloadSchema>;
+}): Array<Extract<WebAction, { type: 'command' }>> {
+  const review = payload.signalReview;
+
+  if (!review) {
+    return [];
+  }
+
+  const outcome =
+    review.mode === 'always'
+      ? 'create'
+      : review.mode === 'never'
+        ? 'without_signal'
+        : (payload.signal_outcome ?? 'without_signal');
+
+  const remember =
+    review.mode === 'ask' && signalRemember(payload.signal_remember);
+
+  if (outcome === 'without_signal' && !remember) {
+    return [];
+  }
+
+  return [
+    {
+      type: 'command',
+      command: payload.nrAlias,
+      subcommand: 'signal-record',
+      arguments: {},
+      options: {
+        target_event_id: payload.eventId,
+        action_category: 'like',
+        signal_type: 'like',
+        signal_outcome: outcome,
+        signal_topics:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.candidateTopics
+              : signalTopics(payload.signal_topics)
+            : [],
+        signal_author_pubkey:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.targetAuthorPubkey
+              : (payload.signal_author_pubkey ?? null)
+            : null,
+        signal_remember: remember,
+        target_event_json: review.targetEventJson,
+        candidate_topics: review.candidateTopics,
+      },
+      recordInTimeline: false,
+    },
+  ];
+}
 
 function statusRoot(title: string, body: string): WebNodeRoot {
   return {
@@ -163,6 +252,7 @@ export async function handleNostrLikeEventAction({
       userPubkey: signed.pubkey,
       interactionType: 'liked',
       interactionCreatedAt: signed.created_at,
+      afterRecordCommands: likeAfterRecordCommands({ payload }),
     };
   } catch (error) {
     setChromeError(error instanceof Error ? error.message : String(error));

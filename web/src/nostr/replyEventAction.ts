@@ -18,6 +18,19 @@ import {
 } from './interactionState';
 import { publishEvent } from './relayLists';
 
+const SignalReviewPayloadSchema = z
+  .object({
+    actionCategory: z.enum(['reply', 'repost_quote']),
+    targetAuthorPubkey: z.string().min(1).nullable().default(null),
+    targetAuthorLabel: z.string().min(1).default('Target author'),
+    candidateTopics: z.array(z.string()).default([]),
+    allowRemember: z.boolean().default(true),
+    mode: z.enum(['ask', 'always', 'never']).default('ask'),
+    targetEventJson: z.string().nullable().default(null),
+  })
+  .nullable()
+  .default(null);
+
 const ReplyPayloadSchema = z.object({
   eventId: z.string().min(1),
   eventPubkey: z.string().min(1),
@@ -35,10 +48,15 @@ const ReplyPayloadSchema = z.object({
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
+  signalReview: SignalReviewPayloadSchema,
 });
 
 const SendReplyPayloadSchema = ReplyPayloadSchema.extend({
   content: z.string().default(''),
+  signal_outcome: z.enum(['create', 'without_signal']).optional(),
+  signal_topics: z.union([z.string(), z.array(z.string())]).optional(),
+  signal_author_pubkey: z.string().nullable().optional(),
+  signal_remember: z.union([z.boolean(), z.string()]).optional(),
 });
 
 type ReplyDeps = {
@@ -68,6 +86,96 @@ function el(
   children: WebNode[],
 ): WebNode {
   return { type: 'element', tag, props, children } as WebNode;
+}
+
+function signalReviewCheckbox({
+  fieldName,
+  value,
+  label,
+  checked,
+}: {
+  fieldName: string;
+  value: string;
+  label: string;
+  checked: boolean;
+}): WebNode {
+  return el('row', { gap: 'xs', itemAlign: 'center' }, [
+    el(
+      'checkbox',
+      {
+        formFieldName: fieldName,
+        value,
+        checked,
+        className: 'web-checkbox--retro',
+      },
+      [],
+    ),
+    text(label),
+  ]);
+}
+
+function signalReviewNodes(
+  review: z.infer<typeof SignalReviewPayloadSchema>,
+): WebNode[] {
+  if (!review || review.mode !== 'ask') {
+    return [];
+  }
+
+  return [
+    el('text', { weight: 'semibold', size: 'sm' }, [text('Signal review')]),
+    el('text', { weight: 'semibold', size: 'sm' }, [text('Author')]),
+    ...(review.targetAuthorPubkey
+      ? [
+          signalReviewCheckbox({
+            fieldName: 'signal_author_pubkey',
+            value: review.targetAuthorPubkey,
+            label: review.targetAuthorLabel,
+            checked: true,
+          }),
+        ]
+      : [
+          el('text', { tone: 'muted', size: 'sm' }, [text('No cached author')]),
+        ]),
+    el('text', { weight: 'semibold', size: 'sm' }, [text('Topics')]),
+    ...(review.candidateTopics.length > 0
+      ? review.candidateTopics.map((topic) =>
+          signalReviewCheckbox({
+            fieldName: 'signal_topics',
+            value: topic,
+            label: topic,
+            checked: true,
+          }),
+        )
+      : [el('text', { tone: 'muted', size: 'sm' }, [text('No topics')])]),
+    ...(review.allowRemember
+      ? [
+          el('divider', { className: 'web-form__section-divider' }, []),
+          signalReviewCheckbox({
+            fieldName: 'signal_remember',
+            value: 'true',
+            label: "Don't ask again for Reply",
+            checked: false,
+          }),
+        ]
+      : []),
+  ];
+}
+
+function withSignalOutcome({
+  action,
+  outcome,
+}: {
+  action: Extract<WebAction, { type: 'clientAction' }>;
+  outcome: 'create' | 'without_signal';
+}): Extract<WebAction, { type: 'clientAction' }> {
+  return {
+    ...action,
+    payload: {
+      ...(action.payload ?? {}),
+      signal_outcome: outcome,
+      signal_topics: [],
+    },
+  };
 }
 
 function statusRoot(title: string, body: string): WebNodeRoot {
@@ -388,6 +496,79 @@ function replyTags(
   return tags;
 }
 
+function signalTopics(
+  value: z.infer<typeof SendReplyPayloadSchema>['signal_topics'],
+): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string');
+  }
+
+  return typeof value === 'string' ? [value] : [];
+}
+
+function signalRemember(
+  value: z.infer<typeof SendReplyPayloadSchema>['signal_remember'],
+): boolean {
+  return value === true || value === 'true' || value === '1';
+}
+
+function replyAfterRecordCommands({
+  payload,
+}: {
+  payload: z.infer<typeof SendReplyPayloadSchema>;
+}): Array<Extract<WebAction, { type: 'command' }>> {
+  const review = payload.signalReview;
+
+  if (!review) {
+    return [];
+  }
+
+  const outcome =
+    review.mode === 'always'
+      ? 'create'
+      : review.mode === 'never'
+        ? 'without_signal'
+        : (payload.signal_outcome ?? 'without_signal');
+
+  const remember =
+    review.mode === 'ask' && signalRemember(payload.signal_remember);
+
+  if (outcome === 'without_signal' && !remember) {
+    return [];
+  }
+
+  return [
+    {
+      type: 'command',
+      command: payload.nrAlias,
+      subcommand: 'signal-record',
+      arguments: {},
+      options: {
+        target_event_id: payload.eventId,
+        action_category: 'reply',
+        signal_type: 'reply',
+        signal_outcome: outcome,
+        signal_topics:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.candidateTopics
+              : signalTopics(payload.signal_topics)
+            : [],
+        signal_author_pubkey:
+          outcome === 'create'
+            ? review.mode === 'always'
+              ? review.targetAuthorPubkey
+              : (payload.signal_author_pubkey ?? null)
+            : null,
+        signal_remember: remember,
+        target_event_json: review.targetEventJson,
+        candidate_topics: review.candidateTopics,
+      },
+      recordInTimeline: false,
+    },
+  ];
+}
+
 function replyPanelRoot({
   payload,
   replies,
@@ -436,8 +617,36 @@ function replyPanelRoot({
               },
               [],
             ),
-            el('row', { className: 'web-form__actions' }, [
-              el('button', { label: 'Send', htmlType: 'submit' }, []),
+            ...signalReviewNodes(payload.signalReview),
+            el('row', { className: 'web-form__actions', gap: 'xs' }, [
+              ...(payload.signalReview?.mode === 'ask'
+                ? [
+                    el(
+                      'button',
+                      {
+                        label: 'Reply + create signal',
+                        htmlType: 'submit',
+                        submitAction: withSignalOutcome({
+                          action,
+                          outcome: 'create',
+                        }),
+                      },
+                      [],
+                    ),
+                    el(
+                      'button',
+                      {
+                        label: 'Reply without signal',
+                        htmlType: 'submit',
+                        submitAction: withSignalOutcome({
+                          action,
+                          outcome: 'without_signal',
+                        }),
+                      },
+                      [],
+                    ),
+                  ]
+                : [el('button', { label: 'Send', htmlType: 'submit' }, [])]),
             ]),
           ],
         ),
@@ -621,6 +830,7 @@ export async function handleNostrSendReplyAction({
       userPubkey: signed.pubkey,
       interactionType: 'replied',
       interactionCreatedAt: signed.created_at,
+      afterRecordCommands: replyAfterRecordCommands({ payload }),
     };
   } catch (error) {
     setChromeError(error instanceof Error ? error.message : String(error));

@@ -461,6 +461,17 @@ async function recordNostrInteraction({
     if (text.startsWith('Missing ') || text.startsWith('Unknown ')) {
       throw new Error(text);
     }
+
+    for (const command of result.afterRecordCommands ?? []) {
+      await runJsonCommandOutput({
+        command: command.command,
+        subcommand: command.subcommand,
+        payload: {
+          arguments: command.arguments ?? {},
+          options: command.options ?? {},
+        },
+      });
+    }
   } catch (err) {
     appendSystemMessage(
       `Could not persist Nostr interaction: ${err instanceof Error ? err.message : String(err)}`,
@@ -481,6 +492,7 @@ function expandHighlightTargetTemplate(
 
 export function useCommands(adapters: CommandsAdapters): CommandsHook {
   const refreshGenerationBySource = new Map<string, number>();
+  let chromeModalOriginParams: RunWebActionParams | null = null;
 
   const pendingReleasesBySource = new Map<
     string,
@@ -643,6 +655,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.setChromeText(null);
     adapters.setChromeWeb(null);
     adapters.setChromePromptSession(null);
+    chromeModalOriginParams = null;
   }
 
   async function executeCommandAction(
@@ -825,6 +838,139 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             err instanceof Error ? err.message : String(err),
           );
         }
+      } else if (clientActionName === 'web.closeModal') {
+        closeChromeModal();
+      } else if (clientActionName === 'web.commandSequence') {
+        const commands = Array.isArray(action.payload.commands)
+          ? action.payload.commands
+          : [];
+
+        const mergeIndex =
+          typeof action.payload.mergeFormOptionsIntoCommand === 'number'
+            ? action.payload.mergeFormOptionsIntoCommand
+            : null;
+
+        const reserved = new Set([
+          'commands',
+          'mergeFormOptionsIntoCommand',
+          'refreshCommand',
+          'successMutations',
+        ]);
+
+        void (async () => {
+          adapters.setChromeLoading(true);
+          adapters.setChromeError(null);
+
+          try {
+            for (let index = 0; index < commands.length; index++) {
+              const command = commands[index] as Record<string, unknown>;
+
+              if (
+                typeof command.command !== 'string' ||
+                typeof command.subcommand !== 'string'
+              ) {
+                throw new Error('Invalid command sequence item.');
+              }
+
+              const options = {
+                ...(typeof command.options === 'object' &&
+                command.options !== null &&
+                !Array.isArray(command.options)
+                  ? (command.options as Record<string, unknown>)
+                  : {}),
+              };
+
+              if (mergeIndex === index) {
+                for (const [key, value] of Object.entries(action.payload)) {
+                  if (!reserved.has(key)) {
+                    options[key] = value;
+                  }
+                }
+              }
+
+              const output = await runJsonCommandOutput({
+                command: command.command,
+                subcommand: command.subcommand,
+                payload: {
+                  arguments: stringRecordValue(command.arguments),
+                  options,
+                },
+              });
+
+              const successTextPrefixes = Array.isArray(
+                command.successTextPrefixes,
+              )
+                ? command.successTextPrefixes.filter(
+                    (prefix): prefix is string => typeof prefix === 'string',
+                  )
+                : [];
+
+              if (
+                successTextPrefixes.length > 0 &&
+                !successTextPrefixes.some((prefix) =>
+                  output.text?.startsWith(prefix),
+                )
+              ) {
+                throw new Error(output.text ?? 'Command sequence failed.');
+              }
+            }
+
+            const completionParams = chromeModalOriginParams ?? params;
+
+            const successMutations = Array.isArray(
+              action.payload.successMutations,
+            )
+              ? action.payload.successMutations.flatMap((entry) => {
+                  const mutation = parseOptimisticMutation(entry);
+
+                  return mutation ? [mutation] : [];
+                })
+              : [];
+
+            completionParams?.applyOptimisticMutations?.(successMutations);
+            closeChromeModal();
+
+            const refreshCommand = action.payload.refreshCommand;
+
+            if (
+              typeof refreshCommand === 'object' &&
+              refreshCommand !== null &&
+              !Array.isArray(refreshCommand)
+            ) {
+              const command = refreshCommand as Record<string, unknown>;
+
+              if (
+                typeof command.command === 'string' &&
+                typeof command.subcommand === 'string'
+              ) {
+                runWebAction(
+                  {
+                    type: 'command',
+                    command: command.command,
+                    subcommand: command.subcommand,
+                    arguments: stringRecordValue(command.arguments),
+                    options: stringRecordValue(command.options),
+                    recordInTimeline: false,
+                  },
+                  {
+                    ...completionParams,
+                    uiExecutionPolicy: {
+                      ...completionParams?.uiExecutionPolicy,
+                      recordInTimeline: false,
+                      suppressSystemMessage: true,
+                    },
+                  },
+                );
+              }
+            }
+          } catch (err) {
+            adapters.setChromeError(
+              err instanceof Error ? err.message : String(err),
+            );
+          } finally {
+            adapters.setChromeLoading(false);
+          }
+        })();
       } else if (clientActionName === 'web.openUrl') {
         const url =
           typeof action.payload.url === 'string' ? action.payload.url : '';
@@ -1507,6 +1653,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     if (commandAction.surface === 'modal') {
+      chromeModalOriginParams = params ?? null;
+
       adapters.setChromeModal({
         command: commandAction.command,
         subcommand: commandAction.subcommand,
@@ -1805,11 +1953,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       const refreshRequestId = adapters.createId();
       let refreshRendered = false;
 
-      refreshRoundTrip = browserTrace?.startSpan({
-        name: `${commandAction.monitoring?.name ?? 'command'}.refresh-roundtrip`,
-        attributes: {},
-        parentSpanId: browserTrace.rootSpanId,
-      });
+      refreshRoundTrip =
+        browserTrace?.startSpan({
+          name: `${commandAction.monitoring?.name ?? 'command'}.refresh-roundtrip`,
+          attributes: {},
+          parentSpanId: browserTrace.rootSpanId,
+        }) ?? null;
 
       const refreshGeneration = sourceId
         ? beginRefreshGeneration(sourceId, endUserPendingOnce)
