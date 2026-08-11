@@ -11,6 +11,7 @@ import { handlePluginsRoot } from './plugin-manager/handler';
 import { handleRoadmapRoot } from './roadmap/handler';
 import { handleRoutstrRoot } from './routstr/handler';
 import { handleSessionRoot } from './session/handler';
+import { handleSkillsRoot } from './skills/handler';
 import { handleStoryRoot } from './story/handler';
 import { handleWalletRoot } from './wallet/handler';
 import { handleWotRoot } from './wot/handlers';
@@ -22,6 +23,8 @@ import { handleWotRoot } from './wot/handlers';
 export const builtinCommandHandlers: Record<string, BuiltinHandler> = {
   help: handleHelpRoot,
   session: handleSessionRoot,
+  skills: handleSkillsRoot,
+  skill: handleSkillsRoot,
   story: handleStoryRoot,
   bot: handleBotRoot,
   plugins: handlePluginsRoot,

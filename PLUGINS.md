@@ -59,7 +59,7 @@ Run:
 
 to see available commands for that plugin. All plugin commands follow the same `<prefix><alias> <subcommand>` pattern (e.g. `/todo list`).
 
-Plugin AI features work through your configured agent backend and the generated **skills** / **`bun src/cli.ts`** tool flow: each plugin exposes a `ToolCallSchema` in `ai.ts`, and `bun run plugin:generate` writes `.claude/skills/appweaver-<alias>/SKILL.md` when the plugin exports `ToolCallSchema` and `skillDescription`.
+Plugin AI features work through your configured agent backend and the generated **skills** / **`bun src/cli.ts`** tool flow: each plugin exposes a `ToolCallSchema` in `ai.ts`, and `bun run plugin:generate` writes `.appweaver/skills/appweaver-<alias>/SKILL.md` when the plugin exports `ToolCallSchema` and `skillDescription`. Enable generated skills per workspace through the Skills Manager; enabled skills are linked into `.claude/skills/`.
 
 ### Version compatibility
 
@@ -209,7 +209,7 @@ Plugins expose AI/CLI tool calls via:
 - **`ToolCallSchema`** (named export from `ai.ts`) — a Zod discriminated union keyed by `type`
 - **`skillDescription`** (export from `ai.ts`) — short string for the generated skill frontmatter (required for skill generation)
 - **`executeTool({ alias, call, db })`** (export from `ai.ts`) — executes one validated tool call
-- **`agentInstructions(alias)`** (optional export from `ai.ts`) — extra prose prepended to generated `.claude/skills/appweaver-<alias>/SKILL.md` (omit it when the JSON schema + shared skill rules are enough)
+- **`agentInstructions(alias)`** (optional export from `ai.ts`) — extra prose prepended to generated `.appweaver/skills/appweaver-<alias>/SKILL.md` (omit it when the JSON schema + shared skill rules are enough)
 
 `src/cli.ts` validates incoming JSON with `ToolCallSchema`, injects `type` from `<toolName>`, then calls `executeTool`.
 
@@ -299,9 +299,9 @@ export function registerPlugins(ctx: PluginContext): void {
 
 **`generated/cli-registry.ts`** — AUTO-GENERATED; imports each plugin’s `ToolCallSchema` from `plugins/<alias>/ai.ts` and exposes alias/schema metadata for `src/cli.ts`.
 
-**`.claude/skills/appweaver-<alias>/SKILL.md`** — AUTO-GENERATED skill docs for CLI-based tool usage (generated when the plugin exports `ToolCallSchema`, `skillDescription`, and passes the generator’s schema checks).
+**`.appweaver/skills/appweaver-<alias>/SKILL.md`** — AUTO-GENERATED skill docs for CLI-based tool usage (generated when the plugin exports `ToolCallSchema`, `skillDescription`, and passes the generator’s schema checks). The Skills Manager links enabled entries into `.claude/skills/` for the active workspace.
 
-Paths such as `.claude/skills/appweaver*/` and `generated/` may be gitignored locally; run `bun run plugin:generate` after clone or template changes. Keep `plugins.json` private as today.
+Paths such as `.appweaver/skills/appweaver*`, `.claude/skills/appweaver*`, and `generated/` may be gitignored locally; run `bun run plugin:generate` after clone or template changes. Keep `plugins.json` private as today.
 
 #### SQLite WAL
 

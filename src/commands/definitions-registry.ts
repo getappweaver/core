@@ -11,6 +11,7 @@ import { getPluginsCommandDefinition } from './plugin-manager/definition';
 import { getRoadmapCommandDefinition } from './roadmap/definition';
 import { getRoutstrCommandDefinition } from './routstr/definition';
 import { getSessionCommandDefinition } from './session/definition';
+import { getSkillsCommandDefinition } from './skills/definition';
 import { getStoryCommandDefinition } from './story/definition';
 import { getWalletCommandDefinition } from './wallet/definition';
 import { getWotCommandDefinition } from './wot/definition';
@@ -18,6 +19,7 @@ import { getWotCommandDefinition } from './wot/definition';
 export const BUILTIN_ROOT_NAMES = [
   'help',
   'session',
+  'skills',
   'story',
   'bot',
   'plugins',
@@ -90,6 +92,8 @@ export function getBuiltinCommandDefinition({
       return getHelpMetaCommandDefinition({ prefix });
     case 'session':
       return getSessionCommandDefinition({ prefix });
+    case 'skills':
+      return getSkillsCommandDefinition(prefix);
     case 'story':
       return getStoryCommandDefinition({ prefix });
     case 'bot':
@@ -124,6 +128,7 @@ export function getBuiltinDefinitionsMap({
   return {
     help: getHelpMetaCommandDefinition({ prefix }),
     session: getSessionCommandDefinition({ prefix }),
+    skills: getSkillsCommandDefinition(prefix),
     story: getStoryCommandDefinition({ prefix }),
     bot: getBotCommandDefinition({ prefix }),
     plugins: getPluginsCommandDefinition({ prefix }),

@@ -24,6 +24,12 @@ Never retry a mutating tool if it returned a Draft ID.
 
 Each skill is a folder: `.claude/skills/<skill_name>/SKILL.md` (OpenCode-compatible YAML frontmatter with `name` matching `<skill_name>`).
 
+### Managed skills and the disabled-skill check
+
+The `skill-status` skill is always available and lists every managed AppWeaver skill with its current **enabled** or **disabled** state for this workspace.
+
+When the user asks about a skill that is **not** in your available skills, do not assume it does not exist. Check the `skill-status` skill — if the skill is listed there as **disabled**, warn the user that it exists but is currently disabled, and ask them to enable it with `<prefix>skills set <name> enable` or the skills manager, which can be opened from the footer joggler icon. Only the user can enable or disable skills — the AI must not change skill state on its own.
+
 ## User intent comes first
 
 Before changing files, running implementation commands, linting, or applying the post-edit workflow, infer the user's intent from the whole prompt and the current conversation.

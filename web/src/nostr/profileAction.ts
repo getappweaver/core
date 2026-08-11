@@ -892,38 +892,97 @@ function latestPostNode({
   profile,
   relayHints,
 }: NostrPostNodeProps): WebNode {
+  let nevent: string | null = null;
+
+  try {
+    nevent = nip19.neventEncode({
+      id: post.id,
+      author: post.pubkey,
+      kind: post.kind,
+      relays: relayHints.slice(0, 1),
+    });
+  } catch {
+    nevent = null;
+  }
+
   return el({
-    tag: 'nostrPost',
-    props: {
-      size: 'sm',
-      nostrEventId: post.id,
-      nostrPubkey: post.pubkey,
-      nostrNpub: profile.npub ?? npubForPubkey(post.pubkey) ?? undefined,
-      nostrAuthorName: profile.name ?? undefined,
-      nostrAuthorUsername: profile.username ?? undefined,
-      nostrAuthorPicture: profile.picture ?? undefined,
-      nostrAuthorAbout: profile.about ?? undefined,
-      nostrRelayHints: relayHints,
-      nostrCreatedAt: post.createdAt,
-      nostrContent: post.content,
-      nostrInlineProfiles: post.inlineProfiles,
-      nostrEmbeds: post.embeds,
-      nostrReplyContext: post.replyContext,
-      nostrShowReplyContext: post.replyContext.length > 0,
-      nostrReplyAction: replyEventAction({
-        event: post.event,
-        profile,
-        relayHints,
+    tag: 'stack',
+    props: { className: 'web-nostrProfile__latestPost' },
+    children: [
+      el({
+        tag: 'nostrPost',
+        props: {
+          size: 'sm',
+          nostrEventId: post.id,
+          nostrPubkey: post.pubkey,
+          nostrNpub: profile.npub ?? npubForPubkey(post.pubkey) ?? undefined,
+          nostrAuthorName: profile.name ?? undefined,
+          nostrAuthorUsername: profile.username ?? undefined,
+          nostrAuthorPicture: profile.picture ?? undefined,
+          nostrAuthorAbout: profile.about ?? undefined,
+          nostrRelayHints: relayHints,
+          nostrCreatedAt: post.createdAt,
+          nostrContent: post.content,
+          nostrInlineProfiles: post.inlineProfiles,
+          nostrEmbeds: post.embeds,
+          nostrReplyContext: post.replyContext,
+          nostrShowReplyContext: post.replyContext.length > 0,
+          nostrReplyAction: replyEventAction({
+            event: post.event,
+            profile,
+            relayHints,
+          }),
+          nostrRepostAction: repostEventAction({
+            event: post.event,
+            profile,
+            relayHints,
+          }),
+          nostrPreviewImages: true,
+          nostrShowActions: true,
+        },
+        children: [],
       }),
-      nostrRepostAction: repostEventAction({
-        event: post.event,
-        profile,
-        relayHints,
-      }),
-      nostrPreviewImages: true,
-      nostrShowActions: true,
-    },
-    children: [],
+      ...(nevent
+        ? [
+            el({
+              tag: 'overflowMenu',
+              props: {
+                label: '⋮',
+                ariaLabel: 'Event actions',
+                buttonVariant: 'icon',
+                className: 'web-nostrProfile__latestPostMenu',
+                stopPropagation: true,
+              },
+              children: [
+                el({
+                  tag: 'menuItem',
+                  props: {
+                    label: 'Open event',
+                    action: openNostrShareAction({
+                      type: 'nevent',
+                      identifier: nevent,
+                      prefixes: profile.sharePrefixes,
+                    }),
+                  },
+                  children: [],
+                }),
+                el({
+                  tag: 'menuItem',
+                  props: {
+                    label: 'Copy nevent',
+                    action: {
+                      type: 'clientAction',
+                      action: 'web.copyText',
+                      payload: { text: nevent },
+                    },
+                  },
+                  children: [],
+                }),
+              ],
+            }),
+          ]
+        : []),
+    ],
   });
 }
 

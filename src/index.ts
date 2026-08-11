@@ -109,6 +109,7 @@ import {
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
+import { initializeWorkspaceSkills } from './skills/manager';
 import { openWalletDb } from './wallet/db';
 import { getNativePiperStatus } from './web/native-tts';
 import { publishWidgetIcons } from './web/publish-widget-icons';
@@ -334,6 +335,12 @@ async function main() {
   process.once('SIGTERM', () => void shutdown(143));
 
   const parentOfBotRoot = getParentWorkspaceRoot();
+
+  initializeWorkspaceSkills({
+    db: seenDb,
+    dmBotRoot,
+    workspaceRoots: [dmBotRoot, parentOfBotRoot],
+  });
 
   ensureOpencodeParentWorkspaceAssets({
     backend: getAgentBackend(seenDb),

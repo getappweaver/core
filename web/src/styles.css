@@ -2885,6 +2885,41 @@ button.composer-chip:active {
   transform: none;
 }
 
+button.composer-skills-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.25rem;
+  min-height: 0;
+  padding: 0.12rem;
+  border: none;
+  border-radius: 0;
+  background: var(--color-warning);
+  box-shadow: none;
+  transition: none;
+}
+
+button.composer-skills-button:hover,
+button.composer-skills-button:focus-visible,
+button.composer-skills-button:active {
+  background: #fff;
+  box-shadow: none;
+  transform: none;
+}
+
+button.composer-skills-button:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  transform: none;
+}
+
+button.composer-skills-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: brightness(0);
+}
+
 button.composer-chip.composer-chip--info {
   color: var(--color-accent);
 }

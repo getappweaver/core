@@ -581,6 +581,25 @@ select {
   border-left: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 
+.web-nostrProfile__latestPost {
+  position: relative;
+}
+
+.web-nostrProfile__latestPost > .web-overflow-menu:has(.web-nostrProfile__latestPostMenu) {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  z-index: 2;
+}
+
+.web-overflow-trigger.web-nostrProfile__latestPostMenu {
+  margin-right: 0;
+}
+
+.web-nostrProfile__latestPost .web-nostrPost__profileHeader {
+  padding-right: 1.75rem;
+}
+
 .web-nostrPost__inlineLink {
   color: var(--color-accent);
   text-decoration: underline;

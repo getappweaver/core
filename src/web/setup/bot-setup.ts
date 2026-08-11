@@ -5,8 +5,8 @@
 //
 // Reads current state from DB, shows current values as defaults,
 // lets user reconfigure workspace, backend, provider, mode, lint, ready.
-// If workspace is "parent", symlinks AGENTS.md, opencode.json, and
-// `.claude/skills/appweaver*/` skill folders into the parent project.
+// If workspace is "parent", symlinks AGENTS.md and opencode.json into the
+// parent project. Managed skills are enabled separately per workspace.
 // Optionally configures Web Push VAPID keys (BOT_WEB_PUSH_*) in .env via web-push.
 // ---------------------------------------------------------------------------
 
@@ -14,7 +14,6 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  readdirSync,
   symlinkSync,
   unlinkSync,
   lstatSync,
@@ -48,7 +47,6 @@ import { dmBotRoot, getParentWorkspaceRoot } from '@src/paths';
 
 const PARENT_ROOT = getParentWorkspaceRoot();
 const BOT_DIR_NAME = basename(dmBotRoot);
-const DM_BOT_SKILLS_DIR = join(dmBotRoot, '.claude', 'skills');
 const AGENT_TEMPLATES_DIR = join(dmBotRoot, 'templates', 'opencode-agents');
 
 const DEFAULT_AGENT_TEMPLATE_FILES = [
@@ -65,7 +63,7 @@ type SymlinkTarget = {
 };
 
 function getSymlinkTargets(): SymlinkTarget[] {
-  const staticTargets: SymlinkTarget[] = [
+  return [
     {
       label: 'opencode.json',
       src: join(dmBotRoot, 'opencode.json'),
@@ -77,34 +75,13 @@ function getSymlinkTargets(): SymlinkTarget[] {
       dest: join(PARENT_ROOT, 'AGENTS.md'),
     },
   ];
-
-  const skillTargets: SymlinkTarget[] = [];
-
-  if (existsSync(DM_BOT_SKILLS_DIR)) {
-    const names = readdirSync(DM_BOT_SKILLS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name.startsWith('appweaver'))
-      .map((d) => d.name)
-      .sort();
-
-    for (const name of names) {
-      const rel = join('.claude', 'skills', name);
-
-      skillTargets.push({
-        label: rel,
-        src: join(DM_BOT_SKILLS_DIR, name),
-        dest: join(PARENT_ROOT, rel),
-      });
-    }
-  }
-
-  return [...staticTargets, ...skillTargets];
 }
 
 const PARENT_GITIGNORE_ENTRIES = [
   `${BOT_DIR_NAME}/`,
   'opencode.json',
   'AGENTS.md',
-  '.claude/skills/appweaver-*/',
+  '.claude/skills/appweaver-*',
 ];
 
 // ---------------------------------------------------------------------------
@@ -666,9 +643,7 @@ async function main(): Promise<void> {
   if (isParent) {
     console.log(`\n  Parent root:       ${PARENT_ROOT}`);
 
-    console.log(
-      '  Symlinks: opencode.json, AGENTS.md, .claude/skills/appweaver-*/',
-    );
+    console.log('  Symlinks: opencode.json, AGENTS.md');
   }
 
   console.log('\n✓ Setup complete. Run `bun run start` to start the bot.\n');

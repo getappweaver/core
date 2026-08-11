@@ -25,6 +25,7 @@ import { Composer } from './components/Composer';
 import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
 import { ComposerProviderMenuButton } from './components/ComposerProviderMenuButton';
+import { ComposerSkillsButton } from './components/ComposerSkillsButton';
 import { ComposerWorkingButton } from './components/ComposerWorkingButton';
 import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
@@ -175,6 +176,12 @@ type CommandResultTimelineItem = Extract<
 >;
 
 const LAYOUT_SETTINGS_TIMELINE_ID = 'layout-settings';
+
+const SKILLS_MANAGER_ICON_URL =
+  resolveWidgetIconUrl({
+    source: 'builtin',
+    icon: '/src/commands/skills/renderers/skills.svg',
+  }) ?? '';
 
 function cleanQueryToken(value: string | null): string | null {
   const trimmed = value?.trim();
@@ -2772,6 +2779,18 @@ function AppInner(): JSX.Element {
                       ? composerAiState()!.executionProfileName
                       : 'Agent'}
                   </button>
+                  <ComposerSkillsButton
+                    iconUrl={SKILLS_MANAGER_ICON_URL}
+                    disabled={!wsConnected()}
+                    onOpen={() => {
+                      openChromeWidget({
+                        command: 'skills',
+                        subcommand: 'manager',
+                        title: 'Skills Manager',
+                        iconUrl: SKILLS_MANAGER_ICON_URL,
+                      });
+                    }}
+                  />
                   <Show when={composerAiState() !== null}>
                     <ComposerModelOverrideButton
                       state={composerAiState()!}

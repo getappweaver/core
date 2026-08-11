@@ -13,7 +13,9 @@ plugins.json
 plugins/
 generated/
 TOOLS.md
-.claude/skills/appweaver*/
+.claude/skills/appweaver*
+.claude/skills/skill-status/
+.appweaver/skills/appweaver*
 .logs/
 .piper-test/
 models/piper/

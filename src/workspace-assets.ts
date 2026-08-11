@@ -3,7 +3,6 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
@@ -68,8 +67,6 @@ function getParentSymlinkTargets({
   dmBotRoot,
   parentOfBotRoot,
 }: InstallParentWorkspaceAssetsProps): SymlinkTarget[] {
-  const skillsDir = join(dmBotRoot, '.claude', 'skills');
-
   const staticTargets: SymlinkTarget[] = [
     {
       label: 'opencode.json',
@@ -83,25 +80,7 @@ function getParentSymlinkTargets({
     },
   ];
 
-  if (!existsSync(skillsDir)) {
-    return staticTargets;
-  }
-
-  const skillTargets = readdirSync(skillsDir, { withFileTypes: true })
-    .filter(
-      (entry) => entry.isDirectory() && entry.name.startsWith('appweaver'),
-    )
-    .map((entry) => {
-      const rel = join('.claude', 'skills', entry.name);
-
-      return {
-        label: rel,
-        src: join(skillsDir, entry.name),
-        dest: join(parentOfBotRoot, rel),
-      };
-    });
-
-  return [...staticTargets, ...skillTargets];
+  return staticTargets;
 }
 
 function ensureAgentTemplates(
@@ -152,7 +131,7 @@ function updateParentGitignore({
     `${botDirName}/`,
     'opencode.json',
     'AGENTS.md',
-    '.claude/skills/appweaver-*/',
+    '.claude/skills/appweaver-*',
   ];
 
   const gitignorePath = join(parentOfBotRoot, '.gitignore');

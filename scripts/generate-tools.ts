@@ -1,25 +1,25 @@
 // ---------------------------------------------------------------------------
-// scripts/generate-tools.ts — Generate .claude/skills/appweaver-*/SKILL.md,
+// scripts/generate-tools.ts — Generate .appweaver/skills/appweaver-*/SKILL.md,
 //                             generated/cli-registry.ts,
 //                             generated/plugins.ts
 //
 // Usage: bun run plugin:generate  (see package.json)
 // Idempotent: all outputs are recreated each run.
 //
-// SKILL.md files under .claude/skills/appweaver-*/ are auto-generated; edit each
+// SKILL.md files under .appweaver/skills/appweaver-*/ are auto-generated; edit each
 // plugin’s plugins/<alias>/ai.ts (via aiDefinition: toolCallSchema,
 // skillDescription, optional agentInstructions/skillNotes/skillRules)
 // and re-run plugin:generate — do not edit SKILL.md by hand.
 // ---------------------------------------------------------------------------
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import { z } from 'zod';
 
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
-const CLAUDE_SKILLS_DIR = join(ROOT, '.claude', 'skills');
+const APPWEAVER_SKILLS_DIR = join(ROOT, '.appweaver', 'skills');
 const GENERATED_DIR = join(ROOT, 'generated');
 const CLI_REGISTRY_TS = join(GENERATED_DIR, 'cli-registry.ts');
 const PLUGINS_TS = join(GENERATED_DIR, 'plugins.ts');
@@ -46,9 +46,8 @@ if (!existsSync(GENERATED_DIR)) {
   mkdirSync(GENERATED_DIR, { recursive: true });
 }
 
-if (!existsSync(CLAUDE_SKILLS_DIR)) {
-  mkdirSync(CLAUDE_SKILLS_DIR, { recursive: true });
-}
+rmSync(APPWEAVER_SKILLS_DIR, { recursive: true, force: true });
+mkdirSync(APPWEAVER_SKILLS_DIR, { recursive: true });
 
 // ---------------------------------------------------------------------------
 // Collected per-plugin data
@@ -307,7 +306,7 @@ for (const entry of pluginsJson.plugins) {
   const bashExamples = buildBashExamples(alias, toolCallSchema);
   const jsonSchema = JSON.stringify(z.toJSONSchema(toolCallSchema), null, 2);
 
-  const skillDir = join(CLAUDE_SKILLS_DIR, `appweaver-${alias}`);
+  const skillDir = join(APPWEAVER_SKILLS_DIR, `appweaver-${alias}`);
   mkdirSync(skillDir, { recursive: true });
 
   const skillMd = generateSkillMarkdown({
@@ -324,7 +323,7 @@ for (const entry of pluginsJson.plugins) {
   writeFileSync(join(skillDir, 'SKILL.md'), skillMd, 'utf8');
 
   console.log(
-    `[generate-tools] Generated .claude/skills/appweaver-${alias}/SKILL.md`,
+    `[generate-tools] Generated .appweaver/skills/appweaver-${alias}/SKILL.md`,
   );
 
   pluginGenData.push({

@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 
 import { createConnectionsTable } from '../nostr/connections';
 import { CORE_DB_PATH, RESTART_REQUESTED_PATH } from '../paths';
+import { createWorkspaceSkillsTable } from '../skills/manager';
 import { createTimelineTables } from '../timeline/db';
 import { createWebPushSubscriptionTables } from '../web/push-subscriptions';
 
@@ -83,6 +84,7 @@ export function openCoreDb(): CoreDb {
   createWotTables(db as CoreDb);
   createRoutstrIndexTables(db as CoreDb);
   createWebPushSubscriptionTables(db as CoreDb);
+  createWorkspaceSkillsTable(db as CoreDb);
 
   return db as CoreDb;
 }

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.1.0] - 2026-08-11
+
+- feat: skill manager (b8361a6)
+
 ## [v11.0.3] - 2026-08-04
 
-- fix: make textarea resizable (6d3ebae)
+- fix: make textarea resizable (ba3bae3)
 
 ## [v11.0.2] - 2026-08-04
 
