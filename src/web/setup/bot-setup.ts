@@ -5,8 +5,8 @@
 //
 // Reads current state from DB, shows current values as defaults,
 // lets user reconfigure workspace, backend, provider, mode, lint, ready.
-// If workspace is "parent", symlinks AGENTS.md and opencode.json into the
-// parent project. Managed skills are enabled separately per workspace.
+// If workspace is "parent", symlinks opencode.json into the parent project.
+// Managed skills are enabled separately per workspace.
 // Optionally configures Web Push VAPID keys (BOT_WEB_PUSH_*) in .env via web-push.
 // ---------------------------------------------------------------------------
 
@@ -14,13 +14,14 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readlinkSync,
   symlinkSync,
   unlinkSync,
   lstatSync,
   readFileSync,
   writeFileSync,
 } from 'fs';
-import { basename, dirname, join } from 'path';
+import { basename, dirname, join, resolve } from 'path';
 import * as readline from 'readline';
 
 import { generateVAPIDKeys } from 'web-push';
@@ -69,20 +70,34 @@ function getSymlinkTargets(): SymlinkTarget[] {
       src: join(dmBotRoot, 'opencode.json'),
       dest: join(PARENT_ROOT, 'opencode.json'),
     },
-    {
-      label: 'AGENTS.md',
-      src: join(dmBotRoot, 'AGENTS.md'),
-      dest: join(PARENT_ROOT, 'AGENTS.md'),
-    },
   ];
 }
 
 const PARENT_GITIGNORE_ENTRIES = [
   `${BOT_DIR_NAME}/`,
   'opencode.json',
-  'AGENTS.md',
   '.claude/skills/appweaver-*',
 ];
+
+function removeLegacyParentAgentsSymlink(): boolean {
+  const source = join(dmBotRoot, 'AGENTS.md');
+  const target = join(PARENT_ROOT, 'AGENTS.md');
+
+  try {
+    if (
+      !lstatSync(target).isSymbolicLink() ||
+      resolve(dirname(target), readlinkSync(target)) !== resolve(source)
+    ) {
+      return false;
+    }
+
+    unlinkSync(target);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,7 +189,15 @@ function updateParentGitignore(): void {
     existing = readFileSync(gitignorePath, 'utf-8').replace(/\r\n/g, '\n');
   }
 
-  const lines = existing === '' ? [] : existing.split('\n');
+  const removedLegacyAgentsEntry = existing
+    .split('\n')
+    .some((line) => line === 'AGENTS.md');
+
+  const lines =
+    existing === ''
+      ? []
+      : existing.split('\n').filter((line) => line !== 'AGENTS.md');
+
   const lineSet = new Set(lines.filter((l) => l !== ''));
   const added: string[] = [];
 
@@ -199,6 +222,10 @@ function updateParentGitignore(): void {
     }
   } else {
     console.log('  Parent .gitignore already contains required entries.');
+  }
+
+  if (removedLegacyAgentsEntry) {
+    console.log('  Removed legacy AGENTS.md entry from parent .gitignore.');
   }
 }
 
@@ -280,6 +307,10 @@ function ensureAgentTemplatesInstalled(targetRoot: string): void {
 }
 
 async function removeSymlinks(): Promise<void> {
+  if (removeLegacyParentAgentsSymlink()) {
+    console.log('  ✓ Removed legacy AppWeaver AGENTS.md symlink');
+  }
+
   for (const target of getSymlinkTargets()) {
     if (isSymlink(target.dest)) {
       unlinkSync(target.dest);
@@ -290,6 +321,10 @@ async function removeSymlinks(): Promise<void> {
 
 async function createSymlinks(): Promise<void> {
   console.log(`\nParent project root: ${PARENT_ROOT}\n`);
+
+  if (removeLegacyParentAgentsSymlink()) {
+    console.log('  ✓ Removed legacy AppWeaver AGENTS.md symlink');
+  }
 
   for (const target of getSymlinkTargets()) {
     if (!existsSync(target.src)) {

@@ -63,6 +63,7 @@ import {
   getProviderName,
   getDmCommandPrefix,
   getWorkspaceTarget,
+  getWorkspaceInstructions,
   getRoutstrSkKey,
   needsSetupBillboard,
   readSetupConfigurationSnapshot,
@@ -664,6 +665,10 @@ async function main() {
         opencodeAgentName:
           executionProfile.kind === 'opencode' ? executionProfile.agent : null,
         cwd,
+        workspaceInstructions: getWorkspaceInstructions(
+          seenDb,
+          getWorkspaceTarget(seenDb),
+        ).instructions,
         getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
         modelOverride,
         onAgentStreamChunk: null,

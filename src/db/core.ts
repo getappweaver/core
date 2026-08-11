@@ -8,6 +8,7 @@ import { createWebPushSubscriptionTables } from '../web/push-subscriptions';
 
 import { createRoutstrIndexTables } from './routstr-index';
 import type { CoreDb } from './shared';
+import { createWorkspaceInstructionsTable } from './workspace-instructions';
 import { createWotTables } from './wot';
 
 export { CORE_DB_PATH as SEEN_DB_PATH, RESTART_REQUESTED_PATH };
@@ -85,6 +86,7 @@ export function openCoreDb(): CoreDb {
   createRoutstrIndexTables(db as CoreDb);
   createWebPushSubscriptionTables(db as CoreDb);
   createWorkspaceSkillsTable(db as CoreDb);
+  createWorkspaceInstructionsTable(db as CoreDb);
 
   return db as CoreDb;
 }

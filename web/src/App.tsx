@@ -2786,7 +2786,7 @@ function AppInner(): JSX.Element {
                       openChromeWidget({
                         command: 'skills',
                         subcommand: 'manager',
-                        title: 'Skills Manager',
+                        title: 'AI Configuration',
                         iconUrl: SKILLS_MANAGER_ICON_URL,
                       });
                     }}

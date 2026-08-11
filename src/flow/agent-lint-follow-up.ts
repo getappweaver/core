@@ -5,7 +5,12 @@
 import { createBackend } from '../backends/factory';
 import type { AgentRunResult } from '../backends/types';
 import { getOutputString } from '../backends/types';
-import type { AgentBackendName, AgentMode, CoreDb } from '../db';
+import type {
+  AgentBackendName,
+  AgentMode,
+  CoreDb,
+  WorkspaceTarget,
+} from '../db';
 import {
   getAgentBackend,
   getBackendExecutionProfile,
@@ -13,6 +18,7 @@ import {
   getModelOverride,
   getRoutstrModel,
   getRoutstrSkKey,
+  getWorkspaceInstructions,
 } from '../db';
 import { runPostAgentLint, formatLintSummary } from '../lint';
 import { C, log } from '../logger';
@@ -30,7 +36,7 @@ export type RunAgentWithLintFollowUpProps = {
   cwd: string;
   coreDb: CoreDb;
   effectiveContent: string;
-  currentWorkspace: string;
+  currentWorkspace: WorkspaceTarget;
   backendName: AgentBackendName;
 };
 
@@ -89,6 +95,8 @@ export async function runAgentWithLintFollowUp({
       opencodeAgentName:
         executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       cwd,
+      workspaceInstructions: getWorkspaceInstructions(coreDb, currentWorkspace)
+        .instructions,
       getRoutstrSkKey: () => getRoutstrSkKey(coreDb),
       modelOverride: effectiveModelOverride,
       onAgentStreamChunk: null,

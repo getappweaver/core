@@ -4,7 +4,7 @@ import type { CommandDefinition } from '@src/system/command-definition';
 export function getSkillsCommandDefinition(prefix: string): CommandDefinition {
   return {
     name: 'skills',
-    summary: 'Enable or disable AppWeaver skills for this workspace.',
+    summary: 'Manage AI instructions and skills for this workspace.',
     aliases: ['skill'],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'skills', {
@@ -13,7 +13,7 @@ export function getSkillsCommandDefinition(prefix: string): CommandDefinition {
       }),
       {
         name: 'manager',
-        summary: 'Open the workspace skills manager.',
+        summary: 'Open workspace AI configuration.',
         textHidden: true,
         aliases: ['list'],
         arguments: [],
@@ -22,9 +22,37 @@ export function getSkillsCommandDefinition(prefix: string): CommandDefinition {
         webWidget: {
           placement: 'fixed',
           surface: 'modal',
-          modalTitle: 'Skills Manager',
+          modalTitle: 'AI Configuration',
           icon: '/src/commands/skills/renderers/skills.svg',
         },
+      },
+      {
+        name: 'set-instructions',
+        summary: 'Customize AI instructions for the active workspace.',
+        textHidden: true,
+        aliases: [],
+        arguments: [
+          {
+            name: 'instructions',
+            summary: 'Workspace AI instructions.',
+            kind: 'string',
+            choices: null,
+            required: false,
+            variadic: false,
+            webInput: 'textarea',
+          },
+        ],
+        options: [],
+        examples: [`${prefix}skills set-instructions <instructions>`],
+      },
+      {
+        name: 'reset-instructions',
+        summary: 'Reset AI instructions for the active workspace.',
+        textHidden: true,
+        aliases: [],
+        arguments: [],
+        options: [],
+        examples: [`${prefix}skills reset-instructions`],
       },
       {
         name: 'set',

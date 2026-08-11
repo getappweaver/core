@@ -13,8 +13,8 @@ export function ComposerSkillsButton(props: ComposerSkillsButtonProps) {
       class="composer-skills-button"
       disabled={props.disabled}
       onClick={props.onOpen}
-      title="Skills manager"
-      aria-label="Open skills manager"
+      title="AI configuration"
+      aria-label="Open AI configuration"
     >
       <img src={props.iconUrl} alt="" aria-hidden="true" />
     </WebButton>

@@ -46,6 +46,8 @@ export type RunMessageProps = {
   cursorMode: AgentMode;
   opencodeAgentName: string | null;
   cwd: string;
+  /** Core chat calls supply the active workspace value; specialized plugin AI calls may omit it. */
+  workspaceInstructions?: string;
   getRoutstrSkKey: () => string | null;
   modelOverride: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;

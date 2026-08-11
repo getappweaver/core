@@ -7,6 +7,7 @@ import {
   getCurrentOrDefaultMode,
   getModelOverride,
   getProviderName,
+  getWorkspaceInstructions,
 } from '@src/db';
 import { getWorkspaceTarget } from '@src/db';
 import { getOrCreateCurrentSession } from '@src/session';
@@ -28,6 +29,7 @@ export async function runWebChat(
   const backendName = getAgentBackend(ctx.seenDb);
   const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
   const modelOverride = getModelOverride(ctx.seenDb, backendName);
+  const workspace = getWorkspaceTarget(ctx.seenDb);
 
   const backend = createBackend({
     backendName,
@@ -40,10 +42,7 @@ export async function runWebChat(
     providerName: getProviderName(ctx.seenDb),
   });
 
-  const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-      ? ctx.dmBotRoot
-      : ctx.parentOfBotRoot;
+  const cwd = workspace === 'appweaver' ? ctx.dmBotRoot : ctx.parentOfBotRoot;
 
   const sessionId = await getOrCreateCurrentSession({
     db: ctx.seenDb,
@@ -63,6 +62,8 @@ export async function runWebChat(
     opencodeAgentName:
       executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     cwd,
+    workspaceInstructions: getWorkspaceInstructions(ctx.seenDb, workspace)
+      .instructions,
     getRoutstrSkKey: () => null,
     modelOverride,
     onAgentStreamChunk: useStream ? onStreamChunk : null,

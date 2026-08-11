@@ -1394,6 +1394,7 @@ export function createOpencodeSDKBackend({
         content,
         opencodeAgentName,
         cwd,
+        workspaceInstructions,
         modelOverride,
         onAgentStreamChunk,
         streamAbortSignal,
@@ -1410,6 +1411,7 @@ export function createOpencodeSDKBackend({
               agentName: selectedAgentName,
               dmBotRoot,
               cwd,
+              workspaceInstructions: workspaceInstructions ?? '',
               content,
             });
 

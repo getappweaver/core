@@ -19,6 +19,7 @@ import {
   getCurrentOrDefaultMode,
   getModelOverride,
   getRoutstrSkKey,
+  getWorkspaceInstructions,
   getWorkspaceTarget,
 } from '../db';
 import type { BotConfig } from '../env';
@@ -38,6 +39,7 @@ async function createRunAgentForPluginDispatch(props: {
   const { seenDb, backend, cwd } = props;
   const modelOverride = getModelOverride(seenDb, backend.name);
   const executionProfile = getBackendExecutionProfile(seenDb, backend.name);
+  const workspace = getWorkspaceTarget(seenDb);
 
   const sessionId = await getOrCreateCurrentSession({
     db: seenDb,
@@ -56,6 +58,8 @@ async function createRunAgentForPluginDispatch(props: {
       opencodeAgentName:
         executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       cwd,
+      workspaceInstructions: getWorkspaceInstructions(seenDb, workspace)
+        .instructions,
       getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
       modelOverride,
       onAgentStreamChunk: null,
