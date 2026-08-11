@@ -28,12 +28,12 @@ import * as readline from 'readline';
 import { SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
-import type { CoreDb } from '@src/db';
 import {
   capabilityRelationTags,
   normalizeCapabilityRelations,
   PluginCapabilityRelationsSchema,
 } from '@src/capabilities/relations';
+import type { CoreDb } from '@src/db';
 import { openCoreDb } from '@src/db';
 import {
   createBlossomAuthBase64,

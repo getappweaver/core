@@ -404,7 +404,8 @@ function capabilityLabels(entry: PluginCatalogEntry): WebNode[] {
       props: {
         label: `${relation}: ${capability.name}:v${capability.version}`,
         size: 'sm' as const,
-        tone: relation === 'provides' ? ('success' as const) : ('muted' as const),
+        tone:
+          relation === 'provides' ? ('success' as const) : ('muted' as const),
       },
     })),
   );

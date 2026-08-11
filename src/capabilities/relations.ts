@@ -105,16 +105,20 @@ export function parseCapabilityRelationTags(
 export function parseCapabilityCatalogFilter(
   value: string,
 ): CapabilityCatalogFilter | null {
-  const match = /^(capability|provides|uses|requires):([a-z][a-z0-9.-]*):v([1-9]\d*)$/.exec(
-    value.trim().toLowerCase(),
-  );
+  const match =
+    /^(capability|provides|uses|requires):([a-z][a-z0-9.-]*):v([1-9]\d*)$/.exec(
+      value.trim().toLowerCase(),
+    );
 
   if (!match) {
     return null;
   }
 
   return {
-    relation: match[1] === 'capability' ? 'provides' : (match[1] as CapabilityRelationName),
+    relation:
+      match[1] === 'capability'
+        ? 'provides'
+        : (match[1] as CapabilityRelationName),
     capability: { name: match[2]!, version: Number(match[3]) },
   };
 }
