@@ -21,6 +21,11 @@ import {
   verifyNip05,
   type AuthorIdentity,
 } from '@src/nostr/author-identity';
+import {
+  extractSha256FromUrl,
+  fetchBlossomServerUrls,
+  resolveVerifiedBlossomDataUrl,
+} from '@src/nostr/blossom';
 import { fetchNip65RelaySet, uniqueRelays } from '@src/nostr/nip65';
 import {
   nostrRepoAddress,
@@ -45,6 +50,8 @@ export const PLUGIN_QUERY_RELAYS = [
 
 const PLUGIN_QUERY_MAX_WAIT_MS = 10_000;
 const AUTHOR_PROFILE_QUERY_MAX_WAIT_MS = 2_000;
+const PLUGIN_ICON_MAX_BYTES = 1024 * 1024;
+const PLUGIN_ICON_FETCH_TIMEOUT_MS = 5_000;
 
 type RefEntry = {
   tag: string;
@@ -362,6 +369,70 @@ async function attachAuthorIdentities(
       ...entry,
       author: await authorIdentityForEntry(ctx, entry),
     })),
+  );
+}
+
+async function resolvePluginIcon(
+  ctx: RouteCommandContext,
+  entry: PluginCatalogEntry,
+  serverUrls: string[],
+): Promise<string> {
+  if (
+    (!entry.icon.startsWith('https://') && !entry.icon.startsWith('http://')) ||
+    !extractSha256FromUrl(entry.icon)
+  ) {
+    return entry.icon;
+  }
+
+  return (
+    (await resolveVerifiedBlossomDataUrl({
+      sourceUrl: entry.icon,
+      serverUrls,
+      maxBytes: PLUGIN_ICON_MAX_BYTES,
+      timeoutMs: PLUGIN_ICON_FETCH_TIMEOUT_MS,
+    })) ?? entry.icon
+  );
+}
+
+async function attachResolvedIcons(
+  ctx: RouteCommandContext,
+  entries: PluginCatalogEntry[],
+): Promise<PluginCatalogEntry[]> {
+  const serversByAuthor = new Map<string, Promise<string[]>>();
+
+  function serverUrlsFor(entry: PluginCatalogEntry): Promise<string[]> {
+    const existing = serversByAuthor.get(entry.pubkey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const serverUrls = fetchBlossomServerUrls({
+      pool: ctx.pool,
+      relayUrls: PLUGIN_QUERY_RELAYS,
+      authorPubkey: entry.pubkey,
+    });
+
+    serversByAuthor.set(entry.pubkey, serverUrls);
+
+    return serverUrls;
+  }
+
+  return Promise.all(
+    entries.map(async (entry) => {
+      if (
+        (!entry.icon.startsWith('https://') &&
+          !entry.icon.startsWith('http://')) ||
+        !extractSha256FromUrl(entry.icon)
+      ) {
+        return entry;
+      }
+
+      return {
+        ...entry,
+        icon: await resolvePluginIcon(ctx, entry, await serverUrlsFor(entry)),
+      };
+    }),
   );
 }
 
@@ -1043,7 +1114,9 @@ export async function queryPluginCatalog(
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  return attachAuthorIdentities(ctx, entries);
+  const entriesWithAuthors = await attachAuthorIdentities(ctx, entries);
+
+  return attachResolvedIcons(ctx, entriesWithAuthors);
 }
 
 export async function handlePluginsInstall(

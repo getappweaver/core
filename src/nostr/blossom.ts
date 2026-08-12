@@ -86,6 +86,121 @@ export function normalizeBlossomServerUrl(server: string): string {
   return server.endsWith('/') ? server.slice(0, -1) : server;
 }
 
+type ResolveVerifiedBlossomDataUrlProps = {
+  sourceUrl: string;
+  serverUrls: string[];
+  maxBytes: number;
+  timeoutMs: number;
+};
+
+function blossomBlobPath(sourceUrl: string, sha256: string): string {
+  try {
+    const fileName = new URL(sourceUrl).pathname.split('/').at(-1) ?? '';
+    const hashIndex = fileName.toLowerCase().indexOf(sha256);
+    const suffix = hashIndex === -1 ? '' : fileName.slice(hashIndex + 64);
+
+    return /^[.][a-zA-Z0-9]{1,10}$/.test(suffix)
+      ? `${sha256}${suffix}`
+      : sha256;
+  } catch {
+    return sha256;
+  }
+}
+
+function imageContentType(response: Response, path: string): string | null {
+  const responseType = response.headers.get('content-type')?.split(';')[0];
+
+  if (responseType?.startsWith('image/')) {
+    return responseType;
+  }
+
+  const extension = path.split('.').at(-1)?.toLowerCase();
+
+  switch (extension) {
+    case 'svg':
+      return 'image/svg+xml';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return null;
+  }
+}
+
+/** Resolve a hash-addressed Blossom image and return only hash-verified bytes. */
+export async function resolveVerifiedBlossomDataUrl({
+  sourceUrl,
+  serverUrls,
+  maxBytes,
+  timeoutMs,
+}: ResolveVerifiedBlossomDataUrlProps): Promise<string | null> {
+  const expectedHash = extractSha256FromUrl(sourceUrl)?.toLowerCase();
+
+  if (!expectedHash) {
+    return null;
+  }
+
+  const blobPath = blossomBlobPath(sourceUrl, expectedHash);
+
+  const serverPaths =
+    blobPath === expectedHash ? [expectedHash] : [blobPath, expectedHash];
+
+  const candidateUrls = [
+    sourceUrl,
+    ...serverUrls.flatMap((server) =>
+      serverPaths.map((path) => `${normalizeBlossomServerUrl(server)}/${path}`),
+    ),
+  ].filter((url, index, urls) => urls.indexOf(url) === index);
+
+  for (const candidateUrl of candidateUrls) {
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(candidateUrl, {
+        headers: { 'Accept-Encoding': 'identity' },
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const declaredLength = Number(response.headers.get('content-length'));
+
+      if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+        continue;
+      }
+
+      const data = new Uint8Array(await response.arrayBuffer());
+
+      if (data.length > maxBytes || (await sha256Hex(data)) !== expectedHash) {
+        continue;
+      }
+
+      const contentType = imageContentType(response, blobPath);
+
+      if (!contentType) {
+        continue;
+      }
+
+      return `data:${contentType};base64,${Buffer.from(data).toString('base64')}`;
+    } catch {
+      // Try the next server from the author's kind 10063 list.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Kind 24242 — Blossom HTTP auth (Authorization: Nostr <base64>)
 // ---------------------------------------------------------------------------

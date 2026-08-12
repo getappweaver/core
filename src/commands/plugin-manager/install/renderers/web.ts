@@ -300,7 +300,7 @@ function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
 
 function pluginIcon(entry: PluginCatalogEntry): WebNode | null {
   if (
-    !entry.icon.startsWith('data:image/svg+xml;base64,') &&
+    !/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(entry.icon) &&
     !entry.icon.startsWith('https://') &&
     !entry.icon.startsWith('http://')
   ) {
