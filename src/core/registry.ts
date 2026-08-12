@@ -32,7 +32,7 @@ const byAlias = new Map<string, BotPlugin>();
 const capabilityRelationsByAlias = new Map<string, PluginCapabilityRelations>();
 
 type RegisterPluginProps = {
-  alias: string;
+  alias?: string;
   plugin: BotPlugin;
   ctx: PluginHostContext;
 };
@@ -103,29 +103,37 @@ function capabilityProviderSource(
 }
 
 export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
-  if (plugin.identity.alias !== alias) {
+  const installedAlias = alias ?? plugin.identity.alias;
+
+  if (plugin.identity.alias !== installedAlias) {
     throw new Error(
-      `Plugin alias mismatch: installed as "${alias}" but claimed "${plugin.identity.alias}"`,
+      `Plugin alias mismatch: installed as "${installedAlias}" but claimed "${plugin.identity.alias}"`,
     );
   }
 
-  if (byAlias.has(alias)) {
-    throw new Error(`Plugin alias collision: "${alias}" already registered`);
+  if (byAlias.has(installedAlias)) {
+    throw new Error(
+      `Plugin alias collision: "${installedAlias}" already registered`,
+    );
   }
 
-  const databasePath = join(dmBotRoot, 'plugins', alias, 'db.sqlite');
+  const databasePath = join(dmBotRoot, 'plugins', installedAlias, 'db.sqlite');
 
-  log.info(`Registering plugin: ${alias} creating database at ${databasePath}`);
+  log.info(
+    `Registering plugin: ${installedAlias} creating database at ${databasePath}`,
+  );
 
   const scopedContext = createPluginScopedContext({ plugin, ctx });
   const providers = plugin.capabilityProviders ?? [];
 
   const pkg = parsePluginPackageJson({
-    pluginDir: join(dmBotRoot, 'plugins', alias),
+    pluginDir: join(dmBotRoot, 'plugins', installedAlias),
   });
 
   if (!pkg) {
-    throw new Error(`Cannot register ${alias}: invalid package metadata.`);
+    throw new Error(
+      `Cannot register ${installedAlias}: invalid package metadata.`,
+    );
   }
 
   if (
@@ -133,12 +141,12 @@ export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
     pkg.version !== plugin.identity.version
   ) {
     throw new Error(
-      `Cannot register ${alias}: package identity does not match runtime identity.`,
+      `Cannot register ${installedAlias}: package identity does not match runtime identity.`,
     );
   }
 
   const source =
-    providers.length > 0 ? capabilityProviderSource(alias, pkg) : null;
+    providers.length > 0 ? capabilityProviderSource(installedAlias, pkg) : null;
 
   if (source) {
     capabilityRegistry.validateProviders({ source, providers });
@@ -153,8 +161,8 @@ export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
     });
   }
 
-  byAlias.set(alias, plugin);
-  capabilityRelationsByAlias.set(alias, pkg.capabilities);
+  byAlias.set(installedAlias, plugin);
+  capabilityRelationsByAlias.set(installedAlias, pkg.capabilities);
 }
 
 export function finalizePluginRegistration(): void {

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.2.1] - 2026-08-12
+
+- fix: support legacy generated plugin registrations (183207f)
+
 ## [v11.2.0] - 2026-08-12
 
-- feat: add configurable workspace AI instructions (aaae554)
+- feat: add configurable workspace AI instructions (87fbd3d)
 
 ## [v11.1.3] - 2026-08-11
 
