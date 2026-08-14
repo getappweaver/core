@@ -63,6 +63,25 @@ export type ChatStreamChunkServerMessage = {
   chunk: AgentStreamChunk;
 };
 
+export type ToolIntervention = {
+  id: string;
+  phase: 'before' | 'after';
+  sessionId: string;
+  callId: string;
+  tool: string;
+  args: Record<string, unknown>;
+  output: string | null;
+  submitted?: boolean;
+  matchedRuleId?: string;
+  matchedRulePattern?: string | null;
+};
+
+export type InterventionRequestServerMessage = {
+  type: 'intervention_request';
+  requestId: string;
+  intervention: ToolIntervention;
+};
+
 export type DoneServerMessage = {
   type: 'done';
   requestId: string;
@@ -81,6 +100,7 @@ export type WebSocketServerMessage =
   | CommandResultServerMessage
   | PromptServerMessage
   | ChatStreamChunkServerMessage
+  | InterventionRequestServerMessage
   | ChatResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;

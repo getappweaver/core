@@ -83,6 +83,30 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
     }
   }
 
+  function updateChangedFieldSubmitButtons(): void {
+    if (!formEl) {
+      return;
+    }
+
+    const buttons = formEl.querySelectorAll<HTMLButtonElement>(
+      'button[data-web-disable-until-field-changed]',
+    );
+
+    for (const button of buttons) {
+      const fieldName = button.getAttribute(
+        'data-web-disable-until-field-changed',
+      );
+
+      const field = fieldName
+        ? formEl.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+            `[name="${CSS.escape(fieldName)}"]`,
+          )
+        : null;
+
+      button.disabled = !field || field.value === field.defaultValue;
+    }
+  }
+
   createEffect(() => {
     if (isEmbeddedWebDemoMode()) {
       return;
@@ -107,8 +131,12 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
     }
 
     updatePositiveIntegerSubmitButtons();
+    updateChangedFieldSubmitButtons();
 
-    const onInput = () => updatePositiveIntegerSubmitButtons();
+    const onInput = () => {
+      updatePositiveIntegerSubmitButtons();
+      updateChangedFieldSubmitButtons();
+    };
 
     formEl.addEventListener('input', onInput);
     formEl.addEventListener('change', onInput);

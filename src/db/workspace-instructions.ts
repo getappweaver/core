@@ -8,9 +8,11 @@ Treat questions and brainstorming as discussion. Only edit files when the user c
 
 When implementing, carry the requested change through appropriate verification and report anything that could not be verified.`;
 
+const DEFAULT_APPWEAVER_WORKSPACE_INSTRUCTIONS = `Treat questions, hypotheses, Q&A, brainstorming, and discussion as conversation. Do not edit files or run implementation steps until the user clearly requests a change.`;
+
 const DEFAULT_WORKSPACE_INSTRUCTIONS: Record<WorkspaceTarget, string> = {
   parent: DEFAULT_PARENT_WORKSPACE_INSTRUCTIONS,
-  appweaver: '',
+  appweaver: DEFAULT_APPWEAVER_WORKSPACE_INSTRUCTIONS,
 };
 
 export type WorkspaceInstructions = {

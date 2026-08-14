@@ -21,6 +21,7 @@ import {
   isToolItem,
 } from '../../types';
 import { writeClipboardText } from '../../utils/clipboard';
+import type { ToolIntervention } from '../../ws-types';
 
 import { ChatMarkdown } from '../ChatMarkdown';
 import { WebButton } from '../WebButton';
@@ -122,10 +123,33 @@ function TimelineItemSlot(props: TimelineItemSlotProps) {
           </Match>
 
           <Match when={isToolItem(item())}>
-            <TimelineToolCard
-              item={item() as Extract<TimelineItem, { type: 'tool' }>}
-              onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
-            />
+            <Show
+              when={
+                viewProps.toolInterventions?.[
+                  (item() as Extract<TimelineItem, { type: 'tool' }>).tool
+                    .callId
+                ]
+              }
+              fallback={
+                <TimelineToolCard
+                  item={item() as Extract<TimelineItem, { type: 'tool' }>}
+                  onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+                  intervention={null}
+                  onResolveIntervention={viewProps.onResolveToolIntervention}
+                  onOpenToolInvocations={viewProps.onOpenToolInvocations}
+                />
+              }
+            >
+              {(intervention) => (
+                <TimelineToolCard
+                  item={item() as Extract<TimelineItem, { type: 'tool' }>}
+                  onDeleteTimelineItem={viewProps.onDeleteTimelineItem}
+                  intervention={intervention()}
+                  onResolveIntervention={viewProps.onResolveToolIntervention}
+                  onOpenToolInvocations={viewProps.onOpenToolInvocations}
+                />
+              )}
+            </Show>
           </Match>
 
           <Match when={isPromptItem(item())}>
@@ -902,6 +926,8 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
         return 'diff';
       case 'git_commit':
         return 'commit diff';
+      case 'session_diff':
+        return 'session diff';
       case 'workspace_diff':
       case null:
       case undefined:
@@ -1311,6 +1337,9 @@ function TimelineDiffSummaryRow(props: TimelineDiffSummaryRowProps) {
 type TimelineToolCardProps = {
   item: Extract<TimelineItem, { type: 'tool' }>;
   onDeleteTimelineItem: TimelineViewProps['onDeleteTimelineItem'];
+  intervention: ToolIntervention | null;
+  onResolveIntervention: TimelineViewProps['onResolveToolIntervention'];
+  onOpenToolInvocations: TimelineViewProps['onOpenToolInvocations'];
 };
 
 type TimelineTool = TimelineToolCardProps['item']['tool'];
@@ -1358,6 +1387,192 @@ function toolDisplayName(tool: TimelineTool): string {
   return raw.length > 0 ? raw[0].toUpperCase() + raw.slice(1) : tool.tool;
 }
 
+function ToolInterventionControls(props: {
+  intervention: ToolIntervention;
+  onResolve: NonNullable<TimelineViewProps['onResolveToolIntervention']>;
+  onClose: () => void;
+}) {
+  const [remember, setRemember] = createSignal(false);
+  const [output, setOutput] = createSignal(props.intervention.output ?? '');
+
+  const normalizedToolName = () =>
+    props.intervention.tool.split('.').at(-1)?.toLowerCase() ??
+    props.intervention.tool.toLowerCase();
+
+  const applyPatchFiles = () => {
+    const patchText = props.intervention.args.patchText;
+
+    return typeof patchText === 'string'
+      ? [
+          ...patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm),
+        ].map((match) => match[1])
+      : [];
+  };
+
+  const ruleArgument = () => {
+    if (normalizedToolName() === 'apply_patch') {
+      const files = applyPatchFiles();
+
+      return files.length > 0 ? { key: '$file', value: files[0] } : null;
+    }
+
+    for (const key of [
+      'command',
+      'pattern',
+      'filePath',
+      'filepath',
+      'path',
+      'url',
+      'query',
+    ]) {
+      const value = props.intervention.args[key];
+
+      if (typeof value === 'string' && value.length > 0) {
+        return { key, value };
+      }
+    }
+
+    return null;
+  };
+
+  const [rulePattern, setRulePattern] = createSignal(
+    ruleArgument()
+      ? normalizedToolName() === 'bash'
+        ? `${ruleArgument()!.value}*`
+        : ruleArgument()!.value
+      : '*',
+  );
+
+  const toolName = () => {
+    const raw =
+      props.intervention.tool.split('.').at(-1) ?? props.intervention.tool;
+
+    return raw.length > 0 ? raw[0].toUpperCase() + raw.slice(1) : raw;
+  };
+
+  return (
+    <div class="tool-intervention">
+      <Show when={props.intervention.submitted}>
+        <textarea
+          class="tool-intervention__output"
+          value={props.intervention.output ?? ''}
+          rows={5}
+          readOnly
+        />
+        <div class="tool-intervention__actions">
+          <WebButton type="button" class="web-button" onClick={props.onClose}>
+            Close
+          </WebButton>
+        </div>
+      </Show>
+      <Show when={!props.intervention.submitted}>
+        <Show when={props.intervention.phase === 'after'}>
+          <textarea
+            class="tool-intervention__output"
+            value={output()}
+            rows={5}
+            autofocus
+            onFocus={(event) => event.currentTarget.select()}
+            onInput={(event) => setOutput(event.currentTarget.value)}
+          />
+        </Show>
+        <label class="tool-intervention__remember">
+          <input
+            type="checkbox"
+            class="checkbox-retro"
+            checked={remember()}
+            onChange={(event) => setRemember(event.currentTarget.checked)}
+          />
+          <span>Don't ask again for `{toolName()}`</span>
+          <input
+            type="text"
+            class="tool-intervention__rule-pattern"
+            value={rulePattern()}
+            disabled={!remember() || ruleArgument() === null}
+            aria-label={`${toolName()} invocation pattern`}
+            title="* matches any characters"
+            onInput={(event) => setRulePattern(event.currentTarget.value)}
+          />
+        </label>
+        <div class="tool-intervention__actions">
+          <Show
+            when={props.intervention.phase === 'before'}
+            fallback={
+              <>
+                <WebButton
+                  type="button"
+                  class="web-button"
+                  onClick={() =>
+                    props.onResolve({
+                      intervention: props.intervention,
+                      action: 'send',
+                      output: output(),
+                      remember: remember(),
+                      ruleArgumentKey: ruleArgument()?.key ?? null,
+                      rulePattern: remember() ? rulePattern() : null,
+                    })
+                  }
+                >
+                  Send
+                </WebButton>
+                <WebButton
+                  type="button"
+                  class="web-button"
+                  onClick={() =>
+                    props.onResolve({
+                      intervention: props.intervention,
+                      action: 'stop',
+                      output: null,
+                      remember: remember(),
+                      ruleArgumentKey: ruleArgument()?.key ?? null,
+                      rulePattern: remember() ? rulePattern() : null,
+                    })
+                  }
+                >
+                  Stop
+                </WebButton>
+              </>
+            }
+          >
+            <WebButton
+              type="button"
+              class="web-button"
+              onClick={() =>
+                props.onResolve({
+                  intervention: props.intervention,
+                  action: 'continue',
+                  output: null,
+                  remember: remember(),
+                  ruleArgumentKey: ruleArgument()?.key ?? null,
+                  rulePattern: remember() ? rulePattern() : null,
+                })
+              }
+            >
+              Continue
+            </WebButton>
+            <WebButton
+              type="button"
+              class="web-button"
+              onClick={() =>
+                props.onResolve({
+                  intervention: props.intervention,
+                  action: 'stop',
+                  output: null,
+                  remember: remember(),
+                  ruleArgumentKey: ruleArgument()?.key ?? null,
+                  rulePattern: remember() ? rulePattern() : null,
+                })
+              }
+            >
+              Stop
+            </WebButton>
+          </Show>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
 function shortenToolTarget(value: string): string {
   const workspaceMarker = '/dm-bot-main/';
   const markerIndex = value.indexOf(workspaceMarker);
@@ -1371,6 +1586,7 @@ function shortenToolTarget(value: string): string {
 
 function compactToolSummary(tool: TimelineTool): string {
   const name = toolDisplayName(tool);
+  const normalizedToolName = tool.tool.split('.').at(-1)?.toLowerCase();
 
   const path = getToolInputValue(tool, [
     'filePath',
@@ -1392,7 +1608,14 @@ function compactToolSummary(tool: TimelineTool): string {
     }
   }
 
-  const target = path ?? command ?? pattern ?? url ?? tool.title;
+  const target =
+    command ??
+    (normalizedToolName === 'glob' || normalizedToolName === 'grep'
+      ? (pattern ?? path)
+      : (path ?? pattern)) ??
+    url ??
+    tool.title;
+
   const suffix = extras.length > 0 ? ` [${extras.join(', ')}]` : '';
 
   return target ? `${name} ${shortenToolTarget(target)}${suffix}` : name;
@@ -1618,6 +1841,56 @@ function TimelinePreparingPatchToolCard(props: { tool: TimelineTool }) {
 
 export function TimelineToolCard(props: TimelineToolCardProps) {
   const tool = () => props.item.tool;
+  const [submittedPanelOpen, setSubmittedPanelOpen] = createSignal(false);
+
+  if (props.intervention && props.onResolveIntervention) {
+    if (props.intervention.matchedRuleId) {
+      return (
+        <div class={`card tool-card tool-card--${tool().status}`}>
+          <div class="tool-card__line" title={toolStatusLabel(tool().status)}>
+            <span class="tool-card__arrow">{compactToolArrow(tool())}</span>
+            <span>{compactToolSummary(tool())}</span>
+            <button
+              type="button"
+              class="tool-intervention__reopen tool-intervention__reopen--rule"
+              onClick={props.onOpenToolInvocations}
+              aria-label="Open matched tool invocation rule"
+              title={`Matched rule: ${props.intervention.matchedRulePattern ?? 'exact arguments'}`}
+            >
+              ...
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div class={`card tool-card tool-card--${tool().status}`}>
+        <div class="tool-card__line" title={toolStatusLabel(tool().status)}>
+          <span class="tool-card__arrow">{compactToolArrow(tool())}</span>
+          <span>{compactToolSummary(tool())}</span>
+          <Show when={props.intervention.submitted}>
+            <button
+              type="button"
+              class="tool-intervention__reopen"
+              onClick={() => setSubmittedPanelOpen((open) => !open)}
+              aria-label="Show submitted tool output"
+              title="Show submitted tool output"
+            >
+              ...
+            </button>
+          </Show>
+        </div>
+        <Show when={!props.intervention.submitted || submittedPanelOpen()}>
+          <ToolInterventionControls
+            intervention={props.intervention}
+            onResolve={props.onResolveIntervention}
+            onClose={() => setSubmittedPanelOpen(false)}
+          />
+        </Show>
+      </div>
+    );
+  }
 
   if (isApplyPatchTool(tool()) && tool().status !== 'completed') {
     return <TimelinePreparingPatchToolCard tool={tool()} />;

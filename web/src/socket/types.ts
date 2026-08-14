@@ -1,5 +1,7 @@
 import type { Accessor, Setter } from 'solid-js';
 
+import type { AgentFileDiff } from '@src/backends/agent-stream-chunk';
+
 import type { ChatHook } from '../chat/types';
 import type { NostrAuthContextValue } from '../contexts/NostrAuthContext';
 import type { CommandDetail, TimelineItem } from '../types';
@@ -11,9 +13,11 @@ import type {
   CommandsResultServerMessage,
   DoneServerMessage,
   ErrorServerMessage,
+  InterventionRequestServerMessage,
   PromptPayload,
   PromptServerMessage,
   TimelineEventsResultServerMessage,
+  ToolIntervention,
 } from '../ws-types';
 
 export type PendingRequest = {
@@ -37,6 +41,7 @@ export type IncomingServerMessage =
   | CommandResultServerMessage
   | PromptServerMessage
   | ChatStreamChunkServerMessage
+  | InterventionRequestServerMessage
   | ChatResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
@@ -55,6 +60,8 @@ export type SocketAppAdapters = {
   >;
   setLoadingCommands: Setter<boolean>;
   setAgentWorking: Setter<boolean>;
+  setToolInterventions: Setter<Record<string, ToolIntervention>>;
+  setSessionDiffFiles: Setter<AgentFileDiff[]>;
   setTimeline: Setter<TimelineItem[]>;
   appendSystemMessage: (text: string) => void;
   createId: () => string;

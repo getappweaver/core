@@ -4,13 +4,11 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
-  readlinkSync,
   readdirSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'fs';
-import { dirname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 
 import { parse } from 'yaml';
 
@@ -146,18 +144,6 @@ function readSkillMetadata(path: string, fallbackName: string): SkillMetadata {
   }
 }
 
-function targetPointsTo(target: string, source: string): boolean {
-  try {
-    if (!lstatSync(target).isSymbolicLink()) {
-      return false;
-    }
-
-    return resolve(dirname(target), readlinkSync(target)) === resolve(source);
-  } catch {
-    return false;
-  }
-}
-
 function syncSkillTarget({
   dmBotRoot,
   workspaceRoot,
@@ -180,16 +166,12 @@ function syncSkillTarget({
     throw new Error(`skill_not_found:${skillName}`);
   }
 
-  if (targetPointsTo(target, source)) {
-    return;
-  }
-
   if (pathExists(target)) {
     rmSync(target, { recursive: true, force: true });
   }
 
   mkdirSync(targetRoot, { recursive: true });
-  symlinkSync(source, target, 'dir');
+  cpSync(source, target, { recursive: true });
 }
 
 function reconcileWorkspaceSkills({

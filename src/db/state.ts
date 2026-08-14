@@ -27,6 +27,7 @@ import {
   STATE_DEFAULT_MODE,
   STATE_DM_COMMAND_PREFIX,
   STATE_LINTING,
+  STATE_INTERVENTION_MODE,
   STATE_MODEL_OVERRIDE,
   STATE_OPENCODE_AGENT,
   STATE_PROVIDER_NAME,
@@ -118,8 +119,7 @@ export function initSkKeyEncryption(
 
 export function getState(db: CoreDb, key: string): string | null {
   const row = db.prepare('SELECT value FROM state WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined;
+    { value: string } | undefined;
 
   return row?.value ?? null;
 }
@@ -129,6 +129,14 @@ export function setState(db: CoreDb, key: string, value: string): void {
     key,
     value,
   ]);
+}
+
+export function getInterventionMode(db: CoreDb): boolean {
+  return getState(db, STATE_INTERVENTION_MODE) === 'on';
+}
+
+export function setInterventionMode(db: CoreDb, enabled: boolean): void {
+  setState(db, STATE_INTERVENTION_MODE, enabled ? 'on' : 'off');
 }
 
 export function markSetupConfigured(db: CoreDb): void {

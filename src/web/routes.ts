@@ -1263,6 +1263,7 @@ export function createWebFetchHandler(
           return runWebChat({
             ctx,
             content,
+            onSessionReady: null,
             onStreamChunk: null,
             streamAbortSignal: null,
           });

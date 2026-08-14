@@ -253,8 +253,7 @@ export type BotPlugin = {
   helpText: (alias: string, prefix: string) => string[];
   /** When set, global `help <alias>` can render structured CLI help via core. */
   commandDefinition:
-    | CommandDefinition
-    | ((prefix: string, alias: string) => CommandDefinition);
+    CommandDefinition | ((prefix: string, alias: string) => CommandDefinition);
   stories?: PluginStoriesProvider;
   aiDefinition?: AiDefinition<z.ZodType, any, any>;
   capabilityProviders?: readonly DefinedCapabilityProvider[];

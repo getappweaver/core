@@ -80,6 +80,42 @@ export function getSkillsCommandDefinition(prefix: string): CommandDefinition {
         options: [],
         examples: [`${prefix}skills set appweaver-todo enable`],
       },
+      {
+        name: 'tool-invocations',
+        summary: 'Open remembered tool invocation rules.',
+        textHidden: true,
+        aliases: [],
+        arguments: [],
+        options: [],
+        examples: [`${prefix}skills tool-invocations`],
+      },
+      {
+        name: 'delete-tool-invocation',
+        summary: 'Delete a remembered tool invocation rule.',
+        textHidden: true,
+        aliases: [],
+        arguments: [
+          {
+            name: 'ruleId',
+            summary: 'Tool invocation rule ID.',
+            kind: 'string',
+            choices: null,
+            required: true,
+            variadic: false,
+          },
+        ],
+        options: [],
+        examples: [],
+      },
+      {
+        name: 'update-tool-invocation',
+        summary: 'Update a remembered tool invocation pattern.',
+        textHidden: true,
+        aliases: [],
+        arguments: [],
+        options: [],
+        examples: [],
+      },
     ],
   };
 }

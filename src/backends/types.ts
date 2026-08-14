@@ -6,8 +6,7 @@ import type { AgentBackendName, AgentMode } from '../db';
 import type { AgentStreamChunk } from './agent-stream-chunk';
 
 export type OutputSegment =
-  | { type: 'text'; value: string }
-  | { type: 'reasoning'; value: string };
+  { type: 'text'; value: string } | { type: 'reasoning'; value: string };
 
 export type AgentRunResult = AgentErrorResult | AgentSuccessResult;
 

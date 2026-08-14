@@ -19,6 +19,8 @@ import type {
 
 export type ComposerAiState = {
   backend: string;
+  interventionAvailable: boolean;
+  interventionEnabled: boolean;
   currentSessionId: string | null;
   executionProfileLabel: 'Agent' | 'Mode';
   executionProfileName: string;

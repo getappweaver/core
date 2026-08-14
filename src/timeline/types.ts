@@ -26,9 +26,7 @@ export type TimelineDiffSummary = {
 };
 
 export type TimelineDiffOrigin =
-  | 'workspace_diff'
-  | 'git_commit'
-  | 'agent_patch';
+  'workspace_diff' | 'git_commit' | 'agent_patch' | 'session_diff';
 
 export type TimelineEventMeta = {
   title: string | null;
@@ -70,9 +68,7 @@ export type TimelineCommandSubcommand = {
   examples: string[];
   inferredWeb?: {
     executionMode:
-      | 'requires_input'
-      | 'runnable_default'
-      | 'runnable_customizable';
+      'requires_input' | 'runnable_default' | 'runnable_customizable';
   };
 };
 

@@ -140,6 +140,23 @@ export const CancelChatClientMessageSchema = z.object({
   requestId: RequestIdSchema,
 });
 
+export const SetInterventionModeClientMessageSchema = z.object({
+  type: z.literal('set_intervention_mode'),
+  requestId: RequestIdSchema,
+  enabled: z.boolean(),
+});
+
+export const ResolveInterventionClientMessageSchema = z.object({
+  type: z.literal('resolve_intervention'),
+  requestId: RequestIdSchema,
+  interventionId: z.string().min(1),
+  action: z.enum(['continue', 'stop', 'send']),
+  output: z.string().nullable(),
+  remember: z.boolean(),
+  ruleArgumentKey: z.string().min(1).nullable(),
+  rulePattern: z.string().min(1).nullable(),
+});
+
 export const SaveTimelineFormClientMessageSchema = z.object({
   type: z.literal('save_timeline_form'),
   requestId: RequestIdSchema,
@@ -229,6 +246,8 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   PromptAnswerClientMessageSchema,
   ChatClientMessageSchema,
   CancelChatClientMessageSchema,
+  SetInterventionModeClientMessageSchema,
+  ResolveInterventionClientMessageSchema,
   SaveTimelineFormClientMessageSchema,
   DeleteTimelineEventClientMessageSchema,
 ]);
@@ -334,6 +353,9 @@ export type PromptAnswerClientMessage = z.infer<
   typeof PromptAnswerClientMessageSchema
 >;
 export type ChatClientMessage = z.infer<typeof ChatClientMessageSchema>;
+export type ResolveInterventionClientMessage = z.infer<
+  typeof ResolveInterventionClientMessageSchema
+>;
 export type SaveTimelineFormClientMessage = z.infer<
   typeof SaveTimelineFormClientMessageSchema
 >;
@@ -388,6 +410,22 @@ export type ChatStreamChunkServerMessage = {
   chunk: AgentStreamChunk;
 };
 
+export type InterventionRequestServerMessage = {
+  type: 'intervention_request';
+  requestId: string;
+  intervention: {
+    id: string;
+    phase: 'before' | 'after';
+    sessionId: string;
+    callId: string;
+    tool: string;
+    args: Record<string, unknown>;
+    output: string | null;
+    matchedRuleId?: string;
+    matchedRulePattern?: string | null;
+  };
+};
+
 export type DoneServerMessage = {
   type: 'done';
   requestId: string;
@@ -406,6 +444,7 @@ export type WebSocketServerMessage =
   | CommandResultServerMessage
   | PromptServerMessage
   | ChatStreamChunkServerMessage
+  | InterventionRequestServerMessage
   | ChatResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
@@ -488,6 +527,17 @@ export function createChatStreamChunkMessage(params: {
     type: 'chat_stream_chunk',
     requestId: params.requestId,
     chunk: params.chunk,
+  };
+}
+
+export function createInterventionRequestMessage(params: {
+  requestId: string;
+  intervention: InterventionRequestServerMessage['intervention'];
+}): InterventionRequestServerMessage {
+  return {
+    type: 'intervention_request',
+    requestId: params.requestId,
+    intervention: params.intervention,
   };
 }
 

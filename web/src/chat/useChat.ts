@@ -21,14 +21,6 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   const pendingStreamTextByRequestId = new Map<string, string>();
   const streamFlushTimerByRequestId = new Map<string, number>();
 
-  function summarizeDiffFiles(files: TimelineFileDiff[]) {
-    return {
-      fileCount: files.length,
-      additions: files.reduce((sum, file) => sum + file.additions, 0),
-      deletions: files.reduce((sum, file) => sum + file.deletions, 0),
-    };
-  }
-
   function flushStreamTextDelta(requestId: string): void {
     streamFlushTimerByRequestId.delete(requestId);
 
@@ -222,20 +214,13 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   ): void {
     logChatDebug('stream.diff', {
       requestId,
-      ...summarizeDiffFiles(files),
+      fileCount: files.length,
     });
 
     closeTextSegmentBeforeStructuralChunk(requestId);
     closeReasoningSegment(requestId);
 
-    adapters.setTimeline((prev) => [
-      ...prev,
-      {
-        id: adapters.createId(),
-        type: 'diff_summary',
-        summary: summarizeDiffFiles(files),
-      } satisfies TimelineItem,
-    ]);
+    adapters.setSessionDiffFiles(files);
   }
 
   function handleStreamTool(requestId: string, tool: TimelineToolCall): void {
@@ -256,7 +241,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       let found = false;
 
       const next = prev.map((item) => {
-        if (item.id !== itemId || item.type !== 'tool') {
+        if (item.type !== 'tool' || item.tool.callId !== tool.callId) {
           return item;
         }
 

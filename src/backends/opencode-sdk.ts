@@ -1,8 +1,9 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (in-process server)
@@ -10,6 +11,7 @@ import { join } from 'node:path';
 import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 
 import { debug, log } from '../logger';
+import { dmBotRoot } from '../paths';
 import type { ProviderName } from '../providers/types';
 
 import {
@@ -24,6 +26,7 @@ import {
   normalizeModelForProvider,
   resolveConfiguredModelFromOpencodeConfig,
 } from './opencode-common';
+import { getOpencodeInterventionEnvironment } from './opencode-intervention';
 import {
   isOpenCodeSessionCompletionEvent,
   parseOpenCodeMessage,
@@ -312,16 +315,43 @@ function getPortsToTry(): number[] {
 
 async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
   const cwd = getOpencodeServerCwd();
+  const pluginDir = join(cwd, '.opencode', 'plugins');
+
+  mkdirSync(pluginDir, { recursive: true });
+
+  copyFileSync(
+    join(
+      dmBotRoot,
+      'templates',
+      'opencode-plugins',
+      'appweaver-intervention.ts',
+    ),
+    join(pluginDir, 'appweaver-intervention.ts'),
+  );
+
+  const interventionPluginPath = join(pluginDir, 'appweaver-intervention.ts');
+
+  const database = process.env.OPENCODE_DB?.trim() || join(cwd, 'opencode.db');
+  const intervention = getOpencodeInterventionEnvironment();
+
+  log.info(
+    `opencode-sdk: installed AppWeaver intervention plugin in ${pluginDir}`,
+  );
 
   const proc = spawn(
     'opencode',
-    ['serve', '--hostname=127.0.0.1', `--port=${port}`],
+    ['serve', '--hostname=0.0.0.0', `--port=${port}`],
     {
       cwd,
       detached: true,
       env: {
         ...process.env,
-        OPENCODE_CONFIG_CONTENT: JSON.stringify({}),
+        OPENCODE_CONFIG_CONTENT: JSON.stringify({
+          plugin: [pathToFileURL(interventionPluginPath).href],
+        }),
+        OPENCODE_DB: database,
+        APPWEAVER_INTERVENTION_URL: intervention.callbackUrl,
+        APPWEAVER_INTERVENTION_TOKEN: intervention.token,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -1040,8 +1070,7 @@ export async function getOpencodeSdkContextStats({
   );
 
   const configuredModel = provider?.models?.[model.modelID] as
-    | { limit?: { context?: unknown } }
-    | undefined;
+    { limit?: { context?: unknown } } | undefined;
 
   const rawContextLimit = configuredModel?.limit?.context;
 
@@ -1245,8 +1274,7 @@ function parsePromptSdkResult({
 
   if (result.error) {
     const err = result.error as
-      | { data?: { message?: string }; statusCode?: number }
-      | undefined;
+      { data?: { message?: string }; statusCode?: number } | undefined;
 
     debug('opencode-sdk prompt error:', {
       statusCode: err?.statusCode,

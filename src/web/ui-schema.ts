@@ -613,6 +613,8 @@ export const WebBasePropsSchema = z.object({
   submitAction: WebActionSchema.optional(),
   /** `button`: disable submit until this form field is a positive integer. */
   disabledUntilFormFieldPositiveInteger: z.string().min(1).optional(),
+  /** `button`: disable submit until this form field differs from its initial value. */
+  disabledUntilFormFieldChanged: z.string().min(1).optional(),
   /** `form`: fields with these names merge into command `options` instead of positional `arguments`. */
   formOptionFieldNames: z.array(z.string().min(1)).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */
@@ -849,7 +851,9 @@ export const TimelineDiffEventSchema = z.object({
   files: z.array(TimelineFileDiffSchema),
   title: z.string().nullable(),
   subtitle: z.string().nullable(),
-  origin: z.enum(['workspace_diff', 'git_commit', 'agent_patch']).nullable(),
+  origin: z
+    .enum(['workspace_diff', 'git_commit', 'agent_patch', 'session_diff'])
+    .nullable(),
   scopePath: z.string().nullable().optional(),
   stagedFiles: z.array(z.string()).optional(),
 });
@@ -873,10 +877,7 @@ export type ClientViewRoot = z.infer<typeof ClientViewResultSchema>;
 export type TimelineEventOutput = z.infer<typeof TimelineEventOutputSchema>;
 /** Union of all possible return types from command handlers. */
 export type WebHandlerResult =
-  | string
-  | WebNodeRoot
-  | ClientViewRoot
-  | TimelineEventOutput;
+  string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
 export type WebShadowMountOverflow = z.infer<
   typeof WebShadowMountOverflowSchema
 >;

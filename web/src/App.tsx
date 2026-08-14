@@ -9,6 +9,11 @@ import {
   Show,
 } from 'solid-js';
 
+import {
+  summarizeTimelineDiffFiles,
+  type TimelineFileDiff,
+} from '@src/timeline/types';
+
 import type { ChatRunStatus } from './chat/types';
 import { useChat } from './chat/useChat';
 import { ChromeOverlay } from './chrome/ChromeOverlay';
@@ -23,6 +28,7 @@ import { useCommandForms } from './commands/useCommandForms';
 import { useCommands } from './commands/useCommands';
 import { Composer } from './components/Composer';
 import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
+import { ComposerInterventionButton } from './components/ComposerInterventionButton';
 import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
 import { ComposerProviderMenuButton } from './components/ComposerProviderMenuButton';
 import { ComposerSkillsButton } from './components/ComposerSkillsButton';
@@ -91,6 +97,7 @@ import {
   scoreCommandMatch,
   scoreSubcommandMatch,
 } from './utils';
+import type { ToolIntervention } from './ws-types';
 
 export function App(): JSX.Element {
   if (window.location.pathname === '/setup') {
@@ -274,6 +281,21 @@ function AppInner(): JSX.Element {
   const [composerText, setComposerText] = createSignal('');
   const [loadingCommands, setLoadingCommands] = createSignal(true);
   const [agentWorking, setAgentWorking] = createSignal(false);
+  const [interventionMode, setInterventionMode] = createSignal(false);
+
+  const [toolInterventions, setToolInterventions] = createSignal<
+    Record<string, ToolIntervention>
+  >({});
+
+  const [sessionDiffFiles, setSessionDiffFiles] = createSignal<
+    TimelineFileDiff[]
+  >([]);
+
+  const sessionDiffSummary = createMemo(() =>
+    summarizeTimelineDiffFiles(sessionDiffFiles()),
+  );
+
+  let sessionDiffSessionId: string | null = null;
 
   const [chatRunStatus, setChatRunStatus] = createSignal<ChatRunStatus>(
     readChatRunStatus(`timeline:${initialTimelineId}`),
@@ -424,6 +446,8 @@ function AppInner(): JSX.Element {
     setComposerAiState,
     setLoadingCommands,
     setAgentWorking,
+    setSessionDiffFiles,
+    setToolInterventions,
     appendSystemMessage,
     createId,
     chat: {
@@ -449,10 +473,134 @@ function AppInner(): JSX.Element {
     sendSocketMessage,
     appendSystemMessage,
     setAgentWorking,
+    setSessionDiffFiles,
     chatRunStatus,
     setChatRunStatus: setPersistedChatRunStatus,
     onChatResult: requestComposerAiState,
   });
+
+  createEffect(() => {
+    const state = composerAiState();
+
+    if (state) {
+      setInterventionMode(state.interventionEnabled);
+    }
+  });
+
+  createEffect(() => {
+    const sessionId = composerAiState()?.currentSessionId ?? null;
+
+    if (sessionDiffSessionId === null) {
+      sessionDiffSessionId = sessionId;
+
+      return;
+    }
+
+    if (sessionId !== sessionDiffSessionId) {
+      sessionDiffSessionId = sessionId;
+      setSessionDiffFiles([]);
+
+      setTimeline((current) =>
+        current.filter(
+          (item) =>
+            item.type !== 'diff' || item.meta?.origin !== 'session_diff',
+        ),
+      );
+    }
+  });
+
+  function toggleInterventionMode(): void {
+    const enabled = !interventionMode();
+
+    setInterventionMode(enabled);
+
+    sendSocketMessage({
+      type: 'set_intervention_mode',
+      requestId: createId(),
+      enabled,
+    });
+  }
+
+  function resolveToolIntervention(props: {
+    intervention: ToolIntervention;
+    action: 'continue' | 'stop' | 'send';
+    output: string | null;
+    remember: boolean;
+    ruleArgumentKey: string | null;
+    rulePattern: string | null;
+  }): void {
+    sendSocketMessage({
+      type: 'resolve_intervention',
+      requestId: createId(),
+      interventionId: props.intervention.id,
+      action: props.action,
+      output: props.output,
+      remember: props.remember,
+      ruleArgumentKey: props.ruleArgumentKey,
+      rulePattern: props.rulePattern,
+    });
+
+    setToolInterventions((current) => {
+      if (props.action === 'send') {
+        return {
+          ...current,
+          [props.intervention.callId]: {
+            ...props.intervention,
+            output: props.output,
+            submitted: true,
+          },
+        };
+      }
+
+      const next = { ...current };
+
+      delete next[props.intervention.callId];
+
+      return next;
+    });
+
+    if (props.action === 'stop') {
+      chat.cancelChat();
+    }
+  }
+
+  function showSessionDiff(): void {
+    const files = sessionDiffFiles();
+    const sessionId = composerAiState()?.currentSessionId;
+
+    if (files.length === 0 || !sessionId) {
+      appendSystemMessage('No session changes are available.');
+
+      return;
+    }
+
+    const itemId = `session-diff-${sessionId}`;
+
+    const item: TimelineItem = {
+      id: itemId,
+      type: 'diff',
+      files,
+      meta: {
+        title: 'Session changes',
+        subtitle: null,
+        origin: 'session_diff',
+        scopePath: null,
+        stagedFiles: [],
+      },
+    };
+
+    setTimeline((current) => [
+      ...current.filter((entry) => entry.id !== itemId),
+      item,
+    ]);
+
+    requestAnimationFrame(() => {
+      timelineEl?.scrollTo({
+        top: timelineEl.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
+  }
 
   const demoHiddenHeaderWidgets = new Set([
     'bot:status',
@@ -2740,6 +2888,16 @@ function AppInner(): JSX.Element {
               onSubmitForm={(itemId) => void submitForm(itemId)}
               layoutPrefs={layoutPrefs()}
               onUpdateLayoutPrefs={updateLayoutPrefs}
+              toolInterventions={toolInterventions()}
+              onResolveToolIntervention={resolveToolIntervention}
+              onOpenToolInvocations={() => {
+                openChromeWidget({
+                  command: 'skills',
+                  subcommand: 'tool-invocations',
+                  title: 'AI Configuration',
+                  iconUrl: SKILLS_MANAGER_ICON_URL,
+                });
+              }}
             />
             <Composer
               setInputRef={(el) => {
@@ -2791,6 +2949,14 @@ function AppInner(): JSX.Element {
                       });
                     }}
                   />
+                  <ComposerInterventionButton
+                    active={interventionMode()}
+                    disabled={
+                      !wsConnected() ||
+                      composerAiState()?.interventionAvailable !== true
+                    }
+                    onToggle={toggleInterventionMode}
+                  />
                   <Show when={composerAiState() !== null}>
                     <ComposerModelOverrideButton
                       state={composerAiState()!}
@@ -2807,6 +2973,21 @@ function AppInner(): JSX.Element {
                       runStatus={chatRunStatus()}
                       onStop={() => chat.cancelChat()}
                     />
+                    <button
+                      type="button"
+                      class="composer-session-diff"
+                      disabled={sessionDiffFiles().length === 0}
+                      onClick={showSessionDiff}
+                      title="Show session changes"
+                    >
+                      {sessionDiffSummary().fileCount} files{' '}
+                      <span class="diff-card__stat diff-card__stat--add">
+                        +{sessionDiffSummary().additions}
+                      </span>{' '}
+                      <span class="diff-card__stat diff-card__stat--del">
+                        -{sessionDiffSummary().deletions}
+                      </span>
+                    </button>
                     <ComposerContextMenuButton
                       backend={composerAiState()!.backend}
                       label={
@@ -2815,6 +2996,8 @@ function AppInner(): JSX.Element {
                       }
                       wsConnected={wsConnected()}
                       compacting={compactSessionRequestId() !== null}
+                      sessionDiffAvailable={sessionDiffFiles().length > 0}
+                      onShowSessionDiff={showSessionDiff}
                       onCompact={compactCurrentSession}
                       onCreateNewSession={() => {
                         void createNewSessionFromComposerMenu();

@@ -4,8 +4,14 @@
 
 import type { SimplePool } from 'nostr-tools/pool';
 
+import {
+  configureOpencodeInterventionPort,
+  handleOpencodeInterventionRequest,
+  OPENCODE_INTERVENTION_PATH,
+} from '@src/backends/opencode-intervention';
 import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { CoreDb } from '@src/db';
+import { getInterventionMode } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
@@ -212,6 +218,8 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
   const host = resolveHost(options.host);
   const port = resolvePort(options.port);
 
+  configureOpencodeInterventionPort(port);
+
   const ctx: WebRouteContext = {
     prefix: options.prefix,
     version: options.version,
@@ -242,6 +250,13 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
       fetch(req, server) {
         const url = new URL(req.url);
 
+        if (
+          url.pathname === OPENCODE_INTERVENTION_PATH &&
+          req.method === 'POST'
+        ) {
+          return handleOpencodeInterventionRequest(req);
+        }
+
         if (url.pathname === '/ws') {
           const nip98 = verifyNip98Authorization({
             authorizationHeader: req.headers.get('Authorization'),
@@ -254,6 +269,8 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
             data: {
               promptSession: new WebSocketPromptSession(),
               currentChatAbort: null,
+              interventionEnabled: getInterventionMode(options.seenDb),
+              interventionBridge: null,
               nip98Authenticated: nip98.ok,
               demoAuthenticated: false,
             },

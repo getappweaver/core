@@ -10,6 +10,7 @@ import {
   getAgentBackend,
   getBackendExecutionProfile,
   getCurrentOrDefaultMode,
+  getInterventionMode,
   getModelOverride,
   getProviderName,
   getState,
@@ -22,6 +23,8 @@ import type { WebRouteContext } from './routes';
 
 export type ComposerAiState = {
   backend: string;
+  interventionAvailable: boolean;
+  interventionEnabled: boolean;
   currentSessionId: string | null;
   executionProfileLabel: 'Agent' | 'Mode';
   executionProfileName: string;
@@ -110,6 +113,8 @@ export async function getComposerAiState(
 
   return {
     backend: backendName,
+    interventionAvailable: backendName === 'opencode' && ctx.attachUrl === null,
+    interventionEnabled: getInterventionMode(ctx.seenDb),
     currentSessionId,
     executionProfileLabel:
       executionProfile.kind === 'cursor' ? 'Mode' : ('Agent' as const),

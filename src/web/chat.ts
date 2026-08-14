@@ -17,6 +17,7 @@ import type { WebRouteContext } from './routes';
 export type RunWebChatProps = {
   ctx: WebRouteContext;
   content: string;
+  onSessionReady: ((sessionId: string) => void) | null;
   onStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   streamAbortSignal: AbortSignal | null;
 };
@@ -24,7 +25,9 @@ export type RunWebChatProps = {
 export async function runWebChat(
   props: RunWebChatProps,
 ): Promise<{ output: string; sessionId: string }> {
-  const { ctx, content, onStreamChunk, streamAbortSignal } = props;
+  const { ctx, content, onSessionReady, onStreamChunk, streamAbortSignal } =
+    props;
+
   const mode = getCurrentOrDefaultMode(ctx.seenDb);
   const backendName = getAgentBackend(ctx.seenDb);
   const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
@@ -49,6 +52,8 @@ export async function runWebChat(
     backend,
     cwd,
   });
+
+  onSessionReady?.(sessionId);
 
   const useStream =
     (backendName === 'opencode' || backendName === 'cursor') &&

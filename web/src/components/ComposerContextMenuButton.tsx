@@ -5,8 +5,10 @@ type ComposerContextMenuButtonProps = {
   label: string;
   wsConnected: boolean;
   compacting: boolean;
+  sessionDiffAvailable: boolean;
   onCompact: () => void;
   onCreateNewSession: () => void;
+  onShowSessionDiff: () => void;
 };
 
 export function ComposerContextMenuButton(
@@ -89,6 +91,18 @@ export function ComposerContextMenuButton(
               {props.compacting ? 'Compacting…' : 'Compact'}
             </button>
           </Show>
+          <button
+            type="button"
+            role="menuitem"
+            class="web-button"
+            disabled={!props.sessionDiffAvailable}
+            onClick={() => {
+              setOpen(false);
+              props.onShowSessionDiff();
+            }}
+          >
+            Show session changes
+          </button>
           <button
             type="button"
             role="menuitem"

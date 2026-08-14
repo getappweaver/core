@@ -39,13 +39,10 @@ export type WebWidget = {
 
 export type PermissionAction = 'allow' | 'ask' | 'deny';
 export type PermissionValue =
-  | PermissionAction
-  | Record<string, PermissionAction>;
+  PermissionAction | Record<string, PermissionAction>;
 
 export type OpenCodeAgentPermissionConfig =
-  | PermissionAction
-  | Record<string, PermissionValue>
-  | null;
+  PermissionAction | Record<string, PermissionValue> | null;
 
 export type OpenCodeAgentDraftConfig = {
   name: string;
@@ -102,9 +99,7 @@ export type CommandSubcommand = {
   examples: string[];
   inferredWeb?: {
     executionMode:
-      | 'requires_input'
-      | 'runnable_default'
-      | 'runnable_customizable';
+      'requires_input' | 'runnable_default' | 'runnable_customizable';
   };
   monitoring?: {
     name: string;
@@ -126,10 +121,7 @@ export type CommandDetail = {
 export type CommandPayload = TimelinePayload;
 
 export type CommandOutput =
-  | string
-  | WebNodeRoot
-  | ClientViewRoot
-  | TimelineEventOutput;
+  string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
 
 export type TimelineItem =
   | {
@@ -170,7 +162,12 @@ export type TimelineItem =
       meta?: {
         title: string | null;
         subtitle: string | null;
-        origin: 'workspace_diff' | 'git_commit' | 'agent_patch' | null;
+        origin:
+          | 'workspace_diff'
+          | 'git_commit'
+          | 'agent_patch'
+          | 'session_diff'
+          | null;
         scopePath?: string | null;
         stagedFiles?: string[];
       } | null;

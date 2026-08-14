@@ -35,6 +35,7 @@ export const STATE_CASHU_DEFAULT_MINT_URL = 'cashu_default_mint_url';
 export const STATE_LINTING = 'linting';
 export const STATE_DM_COMMAND_PREFIX = 'dm_command_prefix';
 export const STATE_SETUP_CONFIGURED_AT = 'setup_configured_at';
+export const STATE_INTERVENTION_MODE = 'intervention_mode';
 
 /** First character(s) of a DM line that mark it as a command (stored in core DB). */
 export const DmCommandPrefixSchema = z

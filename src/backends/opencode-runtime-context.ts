@@ -31,6 +31,11 @@ export function buildOpenCodeActiveRuntimeContext({
   const workspaceTarget = workspaceTargetLabel({ cwd, dmBotRoot });
   const agentsMdExists = existsSync(join(cwd, 'AGENTS.md'));
 
+  const appweaverRuntimeConstraint =
+    workspaceTarget === 'appweaver'
+      ? '\nAppWeaver chat runtime constraint: do not create, touch, or modify restart.requested. That would restart the host process and can interrupt the active chat. If code changes need a restart, say so in your final response instead.'
+      : '';
+
   return `Backend: ${backendName}
 OpenCode agent profile: ${agentName}
 OpenCode agent profile source of truth: .opencode/agents
@@ -38,9 +43,7 @@ Workspace target: ${workspaceTarget}
 Workspace root: ${cwd}
 AppWeaver root: ${dmBotRoot}
 Tool permissions: enforced by the active OpenCode agent profile; do not add an extra shell approval layer from AGENTS.md.
-Workspace AGENTS.md: ${agentsMdExists ? 'present and applied by OpenCode' : 'not found'}.
-AppWeaver chat runtime constraint: do not create, touch, or modify restart.requested. That would restart the host process and can interrupt the active chat. If code changes need a restart, say so in your final response instead.
-Intent reminder: if the user asks a question, proposes a hypothesis, asks for Q&A/brainstorming/discussion, or wants to figure something out together, respond conversationally and do not edit files or run implementation steps until the user clearly asks for a change.
+Workspace AGENTS.md: ${agentsMdExists ? 'present and applied by OpenCode' : 'not found'}.${appweaverRuntimeConstraint}
 `;
 }
 

@@ -1,6 +1,13 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import {
+  clearOpencodeInterventionsForBridge,
+  registerOpencodeInterventionBridge,
+  resolveOpencodeIntervention,
+  unregisterOpencodeInterventionBridge,
+  type InterventionBridge,
+} from '@src/backends/opencode-intervention';
 import { summarizeOpencodeSdkSession } from '@src/backends/opencode-sdk';
 import {
   monitoring,
@@ -12,6 +19,7 @@ import {
   getState,
   getWorkspaceTarget,
   STATE_CURRENT_SESSION,
+  setInterventionMode,
 } from '@src/db';
 import { isDemoMode } from '@src/demo-mode';
 import { log } from '@src/logger';
@@ -23,10 +31,7 @@ import {
   listTimelineHistoryLatest,
   upsertTimelineCommandForm,
 } from '@src/timeline/db';
-import {
-  summarizeTimelineDiffFiles,
-  type TimelinePayload,
-} from '@src/timeline/types';
+import type { TimelinePayload } from '@src/timeline/types';
 import { assertUnreachable } from '@src/utils';
 import type {
   TimelineEventOutput,
@@ -55,6 +60,7 @@ import {
   createCommandsResultMessage,
   createDoneMessage,
   createErrorMessage,
+  createInterventionRequestMessage,
   createTimelineEventsResultMessage,
   type DeleteTimelineEventClientMessage,
   formatWebSocketClientParseFailure,
@@ -63,6 +69,7 @@ import {
   type LoadTimelineClientMessage,
   type RunCapabilityClientMessage,
   type RunCommandClientMessage,
+  type ResolveInterventionClientMessage,
   type SaveTimelineFormClientMessage,
   type WebSocketClientMessage,
   WebSocketClientMessageSchema,
@@ -72,6 +79,8 @@ import {
 export type WebSocketData = {
   promptSession: WebSocketPromptSession;
   currentChatAbort: AbortController | null;
+  interventionEnabled: boolean;
+  interventionBridge: InterventionBridge | null;
   /** Set from NIP-98 on HTTP upgrade and/or first `authenticate` message. */
   nip98Authenticated: boolean;
   /** Demo sessions are intentionally restricted; they are not full backend auth. */
@@ -131,6 +140,61 @@ function sendMessage(
   ws.send(JSON.stringify(message));
 }
 
+function ensureInterventionBridge(
+  ws: Bun.ServerWebSocket<WebSocketData>,
+  db: WebRouteContext['seenDb'],
+): InterventionBridge {
+  if (ws.data.interventionBridge) {
+    return ws.data.interventionBridge;
+  }
+
+  const bridge: InterventionBridge = {
+    db,
+    enabled: () => ws.data.interventionEnabled,
+    send: (intervention) => {
+      sendMessage(
+        ws,
+        createInterventionRequestMessage({
+          requestId: intervention.id,
+          intervention,
+        }),
+      );
+    },
+    abort: () => ws.data.currentChatAbort?.abort(),
+  };
+
+  ws.data.interventionBridge = bridge;
+
+  return bridge;
+}
+
+function handleResolveIntervention(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  message: ResolveInterventionClientMessage;
+}): void {
+  const resolved = resolveOpencodeIntervention(params.message.interventionId, {
+    action: params.message.action,
+    output: params.message.output,
+    remember: params.message.remember,
+    ruleArgumentKey: params.message.ruleArgumentKey,
+    rulePattern: params.message.rulePattern,
+  });
+
+  if (!resolved) {
+    sendMessage(
+      params.ws,
+      createErrorMessage({
+        requestId: params.message.requestId,
+        message: 'intervention_not_found',
+      }),
+    );
+
+    return;
+  }
+
+  sendMessage(params.ws, createDoneMessage(params.message.requestId));
+}
+
 function normalizeIncomingMessage(
   message: string | Buffer | ArrayBuffer,
 ): string {
@@ -152,6 +216,8 @@ function isDemoAuthorization(value: string): boolean {
 function demoComposerAiState(): ComposerAiState {
   return {
     backend: 'demo',
+    interventionAvailable: false,
+    interventionEnabled: false,
     currentSessionId: null,
     executionProfileLabel: 'Agent',
     executionProfileName: 'Demo Agent',
@@ -471,6 +537,8 @@ async function handleDemoWebSocketMessage(params: {
 
     case 'prompt_answer':
     case 'cancel_chat':
+    case 'set_intervention_mode':
+    case 'resolve_intervention':
     case 'delete_timeline_event':
     case 'save_timeline_form':
     case 'record_monitoring_spans':
@@ -1059,6 +1127,8 @@ async function handleChat(params: {
   let streamedReasoning = '';
   let reasoningSegmentIndex = 0;
   let currentReasoningSegmentId: string | null = null;
+  let registeredSessionId: string | null = null;
+  const sessionBridge = ensureInterventionBridge(ws, ctx.seenDb);
 
   function closeCurrentReasoningSegment(): void {
     currentReasoningSegmentId = null;
@@ -1071,6 +1141,14 @@ async function handleChat(params: {
     result = await runWebChat({
       ctx,
       content: message.content,
+      onSessionReady: (sessionId) => {
+        registeredSessionId = sessionId;
+
+        registerOpencodeInterventionBridge({
+          sessionId,
+          bridge: sessionBridge,
+        });
+      },
       onStreamChunk: useStream
         ? (chunk) => {
             sendMessage(
@@ -1087,24 +1165,6 @@ async function handleChat(params: {
 
             if (chunk.kind === 'diff') {
               closeCurrentReasoningSegment();
-
-              insertTimelineEvent(ctx.seenDb, {
-                timelineId: message.timelineId,
-                source: 'web',
-                kind: 'diff_summary',
-                role: null,
-                command: null,
-                subcommand: null,
-                subcommandTag: null,
-                values: null,
-                form: null,
-                text: null,
-                web: null,
-                clientView: null,
-                diffSummary: summarizeTimelineDiffFiles(chunk.files),
-                prompt: null,
-                requestId: null,
-              });
             }
 
             if (chunk.kind === 'tool') {
@@ -1192,6 +1252,13 @@ async function handleChat(params: {
     ws.data.currentChatAbort = null;
     throw err;
   } finally {
+    if (registeredSessionId) {
+      unregisterOpencodeInterventionBridge({
+        sessionId: registeredSessionId,
+        bridge: sessionBridge,
+      });
+    }
+
     if (ws.data.currentChatAbort === chatAbort) {
       ws.data.currentChatAbort = null;
     }
@@ -1236,11 +1303,18 @@ async function handleChat(params: {
 
 export function createWebSocketHandler(ctx: WebRouteContext) {
   return {
-    open(_ws: Bun.ServerWebSocket<WebSocketData>): void {},
+    open(ws: Bun.ServerWebSocket<WebSocketData>): void {
+      ensureInterventionBridge(ws, ctx.seenDb);
+    },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
       ws.data.currentChatAbort?.abort();
       ws.data.currentChatAbort = null;
       ws.data.promptSession.clearAll();
+      ws.data.interventionEnabled = false;
+
+      if (ws.data.interventionBridge) {
+        clearOpencodeInterventionsForBridge(ws.data.interventionBridge);
+      }
     },
     message(
       ws: Bun.ServerWebSocket<WebSocketData>,
@@ -1501,7 +1575,31 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
             case 'cancel_chat': {
               ws.data.currentChatAbort?.abort();
+
+              if (ws.data.interventionBridge) {
+                clearOpencodeInterventionsForBridge(ws.data.interventionBridge);
+              }
+
               sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
+            case 'set_intervention_mode': {
+              ws.data.interventionEnabled = message.enabled;
+              setInterventionMode(ctx.seenDb, message.enabled);
+
+              log.info(
+                `[intervention] mode ${message.enabled ? 'enabled' : 'disabled'}`,
+              );
+
+              sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
+            case 'resolve_intervention': {
+              handleResolveIntervention({ ws, message });
 
               return;
             }

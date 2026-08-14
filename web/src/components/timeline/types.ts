@@ -3,6 +3,7 @@ import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 import type { RunWebActionParams } from '../../commands/types';
 import type { LayoutPrefs } from '../../layout/desktopLayoutPrefs';
 import type { TimelineItem } from '../../types';
+import type { ToolIntervention } from '../../ws-types';
 
 export type TimelineViewProps = {
   activeFormId: string | null;
@@ -44,6 +45,16 @@ export type TimelineViewProps = {
     value: unknown,
   ) => void;
   onSubmitForm: (itemId: string) => void;
+  toolInterventions?: Record<string, ToolIntervention>;
+  onResolveToolIntervention?: (props: {
+    intervention: ToolIntervention;
+    action: 'continue' | 'stop' | 'send';
+    output: string | null;
+    remember: boolean;
+    ruleArgumentKey: string | null;
+    rulePattern: string | null;
+  }) => void;
+  onOpenToolInvocations?: () => void;
   layoutPrefs?: LayoutPrefs;
   onUpdateLayoutPrefs?: (updater: (prefs: LayoutPrefs) => LayoutPrefs) => void;
 };

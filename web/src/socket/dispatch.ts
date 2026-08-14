@@ -104,7 +104,11 @@ export function handleServerMessage(params: {
   pendingRequests: Map<string, PendingRequest>;
   adapters: Pick<
     SocketAppAdapters,
-    'appendSystemMessage' | 'chat' | 'setAgentWorking'
+    | 'appendSystemMessage'
+    | 'chat'
+    | 'setAgentWorking'
+    | 'setTimeline'
+    | 'setToolInterventions'
   >;
 }): void {
   const { message, pendingRequests, adapters } = params;
@@ -185,6 +189,47 @@ export function handleServerMessage(params: {
       }
 
       adapters.chat.handleStreamTextDelta(message.requestId, chunk.text);
+
+      return;
+    }
+
+    case 'intervention_request': {
+      const intervention = message.intervention;
+
+      adapters.setToolInterventions((current) => ({
+        ...current,
+        [intervention.callId]: intervention,
+      }));
+
+      adapters.setTimeline((current) => {
+        if (
+          current.some(
+            (item) =>
+              item.type === 'tool' && item.tool.callId === intervention.callId,
+          )
+        ) {
+          return current;
+        }
+
+        return [
+          ...current,
+          {
+            id: `intervention-tool-${intervention.callId}`,
+            type: 'tool',
+            tool: {
+              id: intervention.callId,
+              callId: intervention.callId,
+              tool: intervention.tool,
+              status: intervention.phase === 'before' ? 'pending' : 'completed',
+              input: intervention.args,
+              title: null,
+              raw: null,
+              output: intervention.output,
+              error: null,
+            },
+          },
+        ];
+      });
 
       return;
     }

@@ -82,6 +82,8 @@ type ClientMessageRecord = Record<string, unknown> & {
 
 const demoComposerAiState: ComposerAiState = {
   backend: 'demo',
+  interventionAvailable: false,
+  interventionEnabled: false,
   currentSessionId: null,
   executionProfileLabel: 'Mode',
   executionProfileName: 'Demo',
@@ -403,6 +405,8 @@ export function useSocket(adapters: SocketAppAdapters) {
             appendSystemMessage: adapters.appendSystemMessage,
             chat: adapters.chat,
             setAgentWorking: adapters.setAgentWorking,
+            setTimeline: adapters.setTimeline,
+            setToolInterventions: adapters.setToolInterventions,
           },
         });
       },
@@ -433,6 +437,8 @@ export function useSocket(adapters: SocketAppAdapters) {
         appendSystemMessage: adapters.appendSystemMessage,
         chat: adapters.chat,
         setAgentWorking: adapters.setAgentWorking,
+        setTimeline: adapters.setTimeline,
+        setToolInterventions: adapters.setToolInterventions,
       },
     });
   }
@@ -543,8 +549,7 @@ export function useSocket(adapters: SocketAppAdapters) {
 
     if (command === 'story' && subcommand === 'start') {
       const payload = record.payload as
-        | { arguments?: Record<string, unknown> }
-        | undefined;
+        { arguments?: Record<string, unknown> } | undefined;
 
       const storyId = payload?.arguments?.id;
       const story = stories.find((entry) => entry.story.id === storyId);
@@ -828,6 +833,8 @@ export function useSocket(adapters: SocketAppAdapters) {
             appendSystemMessage: adapters.appendSystemMessage,
             chat: adapters.chat,
             setAgentWorking: adapters.setAgentWorking,
+            setTimeline: adapters.setTimeline,
+            setToolInterventions: adapters.setToolInterventions,
           },
         });
       } catch (err) {

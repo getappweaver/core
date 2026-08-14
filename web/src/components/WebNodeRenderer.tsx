@@ -180,6 +180,9 @@ function renderElement({
           const disabledUntilFormFieldPositiveInteger = () =>
             element.props?.disabledUntilFormFieldPositiveInteger;
 
+          const disabledUntilFormFieldChanged = () =>
+            element.props?.disabledUntilFormFieldChanged;
+
           const disabled = () =>
             element.props?.disabled === true ||
             getBusy() === true ||
@@ -206,6 +209,7 @@ function renderElement({
                   submitAction() ? JSON.stringify(submitAction()) : undefined
                 }
                 data-web-disable-until-positive-integer={disabledUntilFormFieldPositiveInteger()}
+                data-web-disable-until-field-changed={disabledUntilFormFieldChanged()}
                 onClick={() => {
                   if (element.props?.storyTargetId) {
                     emitStoryTargetClicked(element.props.storyTargetId);
@@ -258,6 +262,7 @@ function renderElement({
                 submitAction() ? JSON.stringify(submitAction()) : undefined
               }
               data-web-disable-until-positive-integer={disabledUntilFormFieldPositiveInteger()}
+              data-web-disable-until-field-changed={disabledUntilFormFieldChanged()}
               onClick={(e) => {
                 if (element.props?.stopPropagation) {
                   e.stopPropagation();
