@@ -6,6 +6,7 @@ import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
 import { getBotIdentitySubcommandDefinition } from './identity/definition';
+import { getBotInferenceKeySubcommandDefinition } from './inference-key/definition';
 import { getBotLintSubcommandDefinition } from './lint/definition';
 import { getBotLogSubcommandDefinition } from './log/definition';
 import { getBotPingSubcommandDefinition } from './ping/definition';
@@ -44,6 +45,7 @@ export function getBotCommandDefinition({
       getBotVersionSubcommandDefinition(p),
       getBotPingSubcommandDefinition(p),
       getBotIdentitySubcommandDefinition(p),
+      getBotInferenceKeySubcommandDefinition(p),
       getBotWorkspaceSubcommandDefinition(p),
       getBotLintSubcommandDefinition(p),
       getBotLogSubcommandDefinition(p),

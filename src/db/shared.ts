@@ -36,6 +36,7 @@ export const STATE_LINTING = 'linting';
 export const STATE_DM_COMMAND_PREFIX = 'dm_command_prefix';
 export const STATE_SETUP_CONFIGURED_AT = 'setup_configured_at';
 export const STATE_INTERVENTION_MODE = 'intervention_mode';
+export const STATE_INFERENCE_API_KEY_HASH = 'inference_api_key_hash';
 
 /** First character(s) of a DM line that mark it as a command (stored in core DB). */
 export const DmCommandPrefixSchema = z

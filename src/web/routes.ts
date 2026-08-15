@@ -40,6 +40,7 @@ import {
   listAllCommandsDetailForWeb,
 } from './command-catalog';
 import { executeBuiltinCommand } from './execute';
+import { handleInferenceRoute, isInferenceRoute } from './inference-routes';
 import { fetchLinkPreview } from './link-preview';
 import { synthesizeNativePiper } from './native-tts';
 import { verifyNip98Authorization } from './nip98-verify';
@@ -608,6 +609,10 @@ export function createWebFetchHandler(
 
     if (req.method === 'GET' && path === '/api/health') {
       return jsonResponse({ ok: true, version: ctx.version });
+    }
+
+    if (isInferenceRoute(path)) {
+      return handleInferenceRoute(req, ctx);
     }
 
     if (path.startsWith('/api/setup/')) {

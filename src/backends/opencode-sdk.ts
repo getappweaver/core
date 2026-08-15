@@ -21,6 +21,7 @@ import {
   type AgentFileDiff,
   type AgentStreamChunk,
 } from './agent-stream-chunk';
+import { serializeChatCompletionMessages } from './chat-completion';
 import type { ParseModelProps } from './opencode-common';
 import {
   normalizeModelForProvider,
@@ -1380,7 +1381,7 @@ export function createOpencodeSDKBackend({
     providerName,
   });
 
-  return {
+  const backend: AgentBackend = {
     name: 'opencode',
     modelName,
 
@@ -1853,6 +1854,55 @@ export function createOpencodeSDKBackend({
       return parsedResult;
     },
 
+    async runChatCompletion(props) {
+      const sessionId = await backend.createSession(props.cwd);
+
+      try {
+        const result = await backend.runMessage({
+          sessionId,
+          content: serializeChatCompletionMessages(props.messages),
+          cursorMode: 'ask',
+          opencodeAgentName: 'ask',
+          cwd: props.cwd,
+          workspaceInstructions: '',
+          getRoutstrSkKey: () => null,
+          modelOverride: props.model,
+          onAgentStreamChunk: (chunk) => {
+            if (chunk.kind === 'text_delta') {
+              props.onChunk({ type: 'text_delta', content: chunk.text });
+            } else if (chunk.kind === 'reasoning_delta') {
+              props.onChunk({
+                type: 'reasoning_delta',
+                content: chunk.text,
+              });
+            }
+          },
+          streamAbortSignal: props.abortSignal,
+          skipRuntimeContext: true,
+        });
+
+        if (result.type === 'error') {
+          throw new Error(result.output);
+        }
+
+        return {
+          outputs: result.outputs,
+          model: result.model ?? props.model,
+          tokens: result.tokens ?? null,
+        };
+      } finally {
+        const { client } = await getOrInitSdk();
+
+        await client.session
+          .delete({ sessionID: sessionId, directory: props.cwd })
+          .catch((err) => {
+            debug(
+              `opencode-sdk: failed to delete inference session ${sessionId}: ${String(err)}`,
+            );
+          });
+      }
+    },
+
     async availableModels(): Promise<string[]> {
       const { client } = await getOrInitSdk();
 
@@ -1879,4 +1929,6 @@ export function createOpencodeSDKBackend({
       return list.sort();
     },
   };
+
+  return backend;
 }

@@ -7,6 +7,7 @@ import { spawn } from 'bun';
 
 import { debug, log } from '../logger';
 
+import { serializeChatCompletionMessages } from './chat-completion';
 import {
   createStreamDebugMetrics,
   logStreamDebugSummary,
@@ -357,7 +358,7 @@ export function createCursorSdkBackend(
 ): AgentBackend {
   const effectiveModel = modelOverride?.trim() || DEFAULT_CURSOR_SDK_MODEL;
 
-  return {
+  const backend: AgentBackend = {
     name: 'cursor',
     modelName: effectiveModel,
 
@@ -437,8 +438,44 @@ export function createCursorSdkBackend(
       };
     },
 
+    async runChatCompletion(props) {
+      const sessionId = await backend.createSession(props.cwd);
+
+      const result = await backend.runMessage({
+        sessionId,
+        content: serializeChatCompletionMessages(props.messages),
+        cursorMode: 'ask',
+        opencodeAgentName: null,
+        cwd: props.cwd,
+        workspaceInstructions: '',
+        getRoutstrSkKey: () => null,
+        modelOverride: props.model,
+        onAgentStreamChunk: (chunk) => {
+          if (chunk.kind === 'text_delta') {
+            props.onChunk({ type: 'text_delta', content: chunk.text });
+          } else if (chunk.kind === 'reasoning_delta') {
+            props.onChunk({ type: 'reasoning_delta', content: chunk.text });
+          }
+        },
+        streamAbortSignal: props.abortSignal,
+        skipRuntimeContext: true,
+      });
+
+      if (result.type === 'error') {
+        throw new Error(result.output);
+      }
+
+      return {
+        outputs: result.outputs,
+        model: result.model ?? props.model,
+        tokens: result.tokens ?? null,
+      };
+    },
+
     async availableModels(): Promise<string[]> {
       return listCursorSdkModelsCached(effectiveModel);
     },
   };
+
+  return backend;
 }

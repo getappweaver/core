@@ -26,6 +26,30 @@ export type AgentSuccessResult = {
   cost?: number;
 };
 
+export type ChatCompletionMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  reasoning: string | null;
+};
+
+export type ChatCompletionChunk =
+  | { type: 'text_delta'; content: string }
+  | { type: 'reasoning_delta'; content: string };
+
+export type RunChatCompletionProps = {
+  messages: ChatCompletionMessage[];
+  model: string;
+  cwd: string;
+  onChunk: (chunk: ChatCompletionChunk) => void;
+  abortSignal: AbortSignal;
+};
+
+export type ChatCompletionResult = {
+  outputs: OutputSegment[];
+  model: string;
+  tokens: { input: number; output: number; total: number } | null;
+};
+
 export function getMessageOutput(outputs: OutputSegment[]): string {
   return outputs
     .filter((o): o is { type: 'text'; value: string } => o.type === 'text')
@@ -59,5 +83,8 @@ export type AgentBackend = {
   modelName: string;
   createSession(cwd: string): Promise<string>;
   runMessage(props: RunMessageProps): Promise<AgentRunResult>;
+  runChatCompletion(
+    props: RunChatCompletionProps,
+  ): Promise<ChatCompletionResult>;
   availableModels(): Promise<string[]>;
 };

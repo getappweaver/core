@@ -11,8 +11,7 @@ export type PermissionAction = 'allow' | 'ask' | 'deny';
 export type PermissionObject = Record<string, PermissionAction>;
 export type PermissionValue = PermissionAction | PermissionObject;
 export type OpencodeAgentPermissionConfig =
-  | PermissionAction
-  | Record<string, PermissionValue>;
+  PermissionAction | Record<string, PermissionValue>;
 
 export type OpencodeAgentConfig = {
   name: string;

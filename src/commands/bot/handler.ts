@@ -6,6 +6,7 @@ import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 
 import { handleBotIdentity } from './identity/handler';
+import { handleBotInferenceKey } from './inference-key/handler';
 import { handleBotLint } from './lint/handler';
 import { handleBotLog } from './log/handler';
 import { handleBotPing } from './ping/handler';
@@ -37,7 +38,7 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
 
   if (!sub) {
     return Promise.resolve(
-      `Usage: ${p}bot status | update-check | update | version | ping | identity | workspace | lint | log | ready | push | restart — or ${p}bot help`,
+      `Usage: ${p}bot status | update-check | update | version | ping | identity | inference-key | workspace | lint | log | ready | push | restart — or ${p}bot help`,
     );
   }
 
@@ -63,6 +64,10 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
 
   if (sub === 'identity') {
     return handleBotIdentity(ctx);
+  }
+
+  if (sub === 'inference-key') {
+    return handleBotInferenceKey(ctx);
   }
 
   if (sub === 'workspace') {
