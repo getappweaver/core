@@ -21,6 +21,7 @@ const pluginsReleasesStylesheet = {
 
     .web-row.plugins-release-title-row,
     .web-row.plugins-release-meta-row,
+    .web-row.plugins-release-git-row,
     .web-row.plugins-release-action-row {
       align-items: center;
       gap: 0.45rem;
@@ -29,6 +30,10 @@ const pluginsReleasesStylesheet = {
     .web-stack.plugins-release-main {
       gap: 0.3rem;
     }
+
+    .web-row.plugins-release-git-row {
+      flex-wrap: wrap;
+    }
   `,
 } as const;
 
@@ -36,6 +41,13 @@ function statusBadge(status: PluginReleaseStatus): WebNode {
   const propsByStatus = {
     'published-ok': { label: 'ok', tone: 'success' as const },
     'publish-needed': { label: 'publish needed', tone: 'warning' as const },
+    'metadata-publish-needed': {
+      label: 'metadata publish needed',
+      tone: 'warning' as const,
+    },
+    'commit-needed': { label: 'commit needed', tone: 'danger' as const },
+    'tag-needed': { label: 'tag needed', tone: 'danger' as const },
+    'push-needed': { label: 'push needed', tone: 'warning' as const },
     'local-behind': { label: 'local behind', tone: 'muted' as const },
     'version-unknown': { label: 'version unknown', tone: 'warning' as const },
   }[status];
@@ -47,8 +59,76 @@ function statusBadge(status: PluginReleaseStatus): WebNode {
   };
 }
 
+function gitBadge(
+  label: string,
+  tone: 'success' | 'warning' | 'danger' | 'muted',
+): WebNode {
+  return {
+    type: 'element',
+    tag: 'badge',
+    props: { label, tone, size: 'sm' },
+  };
+}
+
+function gitStateRow(entry: PluginReleaseEntry): WebNode {
+  return {
+    type: 'element',
+    tag: 'row',
+    props: { className: 'plugins-release-git-row' },
+    children: [
+      gitBadge(
+        entry.git.changedFileCount === 0
+          ? 'clean'
+          : `${entry.git.stagedFileCount} staged`,
+        entry.git.changedFileCount === 0 ? 'success' : 'danger',
+      ),
+      ...(entry.git.changedFileCount > 0
+        ? [gitBadge(`${entry.git.unstagedFileCount} unstaged`, 'danger')]
+        : []),
+      gitBadge(
+        entry.git.branch ?? 'detached HEAD',
+        entry.git.branch ? 'muted' : 'danger',
+      ),
+      gitBadge(
+        entry.git.localTagAtHead
+          ? `tag v${entry.localVersion}`
+          : 'tag missing at HEAD',
+        entry.git.localTagAtHead ? 'success' : 'danger',
+      ),
+      ...entry.git.remotes.map((remote) =>
+        gitBadge(
+          !remote.configured
+            ? `${remote.name} missing`
+            : remote.branchReady && remote.tagReady
+              ? `${remote.name} ready`
+              : `${remote.name} push needed`,
+          !remote.configured
+            ? 'danger'
+            : remote.branchReady && remote.tagReady
+              ? 'success'
+              : 'warning',
+        ),
+      ),
+    ],
+  };
+}
+
 function releaseCard(entry: PluginReleaseEntry): WebNode {
-  const canPublish = entry.status === 'publish-needed';
+  const canPublish =
+    (entry.status === 'publish-needed' ||
+      entry.status === 'metadata-publish-needed' ||
+      entry.status === 'push-needed') &&
+    entry.git.branch !== null &&
+    entry.git.localTagAtHead &&
+    entry.git.remotes.every((remote) => remote.configured);
+
+  const reviewChanges = entry.git.changedFileCount > 0;
+
+  const pushNeeded = entry.git.remotes.some(
+    (remote) => !remote.branchReady || !remote.tagReady,
+  );
+
+  const metadataPublish = entry.status === 'metadata-publish-needed';
 
   return {
     type: 'element',
@@ -99,37 +179,73 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
               },
             ],
           },
+          gitStateRow(entry),
           textBlock(
             `${entry.published.title || entry.published.name} · author via ${entry.authorSigner.label}`,
             'muted',
           ),
-          ...(canPublish
+          ...(canPublish || reviewChanges
             ? [
                 {
                   type: 'element' as const,
                   tag: 'row' as const,
                   props: { className: 'plugins-release-action-row' },
                   children: [
-                    {
-                      type: 'element' as const,
-                      tag: 'button' as const,
-                      props: {
-                        label: 'Publish',
-                        className: 'web-button',
-                        action: {
-                          type: 'command' as const,
-                          command: 'plugins',
-                          subcommand: 'publish',
-                          arguments: { alias: entry.installed.alias },
-                          options: {},
-                          recordInTimeline: false,
-                          clientStatus: {
-                            pending: `Publishing ${entry.installed.alias} plugin...`,
-                            success: `Published ${entry.installed.alias} plugin.`,
+                    ...(reviewChanges
+                      ? [
+                          {
+                            type: 'element' as const,
+                            tag: 'button' as const,
+                            props: {
+                              label: 'Review changes',
+                              className: 'web-button',
+                              action: {
+                                type: 'command' as const,
+                                command: 'file',
+                                subcommand: 'diff',
+                                arguments: { path: '.' },
+                                options: {
+                                  timeline: true,
+                                  repository: entry.repositoryPath,
+                                },
+                                recordInTimeline: true,
+                                clientStatus: {
+                                  pending: `Loading ${entry.installed.alias} changes...`,
+                                  success: `Loaded ${entry.installed.alias} changes.`,
+                                },
+                              },
+                            },
                           },
-                        },
-                      },
-                    },
+                        ]
+                      : []),
+                    ...(canPublish
+                      ? [
+                          {
+                            type: 'element' as const,
+                            tag: 'button' as const,
+                            props: {
+                              label: pushNeeded
+                                ? 'Push & Publish'
+                                : metadataPublish
+                                  ? 'Republish metadata'
+                                  : 'Publish',
+                              className: 'web-button',
+                              action: {
+                                type: 'command' as const,
+                                command: 'plugins',
+                                subcommand: 'publish',
+                                arguments: { alias: entry.installed.alias },
+                                options: {},
+                                recordInTimeline: false,
+                                clientStatus: {
+                                  pending: `${pushNeeded ? 'Pushing and publishing' : 'Publishing'} ${entry.installed.alias} plugin...`,
+                                  success: `Published ${entry.installed.alias} plugin.`,
+                                },
+                              },
+                            },
+                          },
+                        ]
+                      : []),
                   ],
                 },
               ]

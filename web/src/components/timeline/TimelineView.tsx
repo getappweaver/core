@@ -913,6 +913,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
   const workspaceDiff = () => props.item.meta?.origin === 'workspace_diff';
   const scopePath = () => props.item.meta?.scopePath ?? props.item.meta?.title;
+  const repositoryPath = () => props.item.meta?.repositoryPath ?? null;
   const selectedCount = () => selectedFiles().size;
 
   const commitDisabled = () =>
@@ -988,7 +989,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
         subcommand: 'diff',
         payload: {
           arguments: { path },
-          options: { timeline: true },
+          options: { timeline: true, repository: repositoryPath() },
         },
       });
 
@@ -1016,6 +1017,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
           subtitle: event.subtitle,
           origin: event.origin,
           scopePath: event.scopePath ?? null,
+          repositoryPath: event.repositoryPath ?? null,
           stagedFiles: event.stagedFiles ?? [],
         },
       });
@@ -1034,7 +1036,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
       const output = await props.onRunJsonCommand({
         command: 'file',
         subcommand: 'restore',
-        payload: { file },
+        payload: { file, repositoryPath: repositoryPath() },
       });
 
       setCommitStatus(output);
@@ -1062,6 +1064,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
         subcommand: 'commit',
         payload: {
           scopePath: scopePath(),
+          repositoryPath: repositoryPath(),
           message: commitMessage(),
           selectedFiles: Array.from(selectedFiles()),
           expectedStagedFiles: props.item.meta?.stagedFiles ?? [],

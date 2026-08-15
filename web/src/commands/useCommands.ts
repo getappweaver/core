@@ -152,6 +152,7 @@ function timelineEventOutputToItem(
           subtitle: output.event.subtitle,
           origin: output.event.origin,
           scopePath: output.event.scopePath ?? null,
+          repositoryPath: output.event.repositoryPath ?? null,
           stagedFiles: output.event.stagedFiles ?? [],
         },
       };

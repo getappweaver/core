@@ -22,11 +22,9 @@ export type CapabilityCatalogFilter = {
   capability: CapabilityRef;
 };
 
-const RELATION_TAGS: Record<CapabilityRelationName, 'p' | 'u' | 'r'> = {
-  provides: 'p',
-  uses: 'u',
-  requires: 'r',
-};
+export const CAPABILITY_LABEL_NAMESPACE = 'com.getappweaver.capability';
+
+const CAPABILITY_RELATIONS = ['provides', 'uses', 'requires'] as const;
 
 function dedupeCapabilityRefs(refs: CapabilityRef[]): CapabilityRef[] {
   return [
@@ -48,17 +46,40 @@ export function normalizeCapabilityRelations(
   };
 }
 
+export function capabilityRelationsEqual(
+  left: PluginCapabilityRelations,
+  right: PluginCapabilityRelations,
+): boolean {
+  return CAPABILITY_RELATIONS.every((relation) => {
+    const leftRefs = new Set(
+      left[relation].map((ref) => `${ref.name}:v${ref.version}`),
+    );
+
+    const rightRefs = new Set(
+      right[relation].map((ref) => `${ref.name}:v${ref.version}`),
+    );
+
+    return (
+      leftRefs.size === rightRefs.size &&
+      [...leftRefs].every((ref) => rightRefs.has(ref))
+    );
+  });
+}
+
 export function capabilityRelationTags(
   relations: PluginCapabilityRelations,
 ): string[][] {
-  return (Object.keys(RELATION_TAGS) as CapabilityRelationName[]).flatMap(
-    (relation) =>
-      relations[relation].map((capability) => [
-        RELATION_TAGS[relation],
-        capability.name,
-        String(capability.version),
-      ]),
+  const labels = CAPABILITY_RELATIONS.flatMap((relation) =>
+    relations[relation].map((capability) => [
+      'l',
+      capabilityCatalogLabel({ relation, capability }),
+      CAPABILITY_LABEL_NAMESPACE,
+    ]),
   );
+
+  return labels.length > 0
+    ? [['L', CAPABILITY_LABEL_NAMESPACE], ...labels]
+    : [];
 }
 
 export function parseCapabilityRelationTags(
@@ -75,31 +96,57 @@ export function parseCapabilityRelationTags(
     requires: [],
   };
 
-  for (const tag of tags) {
-    const relation =
-      tag[0] === 'p'
-        ? 'provides'
-        : tag[0] === 'u'
-          ? 'uses'
-          : tag[0] === 'r'
-            ? 'requires'
-            : null;
+  const declaresNamespace = tags.some(
+    (tag) => tag[0] === 'L' && tag[1] === CAPABILITY_LABEL_NAMESPACE,
+  );
 
-    if (!relation) {
+  if (!declaresNamespace) {
+    return result;
+  }
+
+  for (const tag of tags) {
+    if (tag[0] !== 'l' || tag[2] !== CAPABILITY_LABEL_NAMESPACE) {
       continue;
     }
 
-    const parsed = CapabilityRefSchema.safeParse({
-      name: tag[1],
-      version: Number(tag[2]),
-    });
+    const parsedLabel = parseCapabilityLabel(tag[1] ?? '');
 
-    if (parsed.success) {
-      result[relation].push(parsed.data);
+    if (parsedLabel) {
+      result[parsedLabel.relation].push(parsedLabel.capability);
     }
   }
 
   return normalizeCapabilityRelations(result);
+}
+
+export function capabilityCatalogLabel({
+  relation,
+  capability,
+}: CapabilityCatalogFilter): string {
+  return `${CAPABILITY_LABEL_NAMESPACE}:${relation}:${capability.name}:v${capability.version}`;
+}
+
+function parseCapabilityLabel(value: string): CapabilityCatalogFilter | null {
+  const match = new RegExp(
+    `^${CAPABILITY_LABEL_NAMESPACE.replaceAll('.', '\\.')}` +
+      ':(provides|uses|requires):([a-z][a-z0-9.-]*):v([1-9]\\d*)$',
+  ).exec(value.trim().toLowerCase());
+
+  if (!match) {
+    return null;
+  }
+
+  const capability = CapabilityRefSchema.safeParse({
+    name: match[2],
+    version: Number(match[3]),
+  });
+
+  return capability.success
+    ? {
+        relation: match[1] as CapabilityRelationName,
+        capability: capability.data,
+      }
+    : null;
 }
 
 export function parseCapabilityCatalogFilter(

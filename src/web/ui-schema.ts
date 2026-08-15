@@ -855,6 +855,7 @@ export const TimelineDiffEventSchema = z.object({
     .enum(['workspace_diff', 'git_commit', 'agent_patch', 'session_diff'])
     .nullable(),
   scopePath: z.string().nullable().optional(),
+  repositoryPath: z.string().nullable().optional(),
   stagedFiles: z.array(z.string()).optional(),
 });
 

@@ -1,5 +1,8 @@
+import { join, relative } from 'path';
+
 import { nip19 } from 'nostr-tools';
 
+import { capabilityRelationsEqual } from '@src/capabilities/relations';
 import { handleBunkerList } from '@src/commands/bunker/list/handler';
 
 import type { RouteCommandContext } from '../../dispatch';
@@ -10,9 +13,14 @@ import {
   PLUGIN_QUERY_RELAYS,
   queryPluginCatalog,
   readInstalledPlugins,
+  readLocalPluginPackageCapabilities,
   readLocalPluginPackageVersion,
   suggestedAlias,
 } from '../install/handler';
+import {
+  inspectPluginReleaseGit,
+  type PluginReleaseGitState,
+} from '../release-git';
 
 import { renderPluginsReleasesText } from './renderers/text';
 import { renderPluginsReleasesWeb } from './renderers/web';
@@ -26,6 +34,10 @@ type AuthorSigner = {
 export type PluginReleaseStatus =
   | 'published-ok'
   | 'publish-needed'
+  | 'metadata-publish-needed'
+  | 'commit-needed'
+  | 'tag-needed'
+  | 'push-needed'
   | 'local-behind'
   | 'version-unknown';
 
@@ -34,6 +46,8 @@ export type PluginReleaseEntry = {
   localVersion: string | null;
   published: PluginCatalogEntry;
   authorSigner: AuthorSigner;
+  git: PluginReleaseGitState;
+  repositoryPath: string;
   status: PluginReleaseStatus;
 };
 
@@ -129,6 +143,8 @@ function compareVersions(left: string, right: string): number | null {
 function releaseStatus(
   localVersion: string | null,
   published: PluginCatalogEntry,
+  git: PluginReleaseGitState,
+  capabilitiesMatch: boolean,
 ): PluginReleaseStatus {
   if (!localVersion) {
     return 'version-unknown';
@@ -140,11 +156,27 @@ function releaseStatus(
     return 'version-unknown';
   }
 
-  if (compared === 0) {
+  if (compared === 0 && capabilitiesMatch) {
     return 'published-ok';
   }
 
-  return compared > 0 ? 'publish-needed' : 'local-behind';
+  if (compared < 0) {
+    return 'local-behind';
+  }
+
+  if (git.changedFileCount > 0) {
+    return 'commit-needed';
+  }
+
+  if (!git.localTagAtHead) {
+    return 'tag-needed';
+  }
+
+  if (!git.remotes.every((remote) => remote.branchReady && remote.tagReady)) {
+    return 'push-needed';
+  }
+
+  return compared === 0 ? 'metadata-publish-needed' : 'publish-needed';
 }
 
 function pluginMatchesInstalled(
@@ -211,13 +243,38 @@ export async function handlePluginsReleases(
         alias: installed.alias,
       });
 
+      const versionTag = localVersion ? `v${localVersion}` : 'v0.0.0';
+
+      const localCapabilities = readLocalPluginPackageCapabilities({
+        dmBotRoot: ctx.dmBotRoot,
+        alias: installed.alias,
+      });
+
+      const git = inspectPluginReleaseGit({
+        dmBotRoot: ctx.dmBotRoot,
+        alias: installed.alias,
+        versionTag,
+      });
+
+      const pluginDir = join(ctx.dmBotRoot, 'plugins', installed.alias);
+
       return [
         {
           installed,
           localVersion,
           published: match.published,
           authorSigner: match.signer,
-          status: releaseStatus(localVersion, match.published),
+          git,
+          repositoryPath: relative(ctx.cwd, pluginDir).replace(/\\/g, '/'),
+          status: releaseStatus(
+            localVersion,
+            match.published,
+            git,
+            capabilityRelationsEqual(
+              localCapabilities,
+              match.published.capabilities,
+            ),
+          ),
         },
       ];
     },

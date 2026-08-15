@@ -44,8 +44,8 @@ Status: implementation substantially complete; compatibility metadata and manual
 - [x] Extend plugin `package.json` parsing with `appweaver.capabilities.provides`, `uses`, and `requires` arrays.
 - [x] Accept several capabilities and several versions of the same capability.
 - [x] Deduplicate exact repeated declarations without collapsing distinct versions.
-- [x] Extend plugin publishing to emit kind `32107` `p`, `u`, and `r` tags.
-- [x] Scope `p`, `u`, and `r` capability semantics to kind `32107` parsing.
+- [x] Extend plugin publishing to emit namespaced NIP-32 capability labels on kind `32107` events.
+- [x] Parse capability labels only from kind `32107` events with the AppWeaver capability namespace.
 - [x] Extend plugin catalog parsing with relation and version metadata.
 - [x] Add `capability:<name>:v<major>` provider filtering.
 - [x] Add explicit `provides:`, `uses`, and `requires:` filters.

@@ -189,33 +189,38 @@ All three values are arrays. The same capability name may appear more than once 
 
 ### Kind `32107` Tags
 
-Published plugin events use one-letter relation tags:
+Published plugin events use NIP-32 labels under the
+`com.getappweaver.capability` namespace:
 
 ```json
 [
-  ["p", "scheduler", "1"],
-  ["p", "scheduler", "2"],
-  ["p", "translation", "1"],
-  ["u", "notification.send", "1"],
-  ["r", "storage.documents", "1"]
+  ["L", "com.getappweaver.capability"],
+  ["l", "com.getappweaver.capability:provides:scheduler:v1", "com.getappweaver.capability"],
+  ["l", "com.getappweaver.capability:provides:scheduler:v2", "com.getappweaver.capability"],
+  ["l", "com.getappweaver.capability:uses:translation:v1", "com.getappweaver.capability"],
+  ["l", "com.getappweaver.capability:requires:notification.send:v1", "com.getappweaver.capability"]
 ]
 ```
 
-For kind `32107` plugin events only:
+The indexed label value contains:
 
-- `p` means provides.
-- `u` means uses.
-- `r` means requires.
+- The AppWeaver namespace.
+- The `provides`, `uses`, or `requires` relation.
+- The capability name.
+- The contract major version.
 
-These meanings are scoped to the AppWeaver plugin event kind. Parsers must not apply them to other Nostr event kinds.
+Capability labels are parsed only from kind `32107` events that declare the
+matching `L` namespace. Legacy `p`, `u`, and `r` capability tags are not
+supported.
 
-Multiple `p`, `u`, and `r` tags are valid. Events may contain:
+Multiple `l` tags are valid. Events may contain:
 
 - Several different capabilities under one relation.
 - The same capability under several supported versions.
 - The same capability under different relations when there is a concrete reason, though publishers should avoid contradictory metadata.
 
-The older proposed `capability` and `uses-capability` tags are not needed.
+The fully qualified label value avoids collisions when relays index only the
+first tag value.
 
 ### Plugin Manager Filters
 
@@ -225,7 +230,8 @@ The canonical search expression remains relation-neutral for normal provider dis
 capability:scheduler:v1
 ```
 
-By default this searches kind `32107` events whose `p` tags provide the requested capability and version.
+By default this searches kind `32107` events with the indexed label
+`com.getappweaver.capability:provides:scheduler:v1`.
 
 The plugin manager may also support explicit relation filters:
 
@@ -238,6 +244,11 @@ requires:scheduler:v1
 This lets users and developers see the ecosystem around a capability, not only providers.
 
 Search results must still pass normal publisher, repository, release, signature, and core API compatibility checks. A catalog declaration never makes a plugin executable. After installation and restart, runtime registration must provide the corresponding operation implementation.
+
+Release management compares local package capability declarations with the
+latest catalog event. A plugin whose version and refs are already published but
+whose capability labels are missing or stale is shown as `metadata publish
+needed` and may republish the same version with corrected labels.
 
 ## Core Capability Contracts
 
@@ -641,7 +652,7 @@ The button invokes `capability:v1:scheduler.show` with the stored provider ID an
 2. NR invokes `capability:v1:scheduler.create` through core.
 3. If no provider is installed, core shows `Find compatible apps`.
 4. The plugin manager opens with `capability:scheduler:v1`.
-5. The catalog finds kind `32107` events with `p`, including Job.
+5. The catalog finds kind `32107` events with the indexed scheduler provider label, including Job.
 6. The user reviews and installs Job through the existing installation flow.
 7. Installation regenerates plugin registration and restarts AppWeaver as required.
 8. The user clicks the NR action again.
@@ -780,7 +791,7 @@ After core routes a valid call, execution errors belong to the provider operatio
 ### Phase 2: Published Relations And Discovery
 
 - Extend plugin `package.json` validation with `provides`, `uses`, and `requires` arrays.
-- Publish `p`, `u`, and `r` tags in kind `32107` events.
+- Publish namespaced NIP-32 capability labels in kind `32107` events.
 - Accept repeated tags and multiple versions of the same capability.
 - Parse and display relation tags in plugin manager results.
 - Add provider and relation filter syntax.
@@ -814,8 +825,8 @@ After core routes a valid call, execution errors belong to the provider operatio
 ## Acceptance Criteria For The Scheduler Example
 
 - NR has no import from Job and no dependency on the local `job` alias.
-- Job publishes a `p` tag for `scheduler:v1` and registers its runtime provider.
-- NR publishes a `u` or `r` tag according to whether scheduling is optional or required for the relevant feature.
+- Job publishes a `provides:scheduler:v1` capability label and registers its runtime provider.
+- NR publishes a `uses` or `requires` scheduler label according to whether scheduling is optional or required for the relevant feature.
 - With Job absent, the NR action offers plugin discovery filtered by `capability:scheduler:v1`.
 - With one scheduler installed, the NR action opens that provider's creation or review flow.
 - With multiple schedulers installed, the user can choose one and optionally save it as default.
@@ -827,19 +838,18 @@ After core routes a valid call, execution errors belong to the provider operatio
 
 ## Open Questions
 
-1. Should `p`, `u`, and `r` remain direct kind `32107` tags, or should relation codes be nested under a single `c` tag to avoid possible semantic overlap with tags used by other Nostr event kinds?
-2. Should provider operation outputs be domain JSON only, or may contracts explicitly include `WebNodeRoot` provider views?
-3. Which scheduler operations are required in v1 beyond `create`, `list`, and `show`?
-4. Should installing a provider preserve a pending capability request for continuation after restart?
-5. What generic callback or continuation mechanism should consumers use when they want a WebAction chooser result persisted automatically?
-6. Should missing `requires` declarations remain log-only, or should plugins be able to mark individual actions disabled through a generic status operation?
-7. How should plugin manager rank multiple providers beyond compatibility, publisher identity, and installed status?
+1. Should provider operation outputs be domain JSON only, or may contracts explicitly include `WebNodeRoot` provider views?
+2. Which scheduler operations are required in v1 beyond `create`, `list`, and `show`?
+3. Should installing a provider preserve a pending capability request for continuation after restart?
+4. What generic callback or continuation mechanism should consumers use when they want a WebAction chooser result persisted automatically?
+5. Should missing `requires` declarations remain log-only, or should plugins be able to mark individual actions disabled through a generic status operation?
+6. How should plugin manager rank multiple providers beyond compatibility, publisher identity, and installed status?
 
 ## Recommended Initial Decisions
 
 - Use exact major-version matching and allow providers to register several majors concurrently.
 - Use explicit `provides`, `uses`, and `requires` arrays in package metadata.
-- Publish relation tags as `p`, `u`, and `r` on kind `32107`, while keeping their meaning scoped to that event kind.
+- Publish fully qualified NIP-32 relation labels under the `com.getappweaver.capability` namespace.
 - Put capability contracts in discoverable files under `src/capabilities/`, with minimum core version comments.
 - Let every capability expose multiple named, schema-validated, canonically versioned operations.
 - Put runtime providers on `BotPlugin` and bind them to plugin identity in core.

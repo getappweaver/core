@@ -33,6 +33,7 @@ export type TimelineEventMeta = {
   subtitle: string | null;
   origin: TimelineDiffOrigin | null;
   scopePath?: string | null;
+  repositoryPath?: string | null;
   stagedFiles?: string[];
 };
 

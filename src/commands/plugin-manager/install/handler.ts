@@ -4,7 +4,9 @@ import { join } from 'path';
 import type { NostrEvent } from 'nostr-tools';
 
 import {
+  capabilityCatalogLabel,
   matchesCapabilityCatalogFilter,
+  normalizeCapabilityRelations,
   parseCapabilityCatalogFilter,
   parseCapabilityRelationTags,
   type CapabilityCatalogFilter,
@@ -740,6 +742,30 @@ export function readLocalPluginPackageVersion({
   }
 }
 
+export function readLocalPluginPackageCapabilities({
+  dmBotRoot,
+  alias,
+}: {
+  dmBotRoot: string;
+  alias: string;
+}): PluginCapabilityRelations {
+  const pkgPath = join(dmBotRoot, 'plugins', alias, 'package.json');
+
+  if (!existsSync(pkgPath)) {
+    return { provides: [], uses: [], requires: [] };
+  }
+
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+      appweaver?: { capabilities?: unknown };
+    };
+
+    return normalizeCapabilityRelations(pkg.appweaver?.capabilities);
+  } catch {
+    return { provides: [], uses: [], requires: [] };
+  }
+}
+
 export function suggestedAlias(pluginName: string): string {
   return pluginName
     .replace(/^(?:appweaver|dm-bot)-/, '')
@@ -1059,6 +1085,9 @@ export async function queryPluginCatalog(
   const filter = {
     kinds: [PLUGIN_KIND],
     ...(options?.authors ? { authors: options.authors } : {}),
+    ...(capabilityFilter
+      ? { '#l': [capabilityCatalogLabel(capabilityFilter)] }
+      : {}),
     limit: 50,
   };
 

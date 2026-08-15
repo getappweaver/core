@@ -169,6 +169,7 @@ export type TimelineItem =
           | 'session_diff'
           | null;
         scopePath?: string | null;
+        repositoryPath?: string | null;
         stagedFiles?: string[];
       } | null;
     }

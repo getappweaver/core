@@ -5,17 +5,18 @@ import type { EventTemplate, NostrEvent } from 'nostr-tools';
 
 import {
   capabilityRelationTags,
+  capabilityRelationsEqual,
   normalizeCapabilityRelations,
   type PluginCapabilityRelations,
 } from '@src/capabilities/relations';
 import type { RouteCommandContext } from '@src/commands/dispatch';
-import { ensureWss } from '@src/env';
 import { bunkerSignEvent } from '@src/nostr/bunker';
 import { listConnections, type ConnectionRow } from '@src/nostr/connections';
 import {
   NIP65_RELAY_LIST_KIND,
   parseNip65RelayTags,
   PROFILE_RELAYS_FOR_QUERY,
+  uniqueRelays,
 } from '@src/nostr/nip65';
 
 import {
@@ -25,6 +26,7 @@ import {
   readInstalledPlugins,
   suggestedAlias,
 } from '../install/handler';
+import { pushPluginRelease } from '../release-git';
 
 import { renderPluginsPublishText } from './renderers/text';
 import { renderPluginsPublishWeb } from './renderers/web';
@@ -384,17 +386,15 @@ async function fetchPluginPublishRelays({
   });
 
   if (!relayList) {
-    return PLUGIN_PUBLISH_RELAYS.map(ensureWss);
+    return uniqueRelays(PLUGIN_PUBLISH_RELAYS);
   }
 
   const { writeRelays } = parseNip65RelayTags(relayList.tags);
 
-  return [
-    ...new Set([
-      ...(writeRelays.length > 0 ? writeRelays : []),
-      ...PLUGIN_PUBLISH_RELAYS.map(ensureWss),
-    ]),
-  ];
+  return uniqueRelays([
+    ...(writeRelays.length > 0 ? writeRelays : []),
+    ...PLUGIN_PUBLISH_RELAYS,
+  ]);
 }
 
 function buildEventTemplate({
@@ -504,7 +504,8 @@ export async function handlePluginsPublish(
 
   if (
     versionAlreadyPublished &&
-    refsEqual(published.refs, refsWithBackfilledChangelogs)
+    refsEqual(published.refs, refsWithBackfilledChangelogs) &&
+    capabilityRelationsEqual(pkg.capabilities, published.capabilities)
   ) {
     const representation: PluginsPublishRepresentation = {
       alias,
@@ -520,6 +521,8 @@ export async function handlePluginsPublish(
       ? renderPluginsPublishWeb(representation)
       : renderPluginsPublishText(representation);
   }
+
+  pushPluginRelease({ dmBotRoot: ctx.dmBotRoot, alias, versionTag });
 
   const connection = findAuthorConnection({ ctx, published });
 

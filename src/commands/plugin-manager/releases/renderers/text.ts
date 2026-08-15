@@ -14,6 +14,14 @@ function statusLabel(status: PluginReleaseStatus): string {
       return 'ok';
     case 'publish-needed':
       return 'publish needed';
+    case 'metadata-publish-needed':
+      return 'metadata publish needed';
+    case 'commit-needed':
+      return 'commit needed';
+    case 'tag-needed':
+      return 'tag needed';
+    case 'push-needed':
+      return 'push needed';
     case 'local-behind':
       return 'local behind';
     case 'version-unknown':
@@ -22,11 +30,27 @@ function statusLabel(status: PluginReleaseStatus): string {
 }
 
 function entryLine(entry: PluginReleaseEntry): string {
+  const remotes = entry.git.remotes
+    .map((remote) =>
+      !remote.configured
+        ? `${remote.name} missing`
+        : remote.branchReady && remote.tagReady
+          ? `${remote.name} ready`
+          : `${remote.name} push needed`,
+    )
+    .join(', ');
+
   return [
     `${entry.installed.alias}:`,
     `local ${entry.localVersion ?? '(unknown)'}`,
     `published ${entry.published.version || '(unknown)'}`,
     `author via ${entry.authorSigner.label}`,
+    entry.git.changedFileCount === 0
+      ? 'clean'
+      : `${entry.git.stagedFileCount} staged, ${entry.git.unstagedFileCount} unstaged`,
+    `branch ${entry.git.branch ?? '(detached)'}`,
+    entry.git.localTagAtHead ? 'tag ready' : 'tag missing at HEAD',
+    remotes,
     statusLabel(entry.status),
   ].join(' | ');
 }
