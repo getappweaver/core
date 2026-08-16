@@ -18,7 +18,13 @@ import {
   appWeaverRoadmapTarget,
 } from './roadmap-panel';
 
-type PluginPageSectionId = 'features' | 'demo' | 'install' | 'apps' | 'more';
+type PluginPageSectionId =
+  | 'features'
+  | 'gallery'
+  | 'demo'
+  | 'install'
+  | 'apps'
+  | 'more';
 
 type PluginPage = {
   routeSlug: string;
@@ -34,6 +40,28 @@ type PluginPage = {
   demoQuery: string;
   demoStories: PluginDemoStory[];
   features: string[];
+  featureGallery: PluginFeatureGallery | null;
+};
+
+type PluginFeatureGalleryItem = {
+  id: string;
+  title: string;
+  description: string[];
+  mediaSrc: string;
+  mediaAlt: string;
+  mediaLabel: string;
+};
+
+type PluginFeatureGallery = {
+  title: string;
+  description: string;
+  items: PluginFeatureGalleryItem[];
+};
+
+type PluginPagePresentation = {
+  title: string;
+  description: string;
+  featureGallery: PluginFeatureGallery;
 };
 
 type PluginDemoViewMode = 'desktop' | 'mobile';
@@ -273,6 +301,88 @@ const pluginDemoStories: Record<string, PluginDemoStory[]> = {
   ],
 };
 
+const pluginPagePresentations: Record<string, PluginPagePresentation> = {
+  nr: {
+    title: 'Explore Nostr by topic. Rank what matters. Filter out what does not.',
+    description:
+      'Nostr Radar is an intentional Nostr reader that discovers posts through your network, evaluates them in finite time slots, and scores relevance with private local signals.',
+    featureGallery: {
+      title: 'A reader designed for deliberate discovery.',
+      description:
+        'Move through finite batches, discover posts through overlooked social signals, and decide which topics deserve your attention.',
+      items: [
+        {
+          id: 'timeline',
+          title: 'Timeline',
+          description: [
+            'Browse posts discovered through your Nostr network without turning your reader into an endless feed.',
+            'Nostr Radar fetches and evaluates posts in time slots, making each reading session a manageable batch.',
+          ],
+          mediaSrc: '/screenshots/nostr-radar/timeline.png',
+          mediaAlt: 'Nostr Radar Timeline showing an evaluated time slot of posts',
+          mediaLabel: 'Timeline screenshot',
+        },
+        {
+          id: 'for-you',
+          title: 'For You',
+          description: [
+            'See the 25 posts most relevant to you from the posts Nostr Radar has evaluated.',
+            'Ranking uses your preferred topics and private interaction signals stored by your local instance.',
+          ],
+          mediaSrc: '/screenshots/nostr-radar/for-you.png',
+          mediaAlt: 'Nostr Radar For You view showing the most relevant posts',
+          mediaLabel: 'For You screenshot',
+        },
+        {
+          id: 'filtering',
+          title: 'Filtering',
+          description: [
+            'Filter both Timeline and For You by time slot, or use mass reading to clear an unwanted topic from either view.',
+            'Click Read all on a topic to quickly remove posts matching that keyword. Add recurring unwanted topics to Unpreferred Topics to skip them in the future, or add topics to Preferred Topics to influence scoring.',
+          ],
+          mediaSrc: '/gifs/nostr-radar/filtering.gif',
+          mediaAlt:
+            'Nostr Radar filtering posts by time slot and removing posts with Read all',
+          mediaLabel: 'Filtering demo',
+        },
+        {
+          id: 'reactions',
+          title: 'Reactions',
+          description: [
+            'Surface reactions, not just reposts or quotes.',
+            'People often react or reply when they do not want to repost. Followers’ reactions reveal worthwhile posts that conventional timelines tend to miss.',
+          ],
+          mediaSrc: '/screenshots/nostr-radar/reactions.png',
+          mediaAlt: 'Nostr Radar showing a post discovered through a follower reaction',
+          mediaLabel: 'Reactions screenshot',
+        },
+        {
+          id: 'archive',
+          title: 'Archive',
+          description: [
+            'Archive posts that are important to you, that you want to collect, or that you plan to return to later.',
+          ],
+          mediaSrc: '/screenshots/nostr-radar/archive.png',
+          mediaAlt: 'Nostr Radar Archive containing saved posts',
+          mediaLabel: 'Archive screenshot',
+        },
+        {
+          id: 'private-scoring',
+          title: 'Private, independent scoring',
+          description: [
+            'Keep two or more Nostr Radar instances for the same pubkey—one for work and another for personal interests.',
+            'Each instance keeps different private signals and runs its own scoring algorithm without requiring another Nostr identity.',
+          ],
+          mediaSrc: '/screenshots/nostr-radar/private-scoring.png',
+          mediaAlt:
+            'Two Nostr Radar instances for the same pubkey with different scoring signals',
+          mediaLabel: 'Independent instances illustration',
+        },
+      ],
+    },
+  },
+};
+
 function demoGifsForView(
   stories: PluginDemoStory[],
   viewMode: PluginDemoViewMode,
@@ -326,6 +436,7 @@ function hasDemoGifsForView(
 
 const pluginPageSections: PluginPageSectionId[] = [
   'features',
+  'gallery',
   'demo',
   'install',
   'apps',
@@ -344,17 +455,17 @@ function officialAppForSlug(slug: string) {
   );
 }
 
-export function pluginNavItemsForPath(_pathname: string): PluginNavItem[] {
-  void _pathname;
+export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
+  const slug = routeSlugForPath(pathname);
+  const commandToken = pluginRouteAliases[slug] ?? slug;
+  const usesFeatureGallery = pluginPagePresentations[commandToken] !== undefined;
 
   return [
     { sectionId: null, label: 'Back', href: '/' },
     { sectionId: 'features', label: 'Features', href: '#features' },
-    {
-      sectionId: 'demo',
-      label: `Demo`,
-      href: '#demo',
-    },
+    usesFeatureGallery
+      ? { sectionId: 'gallery', label: 'Gallery', href: '#gallery' }
+      : { sectionId: 'demo', label: 'Demo', href: '#demo' },
     { sectionId: 'install', label: 'Install', href: '#install' },
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
     { sectionId: 'more', label: 'More', href: '#more' },
@@ -381,6 +492,7 @@ function pluginPageForPath(
 
   const commandToken = pluginRouteAliases[slug] ?? slug;
   const officialApp = officialAppForSlug(slug);
+  const presentation = pluginPagePresentations[commandToken];
   const command = commands.find(
     (entry) =>
       entry.name === commandToken ||
@@ -388,7 +500,7 @@ function pluginPageForPath(
       entry.aliases?.includes(commandToken),
   );
 
-const subcommand = command?.subcommands.find(
+  const subcommand = command?.subcommands.find(
     (entry) =>
       (entry.webWidget?.placement === 'header' ||
         entry.webWidget?.placement === 'right') &&
@@ -411,9 +523,9 @@ const subcommand = command?.subcommands.find(
     label: officialApp?.label ?? `/${command.name}`,
     shortName: officialApp?.shortName ?? displayName,
     iconSrc: pluginIconSrcForSlug(slug),
-    title: `${displayName} for your AppWeaver workspace.`,
+    title: presentation?.title ?? `${displayName} for your AppWeaver workspace.`,
     eyebrow: displayName,
-    description,
+    description: presentation?.description ?? description,
     demoQuery: `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`,
     demoStories: pluginDemoStories[command.name] ?? [],
     features: officialApp?.features ?? [
@@ -421,6 +533,7 @@ const subcommand = command?.subcommands.find(
       'Install it from the AppWeaver plugin manager when it belongs in your workspace.',
       'Use it through commands, widgets, and AI-assisted workflows.',
     ],
+    featureGallery: presentation?.featureGallery ?? null,
   };
 }
 
@@ -486,9 +599,103 @@ function PluginFeatures(props: { page: PluginPage }) {
         <h1 class="plugin-page-title">{props.page.title}</h1>
       </div>
       <p class="plugin-page-description">{props.page.description}</p>
-      <ul class="plugin-page-list">
-        <For each={props.page.features}>{(feature) => <li>{feature}</li>}</For>
-      </ul>
+      <Show when={props.page.featureGallery === null}>
+        <ul class="plugin-page-list">
+          <For each={props.page.features}>{(feature) => <li>{feature}</li>}</For>
+        </ul>
+      </Show>
+    </div>
+  );
+}
+
+function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
+  const [fullscreenItem, setFullscreenItem] =
+    createSignal<PluginFeatureGalleryItem | null>(null);
+
+  return (
+    <div class="plugin-feature-gallery">
+      <div class="plugin-feature-gallery-heading">
+        <div class="plugin-page-eyebrow">Feature Gallery</div>
+        <h2 class="plugin-section-title">{props.gallery.title}</h2>
+        <p class="plugin-page-description">{props.gallery.description}</p>
+      </div>
+      <div class="plugin-feature-gallery-list">
+        <For each={props.gallery.items}>
+          {(item, index) => {
+            const [mediaReady, setMediaReady] = createSignal(false);
+
+            return (
+              <article
+                id={`feature-${item.id}`}
+                class="plugin-feature-gallery-item"
+                classList={{ 'plugin-feature-gallery-item--reverse': index() % 2 === 1 }}
+              >
+                <div class="plugin-feature-gallery-copy">
+                  <div class="plugin-feature-gallery-index">
+                    {String(index() + 1).padStart(2, '0')}
+                  </div>
+                  <h3>{item.title}</h3>
+                  <For each={item.description}>{(paragraph) => <p>{paragraph}</p>}</For>
+                </div>
+                <figure class="plugin-feature-gallery-media">
+                  <figcaption>{item.mediaLabel}</figcaption>
+                  <button
+                    type="button"
+                    class="plugin-feature-gallery-media-button"
+                    disabled={!mediaReady()}
+                    onClick={() => setFullscreenItem(item)}
+                    aria-label={`Open ${item.mediaLabel} fullscreen`}
+                  >
+                    <img
+                      src={item.mediaSrc}
+                      alt={item.mediaAlt}
+                      classList={{ 'is-ready': mediaReady() }}
+                      onLoad={() => setMediaReady(true)}
+                      onError={() => setMediaReady(false)}
+                    />
+                  </button>
+                  <Show when={!mediaReady()}>
+                    <div class="plugin-feature-gallery-placeholder">
+                      <strong>Media coming soon</strong>
+                      <span>{item.mediaSrc}</span>
+                    </div>
+                  </Show>
+                </figure>
+              </article>
+            );
+          }}
+        </For>
+      </div>
+      <Show when={fullscreenItem()}>
+        {(item) => (
+          <div class="lightbox" role="dialog" aria-modal="true">
+            <button
+              type="button"
+              class="lightbox__backdrop"
+              aria-label="Close fullscreen feature media"
+              onClick={() => setFullscreenItem(null)}
+            />
+            <figure class="lightbox__card lightbox__card--screenshot">
+              <div class="lightbox__head">
+                <div>{item().title}</div>
+                <button
+                  type="button"
+                  class="lightbox__close"
+                  onClick={() => setFullscreenItem(null)}
+                  aria-label="Close fullscreen feature media"
+                >
+                  x
+                </button>
+              </div>
+              <img
+                class="lightbox__media lightbox__media--screenshot"
+                src={item().mediaSrc}
+                alt={item().mediaAlt}
+              />
+            </figure>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }
@@ -909,13 +1116,28 @@ function PluginLandingPage(props: {
       <section id="features" class="plugin-page-section plugin-page-section--features">
         <PluginFeatures page={props.page} />
       </section>
-      <section
-        id="demo"
-        class="plugin-page-section plugin-page-section--demo"
-        aria-label={`${props.page.eyebrow} demo`}
+      <Show
+        when={props.page.featureGallery}
+        fallback={
+          <section
+            id="demo"
+            class="plugin-page-section plugin-page-section--demo"
+            aria-label={`${props.page.eyebrow} demo`}
+          >
+            <PluginDemoSection page={props.page} />
+          </section>
+        }
       >
-        <PluginDemoSection page={props.page} />
-      </section>
+        {(gallery) => (
+          <section
+            id="gallery"
+            class="plugin-page-section plugin-page-section--gallery"
+            aria-label={`${props.page.eyebrow} feature gallery`}
+          >
+            <PluginFeatureGallery gallery={gallery()} />
+          </section>
+        )}
+      </Show>
       <section id="install" class="plugin-page-section plugin-page-section--install">
         <PluginInstallPreview page={props.page} />
       </section>

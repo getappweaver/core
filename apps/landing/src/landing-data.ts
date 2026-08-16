@@ -8,6 +8,7 @@ export type OfficialApp = {
   displayName: string;
   shortName: string;
   features: string[];
+  hasInteractiveDemo: boolean;
 };
 
 export type SocialLink = {
@@ -31,6 +32,7 @@ export const officialApps: OfficialApp[] = [
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/todo',
     displayName: 'Todo App',
     shortName: 'Todo',
+    hasInteractiveDemo: true,
     features: [
       'Create structured tasks from chat, web UI actions, or AI prompts.',
       'Focus on one part of the todo tree when you want to work in detail.',
@@ -48,6 +50,7 @@ export const officialApps: OfficialApp[] = [
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/bm',
     displayName: 'Bookmark Manager',
     shortName: 'Bookmark',
+    hasInteractiveDemo: true,
     features: [
       'Your local bookmarks, accessible from anywhere you use AppWeaver.',
       'Ask AI to inspect a link or search for something, then draft a bookmark with a useful description, tags, and category.',
@@ -63,6 +66,7 @@ export const officialApps: OfficialApp[] = [
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/journal',
     displayName: "Captain's Log",
     shortName: 'Journal',
+    hasInteractiveDemo: true,
     features: [
       'Capture private workspace notes as a local Captain\'s Log.',
       'Stroll through entries like a real notepad instead of treating every note as a search result.',
@@ -78,6 +82,7 @@ export const officialApps: OfficialApp[] = [
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/job',
     displayName: 'Job Scheduler',
     shortName: 'Job',
+    hasInteractiveDemo: true,
     features: [
       'Schedule one-off or recurring prompts from the same app hub.',
       'Use natural language like "Run X each Monday at 8am" and AppWeaver creates the job in your timezone.',
@@ -93,6 +98,7 @@ export const officialApps: OfficialApp[] = [
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/file',
     displayName: 'File Manager',
     shortName: 'File',
+    hasInteractiveDemo: true,
     features: [
       'Browse workspace trees without leaving the AppWeaver UI.',
       'Ask for folder summaries and bottom-up context before editing code.',
@@ -103,18 +109,19 @@ export const officialApps: OfficialApp[] = [
     name: 'Nostr Radar',
     label: '/nr',
     description:
-      'Official AppWeaver Nostr Radar app. Adds an intentional Nostr reader that fetches posts from your follows, classifies them with AI, and helps you review important conversations by topic, mood, timeline, or archive.',
+      'Explore Nostr by topic, discover posts through overlooked social signals, and privately rank what matters to you.',
     href: '/apps/nostr-radar',
     packageName: 'appweaver-nr-plugin',
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar',
     displayName: 'Nostr Radar',
     shortName: 'Nostr',
+    hasInteractiveDemo: false,
     features: [
-      'Fetch recent posts from your Nostr follows without turning your reader into an infinite feed.',
-      'Let AI classify complete conversations into topics, moods, summaries, and skip decisions.',
-      'Use the For You tab to rank your timeline by a personalized score based on your past interactions and affinity for each topic.',
-      'Read by topic, mood, timeline, or archive while keeping replies, quotes, mentions, and profiles in context.',
-      'Mark posts read or archived so your reading queue stays intentional.',
+      'Fetch and evaluate posts in finite time slots instead of browsing an infinite feed.',
+      'See the 25 most relevant evaluated posts in For You using private local scoring signals.',
+      'Filter Timeline and For You by time slot, preferred topics, and unpreferred topics.',
+      'Surface reactions, not just reposts or quotes.',
+      'Archive important posts to collect or revisit later.',
     ],
   },
 ];

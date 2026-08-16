@@ -57,9 +57,11 @@ export function OfficialAppGrid(props: OfficialAppGridProps) {
               </span>
             </a>
             <p class="official-app-description">{app.description}</p>
-            <a class="official-app-link" href={app.href}>
-              Interactive Demo
-            </a>
+            <Show when={app.hasInteractiveDemo}>
+              <a class="official-app-link" href={app.href}>
+                Interactive Demo
+              </a>
+            </Show>
           </article>
         )}
       </For>

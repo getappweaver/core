@@ -11,7 +11,7 @@ type CopyableCommandBlockProps = {
 };
 
 const installCommandLines = [
-  'git clone https://github.com/getappweaver/core.git appweaver',
+  'git clone --depth=1 https://github.com/getappweaver/core.git appweaver',
   'cd appweaver && bun install && bun run start',
 ];
 
