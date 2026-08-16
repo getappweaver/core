@@ -2,6 +2,7 @@ import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 
 import { handlePluginsInstall } from './install/handler';
+import { handlePluginsNew } from './new/handler';
 import { handlePluginsPublish } from './publish/handler';
 import { handlePluginsReleases } from './releases/handler';
 
@@ -25,6 +26,13 @@ export const handlePluginsRoot: BuiltinHandler = (ctx) => {
     );
   }
 
+  if (sub === 'new' || sub === 'create') {
+    return handleError(
+      async () => handlePluginsNew(ctx),
+      'Failed to create plugin',
+    );
+  }
+
   if (sub === 'releases' || sub === 'release' || sub === 'publish-status') {
     return handleError(
       async () => handlePluginsReleases(ctx),
@@ -40,6 +48,6 @@ export const handlePluginsRoot: BuiltinHandler = (ctx) => {
   }
 
   return Promise.resolve(
-    `Unknown plugins command: ${sub}. Try ${ctx.prefix}plugins install, ${ctx.prefix}plugins releases, or ${ctx.prefix}plugins publish <alias>`,
+    `Unknown plugins command: ${sub}. Try ${ctx.prefix}plugins new, ${ctx.prefix}plugins install, ${ctx.prefix}plugins releases, or ${ctx.prefix}plugins publish <alias>`,
   );
 };

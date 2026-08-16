@@ -343,7 +343,7 @@ for (const entry of pluginsJson.plugins) {
 function aliasToSchemaImport(alias: string): string {
   return (
     alias
-      .split('-')
+      .split(/[-_]/)
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
       .join('') + 'AiDefinition'
   );
@@ -407,7 +407,7 @@ console.log('[generate-tools] Generated generated/cli-registry.ts');
 function toPluginExportName(alias: string): string {
   return (
     alias
-      .split('-')
+      .split(/[-_]/)
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
       .join('') + 'Plugin'
   );

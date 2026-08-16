@@ -20,6 +20,7 @@ const pluginsReleasesStylesheet = {
     }
 
     .web-row.plugins-release-title-row,
+    .web-row.plugins-releases-toolbar,
     .web-row.plugins-release-meta-row,
     .web-row.plugins-release-git-row,
     .web-row.plugins-release-action-row {
@@ -34,11 +35,37 @@ const pluginsReleasesStylesheet = {
     .web-row.plugins-release-git-row {
       flex-wrap: wrap;
     }
+
+    .web-form.plugins-release-publish-form {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .web-row.plugins-releases-toolbar {
+      justify-content: space-between;
+    }
+
+    .web-stack.plugins-release-result {
+      gap: 0.25rem;
+      padding-top: 0.35rem;
+      border-top: 1px solid var(--color-border, currentColor);
+    }
+
+    .web-row.plugins-release-result-row {
+      align-items: center;
+      gap: 0.45rem;
+    }
   `,
 } as const;
 
+const RELEASES_RELOAD_BUTTON_ID = 'plugins-releases-reload';
+const RELEASES_RELOAD_STATUS_ID = 'plugins-releases-reload-status';
+
 function statusBadge(status: PluginReleaseStatus): WebNode {
   const propsByStatus = {
+    'local-draft': { label: 'local draft', tone: 'info' as const },
+    'not-published': { label: 'not published', tone: 'warning' as const },
     'published-ok': { label: 'ok', tone: 'success' as const },
     'publish-needed': { label: 'publish needed', tone: 'warning' as const },
     'metadata-publish-needed': {
@@ -71,6 +98,8 @@ function gitBadge(
 }
 
 function gitStateRow(entry: PluginReleaseEntry): WebNode {
+  const firstPublish = entry.published === null;
+
   return {
     type: 'element',
     tag: 'row',
@@ -98,12 +127,18 @@ function gitStateRow(entry: PluginReleaseEntry): WebNode {
       ...entry.git.remotes.map((remote) =>
         gitBadge(
           !remote.configured
-            ? `${remote.name} missing`
+            ? firstPublish && remote.name === 'origin'
+              ? 'origin will register'
+              : firstPublish && remote.name === 'github'
+                ? 'github optional'
+                : `${remote.name} missing`
             : remote.branchReady && remote.tagReady
               ? `${remote.name} ready`
               : `${remote.name} push needed`,
           !remote.configured
-            ? 'danger'
+            ? firstPublish
+              ? 'muted'
+              : 'danger'
             : remote.branchReady && remote.tagReady
               ? 'success'
               : 'warning',
@@ -113,22 +148,106 @@ function gitStateRow(entry: PluginReleaseEntry): WebNode {
   };
 }
 
+function publishResult(entry: PluginReleaseEntry): WebNode[] {
+  const result = entry.lastPublish;
+
+  if (!result) {
+    return [];
+  }
+
+  const tone =
+    result.status === 'published'
+      ? ('success' as const)
+      : result.status === 'failed'
+        ? ('danger' as const)
+        : ('warning' as const);
+
+  return [
+    {
+      type: 'element',
+      tag: 'stack',
+      props: { className: 'plugins-release-result' },
+      children: [
+        {
+          type: 'element',
+          tag: 'row',
+          props: { className: 'plugins-release-result-row' },
+          children: [
+            {
+              type: 'element',
+              tag: 'badge',
+              props: {
+                label: result.status.replace('-', ' '),
+                tone,
+                size: 'sm',
+              },
+            },
+            textBlock(result.message, 'muted'),
+          ],
+        },
+        ...(result.eventId
+          ? [textBlock(`Event ID: ${result.eventId}`, 'muted')]
+          : []),
+        ...result.relays.map((relay) => ({
+          type: 'element' as const,
+          tag: 'row' as const,
+          props: { className: 'plugins-release-result-row' },
+          children: [
+            {
+              type: 'element' as const,
+              tag: 'badge' as const,
+              props: {
+                label: relay.ok ? 'ok' : 'failed',
+                tone: relay.ok ? ('success' as const) : ('danger' as const),
+                size: 'sm' as const,
+              },
+            },
+            textBlock(
+              relay.ok ? relay.relay : `${relay.relay}: ${relay.error}`,
+              'muted',
+            ),
+          ],
+        })),
+      ],
+    },
+  ];
+}
+
 function releaseCard(entry: PluginReleaseEntry): WebNode {
-  const canPublish =
-    (entry.status === 'publish-needed' ||
-      entry.status === 'metadata-publish-needed' ||
-      entry.status === 'push-needed') &&
+  const firstPublish = entry.published === null;
+
+  const sourceReadyForFirstPublish =
+    firstPublish &&
+    entry.localVersion !== null &&
+    entry.git.changedFileCount === 0 &&
     entry.git.branch !== null &&
-    entry.git.localTagAtHead &&
-    entry.git.remotes.every((remote) => remote.configured);
+    entry.git.localTagAtHead;
+
+  const canFirstPublish =
+    sourceReadyForFirstPublish && entry.publishSigners.length > 0;
+
+  const canPublish = firstPublish
+    ? canFirstPublish
+    : (entry.status === 'publish-needed' ||
+        entry.status === 'metadata-publish-needed' ||
+        entry.status === 'push-needed') &&
+      entry.git.branch !== null &&
+      entry.git.localTagAtHead &&
+      entry.git.remotes.every((remote) => remote.configured);
+
+  const prepareWithAi = firstPublish && !sourceReadyForFirstPublish;
 
   const reviewChanges = entry.git.changedFileCount > 0;
 
-  const pushNeeded = entry.git.remotes.some(
-    (remote) => !remote.branchReady || !remote.tagReady,
-  );
+  const pushNeeded =
+    !firstPublish &&
+    entry.git.remotes.some((remote) => !remote.branchReady || !remote.tagReady);
 
   const metadataPublish = entry.status === 'metadata-publish-needed';
+  const reviewButtonId = `plugins-release-review-${entry.installed.alias}`;
+  const reviewStatusId = `plugins-release-review-status-${entry.installed.alias}`;
+  const publishButtonId = `plugins-release-publish-${entry.installed.alias}`;
+  const publishStatusId = `plugins-release-publish-status-${entry.installed.alias}`;
 
   return {
     type: 'element',
@@ -172,7 +291,9 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                 type: 'element',
                 tag: 'badge',
                 props: {
-                  label: `published ${entry.published.version || 'unknown'}`,
+                  label: entry.published
+                    ? `published ${entry.published.version || 'unknown'}`
+                    : 'no catalog event',
                   tone: 'muted',
                   size: 'sm',
                 },
@@ -181,10 +302,14 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
           },
           gitStateRow(entry),
           textBlock(
-            `${entry.published.title || entry.published.name} · author via ${entry.authorSigner.label}`,
+            entry.published && entry.authorSigner
+              ? `${entry.published.title || entry.published.name} · author via ${entry.authorSigner.label}`
+              : entry.publishSigners.length > 0
+                ? 'Choose the author identity for the first publication.'
+                : 'No saved bunker identity matches this repository owner.',
             'muted',
           ),
-          ...(canPublish || reviewChanges
+          ...(canPublish || reviewChanges || prepareWithAi
             ? [
                 {
                   type: 'element' as const,
@@ -197,6 +322,7 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                             type: 'element' as const,
                             tag: 'button' as const,
                             props: {
+                              id: reviewButtonId,
                               label: 'Review changes',
                               className: 'web-button',
                               action: {
@@ -209,47 +335,147 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                   repository: entry.repositoryPath,
                                 },
                                 recordInTimeline: true,
+                                pendingUi: { presentation: 'none' as const },
                                 clientStatus: {
-                                  pending: `Loading ${entry.installed.alias} changes...`,
-                                  success: `Loaded ${entry.installed.alias} changes.`,
+                                  background: true,
+                                  activeTargetId: reviewButtonId,
+                                  statusTargetId: reviewStatusId,
+                                  pending: 'Loading...',
+                                  success: 'Loaded.',
                                 },
                               },
                             },
                           },
                         ]
                       : []),
-                    ...(canPublish
+                    ...(prepareWithAi
                       ? [
                           {
                             type: 'element' as const,
                             tag: 'button' as const,
                             props: {
-                              label: pushNeeded
-                                ? 'Push & Publish'
-                                : metadataPublish
-                                  ? 'Republish metadata'
-                                  : 'Publish',
+                              label: 'Prepare release with AI',
                               className: 'web-button',
+                              tone: 'warning' as const,
                               action: {
-                                type: 'command' as const,
-                                command: 'plugins',
-                                subcommand: 'publish',
-                                arguments: { alias: entry.installed.alias },
-                                options: {},
-                                recordInTimeline: false,
-                                clientStatus: {
-                                  pending: `${pushNeeded ? 'Pushing and publishing' : 'Publishing'} ${entry.installed.alias} plugin...`,
-                                  success: `Published ${entry.installed.alias} plugin.`,
-                                },
+                                type: 'agentPrompt' as const,
+                                prompt: [
+                                  `Prepare the local AppWeaver plugin at ${entry.repositoryPath} for its first release.`,
+                                  `Read ${entry.repositoryPath}/AGENTS.md and ${entry.repositoryPath}/__BOTTOMUP.md first.`,
+                                  'Review the implementation, package metadata, capabilities, SVG icon, and documentation for consistency. Resolve readiness issues, run targeted lint, create the appropriate release commit, and ensure the package version tag points at HEAD. Do not publish or register remote repositories yet.',
+                                ].join('\n\n'),
+                                recordInTimeline: true,
                               },
                             },
                           },
                         ]
                       : []),
+                    ...(canPublish && firstPublish
+                      ? [
+                          {
+                            type: 'element' as const,
+                            tag: 'form' as const,
+                            props: {
+                              className:
+                                'web-form plugins-release-publish-form',
+                              formOptionFieldNames: ['signer'],
+                              action: {
+                                type: 'command' as const,
+                                command: 'plugins',
+                                subcommand: 'publish',
+                                arguments: {
+                                  alias: entry.installed.alias,
+                                },
+                                options: {},
+                                recordInTimeline: false,
+                                pendingUi: { presentation: 'none' as const },
+                                clientStatus: {
+                                  background: true,
+                                  activeTargetId: publishButtonId,
+                                  statusTargetId: publishStatusId,
+                                  pending: 'Preparing preview...',
+                                  success: 'Preview ready.',
+                                },
+                              },
+                            },
+                            children: [
+                              {
+                                type: 'element' as const,
+                                tag: 'select' as const,
+                                props: {
+                                  formFieldName: 'signer',
+                                  choices: entry.publishSigners.flatMap(
+                                    (signer) =>
+                                      signer.connectionName
+                                        ? [signer.connectionName]
+                                        : [],
+                                  ),
+                                  choiceLabels: Object.fromEntries(
+                                    entry.publishSigners.flatMap((signer) =>
+                                      signer.connectionName
+                                        ? [
+                                            [
+                                              signer.connectionName,
+                                              signer.label,
+                                            ],
+                                          ]
+                                        : [],
+                                    ),
+                                  ),
+                                  value: entry.suggestedSignerName ?? '',
+                                },
+                              },
+                              {
+                                type: 'element' as const,
+                                tag: 'button' as const,
+                                props: {
+                                  id: publishButtonId,
+                                  label: 'Publish',
+                                  className: 'web-button',
+                                  htmlType: 'submit' as const,
+                                },
+                              },
+                            ],
+                          },
+                        ]
+                      : canPublish
+                        ? [
+                            {
+                              type: 'element' as const,
+                              tag: 'button' as const,
+                              props: {
+                                id: publishButtonId,
+                                label: pushNeeded
+                                  ? 'Push & Publish'
+                                  : metadataPublish
+                                    ? 'Republish metadata'
+                                    : 'Publish',
+                                className: 'web-button',
+                                action: {
+                                  type: 'command' as const,
+                                  command: 'plugins',
+                                  subcommand: 'publish',
+                                  arguments: { alias: entry.installed.alias },
+                                  options: {},
+                                  recordInTimeline: false,
+                                  pendingUi: { presentation: 'none' as const },
+                                  clientStatus: {
+                                    background: true,
+                                    activeTargetId: publishButtonId,
+                                    statusTargetId: publishStatusId,
+                                    pending: 'Preparing preview...',
+                                    success: 'Preview ready.',
+                                  },
+                                },
+                              },
+                            },
+                          ]
+                        : []),
                   ],
                 },
               ]
             : []),
+          ...publishResult(entry),
         ],
       },
     ],
@@ -259,8 +485,6 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
 export function renderPluginsReleasesWeb(
   representation: PluginsReleasesRepresentation,
 ): WebNodeRoot {
-  const hidden = representation.installedCount - representation.matchedCount;
-
   return {
     kind: 'ui',
     version: 1,
@@ -272,18 +496,54 @@ export function renderPluginsReleasesWeb(
       children: [
         {
           type: 'element',
-          tag: 'text',
-          props: { weight: 'bold' },
-          children: [textNode('Plugin Releases')],
+          tag: 'row',
+          props: { className: 'plugins-releases-toolbar' },
+          children: [
+            {
+              type: 'element',
+              tag: 'text',
+              props: { weight: 'bold' },
+              children: [textNode('Plugin Releases')],
+            },
+            {
+              type: 'element',
+              tag: 'button',
+              props: {
+                id: RELEASES_RELOAD_BUTTON_ID,
+                label: 'Reload',
+                className: 'web-button',
+                action: {
+                  type: 'command',
+                  command: 'plugins',
+                  subcommand: 'releases',
+                  arguments: {},
+                  options: {},
+                  recordInTimeline: false,
+                  pendingUi: { presentation: 'none' as const },
+                  clientStatus: {
+                    background: true,
+                    activeTargetId: RELEASES_RELOAD_BUTTON_ID,
+                    statusTargetId: RELEASES_RELOAD_STATUS_ID,
+                    pending: 'Reloading...',
+                    success: 'Reloaded.',
+                  },
+                },
+              },
+            },
+          ],
         },
         textBlock(
-          `Matched ${representation.matchedCount}/${representation.installedCount} installed plugin(s) using ${representation.signerCount} signer(s) across ${representation.relays.length} relays.`,
+          `${representation.publishedCount}/${representation.installedCount} installed plugin(s) are published by ${representation.matchedSignerCount} matched author ${representation.matchedSignerCount === 1 ? 'identity' : 'identities'}. ${representation.unpublishedCount} not published.`,
           'muted',
         ),
-        ...(hidden > 0
+        textBlock(
+          `${representation.signerCount} available identities, including ${representation.bunkerSignerCount} bunker signer(s), across ${representation.relays.length} relays.`,
+          'muted',
+        ),
+        ...(representation.hiddenCount > 0
           ? [
               textBlock(
-                `Hidden non-authored/unknown plugin(s): ${hidden}`,
+                `Hidden plugin(s) published by unavailable authors: ${representation.hiddenCount}`,
                 'muted',
               ),
             ]

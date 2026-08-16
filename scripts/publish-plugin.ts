@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import { existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import * as readline from 'readline';
 
 import { SimplePool } from 'nostr-tools';
@@ -36,12 +36,10 @@ import {
 import type { CoreDb } from '@src/db';
 import { openCoreDb } from '@src/db';
 import {
-  createBlossomAuthBase64,
-  fetchBlossomServerUrls,
-  sha256Hex,
-  uploadBufferToServer,
-} from '@src/nostr/blossom';
-import { fetchNip65WriteRelays as fetchNip65WriteRelaysForPubkey } from '@src/nostr/nip65';
+  readPluginSvgIcon,
+  type PluginSvgIcon,
+  uploadPluginIcon,
+} from '@src/plugin-lifecycle/icon';
 
 import { connectBunker, bunkerSignEvent } from '../src/nostr/bunker';
 import {
@@ -55,7 +53,6 @@ import {
 const PLUGIN_KIND = 32107;
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
-const MAX_ICON_BYTES = 2 * 1024;
 
 const PROFILE_RELAYS = [
   'wss://purplepag.es',
@@ -112,11 +109,6 @@ type RefEntry = {
   changelog: string;
 };
 
-type SvgIcon = {
-  path: string;
-  data: Uint8Array;
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -137,118 +129,6 @@ function ask(question: string): Promise<string> {
 
 function getCoreApiVersion(pkg: PackageJson): string {
   return pkg.appweaver.coreApiVersion;
-}
-
-function readSvgIcon(pluginDir: string, iconPath: string): SvgIcon {
-  if (!iconPath.endsWith('.svg')) {
-    throw new Error('appweaver.icon must point to an .svg file.');
-  }
-
-  const pluginRoot = resolve(pluginDir);
-  const fullPath = resolve(pluginRoot, iconPath);
-
-  if (!fullPath.startsWith(`${pluginRoot}/`)) {
-    throw new Error('appweaver.icon must stay inside the plugin directory.');
-  }
-
-  if (!existsSync(fullPath)) {
-    throw new Error(`appweaver.icon file not found: ${fullPath}`);
-  }
-
-  const icon = readFileSync(fullPath);
-
-  if (icon.byteLength > MAX_ICON_BYTES) {
-    throw new Error(
-      `appweaver.icon must be ${MAX_ICON_BYTES} bytes or smaller; got ${icon.byteLength} bytes.`,
-    );
-  }
-
-  const text = icon.toString('utf8').trimStart();
-
-  if (!text.startsWith('<svg')) {
-    throw new Error(
-      'appweaver.icon must be an SVG file whose content starts with <svg.',
-    );
-  }
-
-  return { path: iconPath, data: Uint8Array.from(icon) };
-}
-
-async function uploadIconToBlossom(
-  pool: SimplePool,
-  bunkerData: BunkerSignerData,
-  icon: SvgIcon,
-): Promise<string> {
-  console.log('\nFetching Blossom servers...');
-
-  const relayUrls = await fetchNip65WriteRelaysForPubkey({
-    pool,
-    authorPubkey: bunkerData.remoteSignerPubkey,
-  });
-
-  const servers = await fetchBlossomServerUrls({
-    pool,
-    relayUrls,
-    authorPubkey: bunkerData.userPubkey,
-  });
-
-  if (servers.length === 0) {
-    throw new Error(
-      'No Blossom servers found (kind 10063) for this identity. Publish a Blossom server list first.',
-    );
-  }
-
-  const hashHex = await sha256Hex(icon.data);
-
-  const auth = await createBlossomAuthBase64({
-    action: 'upload',
-    xTags: [hashHex],
-    expirationSeconds: null,
-    signEvent: (template) => bunkerSignEvent(pool, bunkerData, template),
-  });
-
-  const results = await Promise.allSettled(
-    servers.map(async (server) => {
-      const descriptor = await uploadBufferToServer(
-        server,
-        icon.data,
-        'image/svg+xml',
-        auth,
-      );
-
-      return { server, url: descriptor.url };
-    }),
-  );
-
-  const succeeded = results.filter(
-    (
-      result,
-    ): result is PromiseFulfilledResult<{ server: string; url: string }> =>
-      result.status === 'fulfilled',
-  );
-
-  if (succeeded.length === 0) {
-    const messages = results
-      .filter(
-        (result): result is PromiseRejectedResult =>
-          result.status === 'rejected',
-      )
-      .map((result) =>
-        result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason),
-      );
-
-    throw new Error(
-      `Icon upload failed on all Blossom servers: ${messages.join('; ') || 'unknown error'}`,
-    );
-  }
-
-  console.log(
-    `✓ Icon uploaded to ${succeeded.length}/${servers.length} Blossom server(s).`,
-  );
-
-  return succeeded[0].value.url;
 }
 
 async function connectAndMaybeSave(
@@ -465,11 +345,14 @@ async function main(): Promise<void> {
   }
 
   const description = pkg.appweaver.description ?? pkg.description;
-  let icon: SvgIcon | null = null;
+  let icon: PluginSvgIcon | null = null;
 
   if (pkg.appweaver.icon) {
     try {
-      icon = readSvgIcon(pluginDir, pkg.appweaver.icon);
+      icon = readPluginSvgIcon({
+        pluginDir,
+        iconPath: pkg.appweaver.icon,
+      });
     } catch (err) {
       console.error(String(err));
       process.exit(1);
@@ -523,7 +406,7 @@ async function main(): Promise<void> {
 
   if (icon) {
     try {
-      iconUrl = await uploadIconToBlossom(pool, bunkerData, icon);
+      iconUrl = await uploadPluginIcon({ pool, bunkerData, icon });
       console.log(`Icon URL:       ${iconUrl}`);
     } catch (err) {
       console.error(`Icon upload failed: ${String(err)}`);

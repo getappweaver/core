@@ -1,7 +1,10 @@
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
 import { textBlock, textNode } from '@src/web/widgets';
 
-import type { PluginsPublishRepresentation } from '../handler';
+import type {
+  PluginsPublishPreviewRepresentation,
+  PluginsPublishRepresentation,
+} from '../handler';
 
 const pluginsPublishStylesheet = {
   id: 'plugins-publish-web',
@@ -16,12 +19,167 @@ const pluginsPublishStylesheet = {
     }
 
     .web-row.plugins-publish-title-row,
-    .web-row.plugins-publish-relay-row {
+    .web-row.plugins-publish-relay-row,
+    .web-row.plugins-publish-actions {
       align-items: center;
       gap: 0.45rem;
     }
+
+    .web-row.plugins-publish-actions {
+      flex-wrap: wrap;
+    }
+
+    .web-stack.plugins-publish-preview {
+      gap: 0.35rem;
+    }
   `,
 } as const;
+
+export function renderPluginsPublishPreviewWeb(
+  representation: PluginsPublishPreviewRepresentation,
+): WebNodeRoot {
+  const confirmButtonId = `plugins-publish-confirm-${representation.alias}`;
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'plugins', subcommand: 'publish' },
+    tree: {
+      type: 'element',
+      tag: 'box',
+      props: { padding: 'md', className: 'plugins-publish-card' },
+      children: [
+        {
+          type: 'element',
+          tag: 'stack',
+          props: { className: 'plugins-publish-preview' },
+          children: [
+            {
+              type: 'element',
+              tag: 'row',
+              props: { className: 'plugins-publish-title-row' },
+              children: [
+                {
+                  type: 'element',
+                  tag: 'text',
+                  props: { weight: 'bold' },
+                  children: [textNode(`Review ${representation.title}`)],
+                },
+                {
+                  type: 'element',
+                  tag: 'badge',
+                  props: {
+                    label: representation.firstPublish
+                      ? 'first publication'
+                      : representation.versionTag,
+                    tone: 'warning',
+                    size: 'sm',
+                  },
+                },
+              ],
+            },
+            textBlock(`Package: ${representation.pluginName}`, 'muted'),
+            textBlock(`Version: ${representation.versionTag}`, 'muted'),
+            textBlock(
+              `Signer: bunker ${representation.signerName} (${representation.signerPubkey.slice(0, 12)}...)`,
+              'muted',
+            ),
+            textBlock(`Repository: ${representation.repo}`, 'muted'),
+            textBlock(`Core API: ${representation.coreApiVersion}`, 'muted'),
+            ...(representation.website
+              ? [textBlock(`Website: ${representation.website}`, 'muted')]
+              : []),
+            textBlock(
+              representation.iconPath
+                ? `Icon: validate and upload ${representation.iconPath} to Blossom`
+                : 'Icon: none configured',
+              'muted',
+            ),
+            textBlock(`Description: ${representation.description}`, 'muted'),
+            textBlock(
+              `Capabilities: ${JSON.stringify(representation.capabilities)}`,
+              'muted',
+            ),
+            ...representation.refs.map((ref) =>
+              textBlock(
+                `${ref.tag} · core ${ref.coreApiVersion} · ${ref.changelog}`,
+                'muted',
+              ),
+            ),
+            textBlock(`Relays: ${representation.relays.join(', ')}`, 'muted'),
+            textBlock(
+              representation.firstPublish
+                ? 'Confirming will register the Nostr repository if needed, push the branch and tags, upload the icon, sign the catalog event, and publish it.'
+                : 'Confirming will push and verify Git refs, upload the icon when configured, sign the updated catalog event, and publish it.',
+              'warning',
+            ),
+            {
+              type: 'element',
+              tag: 'row',
+              props: { className: 'plugins-publish-actions' },
+              children: [
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: {
+                    id: confirmButtonId,
+                    label: representation.firstPublish
+                      ? 'Register & Publish'
+                      : 'Confirm Publish',
+                    className: 'web-button',
+                    tone: 'warning',
+                    action: {
+                      type: 'command',
+                      command: 'plugins',
+                      subcommand: 'publish',
+                      arguments: { alias: representation.alias },
+                      options: {
+                        signer: representation.signerName,
+                        confirm: true,
+                      },
+                      recordInTimeline: false,
+                      refresh: {
+                        command: 'plugins',
+                        subcommand: 'releases',
+                        arguments: {},
+                        options: {},
+                        recordInTimeline: false,
+                      },
+                      pendingUi: { presentation: 'none' },
+                      clientStatus: {
+                        background: true,
+                        activeTargetId: confirmButtonId,
+                        pending: 'Publishing...',
+                        success: 'Published.',
+                      },
+                    },
+                  },
+                },
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: {
+                    label: 'Cancel',
+                    className: 'web-button',
+                    action: {
+                      type: 'command',
+                      command: 'plugins',
+                      subcommand: 'releases',
+                      arguments: {},
+                      options: {},
+                      recordInTimeline: false,
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    stylesheets: [pluginsPublishStylesheet],
+  };
+}
 
 function statusTone(
   status: PluginsPublishRepresentation['status'],

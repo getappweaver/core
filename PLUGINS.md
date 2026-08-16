@@ -79,26 +79,22 @@ Currently manual:
 
 ### Scaffolding a new plugin (local dev)
 
-To start from the built-in template inside this repo:
+In the `appweaver` workspace, run `/plugins new` to open the creation form. The form creates `plugins/<alias>/`, preserves the template `AGENTS.md`, initializes its nested Git repository, adds a `local://plugins/<alias>` entry to `plugins.json`, regenerates plugin registration, and offers a **Develop with AI** action.
+
+The equivalent interactive CLI is:
 
 ```bash
 bun run plugin:new
 ```
 
-The script prompts for:
+The form and script collect:
 
 - **Alias** (required) — folder name and command token (e.g. `todo` → `plugins/todo/`, `/todo …` with default DM prefix)
+- **Title** (optional) — human-readable app name
 - **Short description** (optional) — defaults to a sensible string from the alias
 - **Core API version** (optional) — defaults from the current AppWeaver major version in root `package.json`
 
-It copies `scripts/plugin-template/` into `plugins/<alias>/`, expanding placeholders (`{{ALIAS}}`, `{{PASCAL_ALIAS}}`, etc.). It can optionally run `eslint` with `--fix` **only** for that new folder.
-
-**It does not** edit `plugins.json` or run `bun run plugin:generate`. After you’re ready to wire the plugin into this checkout:
-
-1. Add an entry to `plugins.json`
-2. Run `bun run plugin:generate` (registers the plugin and CLI/skill outputs)
-
-For a distributable plugin, treat the scaffold as a starting point: finish features, then publish from its own git repo as described under [Publishing a plugin](#publishing-a-plugin).
+Treat the scaffold as a starting point. Develop and review the product, then use `/plugins releases` to prepare and publish it.
 
 ### Plugin structure
 
@@ -144,15 +140,24 @@ Older in-tree plugins may add `output/`, web renderers, or extra `db/` modules; 
   "name": "appweaver-todo-plugin",
   "version": "1.0.1",
   "description": "Todo management plugin for AppWeaver",
-  "dmBot": {
-    "coreApiVersion": "5",
-    "description": "Todo management plugin for AppWeaver"
+  "appweaver": {
+    "title": "Todos",
+    "icon": "icon.svg",
+    "coreApiVersion": "^11.0.0",
+    "description": "Todo management plugin for AppWeaver",
+    "capabilities": {
+      "provides": [],
+      "uses": [],
+      "requires": []
+    }
   }
 }
 ```
 
-- `dmBot.coreApiVersion` — bot core major version (or range) this release supports; used by the installer for compatibility.
-- `dmBot.description` — short description used in plugin help and when publishing to Nostr; required for registration.
+- `appweaver.coreApiVersion` — compatible AppWeaver core range used by the installer.
+- `appweaver.description` — package and catalog description.
+- `appweaver.icon` — optional SVG path, validated and uploaded during publication.
+- `appweaver.capabilities` — NIP-32 capability relations published with the catalog event.
 
 ### `init.ts` — the plugin object
 
@@ -225,9 +230,25 @@ Plugins that mutate data should use a draft/confirm pattern — the AI proposes 
 
 ### Publishing a plugin
 
-#### 1. Tag your release
+Use `/plugins releases` to review the complete lifecycle state. Local plugins show Git cleanliness, branch and tag readiness, repository state, package metadata, and matching signer identities.
 
-Bump the version in `package.json`:
+For an unfinished local plugin, **Prepare release with AI** asks the agent to review the implementation, metadata, capabilities, icon, and documentation before creating the release commit and version tag.
+
+When ready, **Publish** opens a read-only preview containing the signer, repository address, package metadata, capability relations, release refs, icon action, and target relays. The final **Register & Publish** confirmation can:
+
+- Register the NIP-34 repository and configure the Nostr origin
+- Push and verify the branch and version tags
+- Validate and upload `appweaver.icon` to the author's Blossom servers
+- Sign and publish the kind `32107` catalog event through the selected bunker
+- Replace the local manifest repository with the final `nostr://` address
+
+The CLI publisher remains available for manual workflows:
+
+```bash
+bun run plugin:publish <alias>
+```
+
+Before publishing, bump the version in `package.json` and ensure its corresponding tag points at `HEAD`:
 
 ```json
 {
@@ -235,20 +256,11 @@ Bump the version in `package.json`:
 }
 ```
 
-Then tag and push:
+For example:
 
 ```bash
 git tag -a v1.0.1 -m "Release v1.0.1"
-git push origin v1.0.1
 ```
-
-#### 2. Publish the Nostr event
-
-```bash
-bun run plugin:publish
-```
-
-This reads your `package.json`, fetches the existing kind `32107` event from relays (if any), appends the new ref, and republishes. You sign with a NIP-46 bunker — your key never leaves your signer app.
 
 The published event looks like:
 

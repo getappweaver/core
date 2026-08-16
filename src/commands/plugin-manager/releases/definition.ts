@@ -6,7 +6,7 @@ export function getPluginsReleasesSubcommandDefinition(
   return {
     name: 'releases',
     summary:
-      'List installed plugins whose published plugin events match a local signer.',
+      'Review local plugin development, release, and publication readiness.',
     aliases: ['release', 'publish-status'],
     arguments: [],
     options: [],

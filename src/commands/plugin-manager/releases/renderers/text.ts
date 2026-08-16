@@ -10,6 +10,10 @@ type RenderPluginsReleasesTextContext = {
 
 function statusLabel(status: PluginReleaseStatus): string {
   switch (status) {
+    case 'local-draft':
+      return 'local draft';
+    case 'not-published':
+      return 'not published';
     case 'published-ok':
       return 'ok';
     case 'publish-needed':
@@ -43,8 +47,17 @@ function entryLine(entry: PluginReleaseEntry): string {
   return [
     `${entry.installed.alias}:`,
     `local ${entry.localVersion ?? '(unknown)'}`,
-    `published ${entry.published.version || '(unknown)'}`,
-    `author via ${entry.authorSigner.label}`,
+    entry.published
+      ? `published ${entry.published.version || '(unknown)'}`
+      : 'not published',
+    entry.authorSigner
+      ? `author via ${entry.authorSigner.label}`
+      : entry.publishSigners.length > 0
+        ? `first-publish signer ${entry.publishSigners
+            .map((signer) => signer.connectionName)
+            .filter(Boolean)
+            .join(', ')}`
+        : 'no matching bunker signer',
     entry.git.changedFileCount === 0
       ? 'clean'
       : `${entry.git.stagedFileCount} staged, ${entry.git.unstagedFileCount} unstaged`,
@@ -59,11 +72,11 @@ export function renderPluginsReleasesText(
   representation: PluginsReleasesRepresentation,
   context: RenderPluginsReleasesTextContext,
 ): string {
-  const hidden = representation.installedCount - representation.matchedCount;
-
   const header = [
     'Plugin releases',
-    `Matched ${representation.matchedCount}/${representation.installedCount} installed plugin(s) using ${representation.signerCount} signer(s).`,
+    `${representation.publishedCount}/${representation.installedCount} installed plugin(s) are published by ${representation.matchedSignerCount} matched author ${representation.matchedSignerCount === 1 ? 'identity' : 'identities'}.`,
+    `${representation.unpublishedCount} plugin(s) are not published.`,
+    `${representation.signerCount} available identities, including ${representation.bunkerSignerCount} bunker signer(s).`,
     `Relays: ${representation.relays.join(', ')}`,
   ].join('\n');
 
@@ -71,14 +84,18 @@ export function renderPluginsReleasesText(
     return [
       header,
       '',
-      'No installed plugins matched the available author signers.',
+      'No local plugins can be managed with the available author signers.',
       `Add a bunker signer with ${context.prefix}bunker add, then try again.`,
     ].join('\n');
   }
 
   return [
     header,
-    ...(hidden > 0 ? [`Hidden non-authored/unknown plugin(s): ${hidden}`] : []),
+    ...(representation.hiddenCount > 0
+      ? [
+          `Hidden plugin(s) published by unavailable authors: ${representation.hiddenCount}`,
+        ]
+      : []),
     '',
     ...representation.entries.map(entryLine),
   ].join('\n');

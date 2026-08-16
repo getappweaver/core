@@ -24,11 +24,11 @@ import { openDb } from './db';
 const pluginDir = import.meta.dir;
 const alias = basename(pluginDir);
 
-const {{ALIAS}}Pkg = parsePluginPackageJson({ pluginDir });
+const {{IDENTIFIER_ALIAS}}Pkg = parsePluginPackageJson({ pluginDir });
 
-if (!{{ALIAS}}Pkg) {
+if (!{{IDENTIFIER_ALIAS}}Pkg) {
   throw new Error(
-    `{{PASCAL_ALIAS}} plugin: invalid or missing package.json. Required: name, version, dmBot.coreApiVersion, dmBot.description`,
+    `{{PASCAL_ALIAS}} plugin: invalid or missing package.json. Required: name, version, appweaver.coreApiVersion, appweaver.description, appweaver.capabilities`,
   );
 }
 
@@ -37,10 +37,10 @@ export let {{PASCAL_ALIAS}}PluginDb: Database | null = null;
 
 export const {{PASCAL_ALIAS}}Plugin: BotPlugin = {
   identity: {
-    name: {{ALIAS}}Pkg.name,
+    name: {{IDENTIFIER_ALIAS}}Pkg.name,
     alias,
-    version: {{ALIAS}}Pkg.version,
-    description: {{ALIAS}}Pkg.description,
+    version: {{IDENTIFIER_ALIAS}}Pkg.version,
+    description: {{IDENTIFIER_ALIAS}}Pkg.description,
   },
   handler: async (
     args: string[],

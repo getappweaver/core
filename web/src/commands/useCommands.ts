@@ -137,6 +137,16 @@ function taskbarLoadingWeb(command: string, subcommand: string): WebNodeRoot {
   };
 }
 
+function showsTimelineLoadingWidget(
+  command: string,
+  subcommand: string,
+): boolean {
+  return (
+    command === 'plugins' &&
+    ['releases', 'release', 'publish-status'].includes(subcommand)
+  );
+}
+
 function timelineEventOutputToItem(
   output: TimelineEventOutput,
   id: string,
@@ -2387,6 +2397,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     const requestId = adapters.createId();
     const isTaskbar = adapters.isTaskbarSubcommand(command, subcommand.name);
 
+    const loadingTimelineItemId =
+      !isTaskbar && showsTimelineLoadingWidget(command, subcommand.name)
+        ? adapters.createId()
+        : null;
+
     const browserTrace = subcommand.monitoring
       ? createBrowserTrace({
           name: subcommand.monitoring.name,
@@ -2434,15 +2449,37 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         visible: true,
       });
     } else {
-      adapters.setTimeline((prev) => [
-        ...prev,
-        {
-          id: adapters.createId(),
-          type: 'chat',
-          role: 'user',
-          text: summarizeInvocation(command, subcommand.name, values),
-        },
-      ]);
+      adapters.setTimeline((prev) => {
+        const next: TimelineItem[] = [
+          ...prev,
+          {
+            id: adapters.createId(),
+            type: 'chat',
+            role: 'user',
+            text: summarizeInvocation(command, subcommand.name, values),
+          },
+        ];
+
+        if (loadingTimelineItemId) {
+          next.push({
+            id: loadingTimelineItemId,
+            type: 'command_result',
+            command,
+            subcommand: subcommand.name,
+            subcommandTag: getResultSubcommandTag(
+              command,
+              subcommand.name,
+              values,
+            ),
+            values,
+            text: null,
+            web: taskbarLoadingWeb(command, subcommand.name),
+            clientView: null,
+          });
+        }
+
+        return next;
+      });
     }
 
     adapters.pendingRequests.set(requestId, {
@@ -2474,24 +2511,29 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             visible: true,
           });
         } else {
-          adapters.setTimeline((prev) => [
-            ...prev,
-            {
-              id: adapters.createId(),
-              type: 'command_result',
+          const resultItem: TimelineItem = {
+            id: loadingTimelineItemId ?? adapters.createId(),
+            type: 'command_result',
+            command,
+            subcommand: subcommand.name,
+            subcommandTag: getResultSubcommandTag(
               command,
-              subcommand: subcommand.name,
-              subcommandTag: getResultSubcommandTag(
-                command,
-                subcommand.name,
-                values,
-              ),
+              subcommand.name,
               values,
-              text: output.text,
-              web: output.web,
-              clientView: output.clientView,
-            },
-          ]);
+            ),
+            values,
+            text: output.text,
+            web: output.web,
+            clientView: output.clientView,
+          };
+
+          adapters.setTimeline((prev) =>
+            loadingTimelineItemId
+              ? prev.map((item) =>
+                  item.id === loadingTimelineItemId ? resultItem : item,
+                )
+              : [...prev, resultItem],
+          );
         }
 
         updateSpan?.end();
@@ -2538,6 +2580,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       },
       onError: () => {
         finishTrace('error');
+
+        if (loadingTimelineItemId) {
+          adapters.setTimeline((prev) =>
+            prev.filter((item) => item.id !== loadingTimelineItemId),
+          );
+        }
 
         if (adapters.pendingPromptRequestId() === requestId) {
           adapters.setPendingPromptRequestId(null);

@@ -218,7 +218,15 @@ function renderElement({
               >
                 <Show
                   when={(element.children ?? []).length > 0}
-                  fallback={element.props?.label ?? ''}
+                  fallback={
+                    isBackgroundCommandTargetActive(element)
+                      ? ((element.props?.action?.type === 'command'
+                          ? element.props.action.clientStatus?.pending
+                          : null) ??
+                        element.props?.label ??
+                        '')
+                      : (element.props?.label ?? '')
+                  }
                 >
                   <For each={element.children ?? []}>{renderChild}</For>
                 </Show>

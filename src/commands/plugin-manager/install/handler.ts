@@ -68,6 +68,7 @@ export type PluginCatalogEntry = {
   name: string;
   title: string;
   icon: string;
+  iconSource: string;
   website: string;
   description: string;
   version: string;
@@ -162,6 +163,8 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
       changelog: tag[3],
     }));
 
+  const iconTag = event.tags.find((tag) => tag[0] === 'icon');
+
   return {
     id: event.id,
     createdAt: event.created_at,
@@ -169,6 +172,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     name,
     title: tagValue(event.tags, 'title'),
     icon: tagValue(event.tags, 'icon'),
+    iconSource: iconTag?.[2] ?? '',
     website: tagValue(event.tags, 'website'),
     description: event.content,
     version: tagValue(event.tags, 'version'),

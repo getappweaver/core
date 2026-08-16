@@ -23,7 +23,7 @@ function rowTo{{PASCAL_ALIAS}}(row: Record<string, unknown>): {{PASCAL_ALIAS}} {
 
 export function create{{PASCAL_ALIAS}}Table(db: DatabaseType): void {
   db.run(`
-    CREATE TABLE IF NOT EXISTS {{ALIAS}}s (
+    CREATE TABLE IF NOT EXISTS {{SQL_ALIAS}}s (
       id         INTEGER PRIMARY KEY,
       data       TEXT    NOT NULL,
       created_at INTEGER NOT NULL
@@ -38,7 +38,7 @@ export function create{{PASCAL_ALIAS}}(
   const now = Date.now();
 
   const info = db.run(
-    `INSERT INTO {{ALIAS}}s (data, created_at) VALUES (?, ?)`,
+    `INSERT INTO {{SQL_ALIAS}}s (data, created_at) VALUES (?, ?)`,
     [input.data, now],
   );
 
@@ -51,7 +51,7 @@ export function get{{PASCAL_ALIAS}}(
   db: DatabaseType,
   id: number,
 ): {{PASCAL_ALIAS}} | null {
-  const row = db.prepare('SELECT * FROM {{ALIAS}}s WHERE id = ?').get(id) as
+  const row = db.prepare('SELECT * FROM {{SQL_ALIAS}}s WHERE id = ?').get(id) as
     | Record<string, unknown>
     | undefined;
 
@@ -59,7 +59,7 @@ export function get{{PASCAL_ALIAS}}(
 }
 
 export function list{{PASCAL_ALIAS}}s(db: DatabaseType): {{PASCAL_ALIAS}}[] {
-  const rows = db.prepare('SELECT * FROM {{ALIAS}}s ORDER BY id').all() as Record<
+  const rows = db.prepare('SELECT * FROM {{SQL_ALIAS}}s ORDER BY id').all() as Record<
     string,
     unknown
   >[];
@@ -78,7 +78,7 @@ export function update{{PASCAL_ALIAS}}(
   }
 
   if (input.data !== undefined) {
-    db.run('UPDATE {{ALIAS}}s SET data = ? WHERE id = ?', [
+    db.run('UPDATE {{SQL_ALIAS}}s SET data = ? WHERE id = ?', [
       input.data,
       input.id,
     ]);
@@ -88,7 +88,7 @@ export function update{{PASCAL_ALIAS}}(
 }
 
 export function delete{{PASCAL_ALIAS}}(db: DatabaseType, id: number): boolean {
-  const info = db.prepare('DELETE FROM {{ALIAS}}s WHERE id = ?').run(id);
+  const info = db.prepare('DELETE FROM {{SQL_ALIAS}}s WHERE id = ?').run(id);
 
   return info.changes > 0;
 }

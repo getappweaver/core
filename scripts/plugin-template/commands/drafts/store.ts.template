@@ -34,7 +34,7 @@ export type {{PASCAL_ALIAS}}DraftRow = {{PASCAL_ALIAS}}DraftEntry & {
 
 export function create{{PASCAL_ALIAS}}DraftsTable(db: Database): void {
   db.run(`
-    CREATE TABLE IF NOT EXISTS {{ALIAS}}_drafts (
+    CREATE TABLE IF NOT EXISTS {{SQL_ALIAS}}_drafts (
       id              INTEGER PRIMARY KEY,
       kind            TEXT NOT NULL,
       input           TEXT NOT NULL,
@@ -47,7 +47,7 @@ export function create{{PASCAL_ALIAS}}DraftsTable(db: Database): void {
 export function storeDraft(db: Database, entry: {{PASCAL_ALIAS}}DraftEntry): number {
   const now = Date.now();
   const info = db.run(
-    `INSERT INTO {{ALIAS}}_drafts (kind, input, original_prompt, created_at) VALUES (?, ?, ?, ?)`,
+    `INSERT INTO {{SQL_ALIAS}}_drafts (kind, input, original_prompt, created_at) VALUES (?, ?, ?, ?)`,
     [entry.kind, JSON.stringify(entry.input), entry.originalPrompt, now],
   );
 
@@ -55,7 +55,7 @@ export function storeDraft(db: Database, entry: {{PASCAL_ALIAS}}DraftEntry): num
 }
 
 export function getDraft(db: Database, id: number): {{PASCAL_ALIAS}}DraftRow | null {
-  const row = db.prepare('SELECT * FROM {{ALIAS}}_drafts WHERE id = ?').get(id) as
+  const row = db.prepare('SELECT * FROM {{SQL_ALIAS}}_drafts WHERE id = ?').get(id) as
     | Record<string, unknown>
     | undefined;
 
@@ -68,14 +68,14 @@ export function getDraft(db: Database, id: number): {{PASCAL_ALIAS}}DraftRow | n
 
 export function listDrafts(db: Database): {{PASCAL_ALIAS}}DraftRow[] {
   const rows = db
-    .prepare('SELECT * FROM {{ALIAS}}_drafts ORDER BY id')
+    .prepare('SELECT * FROM {{SQL_ALIAS}}_drafts ORDER BY id')
     .all() as Record<string, unknown>[];
 
   return rows.map(rowToDraft);
 }
 
 export function deleteDraft(db: Database, id: number): boolean {
-  return db.prepare('DELETE FROM {{ALIAS}}_drafts WHERE id = ?').run(id).changes > 0;
+  return db.prepare('DELETE FROM {{SQL_ALIAS}}_drafts WHERE id = ?').run(id).changes > 0;
 }
 
 function rowToDraft(row: Record<string, unknown>): {{PASCAL_ALIAS}}DraftRow {
