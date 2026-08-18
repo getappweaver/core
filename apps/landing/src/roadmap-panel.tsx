@@ -44,7 +44,7 @@ import {
 import {
   loadRoadmapSnapshot,
   type RoadmapTarget,
-} from './roadmap-loader';
+} from '@src/roadmap';
 
 const DEFAULT_ROADMAP_LNURLP_DEV =
   'https://getappweaver.com/.well-known/lnurlp/donations_test';
@@ -247,6 +247,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
       const snapshot = await loadRoadmapSnapshot({
         target: props.target,
         boardKey: props.boardKey,
+        pool: null
       });
 
       if (!mounted) {

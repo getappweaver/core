@@ -23,24 +23,22 @@ import {
   PROFILE_RELAYS_FOR_QUERY,
 } from '@src/nostr/nip65';
 
+import type { RoadmapSnapshot, RoadmapTarget } from './types';
+
 const QUERY_MAX_WAIT_MS = 4_000;
 const EVENT_LIMIT = 500;
 const FILTER_VALUE_CHUNK_SIZE = 100;
 
-export type RoadmapTarget = {
-  ownerPubkey: string;
-  repoId: string;
-  relayHints: string[];
-};
-
-export type RoadmapSnapshot = {
-  events: NostrEvent[];
-  relays: string[];
-};
-
 type LoadRoadmapSnapshotProps = {
   target: RoadmapTarget;
-  boardKey: string;
+  boardKey: string | null;
+  pool: SimplePool | null;
+};
+
+type LoadRoadmapSnapshotsProps = {
+  targets: RoadmapTarget[];
+  boardKey: string | null;
+  pool: SimplePool | null;
 };
 
 function uniqueEvents(events: NostrEvent[]): NostrEvent[] {
@@ -104,10 +102,13 @@ function chunks(values: string[]): string[][] {
 export async function loadRoadmapSnapshot({
   target,
   boardKey,
+  pool: externalPool,
 }: LoadRoadmapSnapshotProps): Promise<RoadmapSnapshot> {
-  const pool = new SimplePool();
+  const pool = externalPool ?? new SimplePool();
+  const ownsPool = externalPool === null;
   const openedRelays = new Set<string>();
   const targetRelays = uniqueRoadmapRelays(target.relayHints);
+
   const discoveryRelays = uniqueRoadmapRelays([
     ...targetRelays,
     ...PROFILE_RELAYS_FOR_QUERY,
@@ -141,6 +142,7 @@ export async function loadRoadmapSnapshot({
         { maxWait: QUERY_MAX_WAIT_MS },
       ),
     ]);
+
     const project = latestEvent(projectEvents);
 
     if (!project) {
@@ -157,14 +159,12 @@ export async function loadRoadmapSnapshot({
     }
 
     const repoRelays = repoRelaysForProject(project, relayListsByPubkey);
-    const dataRelays = uniqueRoadmapRelays([
-      ...targetRelays,
-      ...repoRelays,
-    ]);
+    const dataRelays = uniqueRoadmapRelays([...targetRelays, ...repoRelays]);
 
     dataRelays.forEach((relay) => openedRelays.add(relay));
 
     const projectAddress = `${PROJECT_KIND}:${target.ownerPubkey}:${target.repoId}`;
+
     const [workflowEvents, issueEvents, activityEvents, pluginEvents] =
       await Promise.all([
         pool.querySync(
@@ -211,22 +211,28 @@ export async function loadRoadmapSnapshot({
           { maxWait: QUERY_MAX_WAIT_MS },
         ),
       ]);
-    const workflows = uniqueEvents(workflowEvents);
-    const requestedWorkflow = workflows.find(
-      (event) => tagValues(event, 'd')[0] === boardKey,
-    );
 
-    if (!requestedWorkflow) {
-      throw new Error(
-        `Roadmap workflow ${boardKey} was not found for repository ${target.repoId}.`,
+    const workflows = uniqueEvents(workflowEvents);
+
+    if (boardKey !== null) {
+      const requestedWorkflow = workflows.find(
+        (event) => tagValues(event, 'd')[0] === boardKey,
       );
+
+      if (!requestedWorkflow) {
+        throw new Error(
+          `Roadmap workflow ${boardKey} was not found for repository ${target.repoId}.`,
+        );
+      }
     }
 
     const workflowAddresses = workflows
       .map(eventAddress)
       .filter((address): address is string => address !== null);
+
     const issueIds = uniqueEvents(issueEvents).map((event) => event.id);
     const trackerAddressValues = [projectAddress, ...workflowAddresses];
+
     const [trackerGroups, dependentGroups] = await Promise.all([
       Promise.all(
         chunks(trackerAddressValues).map((addresses) =>
@@ -242,20 +248,23 @@ export async function loadRoadmapSnapshot({
           ),
         ),
       ),
-      Promise.all(
-        chunks(issueIds).map((ids) =>
-          pool.querySync(
-            dataRelays,
-            {
-              kinds: [DELETE_KIND, ZAP_KIND],
-              '#e': ids,
-              limit: EVENT_LIMIT,
-            },
-            { maxWait: QUERY_MAX_WAIT_MS },
-          ),
-        ),
-      ),
+      issueIds.length > 0
+        ? Promise.all(
+            chunks(issueIds).map((ids) =>
+              pool.querySync(
+                dataRelays,
+                {
+                  kinds: [DELETE_KIND, ZAP_KIND],
+                  '#e': ids,
+                  limit: EVENT_LIMIT,
+                },
+                { maxWait: QUERY_MAX_WAIT_MS },
+              ),
+            ),
+          )
+        : Promise.resolve([] as NostrEvent[][]),
     ]);
+
     const graphEvents = uniqueEvents([
       project,
       ...(relayList ? [relayList] : []),
@@ -266,6 +275,7 @@ export async function loadRoadmapSnapshot({
       ...trackerGroups.flat(),
       ...dependentGroups.flat(),
     ]);
+
     const relevantAuthorPubkeys = [
       ...new Set(
         graphEvents
@@ -279,6 +289,7 @@ export async function loadRoadmapSnapshot({
           .map((event) => event.pubkey),
       ),
     ];
+
     const profileRelays = uniqueRoadmapRelays([
       ...dataRelays,
       ...PROFILE_RELAYS_FOR_QUERY,
@@ -286,19 +297,23 @@ export async function loadRoadmapSnapshot({
 
     profileRelays.forEach((relay) => openedRelays.add(relay));
 
-    const profileGroups = await Promise.all(
-      chunks(relevantAuthorPubkeys).map((authors) =>
-        pool.querySync(
-          profileRelays,
-          {
-            kinds: [PROFILE_KIND],
-            authors,
-            limit: authors.length,
-          },
-          { maxWait: QUERY_MAX_WAIT_MS },
-        ),
-      ),
-    );
+    const profileGroups =
+      relevantAuthorPubkeys.length > 0
+        ? await Promise.all(
+            chunks(relevantAuthorPubkeys).map((authors) =>
+              pool.querySync(
+                profileRelays,
+                {
+                  kinds: [PROFILE_KIND],
+                  authors,
+                  limit: authors.length,
+                },
+                { maxWait: QUERY_MAX_WAIT_MS },
+              ),
+            ),
+          )
+        : [];
+
     const profiles = latestEventsByPubkey(uniqueEvents(profileGroups.flat()));
 
     return {
@@ -306,6 +321,29 @@ export async function loadRoadmapSnapshot({
       relays: repoRelays.length > 0 ? repoRelays : dataRelays,
     };
   } finally {
-    pool.close([...openedRelays]);
+    if (ownsPool) {
+      pool.close([...openedRelays]);
+    }
   }
+}
+
+export async function loadRoadmapSnapshots({
+  targets,
+  boardKey,
+  pool,
+}: LoadRoadmapSnapshotsProps): Promise<RoadmapSnapshot> {
+  if (targets.length === 0) {
+    return { events: [], relays: [] };
+  }
+
+  const snapshots = await Promise.all(
+    targets.map((target) => loadRoadmapSnapshot({ target, boardKey, pool })),
+  );
+
+  return {
+    events: uniqueEvents(snapshots.flatMap((snapshot) => snapshot.events)),
+    relays: uniqueRoadmapRelays(
+      snapshots.flatMap((snapshot) => snapshot.relays),
+    ),
+  };
 }
