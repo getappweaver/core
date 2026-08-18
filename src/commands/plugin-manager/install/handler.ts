@@ -68,6 +68,7 @@ export type PluginCatalogEntry = {
   name: string;
   title: string;
   icon: string;
+  iconUrl: string;
   iconSource: string;
   website: string;
   description: string;
@@ -172,6 +173,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     name,
     title: tagValue(event.tags, 'title'),
     icon: tagValue(event.tags, 'icon'),
+    iconUrl: tagValue(event.tags, 'icon'),
     iconSource: iconTag?.[2] ?? '',
     website: tagValue(event.tags, 'website'),
     description: event.content,

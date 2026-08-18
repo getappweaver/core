@@ -37,7 +37,9 @@ function entryLine(entry: PluginReleaseEntry): string {
   const remotes = entry.git.remotes
     .map((remote) =>
       !remote.configured
-        ? `${remote.name} missing`
+        ? remote.required
+          ? `${remote.name} missing`
+          : `${remote.name} optional`
         : remote.branchReady && remote.tagReady
           ? `${remote.name} ready`
           : `${remote.name} push needed`,

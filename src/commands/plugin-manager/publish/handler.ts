@@ -249,7 +249,7 @@ export function pluginMetadataMatchesPackage({
 
   const iconMatches = icon
     ? published.iconSource === icon.path &&
-      published.icon.includes(iconHash ?? '')
+      published.iconUrl.includes(iconHash ?? '')
     : true;
 
   return (
@@ -940,7 +940,7 @@ export async function handlePluginsPublish(
         bunkerData: connection.data,
         icon,
       })
-    : published?.icon || null;
+    : published?.iconUrl || null;
 
   const template = buildEventTemplate({ pkg, repo, refs, iconUrl });
   const signed = await bunkerSignEvent(ctx.pool, connection.data, template);

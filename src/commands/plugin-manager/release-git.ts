@@ -4,8 +4,11 @@ const RELEASE_REMOTES = ['origin', 'github'] as const;
 
 type ReleaseRemoteName = (typeof RELEASE_REMOTES)[number];
 
+const REQUIRED_RELEASE_REMOTES = new Set<ReleaseRemoteName>(['origin']);
+
 export type PluginReleaseRemoteState = {
   name: ReleaseRemoteName;
+  required: boolean;
   configured: boolean;
   branchReady: boolean;
   tagReady: boolean;
@@ -62,10 +65,12 @@ function remoteState({
   head: string;
 }): PluginReleaseRemoteState {
   const configured = runGit(pluginDir, ['remote', 'get-url', name]).ok;
+  const required = REQUIRED_RELEASE_REMOTES.has(name);
 
   if (!configured || branch === null) {
     return {
       name,
+      required,
       configured,
       branchReady: false,
       tagReady: false,
@@ -87,6 +92,7 @@ function remoteState({
   if (!refs.ok) {
     return {
       name,
+      required,
       configured: true,
       branchReady: false,
       tagReady: false,
@@ -107,6 +113,7 @@ function remoteState({
 
   return {
     name,
+    required,
     configured: true,
     branchReady: hashes.get(branchRef) === head,
     tagReady:
@@ -201,7 +208,13 @@ export function pushPluginRelease({
 
   for (const remote of state.remotes) {
     if (!remote.configured) {
-      throw new Error(`Required git remote is not configured: ${remote.name}`);
+      if (remote.required) {
+        throw new Error(
+          `Required git remote is not configured: ${remote.name}`,
+        );
+      }
+
+      continue;
     }
 
     const pushed = runGit(pluginDir, [
@@ -219,7 +232,7 @@ export function pushPluginRelease({
   const verified = inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
 
   const incomplete = verified.remotes.filter(
-    (remote) => !remote.branchReady || !remote.tagReady,
+    (remote) => remote.configured && (!remote.branchReady || !remote.tagReady),
   );
 
   if (incomplete.length > 0) {

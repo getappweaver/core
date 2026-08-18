@@ -194,7 +194,13 @@ function releaseStatus(
     return 'tag-needed';
   }
 
-  if (!git.remotes.every((remote) => remote.branchReady && remote.tagReady)) {
+  if (
+    git.remotes.some(
+      (remote) =>
+        (remote.required || remote.configured) &&
+        (!remote.branchReady || !remote.tagReady),
+    )
+  ) {
     return 'push-needed';
   }
 

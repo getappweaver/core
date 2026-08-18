@@ -129,14 +129,14 @@ function gitStateRow(entry: PluginReleaseEntry): WebNode {
           !remote.configured
             ? firstPublish && remote.name === 'origin'
               ? 'origin will register'
-              : firstPublish && remote.name === 'github'
+              : !remote.required
                 ? 'github optional'
                 : `${remote.name} missing`
             : remote.branchReady && remote.tagReady
               ? `${remote.name} ready`
               : `${remote.name} push needed`,
           !remote.configured
-            ? firstPublish
+            ? firstPublish || !remote.required
               ? 'muted'
               : 'danger'
             : remote.branchReady && remote.tagReady
@@ -233,7 +233,9 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
         entry.status === 'push-needed') &&
       entry.git.branch !== null &&
       entry.git.localTagAtHead &&
-      entry.git.remotes.every((remote) => remote.configured);
+      entry.git.remotes.every(
+        (remote) => !remote.required || remote.configured,
+      );
 
   const prepareWithAi = firstPublish && !sourceReadyForFirstPublish;
 
@@ -241,7 +243,11 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
 
   const pushNeeded =
     !firstPublish &&
-    entry.git.remotes.some((remote) => !remote.branchReady || !remote.tagReady);
+    entry.git.remotes.some(
+      (remote) =>
+        (remote.required || remote.configured) &&
+        (!remote.branchReady || !remote.tagReady),
+    );
 
   const metadataPublish = entry.status === 'metadata-publish-needed';
   const reviewButtonId = `plugins-release-review-${entry.installed.alias}`;
