@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { debug, log } from '../logger';
+import type { WebNodeRoot } from '../web/ui-schema';
 
 import {
   createOpenCodeParseState,
@@ -40,6 +41,12 @@ export type AgentStreamChunk =
   | { kind: 'summary'; id: string; text: string }
   | { kind: 'diff'; files: AgentFileDiff[] }
   | { kind: 'tool'; tool: AgentToolCall }
+  | {
+      kind: 'question';
+      requestId: string;
+      sessionId: string;
+      prompt: WebNodeRoot;
+    }
   | { kind: 'status'; phase: 'started' | 'completed'; message: string | null }
   | { kind: 'error'; message: string };
 

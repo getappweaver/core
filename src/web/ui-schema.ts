@@ -233,6 +233,10 @@ export const WebActionSchema = z.discriminatedUnion('type', [
     value: z.string(),
     /** Optional form field whose value is appended to `value` with a space. */
     valueFromField: z.string().min(1).optional(),
+    /** Optional form fields serialized as an array of string arrays. */
+    valuesFromFields: z.array(z.string().min(1)).optional(),
+    /** Freeform fields that replace corresponding selected values when non-empty. */
+    customValuesFromFields: z.array(z.string().min(1)).optional(),
   }),
 ]);
 

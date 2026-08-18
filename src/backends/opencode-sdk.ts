@@ -13,6 +13,7 @@ import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 import { debug, log } from '../logger';
 import { dmBotRoot } from '../paths';
 import type { ProviderName } from '../providers/types';
+import type { WebNode, WebNodeRoot } from '../web/ui-schema';
 
 import {
   coerceFileDiff,
@@ -270,6 +271,239 @@ export type OpencodeSetupAuthorizeResult = {
 };
 
 type StoredAuthJson = Record<string, unknown>;
+
+type OpenCodeQuestion = {
+  question: string;
+  header: string;
+  options: Array<{ label: string; description: string }>;
+  multiple: boolean;
+};
+
+type OpenCodeQuestionRequest = {
+  id: string;
+  sessionId: string;
+  questions: OpenCodeQuestion[];
+};
+
+type ReplyOpencodeSdkQuestionProps = {
+  requestId: string;
+  sessionId: string;
+  cwd: string;
+  answer: string;
+};
+
+function questionTextNode(value: string): WebNode {
+  return { type: 'text', value };
+}
+
+function questionTextBlock(value: string, tone?: 'muted'): WebNode {
+  return {
+    type: 'element',
+    tag: 'text',
+    props: {
+      whiteSpace: 'pre-wrap',
+      ...(tone ? { tone } : {}),
+    },
+    children: [questionTextNode(value)],
+  };
+}
+
+function buildQuestionPrompt(request: OpenCodeQuestionRequest): WebNodeRoot {
+  const fieldNames = request.questions.map((_, index) => `answer-${index}`);
+
+  const customFieldNames = request.questions.map(
+    (_, index) => `answer-${index}-custom`,
+  );
+
+  const questionNodes = request.questions.map((question, index): WebNode => {
+    const fieldName = fieldNames[index];
+
+    return {
+      type: 'element',
+      tag: 'stack',
+      props: { gap: 'xs' },
+      children: [
+        {
+          type: 'element',
+          tag: 'text',
+          props: { weight: 'bold' },
+          children: [questionTextNode(question.header)],
+        },
+        questionTextBlock(question.question),
+        {
+          type: 'element',
+          tag: 'choiceField',
+          props: {
+            formFieldName: fieldName,
+            choices: question.options.map((option) => option.label),
+            choiceLabels: Object.fromEntries(
+              question.options.map((option) => [option.label, option.label]),
+            ),
+            ...(question.multiple ? { multiple: true as const } : {}),
+          },
+        },
+        ...question.options.map((option) =>
+          questionTextBlock(`${option.label}: ${option.description}`, 'muted'),
+        ),
+        {
+          type: 'element',
+          tag: 'textArea',
+          props: {
+            formFieldName: customFieldNames[index],
+            inputPlaceholder: 'Custom answer',
+            maxRows: 2,
+          },
+        },
+      ],
+    };
+  });
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'agent', subcommand: 'question' },
+    tree: {
+      type: 'element',
+      tag: 'form',
+      props: {
+        action: {
+          type: 'prompt_answer',
+          value: '',
+          valuesFromFields: fieldNames,
+          customValuesFromFields: customFieldNames,
+        },
+      },
+      children: [
+        {
+          type: 'element',
+          tag: 'stack',
+          props: { gap: 'md' },
+          children: [
+            ...questionNodes,
+            {
+              type: 'element',
+              tag: 'button',
+              props: {
+                label: 'Answer',
+                className: 'web-button',
+                tone: 'warning',
+                htmlType: 'submit',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+function parseQuestionAskedEvent(
+  raw: unknown,
+  sessionId: string,
+): OpenCodeQuestionRequest | null {
+  const rec = unwrapOpenCodeEventRecord(raw);
+
+  if (rec?.type !== 'question.asked') {
+    return null;
+  }
+
+  const properties = rec.properties;
+
+  if (!properties || typeof properties !== 'object') {
+    return null;
+  }
+
+  const value = properties as Record<string, unknown>;
+
+  if (
+    value.sessionID !== sessionId ||
+    typeof value.id !== 'string' ||
+    !Array.isArray(value.questions)
+  ) {
+    return null;
+  }
+
+  const questions = value.questions
+    .map((entry): OpenCodeQuestion | null => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+
+      const question = entry as Record<string, unknown>;
+
+      if (
+        typeof question.question !== 'string' ||
+        typeof question.header !== 'string' ||
+        !Array.isArray(question.options)
+      ) {
+        return null;
+      }
+
+      const options = question.options
+        .map((entry): OpenCodeQuestion['options'][number] | null => {
+          if (!entry || typeof entry !== 'object') {
+            return null;
+          }
+
+          const option = entry as Record<string, unknown>;
+
+          return typeof option.label === 'string' &&
+            typeof option.description === 'string'
+            ? { label: option.label, description: option.description }
+            : null;
+        })
+        .filter(
+          (option): option is OpenCodeQuestion['options'][number] =>
+            option !== null,
+        );
+
+      return {
+        question: question.question,
+        header: question.header,
+        options,
+        multiple: question.multiple === true,
+      };
+    })
+    .filter((question): question is OpenCodeQuestion => question !== null);
+
+  return questions.length > 0 ? { id: value.id, sessionId, questions } : null;
+}
+
+export async function replyOpencodeSdkQuestion({
+  requestId,
+  sessionId,
+  cwd,
+  answer,
+}: ReplyOpencodeSdkQuestionProps): Promise<void> {
+  const parsed = JSON.parse(answer) as unknown;
+
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry.every((value) => typeof value === 'string'),
+    )
+  ) {
+    throw new Error('Invalid OpenCode question answer');
+  }
+
+  const { client } = await getOrInitSdk();
+
+  const result = await client.question.reply({
+    requestID: requestId,
+    directory: cwd,
+    answers: parsed,
+  });
+
+  const err = sdkResultError(result);
+
+  if (err) {
+    throw new Error(errorMessage(err));
+  }
+
+  debug('opencode-sdk: question answered', { sessionId, requestId });
+}
 
 function diffSignature(files: AgentFileDiff[]): string {
   return files
@@ -1662,6 +1896,25 @@ export function createOpencodeSDKBackend({
           for await (const evt of stream) {
             if (stopConsumer || streamAbortSignal.aborted) {
               break;
+            }
+
+            const questionRequest = parseQuestionAskedEvent(evt, sessionId);
+
+            if (questionRequest) {
+              debug('opencode-sdk stream: handling question.asked', {
+                sessionId,
+                requestId: questionRequest.id,
+                questions: questionRequest.questions.length,
+              });
+
+              emitStreamChunk({
+                kind: 'question',
+                requestId: questionRequest.id,
+                sessionId,
+                prompt: buildQuestionPrompt(questionRequest),
+              });
+
+              continue;
             }
 
             const chunks = mapOpencodeSsePayloadToChunk(

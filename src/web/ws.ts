@@ -8,12 +8,16 @@ import {
   unregisterOpencodeInterventionBridge,
   type InterventionBridge,
 } from '@src/backends/opencode-intervention';
-import { summarizeOpencodeSdkSession } from '@src/backends/opencode-sdk';
+import {
+  replyOpencodeSdkQuestion,
+  summarizeOpencodeSdkSession,
+} from '@src/backends/opencode-sdk';
 import {
   monitoring,
   recordMonitoringSpans,
   runWithMonitoringContext,
 } from '@src/core/monitoring';
+import { createWebPrompt } from '@src/core/plugin';
 import {
   getAgentBackend,
   getState,
@@ -1152,6 +1156,60 @@ async function handleChat(params: {
       },
       onStreamChunk: useStream
         ? (chunk) => {
+            if (chunk.kind === 'question') {
+              log.info(
+                `[websocket] presenting OpenCode question ${chunk.requestId}`,
+              );
+
+              const promptFn = ws.data.promptSession.createPromptFn({
+                requestId: message.requestId,
+                timelineId: message.timelineId,
+                recordInTimeline: false,
+                send: (serverMessage) => {
+                  if (serverMessage.type === 'prompt') {
+                    insertTimelineEvent(ctx.seenDb, {
+                      timelineId: message.timelineId,
+                      source: 'web',
+                      kind: 'prompt',
+                      role: null,
+                      command: null,
+                      subcommand: null,
+                      subcommandTag: null,
+                      values: null,
+                      form: null,
+                      text: null,
+                      web: null,
+                      clientView: null,
+                      prompt: serverMessage.prompt,
+                      requestId: serverMessage.requestId,
+                    });
+                  }
+
+                  sendMessage(ws, serverMessage);
+                },
+              });
+
+              void promptFn(createWebPrompt(chunk.prompt))
+                .then((answer) =>
+                  replyOpencodeSdkQuestion({
+                    requestId: chunk.requestId,
+                    sessionId: chunk.sessionId,
+                    cwd:
+                      getWorkspaceTarget(ctx.seenDb) === 'appweaver'
+                        ? ctx.dmBotRoot
+                        : ctx.parentOfBotRoot,
+                    answer,
+                  }),
+                )
+                .catch((err) => {
+                  log.warn(
+                    `OpenCode question reply failed: ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                });
+
+              return;
+            }
+
             sendMessage(
               ws,
               createChatStreamChunkMessage({

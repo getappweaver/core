@@ -1,5 +1,6 @@
 import type { TimelineFileDiff, TimelineToolCall } from '@src/timeline/types';
 
+import { splitPromptPayload } from '../socket/dispatch';
 import type { TimelineItem } from '../types';
 
 import { logChatDebug } from './debug';
@@ -376,6 +377,23 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     adapters.setAgentWorking(true);
 
     adapters.pendingRequests.set(requestId, {
+      onPrompt: (message) => {
+        const prompt = splitPromptPayload(message.prompt);
+
+        adapters.setAgentWorking(false);
+        adapters.setPendingPromptRequestId(message.requestId);
+
+        adapters.setTimeline((prev) => [
+          ...prev,
+          {
+            id: adapters.createId(),
+            type: 'prompt',
+            requestId: message.requestId,
+            text: prompt.text,
+            web: prompt.web,
+          },
+        ]);
+      },
       onChatResult: (message) => {
         logChatDebug('chat.pending.on_result', {
           requestId,

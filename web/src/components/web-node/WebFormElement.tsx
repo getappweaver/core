@@ -180,6 +180,41 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
     const fd = new FormData(formEl);
 
     if (action.type === 'prompt_answer') {
+      if (action.valuesFromFields) {
+        const values = action.valuesFromFields.map((fieldName, index) => {
+          const customFieldName = action.customValuesFromFields?.[index];
+
+          const customValue = customFieldName ? fd.get(customFieldName) : null;
+
+          const customAnswer =
+            typeof customValue === 'string' ? customValue.trim() : '';
+
+          if (customAnswer.length > 0) {
+            return [customAnswer];
+          }
+
+          return fd
+            .getAll(fieldName)
+            .filter((value): value is string => typeof value === 'string')
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+        });
+
+        props.onRunAction?.(
+          {
+            ...action,
+            type: 'prompt_answer',
+            value: JSON.stringify(values),
+          },
+          {
+            onReplaceRoot: props.onReplaceRoot,
+            promptRequestId: props.promptRequestId,
+          },
+        );
+
+        return;
+      }
+
       const fieldName = action.valueFromField;
 
       const fieldValue =

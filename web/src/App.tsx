@@ -473,6 +473,7 @@ function AppInner(): JSX.Element {
     sendSocketMessage,
     appendSystemMessage,
     setAgentWorking,
+    setPendingPromptRequestId,
     setSessionDiffFiles,
     chatRunStatus,
     setChatRunStatus: setPersistedChatRunStatus,
