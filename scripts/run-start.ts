@@ -33,14 +33,72 @@ function isWebUiEnabled(): boolean {
   return (process.env.START_WEB_UI ?? '1') !== '0';
 }
 
+function readArgValue(name: string): string | null {
+  const args = process.argv.slice(2);
+  const inlinePrefix = `${name}=`;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (arg.startsWith(inlinePrefix)) {
+      return arg.slice(inlinePrefix.length).trim() || null;
+    }
+
+    if (arg === name) {
+      const value = args[i + 1];
+
+      if (!value || value.startsWith('--')) {
+        return null;
+      }
+
+      return value.trim() || null;
+    }
+  }
+
+  return null;
+}
+
+function resolveBindHost(): string {
+  return (
+    readArgValue('--host') || process.env.BOT_WEB_HOST?.trim() || '127.0.0.1'
+  );
+}
+
+function displayUrlHost(host: string): string {
+  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+}
+
+function resolveWebUiHost(): string {
+  return displayUrlHost(resolveBindHost());
+}
+
+function resolveWebUiPort(): string {
+  return process.env.BOT_WEB_UI_PORT?.trim() || '5551';
+}
+
 function botEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
+  const setupEnv = {
     BOT_SETUP_BILLBOARD: shouldShowSetup()
       ? '1'
       : process.env.BOT_SETUP_BILLBOARD,
     APPWEAVER_DEMO: isDemoMode() ? '1' : process.env.APPWEAVER_DEMO,
-    BOT_WEB_STATIC: isWebUiEnabled() ? '1' : '0',
+  };
+
+  if (!isWebUiEnabled()) {
+    return {
+      ...process.env,
+      ...setupEnv,
+      BOT_WEB_HOST: resolveBindHost(),
+      BOT_WEB_STATIC: '0',
+    };
+  }
+
+  return {
+    ...process.env,
+    ...setupEnv,
+    BOT_WEB_HOST: resolveBindHost(),
+    BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
+    BOT_WEB_STATIC: '1',
   };
 }
 

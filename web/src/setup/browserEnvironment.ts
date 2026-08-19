@@ -10,12 +10,7 @@ export type DetectedBrowser =
 export type DetectedDevice = 'phone' | 'tablet' | 'desktop';
 
 export type DetectedOS =
-  | 'Android'
-  | 'iOS'
-  | 'macOS'
-  | 'Windows'
-  | 'Linux'
-  | 'Unknown';
+  'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux' | 'Unknown';
 
 export type BrowserEnvironment = {
   browser: DetectedBrowser;
