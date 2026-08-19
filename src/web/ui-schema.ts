@@ -105,7 +105,7 @@ export const WebOptimisticMutationSchema = z.discriminatedUnion('type', [
 export type WebOptimisticMutation = z.infer<typeof WebOptimisticMutationSchema>;
 
 export const WebOptimisticCommandPayloadSchema = z.object({
-  mutations: z.array(WebOptimisticMutationSchema).min(1),
+  mutations: z.array(WebOptimisticMutationSchema),
   command: z.object({
     command: z.string().min(1),
     subcommand: z.string().min(1),
@@ -303,6 +303,12 @@ const WebNostrPostReferenceBaseSchema = z.object({
   resolutionStatus: z
     .enum(['resolved', 'unresolved', 'loading', 'missing', 'error'])
     .optional(),
+  /** Resolve an unresolved reference immediately when mounted. */
+  resolveOnLoad: z.boolean().optional(),
+  /** Whether network resolution may persist results in the shared Nostr cache. */
+  resolutionMode: z.enum(['persistent', 'ephemeral']).optional(),
+  /** Profile-modal policy inherited when this reference's author is opened. */
+  profileResolveReferencesAutomatically: z.boolean().optional(),
   id: z.string().min(1).optional(),
   pubkey: z.string().min(1).optional(),
   kind: z.number().int().optional(),
@@ -315,6 +321,10 @@ const WebNostrPostReferenceBaseSchema = z.object({
   authorAbout: z.string().optional(),
   createdAt: z.number().int().optional(),
   content: z.string().optional(),
+  /** Display title for long-form or otherwise titled events. */
+  title: z.string().min(1).optional(),
+  /** Source URL or NIP-21 event reference for source-backed event kinds. */
+  source: z.string().min(1).optional(),
   href: z.string().min(1).optional(),
   label: z.string().min(1).optional(),
   readAction: WebActionSchema.nullable().optional(),
@@ -397,8 +407,12 @@ export const WebNostrPostPropsSchema = z.object({
   nostrPubkey: z.string().min(1).optional(),
   /** Event created_at unix timestamp in seconds. */
   nostrCreatedAt: z.number().int().optional(),
+  /** Nostr event kind used for specialized generic presentation. */
+  nostrKind: z.number().int().optional(),
   /** Event content. */
   nostrContent: z.string().optional(),
+  /** Source URL or NIP-21 event reference for source-backed event kinds. */
+  nostrSource: z.string().min(1).optional(),
   /** Display name from profile metadata. */
   nostrAuthorName: z.string().min(1).optional(),
   /** Username/name fallback from profile metadata. */
@@ -429,6 +443,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrProfileActions: z.array(WebNostrPostExtraActionSchema).optional(),
   /** Optional read action that resolves current plugin-owned profile actions when the modal opens. */
   nostrProfileActionsReadAction: WebActionSchema.nullable().optional(),
+  /** Profile-modal policy for unresolved references in Latest Posts. */
+  nostrProfileResolveReferencesAutomatically: z.boolean().optional(),
   /** Optional command/client action for plugin-owned archive behavior. */
   nostrArchiveAction: WebActionSchema.nullable().optional(),
   /** True when plugin-owned archive state is active. */

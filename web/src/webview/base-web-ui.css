@@ -169,6 +169,14 @@ select {
   background: var(--color-warning);
 }
 
+a.web-button,
+a.web-button:visited,
+a.web-button:hover,
+a.web-button:focus-visible {
+  color: #000;
+  text-decoration: none;
+}
+
 .web-button:active {
   background: color-mix(in srgb, var(--color-warning) 72%, #000);
   box-shadow: 2px 2px 0 var(--color-panel-shadow);
@@ -618,6 +626,66 @@ select {
 
 .web-nostrPost__body {
   line-height: 1.32;
+}
+
+.web-nostrPost__replyLink {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  text-decoration: none;
+}
+
+.web-nostrPost__replyLink:hover,
+.web-nostrPost__replyLink:focus-visible {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.web-nostrPost__highlight {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.web-nostrPost__highlight blockquote {
+  margin: 0;
+  padding: 0.3rem 0.5rem;
+  border-left: 2px solid var(--color-warning);
+  background: color-mix(in srgb, var(--color-surface-alt) 92%, transparent);
+  white-space: pre-wrap;
+}
+
+.web-nostrPost__highlightSource {
+  width: fit-content;
+  color: var(--color-accent);
+  overflow-wrap: anywhere;
+}
+
+.web-nostrPost__highlightNostrSource {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.web-nostrPost__highlightMeta {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.web-nostrPost__highlightAuthor,
+.web-nostrPost__highlightAuthor:hover,
+.web-nostrPost__highlightAuthor:focus-visible {
+  color: var(--color-accent);
+}
+
+.web-nostrPost__highlightLoad,
+.web-nostrPost__highlightLoad:hover,
+.web-nostrPost__highlightLoad:focus-visible {
+  color: var(--color-accent);
 }
 
 .web-nostrPost__more {

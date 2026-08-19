@@ -1,4 +1,4 @@
-import { nip19 } from 'nostr-tools';
+import { kinds, nip19 } from 'nostr-tools';
 import type { Accessor, JSX } from 'solid-js';
 import {
   createMemo,
@@ -54,6 +54,50 @@ const AUDIO_EXTENSIONS = [
   '.wav',
   '.flac',
 ];
+
+const MAX_NESTED_REFERENCE_DEPTH = 4;
+const SUPPORTED_NOSTR_CONTENT_KINDS = new Set([1, 1111, 9802, 30023]);
+
+const NOSTR_KIND_NAME_BY_NUMBER = new Map<number, string>();
+
+for (const [name, value] of Object.entries(kinds)) {
+  if (typeof value === 'number' && !NOSTR_KIND_NAME_BY_NUMBER.has(value)) {
+    NOSTR_KIND_NAME_BY_NUMBER.set(value, name);
+  }
+}
+
+const SOCIAL_REFERENCE_KINDS = new Set<number>([
+  kinds.ForumThread,
+  kinds.PublicMessage,
+  kinds.Photo,
+  kinds.NormalVideo,
+  kinds.ShortVideo,
+  kinds.ChannelMessage,
+  kinds.PodcastEpisode,
+  kinds.Poll,
+  kinds.Voice,
+  kinds.Scroll,
+  kinds.VoiceComment,
+  kinds.LiveChatMessage,
+  kinds.CodeSnippet,
+  kinds.LiveEvent,
+]);
+
+function readableKindName(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+}
+
+function openNostrEventLabel(kind: number | undefined): string {
+  if (kind === undefined) {
+    return 'Open nostr event';
+  }
+
+  const name = NOSTR_KIND_NAME_BY_NUMBER.get(kind);
+
+  return name && SOCIAL_REFERENCE_KINDS.has(kind)
+    ? `Open ${readableKindName(name)} · kind ${kind}`
+    : `Open nostr event · kind ${kind}`;
+}
 
 type InlineProfile = NonNullable<
   NonNullable<WebNostrPostProps['nostrInlineProfiles']>
@@ -250,11 +294,249 @@ function PostTranslationPanel(props: {
 function referenceResolutionStatus(
   reference: WebNostrPostReference,
 ): ReferenceResolutionStatus {
-  return reference.resolutionStatus ?? 'resolved';
+  if (reference.resolutionStatus) {
+    return reference.resolutionStatus;
+  }
+
+  return (reference.type === 'event' || reference.type === 'address') &&
+    reference.id &&
+    reference.content === undefined
+    ? 'unresolved'
+    : 'resolved';
 }
 
 type EventContextRequest = Parameters<typeof resolveNostrEventContext>[0];
 type EventContextResponsePromise = ReturnType<typeof resolveNostrEventContext>;
+type EventContextResponse = Awaited<EventContextResponsePromise>;
+type ResolvedNostrEvent = EventContextResponse['targetEvent'];
+
+type DecodedContentEventReference = {
+  token: string;
+  id: string;
+  authorPubkey: string | null;
+  relayHints: string[];
+};
+
+function decodeContentEventReference(
+  token: string,
+): DecodedContentEventReference | null {
+  try {
+    const decoded = nip19.decode(token.slice('nostr:'.length));
+
+    if (decoded.type === 'note') {
+      return {
+        token,
+        id: decoded.data,
+        authorPubkey: null,
+        relayHints: [],
+      };
+    }
+
+    if (decoded.type === 'nevent') {
+      return {
+        token,
+        id: decoded.data.id,
+        authorPubkey: decoded.data.author ?? null,
+        relayHints: decoded.data.relays ?? [],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function contentEventReferences(
+  content: string,
+): DecodedContentEventReference[] {
+  const references = new Map<string, DecodedContentEventReference>();
+
+  for (const match of content.matchAll(NOSTR_REFERENCE_RE)) {
+    const decoded = decodeContentEventReference(match[0]);
+
+    if (decoded && !references.has(decoded.id)) {
+      references.set(decoded.id, decoded);
+    }
+  }
+
+  return [...references.values()];
+}
+
+function sourceEventReference(source: string): WebNostrPostReference | null {
+  const trimmed = source.trim();
+
+  const token = trimmed.startsWith('nostr:')
+    ? trimmed
+    : trimmed.startsWith('nevent1') ||
+        trimmed.startsWith('note1') ||
+        trimmed.startsWith('naddr1')
+      ? `nostr:${trimmed}`
+      : null;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const decoded = nip19.decode(token.slice('nostr:'.length));
+
+    if (decoded.type === 'naddr') {
+      return {
+        token,
+        type: 'address',
+        id: `${decoded.data.kind}:${decoded.data.pubkey}:${decoded.data.identifier}`,
+        pubkey: decoded.data.pubkey,
+        kind: decoded.data.kind,
+        relayHints: decoded.data.relays ?? [],
+        resolutionStatus: 'unresolved',
+        showActions: false,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  const decoded = decodeContentEventReference(token);
+
+  return decoded
+    ? {
+        token,
+        type: 'event',
+        id: decoded.id,
+        pubkey: decoded.authorPubkey ?? undefined,
+        relayHints: decoded.relayHints,
+        resolutionStatus: 'unresolved',
+        showActions: false,
+      }
+    : null;
+}
+
+function isHttpSource(source: string): boolean {
+  try {
+    const url = new URL(source);
+
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+type HighlightContentProps = {
+  content: string;
+  source: string | undefined;
+  sharePrefixes: WebNostrPostReference['sharePrefixes'];
+  sourceLoaded: boolean;
+  onToggleSource: (reference: WebNostrPostReference) => void;
+  runAction: RunPostAction;
+};
+
+function HighlightContent(props: HighlightContentProps): JSX.Element {
+  const initialSource = props.source
+    ? sourceEventReference(props.source)
+    : null;
+
+  const [nostrSource, setNostrSource] =
+    createSignal<WebNostrPostReference | null>(initialSource);
+
+  onMount(() => {
+    if (!initialSource) {
+      return;
+    }
+
+    void resolveReferenceTarget({
+      reference: { ...initialSource, sharePrefixes: props.sharePrefixes },
+      depth: 0,
+      visitedIds: new Set(),
+    })
+      .then(setNostrSource)
+      .catch(() => {});
+  });
+
+  const sourceTime = () => relativeTime(nostrSource()?.createdAt, Date.now());
+
+  const sourceHandle = () =>
+    firstNonEmpty([
+      nostrSource()?.authorUsername ?? '',
+      nostrSource()?.authorName ?? '',
+      shortValue(nostrSource()?.npub),
+      shortValue(nostrSource()?.pubkey),
+    ]) ?? 'unknown';
+
+  return (
+    <div class="web-nostrPost__highlight">
+      <blockquote>{props.content}</blockquote>
+      <Show when={props.source}>
+        {(value) =>
+          isHttpSource(value()) ? (
+            <a
+              class="web-nostrPost__highlightSource"
+              href={value()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {value()}
+            </a>
+          ) : nostrSource() ? (
+            <div class="web-nostrPost__highlightNostrSource">
+              <div class="web-nostrPost__highlightMeta">
+                From{' '}
+                <button
+                  type="button"
+                  class="web-nostrPost__authorButton web-nostrPost__highlightAuthor"
+                  onClick={() =>
+                    props.runAction(profileActionForReference(nostrSource()!))
+                  }
+                  disabled={!nostrSource()?.pubkey}
+                >
+                  @{sourceHandle()}
+                </button>
+                <Show when={sourceTime()}>{(time) => <> · {time()}</>}</Show>
+                <Show when={nostrSource()?.title}>
+                  {(title) => <> · {title()}</>}
+                </Show>
+              </div>
+              <button
+                type="button"
+                class="web-nostrPost__replyLink web-nostrPost__highlightLoad"
+                onClick={() => props.onToggleSource(nostrSource()!)}
+              >
+                {nostrSource()?.kind === 30023
+                  ? props.sourceLoaded
+                    ? 'Hide article'
+                    : 'Show article'
+                  : props.sourceLoaded
+                    ? 'Hide nostr event'
+                    : 'Show nostr event'}
+              </button>
+            </div>
+          ) : (
+            <span class="web-nostrPost__highlightSource">{value()}</span>
+          )
+        }
+      </Show>
+    </div>
+  );
+}
+
+function openNostrEventHref(reference: WebNostrPostReference): string | null {
+  if (!reference.id) {
+    return null;
+  }
+
+  try {
+    const nevent = nip19.neventEncode({
+      id: reference.id,
+      relays: reference.relayHints,
+      author: reference.pubkey,
+      kind: reference.kind,
+    });
+
+    return `${reference.sharePrefixes?.nevent ?? 'nostr:'}${nevent}`;
+  } catch {
+    return null;
+  }
+}
 
 const pendingThreadContextRequests = new Map<
   string,
@@ -264,21 +546,82 @@ const pendingThreadContextRequests = new Map<
 function resolveThreadContextRequest(
   input: EventContextRequest,
 ): EventContextResponsePromise {
-  const existing = pendingThreadContextRequests.get(input.eventId);
+  const requestKey = input.eventId ?? input.address;
+
+  if (!requestKey) {
+    return Promise.reject(new Error('Missing Nostr event resolution target.'));
+  }
+
+  const existing = pendingThreadContextRequests.get(requestKey);
 
   if (existing) {
     return existing;
   }
 
   const pending = resolveNostrEventContext(input).finally(() => {
-    if (pendingThreadContextRequests.get(input.eventId) === pending) {
-      pendingThreadContextRequests.delete(input.eventId);
+    if (pendingThreadContextRequests.get(requestKey) === pending) {
+      pendingThreadContextRequests.delete(requestKey);
     }
   });
 
-  pendingThreadContextRequests.set(input.eventId, pending);
+  pendingThreadContextRequests.set(requestKey, pending);
 
   return pending;
+}
+
+type ResolveReferenceTargetProps = {
+  reference: WebNostrPostReference;
+  depth: number;
+  visitedIds: Set<string>;
+};
+
+async function resolveReferenceTarget({
+  reference,
+  depth,
+  visitedIds,
+}: ResolveReferenceTargetProps): Promise<WebNostrPostReference> {
+  const decoded = reference.token
+    ? decodeContentEventReference(reference.token)
+    : null;
+
+  const address = reference.type === 'address' ? (reference.id ?? null) : null;
+  const eventId = address ? null : (reference.id ?? decoded?.id ?? null);
+  const authorPubkey = reference.pubkey ?? decoded?.authorPubkey ?? null;
+  const targetKey = eventId ?? address;
+
+  if (
+    !targetKey ||
+    depth >= MAX_NESTED_REFERENCE_DEPTH ||
+    visitedIds.has(targetKey)
+  ) {
+    throw new Error('Invalid or repeated Nostr reference target.');
+  }
+
+  const response = await resolveThreadContextRequest({
+    eventId,
+    authorPubkey,
+    address,
+    targetEvent: null,
+    relayHints: [
+      ...new Set([
+        ...(reference.relayHints ?? []),
+        ...(decoded?.relayHints ?? []),
+      ]),
+    ],
+    fallbackRelays: [],
+    includeDirectReplies: false,
+    replyLimit: 1,
+    threadContextOnly: true,
+    resolutionMode: reference.resolutionMode ?? 'persistent',
+  });
+
+  return resolvedReferenceTree({
+    reference,
+    event: response.targetEvent,
+    response,
+    depth,
+    visitedIds,
+  });
 }
 
 type ResolvedReferenceProps = {
@@ -363,6 +706,8 @@ function resolvedReference({
     kind: event.kind,
     createdAt: event.created_at,
     content: event.content,
+    title: event.tags.find((tag) => tag[0] === 'title')?.[1],
+    source: event.tags.find((tag) => tag[0] === 'r')?.[1],
     npub: nip19.npubEncode(event.pubkey),
     authorName: profile?.displayName ?? undefined,
     authorUsername: profile?.name ?? undefined,
@@ -421,6 +766,106 @@ function resolvedReference({
     },
     showActions: true,
   };
+}
+
+type ResolvedReferenceTreeProps = {
+  reference: WebNostrPostReference;
+  event: ResolvedNostrEvent;
+  response: EventContextResponse;
+  depth: number;
+  visitedIds: Set<string>;
+};
+
+function resolvedReferenceTree({
+  reference,
+  event,
+  response,
+  depth,
+  visitedIds,
+}: ResolvedReferenceTreeProps): WebNostrPostReference {
+  const profilesByPubkey = resolvedAuthorProfiles(response.profileEvents);
+
+  const edgeRelayHints = new Map(
+    response.graph.edges.flatMap((edge) =>
+      edge.target.type === 'event'
+        ? [
+            [
+              `${edge.sourceEventId}:${edge.target.eventId}`,
+              edge.relayHints,
+            ] as const,
+          ]
+        : [],
+    ),
+  );
+
+  const resolved = resolvedReference({
+    reference,
+    event,
+    relayHints:
+      edgeRelayHints.get(`${reference.id ?? event.id}:${event.id}`) ??
+      response.targetRelayHints,
+    profile: profilesByPubkey.get(event.pubkey) ?? null,
+  });
+
+  if (depth >= MAX_NESTED_REFERENCE_DEPTH) {
+    return resolved;
+  }
+
+  const eventsById = new Map(
+    [response.targetEvent, ...response.graph.events].map((item) => [
+      item.id,
+      item,
+    ]),
+  );
+
+  const nextVisitedIds = new Set(visitedIds).add(event.id);
+
+  const embeddedReferences = contentEventReferences(event.content).flatMap(
+    (embedded): WebNostrPostReference[] => {
+      if (nextVisitedIds.has(embedded.id)) {
+        return [];
+      }
+
+      const embeddedEvent = eventsById.get(embedded.id);
+
+      const relayHints = [
+        ...new Set([
+          ...embedded.relayHints,
+          ...(edgeRelayHints.get(`${event.id}:${embedded.id}`) ?? []),
+        ]),
+      ];
+
+      const childReference: WebNostrPostReference = {
+        token: embedded.token,
+        type: 'event',
+        id: embedded.id,
+        pubkey: embeddedEvent?.pubkey ?? embedded.authorPubkey ?? undefined,
+        relayHints,
+        resolutionStatus: embeddedEvent ? 'resolved' : 'unresolved',
+        resolveOnLoad: reference.resolveOnLoad,
+        resolutionMode: reference.resolutionMode,
+        profileResolveReferencesAutomatically:
+          reference.profileResolveReferencesAutomatically,
+        showActions: embeddedEvent !== undefined,
+      };
+
+      return [
+        embeddedEvent
+          ? resolvedReferenceTree({
+              reference: childReference,
+              event: embeddedEvent,
+              response,
+              depth: depth + 1,
+              visitedIds: nextVisitedIds,
+            })
+          : childReference,
+      ];
+    },
+  );
+
+  return embeddedReferences.length > 0
+    ? { ...resolved, embeddedReferences }
+    : resolved;
 }
 
 type LinkPreviewResponse = {
@@ -530,6 +975,37 @@ function referenceDisplayName(reference: WebNostrPostReference): string {
   );
 }
 
+type FlashNostrEventProps = {
+  source: HTMLElement;
+  eventId: string;
+};
+
+function flashNostrEvent({ source, eventId }: FlashNostrEventProps): void {
+  const root = source.getRootNode();
+
+  const target =
+    root instanceof Document || root instanceof ShadowRoot
+      ? root.querySelector<HTMLElement>(
+          `[data-nostr-event-id="${CSS.escape(eventId)}"]`,
+        )
+      : null;
+
+  if (!target) {
+    return;
+  }
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.remove('web-highlight-flash');
+  void target.offsetWidth;
+  target.classList.add('web-highlight-flash');
+
+  target.addEventListener(
+    'animationend',
+    () => target.classList.remove('web-highlight-flash'),
+    { once: true },
+  );
+}
+
 function inlineProfileLabel(profile: InlineProfile): string {
   return `@${
     firstNonEmpty([
@@ -559,6 +1035,7 @@ function profileActionForInlineProfile(
       relayHints: profile.relayHints ?? [],
       profileActions: profile.profileActions ?? [],
       profileActionsReadAction: profile.profileActionsReadAction ?? null,
+      resolveReferencesAutomatically: false,
       sharePrefixes: profile.sharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
@@ -585,6 +1062,8 @@ function profileActionForReference(
       relayHints: reference.relayHints ?? [],
       profileActions: reference.profileActions ?? [],
       profileActionsReadAction: reference.profileActionsReadAction ?? null,
+      resolveReferencesAutomatically:
+        reference.profileResolveReferencesAutomatically ?? false,
       sharePrefixes: reference.sharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
@@ -612,6 +1091,8 @@ function profileActionForElement(
       profileActions: elementProps.nostrProfileActions ?? [],
       profileActionsReadAction:
         elementProps.nostrProfileActionsReadAction ?? null,
+      resolveReferencesAutomatically:
+        elementProps.nostrProfileResolveReferencesAutomatically ?? false,
       sharePrefixes: elementProps.nostrSharePrefixes ?? {
         nevent: 'nostr://',
         nprofile: 'nostr://',
@@ -1191,13 +1672,23 @@ function ReferenceCard(props: {
   onOpenImage: OpenImagePreview;
   onRetryResolution?: () => void;
   currentUserPubkey: string | null;
+  depth?: number;
+  visitedIds?: Set<string>;
 }): JSX.Element {
-  const name = () => referenceDisplayName(props.reference);
+  const [referenceOverride, setReferenceOverride] =
+    createSignal<WebNostrPostReference | null>(null);
 
-  const attachments = () =>
-    attachmentsFromContent(props.reference.content ?? '');
+  const [loadedSourceReference, setLoadedSourceReference] =
+    createSignal<WebNostrPostReference | null>(null);
 
-  const embeddedReferences = () => props.reference.embeddedReferences ?? [];
+  const reference = () => referenceOverride() ?? props.reference;
+  const depth = () => props.depth ?? 0;
+  const visitedIds = () => props.visitedIds ?? new Set<string>();
+  const name = () => referenceDisplayName(reference());
+
+  const attachments = () => attachmentsFromContent(reference().content ?? '');
+
+  const embeddedReferences = () => reference().embeddedReferences ?? [];
 
   const embeddedReferenceMap = () =>
     Object.fromEntries(
@@ -1206,21 +1697,21 @@ function ReferenceCard(props: {
       ),
     );
 
-  const showActions = () => props.reference.showActions !== false;
+  const showActions = () => reference().showActions !== false;
   const getEntityPending = useContext(WebPendingEntityContext);
 
   const referencePending = () =>
-    props.reference.entityKey
-      ? getEntityPending(props.reference.entityKey).pending
+    reference().entityKey
+      ? getEntityPending(reference().entityKey).pending
       : false;
 
   const translation = createPostTranslation({
     runAction: props.runAction,
-    entityKey: () => props.reference.entityKey ?? null,
+    entityKey: () => reference().entityKey ?? null,
   });
 
   const actionItems = createMemo(() =>
-    referenceActionItems(props.reference, props.currentUserPubkey),
+    referenceActionItems(reference(), props.currentUserPubkey),
   );
 
   const headerActionItems = createMemo(() =>
@@ -1236,12 +1727,105 @@ function ReferenceCard(props: {
   );
 
   const openProfile = () =>
-    props.runAction(profileActionForReference(props.reference));
+    props.runAction(profileActionForReference(reference()));
 
-  const resolutionStatus = () => referenceResolutionStatus(props.reference);
+  const resolutionStatus = () => referenceResolutionStatus(reference());
+
+  const toggleHighlightSource = (sourceReference: WebNostrPostReference) => {
+    setLoadedSourceReference((current) => (current ? null : sourceReference));
+  };
+
+  const hasUnresolvedNestedReference = () => {
+    const current = reference();
+
+    const embeddedIds = new Set(
+      (current.embeddedReferences ?? []).flatMap((embedded) =>
+        embedded.id ? [embedded.id] : [],
+      ),
+    );
+
+    return (
+      current.type === 'event' &&
+      current.content !== undefined &&
+      contentEventReferences(current.content).some(
+        (embedded) =>
+          !embeddedIds.has(embedded.id) && !visitedIds().has(embedded.id),
+      )
+    );
+  };
+
+  const resolveReference = async (): Promise<void> => {
+    const current = reference();
+
+    const decoded = current.token
+      ? decodeContentEventReference(current.token)
+      : null;
+
+    const address = current.type === 'address' ? (current.id ?? null) : null;
+    const eventId = address ? null : (current.id ?? decoded?.id ?? null);
+    const authorPubkey = current.pubkey ?? decoded?.authorPubkey ?? null;
+    const targetKey = eventId ?? address;
+
+    if (
+      !targetKey ||
+      depth() >= MAX_NESTED_REFERENCE_DEPTH ||
+      visitedIds().has(targetKey)
+    ) {
+      props.onRetryResolution?.();
+
+      return;
+    }
+
+    setReferenceOverride({ ...current, resolutionStatus: 'loading' });
+
+    try {
+      const response = await resolveThreadContextRequest({
+        eventId,
+        authorPubkey,
+        address,
+        targetEvent: null,
+        relayHints: [
+          ...new Set([
+            ...(current.relayHints ?? []),
+            ...(decoded?.relayHints ?? []),
+          ]),
+        ],
+        fallbackRelays: [],
+        includeDirectReplies: false,
+        replyLimit: 1,
+        threadContextOnly: true,
+        resolutionMode: current.resolutionMode ?? 'persistent',
+      });
+
+      setReferenceOverride(
+        resolvedReferenceTree({
+          reference: current,
+          event: response.targetEvent,
+          response,
+          depth: depth(),
+          visitedIds: visitedIds(),
+        }),
+      );
+    } catch {
+      setReferenceOverride({ ...current, resolutionStatus: 'error' });
+    }
+  };
+
+  onMount(() => {
+    if (
+      reference().resolveOnLoad !== false &&
+      (resolutionStatus() !== 'resolved' || hasUnresolvedNestedReference())
+    ) {
+      void resolveReference();
+    }
+  });
 
   const resolutionLabel = () => {
     const status = resolutionStatus();
+
+    if (status === 'unresolved') {
+      return 'Referenced post is not loaded.';
+    }
 
     if (status === 'missing') {
       return 'Referenced post not found.';
@@ -1254,9 +1838,15 @@ function ReferenceCard(props: {
     return 'Waiting to load referenced post...';
   };
 
-  const canRetryResolution = () =>
-    (resolutionStatus() === 'missing' || resolutionStatus() === 'error') &&
-    props.onRetryResolution !== undefined;
+  const canResolveReference = () =>
+    (resolutionStatus() === 'unresolved' ||
+      resolutionStatus() === 'missing' ||
+      resolutionStatus() === 'error') &&
+    (reference().pubkey !== undefined ||
+      (reference().token
+        ? sourceEventReference(reference().token!) !== null
+        : false) ||
+      props.onRetryResolution !== undefined);
 
   return (
     <Show
@@ -1268,22 +1858,27 @@ function ReferenceCard(props: {
           aria-live="polite"
         >
           <span>{resolutionLabel()}</span>
-          <Show when={canRetryResolution()}>
+          <Show when={canResolveReference()}>
             <button
               type="button"
               class="web-nostrPost__action"
-              onClick={() => props.onRetryResolution?.()}
+              onClick={() => void resolveReference()}
             >
-              Retry
+              {resolutionStatus() === 'unresolved'
+                ? 'Show referenced post'
+                : 'Retry'}
             </button>
           </Show>
         </div>
       }
     >
       <Show
-        when={props.reference.href}
+        when={reference().href}
         fallback={
-          <article class="web-nostrPost web-nostrPost--nested">
+          <article
+            class="web-nostrPost web-nostrPost--nested"
+            data-nostr-event-id={reference().id}
+          >
             <Show when={referencePending() || translation.pending()}>
               <div class="web-nostrPost__pending" aria-hidden="true">
                 <span>
@@ -1296,10 +1891,10 @@ function ReferenceCard(props: {
               class="web-nostrPost__avatar web-nostrPost__profileButton"
               aria-label={`Open ${name()} profile`}
               onClick={openProfile}
-              disabled={!props.reference.pubkey}
+              disabled={!reference().pubkey}
             >
               <Show
-                when={props.reference.authorPicture}
+                when={reference().authorPicture}
                 fallback={initials(name())}
               >
                 {(src) => <img src={src()} alt="" />}
@@ -1312,7 +1907,7 @@ function ReferenceCard(props: {
                     type="button"
                     class="web-nostrPost__name web-nostrPost__authorButton"
                     onClick={openProfile}
-                    disabled={!props.reference.pubkey}
+                    disabled={!reference().pubkey}
                   >
                     {name()}
                   </button>
@@ -1336,25 +1931,70 @@ function ReferenceCard(props: {
                       </button>
                     )}
                   </For>
-                  <Show
-                    when={relativeTime(props.reference.createdAt, Date.now())}
-                  >
+                  <Show when={relativeTime(reference().createdAt, Date.now())}>
                     {(time) => (
                       <time class="web-nostrPost__time">{time()}</time>
                     )}
                   </Show>
                 </div>
               </div>
-              <Show when={props.reference.content} fallback="(empty note)">
-                {(content) => (
-                  <div class="web-nostrPost__embedContent">
-                    <InlineContent
-                      content={content()}
-                      inlineProfiles={props.reference.inlineProfiles ?? {}}
-                      embeds={embeddedReferenceMap()}
-                      runAction={props.runAction}
-                    />
-                  </div>
+              <Show
+                when={reference().kind === 9802}
+                fallback={
+                  <Show
+                    when={
+                      reference().kind === undefined ||
+                      SUPPORTED_NOSTR_CONTENT_KINDS.has(reference().kind!)
+                    }
+                    fallback={
+                      <Show when={openNostrEventHref(reference())}>
+                        {(href) => (
+                          <a
+                            class="web-nostrPost__replyLink"
+                            href={href()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {openNostrEventLabel(reference().kind)}
+                          </a>
+                        )}
+                      </Show>
+                    }
+                  >
+                    <Show when={reference().content} fallback="(empty note)">
+                      {(content) => (
+                        <div class="web-nostrPost__embedContent">
+                          <InlineContent
+                            content={content()}
+                            inlineProfiles={reference().inlineProfiles ?? {}}
+                            embeds={embeddedReferenceMap()}
+                            runAction={props.runAction}
+                          />
+                        </div>
+                      )}
+                    </Show>
+                  </Show>
+                }
+              >
+                <HighlightContent
+                  content={reference().content ?? ''}
+                  source={reference().source}
+                  sharePrefixes={reference().sharePrefixes}
+                  sourceLoaded={loadedSourceReference() !== null}
+                  onToggleSource={toggleHighlightSource}
+                  runAction={props.runAction}
+                />
+              </Show>
+              <Show when={loadedSourceReference()}>
+                {(sourceReference) => (
+                  <ReferenceCard
+                    reference={sourceReference()}
+                    runAction={props.runAction}
+                    onOpenImage={props.onOpenImage}
+                    currentUserPubkey={props.currentUserPubkey}
+                    depth={depth() + 1}
+                    visitedIds={new Set(visitedIds()).add(reference().id ?? '')}
+                  />
                 )}
               </Show>
               <PostTranslationPanel translation={translation} />
@@ -1365,13 +2005,17 @@ function ReferenceCard(props: {
               <Show when={embeddedReferences().length > 0}>
                 <div class="web-nostrPost__embeds">
                   <For each={embeddedReferences()}>
-                    {(reference) => (
+                    {(embeddedReference) => (
                       <ReferenceCard
-                        reference={reference}
+                        reference={embeddedReference}
                         runAction={props.runAction}
                         onOpenImage={props.onOpenImage}
                         onRetryResolution={props.onRetryResolution}
                         currentUserPubkey={props.currentUserPubkey}
+                        depth={depth() + 1}
+                        visitedIds={new Set(visitedIds()).add(
+                          reference().id ?? '',
+                        )}
                       />
                     )}
                   </For>
@@ -1382,7 +2026,7 @@ function ReferenceCard(props: {
                   items={footerActionItems()}
                   runAction={props.runAction}
                   disabled={referencePending()}
-                  entityKey={props.reference.entityKey}
+                  entityKey={reference().entityKey}
                 />
               </Show>
             </div>
@@ -1397,20 +2041,20 @@ function ReferenceCard(props: {
             rel="noopener noreferrer"
           >
             <div class="web-nostrPost__embedTitle">
-              {referenceTitle(props.reference)}
+              {referenceTitle(reference())}
             </div>
-            <Show when={referenceSubtitle(props.reference)}>
+            <Show when={referenceSubtitle(reference())}>
               {(subtitle) => (
                 <div class="web-nostrPost__embedMeta">{subtitle()}</div>
               )}
             </Show>
-            <Show when={props.reference.content}>
+            <Show when={reference().content}>
               {(content) => (
                 <>
                   <div class="web-nostrPost__embedContent">
                     <InlineContent
                       content={content()}
-                      inlineProfiles={props.reference.inlineProfiles ?? {}}
+                      inlineProfiles={reference().inlineProfiles ?? {}}
                       embeds={embeddedReferenceMap()}
                       runAction={props.runAction}
                     />
@@ -1447,6 +2091,9 @@ export function WebNostrPostElement(
   const [expanded, setExpanded] = createSignal(
     props.element.props?.nostrInitiallyExpanded === true,
   );
+
+  const [loadedSourceReference, setLoadedSourceReference] =
+    createSignal<WebNostrPostReference | null>(null);
 
   const [showMediaPreview, setShowMediaPreview] = createSignal(false);
 
@@ -1518,6 +2165,11 @@ export function WebNostrPostElement(
       : content();
 
   const contentReferences = () => uniqueContentReferences(content(), embeds());
+
+  const toggleHighlightSource = (sourceReference: WebNostrPostReference) => {
+    setLoadedSourceReference((current) => (current ? null : sourceReference));
+  };
+
   const suppliedReplyContext = () => elementProps()?.nostrReplyContext ?? [];
 
   const replyContext = () =>
@@ -1530,6 +2182,8 @@ export function WebNostrPostElement(
         ? (replyContextOverrides()[reference.id] ?? reference)
         : reference;
     });
+
+  const immediateParent = () => replyContext().at(-1) ?? null;
 
   const setPendingReferenceStatus = (
     status: Extract<ReferenceResolutionStatus, 'loading' | 'error'>,
@@ -1668,6 +2322,23 @@ export function WebNostrPostElement(
     if (next) {
       void resolveThreadContext();
     }
+  };
+
+  const showImmediateParent = async (source: HTMLElement): Promise<void> => {
+    const parent = immediateParent();
+
+    if (!parent?.id) {
+      return;
+    }
+
+    setShowThreadContext(true);
+    await resolveThreadContext();
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        flashNostrEvent({ source, eventId: parent.id! });
+      });
+    });
   };
 
   const attachments = () => [
@@ -1840,6 +2511,7 @@ export function WebNostrPostElement(
     <article
       class={elementClass(props.element)}
       data-ui={elementUi(props.element)}
+      data-nostr-event-id={elementProps()?.nostrEventId}
       style={elementStyle(props.element)}
       aria-busy={
         entityPending().pending || translation.pending() ? 'true' : undefined
@@ -1875,6 +2547,34 @@ export function WebNostrPostElement(
           </div>
         )}
       </For>
+      <Show when={replyContext().length > 0}>
+        <div class="web-nostrPost__contextBlock">
+          <button
+            type="button"
+            class="web-nostrPost__action web-nostrPost__contextToggle"
+            onClick={toggleThreadContext}
+          >
+            {showThreadContext()
+              ? 'Hide thread context'
+              : `Show thread context (${replyContext().length})`}
+          </button>
+          <Show when={showThreadContext()}>
+            <div class="web-nostrPost__replyContext">
+              <For each={replyContext()}>
+                {(reference) => (
+                  <ReferenceCard
+                    reference={reference}
+                    runAction={props.runAction}
+                    onOpenImage={openLightboxImage}
+                    onRetryResolution={() => void resolveThreadContext()}
+                    currentUserPubkey={currentUserPubkey()}
+                  />
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
+      </Show>
       <div class="web-nostrPost__profileHeader">
         <button
           type="button"
@@ -1928,61 +2628,75 @@ export function WebNostrPostElement(
       </div>
 
       <div class="web-nostrPost__main">
-        <Show when={replyContext().length > 0}>
-          <div class="web-nostrPost__contextBlock">
+        <Show when={immediateParent()}>
+          {(parent) => (
             <button
               type="button"
-              class="web-nostrPost__action web-nostrPost__contextToggle"
-              onClick={toggleThreadContext}
+              class="web-nostrPost__replyLink"
+              onClick={(event) => void showImmediateParent(event.currentTarget)}
             >
-              {showThreadContext()
-                ? 'Hide thread context'
-                : `Show thread context (${replyContext().length})`}
+              ↳ replying to {referenceDisplayName(parent())}
+              <Show when={relativeTime(parent().createdAt, nowMs())}>
+                {(time) => <> · {time()}</>}
+              </Show>
             </button>
-            <Show when={showThreadContext()}>
-              <div class="web-nostrPost__replyContext">
-                <For each={replyContext()}>
-                  {(reference) => (
-                    <ReferenceCard
-                      reference={reference}
-                      runAction={props.runAction}
-                      onOpenImage={openLightboxImage}
-                      onRetryResolution={() => void resolveThreadContext()}
-                      currentUserPubkey={currentUserPubkey()}
-                    />
-                  )}
-                </For>
-              </div>
-            </Show>
-          </div>
+          )}
         </Show>
 
-        <div class="web-nostrPost__body">
-          <Show
-            when={
-              visibleContentParts(visibleContent(), inlineProfiles(), embeds())
-                .length > 0
-            }
-            fallback={content().length > 0 ? '' : '(empty note)'}
-          >
-            <InlineContent
-              content={visibleContent()}
-              inlineProfiles={inlineProfiles()}
-              embeds={embeds()}
+        <Show
+          when={elementProps()?.nostrKind === 9802}
+          fallback={
+            <div class="web-nostrPost__body">
+              <Show
+                when={
+                  visibleContentParts(
+                    visibleContent(),
+                    inlineProfiles(),
+                    embeds(),
+                  ).length > 0
+                }
+                fallback={content().length > 0 ? '' : '(empty note)'}
+              >
+                <InlineContent
+                  content={visibleContent()}
+                  inlineProfiles={inlineProfiles()}
+                  embeds={embeds()}
+                  runAction={props.runAction}
+                />
+              </Show>
+              <Show when={isContentCollapsed()}>
+                {' '}
+                <button
+                  type="button"
+                  class="web-nostrPost__action web-nostrPost__more"
+                  onClick={() => setExpanded(true)}
+                >
+                  More
+                </button>
+              </Show>
+            </div>
+          }
+        >
+          <HighlightContent
+            content={content()}
+            source={elementProps()?.nostrSource}
+            sharePrefixes={elementProps()?.nostrSharePrefixes}
+            sourceLoaded={loadedSourceReference() !== null}
+            onToggleSource={toggleHighlightSource}
+            runAction={props.runAction}
+          />
+        </Show>
+
+        <Show when={loadedSourceReference()}>
+          {(sourceReference) => (
+            <ReferenceCard
+              reference={sourceReference()}
               runAction={props.runAction}
+              onOpenImage={openLightboxImage}
+              currentUserPubkey={currentUserPubkey()}
             />
-          </Show>
-          <Show when={isContentCollapsed()}>
-            {' '}
-            <button
-              type="button"
-              class="web-nostrPost__action web-nostrPost__more"
-              onClick={() => setExpanded(true)}
-            >
-              More
-            </button>
-          </Show>
-        </div>
+          )}
+        </Show>
 
         <PostTranslationPanel translation={translation} />
 

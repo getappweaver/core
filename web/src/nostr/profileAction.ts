@@ -15,10 +15,7 @@ import {
   type NostrProfilePostsRequest,
   type NostrProfilePostsResponse,
 } from '@src/web/nostr-resolution-schema';
-import {
-  openNostrShareAction,
-  type NostrSharePrefixes,
-} from '@src/web/nostr-share';
+import { nostrShareUrl, type NostrSharePrefixes } from '@src/web/nostr-share';
 import type {
   WebAction,
   WebNode,
@@ -53,6 +50,7 @@ const ProfilePayloadSchema = z.object({
   }),
   profileActions: z.array(WebNostrPostExtraActionSchema).default([]),
   profileActionsReadAction: WebActionSchema.nullable().default(null),
+  resolveReferencesAutomatically: z.boolean().default(false),
   fallbackRelays: z
     .array(z.string().min(1))
     .default([...PROFILE_RELAYS_FOR_QUERY]),
@@ -100,7 +98,7 @@ type LatestProfilePost = {
   content: string;
   event: NostrEvent;
   inlineProfiles: Record<string, InlineProfile>;
-  replyContext: LatestProfilePostReference[];
+  replyContext: WebNostrPostReference[];
   embeds: Record<string, WebNostrPostReference>;
 };
 
@@ -213,6 +211,7 @@ type BuildNostrProfileActionPayloadProps = {
   profileActions: WebNostrPostExtraAction[];
   profileActionsReadAction: WebAction | null;
   sharePrefixes: NostrSharePrefixes;
+  resolveReferencesAutomatically: boolean;
 };
 
 type NostrPostNodeProps = {
@@ -281,6 +280,7 @@ const CONTACT_LIST_FRESH_TTL_MS = 60_000;
 const CONTACT_LIST_STALE_TTL_MS = 15 * 60_000;
 const PROFILE_POSTS_FRESH_TTL_MS = 60_000;
 const PROFILE_POSTS_STALE_TTL_MS = 15 * 60_000;
+const PROFILE_POSTS_METADATA_WAIT_MS = 1_000;
 
 const profileMetadataCache = new ProfileMemoryCache<ProfileMetadata | null>();
 const followedByFollowsCache = new ProfileMemoryCache<number | null>();
@@ -960,11 +960,12 @@ function latestPostNode({
                   tag: 'menuItem',
                   props: {
                     label: 'Open event',
-                    action: openNostrShareAction({
+                    href: nostrShareUrl({
                       type: 'nevent',
                       identifier: nevent,
                       prefixes: profile.sharePrefixes,
                     }),
+                    external: true,
                   },
                   children: [],
                 }),
@@ -1082,16 +1083,17 @@ function profileRoot({
       }),
     ),
     el({
-      tag: 'button',
+      tag: 'link',
       props: {
-        label: 'Open profile',
-        action: openNostrShareAction({
+        href: nostrShareUrl({
           type: 'nprofile',
           identifier: nprofile,
           prefixes: payload.sharePrefixes,
         }),
+        external: true,
+        className: 'web-button',
       },
-      children: [],
+      children: [text('Open profile')],
     }),
     el({
       tag: 'button',
@@ -1340,6 +1342,63 @@ function targetKey(target: EventReferenceTarget): string {
     : `address:${addressKey(target)}`;
 }
 
+type UnresolvedProfileReferenceProps = {
+  target: EventReferenceTarget;
+  token: string | undefined;
+  relayHints: string[];
+  viewedProfile: ProfilePayload;
+  profileByPubkey: Map<string, ProfileMetadata>;
+};
+
+function unresolvedProfileReference({
+  target,
+  token,
+  relayHints,
+  viewedProfile,
+  profileByPubkey,
+}: UnresolvedProfileReferenceProps): WebNostrPostReference {
+  const pubkey = target.type === 'event' ? target.authorPubkey : target.pubkey;
+
+  const profile = pubkey
+    ? pubkey.toLowerCase() === viewedProfile.pubkey.toLowerCase()
+      ? {
+          name: viewedProfile.name,
+          username: viewedProfile.username,
+          picture: viewedProfile.picture,
+          about: viewedProfile.about,
+        }
+      : profileByPubkey.get(pubkey.toLowerCase())
+    : null;
+
+  return {
+    token,
+    type: target.type,
+    id:
+      target.type === 'event'
+        ? target.eventId
+        : addressKey({
+            kind: target.kind,
+            pubkey: target.pubkey,
+            identifier: target.identifier,
+          }),
+    pubkey: pubkey ?? undefined,
+    kind: target.type === 'address' ? target.kind : undefined,
+    npub: pubkey ? (npubForPubkey(pubkey) ?? undefined) : undefined,
+    relayHints,
+    sharePrefixes: viewedProfile.sharePrefixes,
+    authorName: profile?.name ?? undefined,
+    authorUsername: profile?.username ?? undefined,
+    authorPicture: profile?.picture ?? undefined,
+    authorAbout: profile?.about ?? undefined,
+    resolutionStatus: 'unresolved',
+    resolveOnLoad: viewedProfile.resolveReferencesAutomatically,
+    resolutionMode: 'ephemeral',
+    profileResolveReferencesAutomatically:
+      viewedProfile.resolveReferencesAutomatically,
+    showActions: false,
+  };
+}
+
 function targetFromNip19(value: string): EventReferenceTarget | null {
   try {
     const decoded = nip19.decode(value);
@@ -1469,7 +1528,16 @@ function resolvedReferencesForEvent({
       }
 
       if (!resolvedEvent) {
-        references.push({ ...addressReference, relayHints });
+        references.push(
+          unresolvedProfileReference({
+            target,
+            token: match[0],
+            relayHints,
+            viewedProfile,
+            profileByPubkey,
+          }),
+        );
+
         continue;
       }
 
@@ -1503,6 +1571,16 @@ function resolvedReferencesForEvent({
     }
 
     if (!resolvedEvent) {
+      references.push(
+        unresolvedProfileReference({
+          target,
+          token: match[0],
+          relayHints,
+          viewedProfile,
+          profileByPubkey,
+        }),
+      );
+
       continue;
     }
 
@@ -1545,9 +1623,9 @@ function replyContextFromGraph({
 }: Omit<
   ResolvedReferencesProps,
   'depth' | 'visitedEventIds'
->): LatestProfilePostReference[] {
+>): WebNostrPostReference[] {
   const seenEventIds = new Set<string>();
-  const references: LatestProfilePostReference[] = [];
+  const references: WebNostrPostReference[] = [];
 
   for (const edge of graph.edgesBySource.get(event.id) ?? []) {
     if (edge.role !== 'thread-root' && edge.role !== 'thread-parent') {
@@ -1556,7 +1634,21 @@ function replyContextFromGraph({
 
     const context = eventForTarget(edge.target, graph);
 
-    if (!context || seenEventIds.has(context.id)) {
+    if (!context) {
+      references.push(
+        unresolvedProfileReference({
+          target: edge.target,
+          token: undefined,
+          relayHints: uniqueRelays([...edge.relayHints, ...defaultRelayHints]),
+          viewedProfile,
+          profileByPubkey,
+        }),
+      );
+
+      continue;
+    }
+
+    if (seenEventIds.has(context.id)) {
       continue;
     }
 
@@ -1641,25 +1733,9 @@ export function collectGraphProfilePubkeys({
   response: NostrProfilePostsResponse;
   viewedPubkey: string;
 }): string[] {
-  const pubkeys = new Set<string>();
-
-  for (const event of response.graph.events) {
-    pubkeys.add(event.pubkey.toLowerCase());
-
-    for (const tag of event.tags) {
-      if (tag[0] === 'p' && tag[1]) {
-        pubkeys.add(tag[1].toLowerCase());
-      }
-    }
-  }
-
-  for (const edge of response.graph.edges) {
-    if (edge.target.type === 'event' && edge.target.authorPubkey) {
-      pubkeys.add(edge.target.authorPubkey.toLowerCase());
-    } else if (edge.target.type === 'address') {
-      pubkeys.add(edge.target.pubkey.toLowerCase());
-    }
-  }
+  const pubkeys = new Set(
+    response.graph.events.map((event) => event.pubkey.toLowerCase()),
+  );
 
   pubkeys.delete(viewedPubkey.toLowerCase());
 
@@ -1708,7 +1784,7 @@ async function fetchLatestProfilePosts({
     key,
     freshTtlMs: PROFILE_POSTS_FRESH_TTL_MS,
     staleTtlMs: PROFILE_POSTS_STALE_TTL_MS,
-    forceRefresh: false,
+    forceRefresh: true,
     load: async () => {
       const response = NostrProfilePostsResponseSchema.parse(
         await postJson<unknown>('/api/nostr/profile-posts', request),
@@ -1719,7 +1795,7 @@ async function fetchLatestProfilePosts({
         viewedPubkey: pubkey,
       });
 
-      const profileMetadataResults = await Promise.allSettled(
+      const profileMetadataRequest = Promise.allSettled(
         profilePubkeys.map(
           async (profilePubkey) =>
             [
@@ -1731,6 +1807,13 @@ async function fetchLatestProfilePosts({
             ] as const,
         ),
       );
+
+      const profileMetadataResults = await Promise.race([
+        profileMetadataRequest,
+        new Promise<Awaited<typeof profileMetadataRequest>>((resolve) => {
+          window.setTimeout(() => resolve([]), PROFILE_POSTS_METADATA_WAIT_MS);
+        }),
+      ]);
 
       const profileByPubkey = new Map(
         profileMetadataResults.flatMap((result) =>
@@ -2093,6 +2176,7 @@ export function buildNostrProfileActionPayload({
   profileActions,
   profileActionsReadAction,
   sharePrefixes,
+  resolveReferencesAutomatically,
 }: BuildNostrProfileActionPayloadProps): ProfilePayload {
   return parseProfilePayload({
     pubkey,
@@ -2105,6 +2189,7 @@ export function buildNostrProfileActionPayload({
     profileActions,
     profileActionsReadAction,
     sharePrefixes,
+    resolveReferencesAutomatically,
   });
 }
 

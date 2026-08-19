@@ -136,7 +136,7 @@ function parseNip10References(
   const eventTags = event.tags.filter((tag) => tag[0] === 'e');
 
   const markedTags = eventTags.filter(
-    (tag) => tag[3] === 'root' || tag[3] === 'reply',
+    (tag) => tag[3] === 'root' || tag[3] === 'reply' || tag[3] === 'mention',
   );
 
   if (markedTags.length > 0) {
@@ -305,6 +305,45 @@ function parseQuoteReferences(
   }
 }
 
+function parseHighlightSource(
+  event: NostrEvent,
+  edges: Map<string, EventReferenceEdge>,
+): void {
+  if (event.kind !== 9802) {
+    return;
+  }
+
+  const addressTag = event.tags.find((tag) => tag[0] === 'a');
+
+  if (addressTag) {
+    addReference({
+      edges,
+      sourceEventId: event.id,
+      role: 'embed',
+      target: addressTarget(addressTag[1]),
+      relayHints: addressTag[2] ? [addressTag[2]] : [],
+    });
+  }
+
+  const eventTag = event.tags.find((tag) => tag[0] === 'e');
+
+  if (!eventTag) {
+    return;
+  }
+
+  addReference({
+    edges,
+    sourceEventId: event.id,
+    role: 'embed',
+    target: eventTargetFromTag({
+      tag: eventTag,
+      valueIndex: 1,
+      authorIndex: 3,
+    }),
+    relayHints: eventTag[2] ? [eventTag[2]] : [],
+  });
+}
+
 function parseInteractionTarget(
   event: NostrEvent,
   edges: Map<string, EventReferenceEdge>,
@@ -388,6 +427,7 @@ export function parseEventReferences(event: NostrEvent): EventReferenceEdge[] {
   parseNip22References(event, edges);
   parseInteractionTarget(event, edges);
   parseQuoteReferences(event, edges);
+  parseHighlightSource(event, edges);
   parseContentReferences(event, edges);
 
   return [...edges.values()];

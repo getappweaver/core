@@ -269,7 +269,6 @@ function parseOptimisticCommandPayload(
 
   if (
     !command ||
-    mutations.length === 0 ||
     typeof command.command !== 'string' ||
     typeof command.subcommand !== 'string'
   ) {
@@ -982,17 +981,6 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             adapters.setChromeLoading(false);
           }
         })();
-      } else if (clientActionName === 'web.openUrl') {
-        const url =
-          typeof action.payload.url === 'string' ? action.payload.url : '';
-
-        if (url.length > 0) {
-          const opened = window.open(url, '_blank', 'noopener,noreferrer');
-
-          if (!opened) {
-            window.location.href = url;
-          }
-        }
       } else if (clientActionName === 'web.copyText') {
         const text =
           typeof action.payload.text === 'string' ? action.payload.text : '';

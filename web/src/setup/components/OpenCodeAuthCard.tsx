@@ -230,7 +230,6 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
       setAuthorizeResult(result);
 
       if (result.url) {
-        window.open(result.url, '_blank', 'noopener,noreferrer');
         void waitForProviderAuth(provider.id);
       }
     } catch (err) {
@@ -451,7 +450,11 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                       {(url) => (
                         <p>
                           Auth URL:{' '}
-                          <a href={url()} target="_blank" rel="noreferrer">
+                          <a
+                            href={url()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             open provider login
                           </a>
                         </p>

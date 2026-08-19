@@ -119,8 +119,8 @@ export const NostrProfilePostsResponseSchema = z.object({
 
 export const NostrEventContextRequestSchema = z
   .object({
-    eventId: hex64Schema,
-    authorPubkey: hex64Schema,
+    eventId: hex64Schema.nullable(),
+    authorPubkey: hex64Schema.nullable(),
     address: z.string().max(4_096).nullable(),
     targetEvent: nostrEventSchema.nullable().default(null),
     relayHints: relayListSchema,
@@ -128,8 +128,12 @@ export const NostrEventContextRequestSchema = z
     includeDirectReplies: z.boolean(),
     replyLimit: z.number().int().min(1).max(MAX_NOSTR_DIRECT_REPLIES),
     threadContextOnly: z.boolean().optional(),
+    resolutionMode: z.enum(['persistent', 'ephemeral']).default('persistent'),
   })
-  .strict();
+  .strict()
+  .refine((value) => value.eventId !== null || value.address !== null, {
+    message: 'eventId or address is required',
+  });
 
 export const NostrEventContextResponseSchema = z.object({
   ok: z.literal(true),

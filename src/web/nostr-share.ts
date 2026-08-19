@@ -1,5 +1,3 @@
-import type { WebAction } from './ui-schema';
-
 export type NostrShareType = 'nevent' | 'nprofile';
 
 export type NostrSharePrefixes = {
@@ -24,18 +22,4 @@ export function nostrShareUrl({
   return prefix.includes(placeholder)
     ? prefix.replaceAll(placeholder, identifier)
     : `${prefix}${identifier}`;
-}
-
-type OpenNostrShareActionProps = NostrShareUrlProps;
-
-export function openNostrShareAction({
-  type,
-  identifier,
-  prefixes,
-}: OpenNostrShareActionProps): WebAction {
-  return {
-    type: 'clientAction',
-    action: 'web.openUrl',
-    payload: { url: nostrShareUrl({ type, identifier, prefixes }) },
-  };
 }

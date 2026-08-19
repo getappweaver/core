@@ -20,12 +20,14 @@ import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { CoreDb } from '@src/db';
 import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
+import { isReplaceableKind } from '@src/nostr/cache/store';
 import {
   BunkerSignerDataSchema,
   getConnection,
   listConnections,
   saveConnection,
 } from '@src/nostr/connections';
+import { parseEventReferences } from '@src/nostr/event-references';
 import { uniqueRelays } from '@src/nostr/nip65';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import type { WotServices } from '@src/nostr/wot-service';
@@ -268,27 +270,16 @@ async function resolveNostrProfilePosts({
       contextRelays,
       fallbackRelays: input.fallbackRelays,
       limit: input.limit,
-      refreshMode: 'stale-while-revalidate',
+      refreshMode: 'require-fresh',
       refreshIntervalMs: PROFILE_POSTS_REFRESH_INTERVAL_MS,
       deadlineAtMs,
     });
 
-    const graph = await service.resolveGraph({
-      rootEvents: primaryEvents,
-      contextRelays,
-      fallbackRelays: input.fallbackRelays,
-      policy: {
-        includeThread: true,
-        includeEmbeds: true,
-        includeInteractions: true,
-        includeReplies: false,
-        maxDepth: 2,
-        maxEvents: 50,
-        maxReferencesPerEvent: 8,
-        timeoutMs: 8_000,
-      },
-      deadlineAtMs,
-    });
+    const graph = {
+      events: primaryEvents,
+      edges: primaryEvents.flatMap(parseEventReferences),
+      missing: [],
+    };
 
     const response = NostrProfilePostsResponseSchema.parse({
       ok: true,
@@ -315,12 +306,90 @@ async function resolveNostrProfilePosts({
 
 type ResolveNostrEventContextProps = ResolveNostrProfilePostsProps;
 
+type ParsedNostrAddress = {
+  kind: number;
+  pubkey: string;
+  identifier: string;
+};
+
+function parseNostrAddress(value: string): ParsedNostrAddress | null {
+  const firstColon = value.indexOf(':');
+  const secondColon = value.indexOf(':', firstColon + 1);
+
+  if (firstColon <= 0 || secondColon <= firstColon + 1) {
+    return null;
+  }
+
+  const kind = Number.parseInt(value.slice(0, firstColon), 10);
+  const pubkey = value.slice(firstColon + 1, secondColon).toLowerCase();
+
+  if (
+    !Number.isSafeInteger(kind) ||
+    !isReplaceableKind(kind) ||
+    !/^[0-9a-f]{64}$/.test(pubkey)
+  ) {
+    return null;
+  }
+
+  return {
+    kind,
+    pubkey,
+    identifier: value.slice(secondColon + 1),
+  };
+}
+
+type ResolveEphemeralNostrTargetProps = {
+  input: z.infer<typeof NostrEventContextRequestSchema>;
+  address: ParsedNostrAddress | null;
+  pool: SimplePool;
+  contextRelays: string[];
+  deadlineAtMs: number;
+};
+
+async function resolveEphemeralNostrTarget({
+  input,
+  address,
+  pool,
+  contextRelays,
+  deadlineAtMs,
+}: ResolveEphemeralNostrTargetProps) {
+  const relays = uniqueRelays([
+    ...input.relayHints,
+    ...contextRelays,
+    ...input.fallbackRelays,
+  ]);
+
+  if (relays.length === 0) {
+    return { event: null, relayHints: [] };
+  }
+
+  const filter = input.eventId
+    ? { ids: [input.eventId], limit: 1 }
+    : {
+        kinds: [address!.kind],
+        authors: [address!.pubkey],
+        '#d': [address!.identifier],
+        limit: 1,
+      };
+
+  const events = await pool.querySync(relays, filter, {
+    maxWait: Math.max(1, deadlineAtMs - Date.now()),
+  });
+
+  const event = events.sort(
+    (left, right) => right.created_at - left.created_at,
+  )[0];
+
+  return { event: event ?? null, relayHints: relays };
+}
+
 async function resolveNostrEventContext({
   req,
   service,
   contextRelays,
   nowMs,
-}: ResolveNostrEventContextProps): Promise<Response> {
+  pool,
+}: ResolveNostrEventContextProps & { pool: SimplePool }): Promise<Response> {
   try {
     const payload = await parseLimitedJsonBody({
       req,
@@ -330,7 +399,11 @@ async function resolveNostrEventContext({
     const input = NostrEventContextRequestSchema.parse(payload);
     const deadlineAtMs = nowMs() + 8_000;
 
-    if (input.targetEvent && input.targetEvent.id !== input.eventId) {
+    if (
+      input.targetEvent &&
+      input.eventId !== null &&
+      input.targetEvent.id !== input.eventId
+    ) {
       return jsonResponse({ error: 'nostr_event_mismatch' }, { status: 400 });
     }
 
@@ -346,48 +419,79 @@ async function resolveNostrEventContext({
       });
     }
 
-    const targetResult = await service.resolveEventById({
-      eventId: input.eventId,
-      authorPubkey: input.authorPubkey,
-      relayHints: input.relayHints,
-      contextRelays,
-      fallbackRelays: input.fallbackRelays,
-      deadlineAtMs,
-    });
+    const address = input.address ? parseNostrAddress(input.address) : null;
+
+    if (input.eventId === null && address === null) {
+      return jsonResponse({ error: 'invalid_nostr_address' }, { status: 400 });
+    }
+
+    const targetResult =
+      input.resolutionMode === 'ephemeral'
+        ? await resolveEphemeralNostrTarget({
+            input,
+            address,
+            pool,
+            contextRelays,
+            deadlineAtMs,
+          })
+        : input.eventId
+          ? await service.resolveEventById({
+              eventId: input.eventId,
+              authorPubkey: input.authorPubkey,
+              relayHints: input.relayHints,
+              contextRelays,
+              fallbackRelays: input.fallbackRelays,
+              deadlineAtMs,
+            })
+          : await service.resolveReplaceableEvent({
+              kind: address!.kind,
+              pubkey: address!.pubkey,
+              identifier: address!.identifier,
+              relayHints: input.relayHints,
+              contextRelays,
+              fallbackRelays: input.fallbackRelays,
+              refreshMode: 'stale-while-revalidate',
+              refreshIntervalMs: PROFILE_POSTS_REFRESH_INTERVAL_MS,
+              deadlineAtMs,
+            });
 
     if (!targetResult.event) {
       return jsonResponse({ error: 'nostr_event_not_found' }, { status: 404 });
     }
 
-    const graph = await service.resolveGraph({
-      rootEvents: [targetResult.event],
-      contextRelays,
-      fallbackRelays: input.fallbackRelays,
-      policy: {
-        includeThread: true,
-        includeEmbeds: !input.threadContextOnly,
-        includeInteractions: !input.threadContextOnly,
-        includeReplies: false,
-        maxDepth: input.threadContextOnly ? 1 : 2,
-        maxEvents: input.threadContextOnly ? 16 : 50,
-        maxReferencesPerEvent: 8,
-        timeoutMs: 8_000,
-      },
-      deadlineAtMs,
-    });
+    const graph =
+      input.resolutionMode === 'ephemeral'
+        ? { events: [targetResult.event], edges: [], missing: [] }
+        : await service.resolveGraph({
+            rootEvents: [targetResult.event],
+            contextRelays,
+            fallbackRelays: input.fallbackRelays,
+            policy: {
+              includeThread: true,
+              includeEmbeds: !input.threadContextOnly,
+              includeInteractions: !input.threadContextOnly,
+              includeReplies: false,
+              maxDepth: input.threadContextOnly ? 1 : 2,
+              maxEvents: input.threadContextOnly ? 16 : 50,
+              maxReferencesPerEvent: 8,
+              timeoutMs: 8_000,
+            },
+            deadlineAtMs,
+          });
 
-    const directReplies = input.includeDirectReplies
-      ? await service.queryDirectReplies({
-          eventId: targetResult.event.id,
-          address: input.address,
-          authorPubkey: targetResult.event.pubkey,
-          relayHints: targetResult.relayHints,
-          contextRelays,
-          fallbackRelays: input.fallbackRelays,
-          limit: input.replyLimit,
-          deadlineAtMs,
-        })
-      : [];
+    const directReplies =
+      input.includeDirectReplies && input.resolutionMode === 'persistent'
+        ? await service.queryDirectReplies({
+            eventId: targetResult.event.id,
+            address: input.address,
+            authorPubkey: targetResult.event.pubkey,
+            relayHints: targetResult.relayHints,
+            contextRelays,
+            fallbackRelays: input.fallbackRelays,
+            limit: input.replyLimit,
+            deadlineAtMs,
+          })
+        : [];
 
     const profilePubkeys = [
       ...new Set(
@@ -1129,6 +1233,7 @@ export function createWebFetchHandler(
         service: ctx.nostrResolution!,
         contextRelays: ctx.botRelayUrls,
         nowMs: Date.now,
+        pool: ctx.pool,
       });
     }
 
