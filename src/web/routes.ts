@@ -689,6 +689,11 @@ function redirectToSetupUi(url: URL): Response | null {
   }
 
   const target = new URL('/setup', origin);
+
+  if (url.host === target.host) {
+    return null;
+  }
+
   target.search = url.search;
 
   return Response.redirect(target.toString(), 302);

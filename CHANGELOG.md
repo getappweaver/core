@@ -4,6 +4,11 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.2.5] - 2026-08-20
+
+- fix: nak is an optional dependency --patch (8442bb7)
+- fix: setup redirect bug (a86034f)
+
 ## [v11.2.4] - 2026-08-20
 
 - feat: AI intervention and session diff tools --minor (26812a3)
@@ -17,7 +22,7 @@ You can also run `bun run release:changelog` to rewrite this file from tags.
 - fix: refactor roadmap as a library to be used by apps/landing and src/commands/roadmap which fixes the issue loading problem in src/commands/roadmap --patch (71d4a6e)
 - feat: many nostr post element fixes, added highlight support --minor (1d8bdff)
 - fix: added --host argument to run-start script --patch (bcd74bc)
-- fix: Production no longer sets BOT_SETUP_UI_ORIGIN to localhost (5d235ff)
+- fix: Production no longer sets BOT_SETUP_UI_ORIGIN to localhost (d1d56ab)
 
 ## [v11.2.3] - 2026-08-12
 
