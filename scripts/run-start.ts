@@ -64,18 +64,6 @@ function resolveBindHost(): string {
   );
 }
 
-function displayUrlHost(host: string): string {
-  return host === '0.0.0.0' || host === '::' ? 'localhost' : host;
-}
-
-function resolveWebUiHost(): string {
-  return displayUrlHost(resolveBindHost());
-}
-
-function resolveWebUiPort(): string {
-  return process.env.BOT_WEB_UI_PORT?.trim() || '5551';
-}
-
 function botEnv(): NodeJS.ProcessEnv {
   const setupEnv = {
     BOT_SETUP_BILLBOARD: shouldShowSetup()
@@ -97,7 +85,6 @@ function botEnv(): NodeJS.ProcessEnv {
     ...process.env,
     ...setupEnv,
     BOT_WEB_HOST: resolveBindHost(),
-    BOT_SETUP_UI_ORIGIN: `http://${resolveWebUiHost()}:${resolveWebUiPort()}`,
     BOT_WEB_STATIC: '1',
   };
 }

@@ -4,9 +4,24 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.2.4] - 2026-08-20
+
+- feat: AI intervention and session diff tools --minor (26812a3)
+- feat: add authenticated OpenAI-compatible inference API --minor (ca0c700)
+- feat: capability labeling fix with NIP-32 and plugin release management improvements --minor (31f8b2c)
+- feat: new gallery section --minor (b5e5908)
+- docs: new bottomup design document --patch (ba5b274)
+- feat: milestone 1 for plugins releases changes --minor (087338a)
+- fix: some of the plugins workflow has been fixed --patch (93e82a3)
+- feat: opencode added support for `question.asked` message and the question/prompt widget --minor (ac93890)
+- fix: refactor roadmap as a library to be used by apps/landing and src/commands/roadmap which fixes the issue loading problem in src/commands/roadmap --patch (71d4a6e)
+- feat: many nostr post element fixes, added highlight support --minor (1d8bdff)
+- fix: added --host argument to run-start script --patch (bcd74bc)
+- fix: Production no longer sets BOT_SETUP_UI_ORIGIN to localhost (5d235ff)
+
 ## [v11.2.3] - 2026-08-12
 
-- chore: update packages (071c1b1)
+- chore: update packages (4ccae42)
 
 ## [v11.2.2] - 2026-08-12
 
