@@ -103,7 +103,6 @@ async function spawnNativePiper(props: SpawnNativePiperProps): Promise<Blob> {
       '-',
       '--length_scale',
       String(props.lengthScale),
-      '--quiet',
     ],
     {
       stdin: 'pipe',
