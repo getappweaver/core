@@ -11,7 +11,10 @@ node_modules
 .data/browser-profile/
 plugins.json
 plugins/
-generated/
+generated/*
+!generated/plugins/
+generated/plugins/*
+!generated/plugins/index.ts
 TOOLS.md
 .claude/skills/appweaver*
 .claude/skills/skill-status/
