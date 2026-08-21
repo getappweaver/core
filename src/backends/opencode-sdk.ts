@@ -63,6 +63,17 @@ let lastStartedPort: number | null = null;
 
 const DEFAULT_PORT_START = 4099;
 const DEFAULT_PORT_COUNT = 12;
+const SERVER_START_TIMEOUT_MS = 30_000;
+
+class OpenCodeServerStartTimeoutError extends Error {
+  constructor() {
+    super(
+      `Timeout waiting for server to start after ${SERVER_START_TIMEOUT_MS}ms`,
+    );
+
+    this.name = 'OpenCodeServerStartTimeoutError';
+  }
+}
 
 type PortAvailability =
   | {
@@ -596,8 +607,8 @@ async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
     const timeout = setTimeout(() => {
       cleanup();
       stopOpencodeServerProcess(proc);
-      reject(new Error(`Timeout waiting for server to start after 5000ms`));
-    }, 5000);
+      reject(new OpenCodeServerStartTimeoutError());
+    }, SERVER_START_TIMEOUT_MS);
 
     let output = '';
     let resolved = false;
@@ -706,6 +717,12 @@ async function initSdk(): Promise<SdkInstance> {
       return sdk;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (lastError instanceof OpenCodeServerStartTimeoutError) {
+        throw new Error(
+          `OpenCode SDK server failed to start on port ${port}: ${lastError.message}`,
+        );
+      }
 
       if (port === ports[ports.length - 1]) {
         break;
