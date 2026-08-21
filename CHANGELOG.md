@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.4.0] - 2026-08-21
+
+- feat: alpine OS setup script (c62cbd6)
+
 ## [v11.3.1] - 2026-08-21
 
-- fix: small wording fixes on version mismatch when the app coreApiVersion is less than current AppWeaver version (b562ece)
+- fix: small wording fixes on version mismatch when the app coreApiVersion is less than current AppWeaver version (9a70dfa)
 
 ## [v11.3.0] - 2026-08-21
 
