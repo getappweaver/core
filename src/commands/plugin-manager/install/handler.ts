@@ -80,6 +80,7 @@ export type PluginCatalogEntry = {
   installedAlias: string | null;
   installedVersion: string | null;
   compatibleRef: RefEntry | null;
+  coreCompatibilityVerified: boolean;
   latestRef: RefEntry | null;
   blockedUpdateRef: RefEntry | null;
   coreUpdateCanUnlockBlockedRef: boolean;
@@ -185,6 +186,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     installedAlias: null,
     installedVersion: null,
     compatibleRef: null,
+    coreCompatibilityVerified: false,
     latestRef: refs.at(-1) ?? null,
     blockedUpdateRef: null,
     coreUpdateCanUnlockBlockedRef: false,
@@ -1040,7 +1042,9 @@ function attachInstalledState({
         plugin.alias === entry.name,
     );
 
-    const compatibleRef = latestCompatibleRef(entry.refs, coreVersion);
+    const verifiedRef = latestCompatibleRef(entry.refs, coreVersion);
+    const latestRef = entry.refs.at(-1) ?? null;
+    const compatibleRef = verifiedRef ?? latestRef;
 
     const installedVersion = installed
       ? readLocalPluginPackageVersion({ dmBotRoot, alias: installed.alias })
@@ -1058,7 +1062,8 @@ function attachInstalledState({
       installedAlias: installed?.alias ?? null,
       installedVersion,
       compatibleRef,
-      latestRef: entry.refs.at(-1) ?? null,
+      coreCompatibilityVerified: verifiedRef !== null,
+      latestRef,
       blockedUpdateRef,
       coreUpdateCanUnlockBlockedRef: canCoreUpdateUnlockRef({
         ref: blockedUpdateRef,

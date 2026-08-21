@@ -22,12 +22,21 @@ export function renderPluginsInstallText(
   ];
 
   for (const entry of representation.entries) {
+    const coreMajor =
+      representation.coreVersion.split('.')[0] || representation.coreVersion;
+
+    const verification = entry.coreCompatibilityVerified
+      ? ''
+      : `; unverified on core ${coreMajor}`;
+
     const status = entry.installedAlias
       ? entry.updateAvailable || entry.blockedUpdateRef
-        ? `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; update(s) available`
-        : `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; up to date`
+        ? `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; update(s) available${verification}`
+        : `installed as ${entry.installedAlias} @ ${entry.installedVersion ?? 'unknown'}; up to date${verification}`
       : entry.compatibleRef
-        ? `compatible: ${entry.compatibleRef.tag}`
+        ? entry.coreCompatibilityVerified
+          ? `compatible: ${entry.compatibleRef.tag}`
+          : `unverified on core ${coreMajor}: ${entry.compatibleRef.tag}`
         : `not compatible with core ${representation.coreVersion}`;
 
     lines.push(`- ${entry.title || entry.name} (${status})`);

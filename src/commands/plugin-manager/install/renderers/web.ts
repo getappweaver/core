@@ -82,6 +82,7 @@ function versionStatus(
 ): WebNode {
   let label: string;
   let tone: 'muted' | 'success' | 'warning';
+  const coreMajor = coreVersion.split('.')[0] || coreVersion;
 
   if (entry.installedAlias) {
     const installedVersion = entry.installedVersion ?? 'unknown';
@@ -93,9 +94,19 @@ function versionStatus(
       label = `Installed: ${entry.installedAlias} @ ${installedVersion} · up to date`;
       tone = 'success';
     }
+
+    if (!entry.coreCompatibilityVerified) {
+      label += ` · unverified on core ${coreMajor}`;
+      tone = 'warning';
+    }
   } else if (entry.compatibleRef) {
-    label = `Compatible: ${entry.compatibleRef.tag}`;
-    tone = 'success';
+    if (entry.coreCompatibilityVerified) {
+      label = `Compatible: ${entry.compatibleRef.tag}`;
+      tone = 'success';
+    } else {
+      label = `Unverified on core ${coreMajor}: ${entry.compatibleRef.tag}`;
+      tone = 'warning';
+    }
   } else {
     const latest = entry.latestRef
       ? `${entry.latestRef.tag} / core ${entry.latestRef.coreApiVersion}`
