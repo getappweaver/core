@@ -96,12 +96,14 @@ type SetPiperConfigProps = {
   binaryPath: string;
   modelPath: string;
   libraryPath: string;
+  serviceEnabled: boolean;
 };
 
 type SetPiperConfigResult = {
   binaryPath: string;
   modelPath: string;
   libraryPath: string;
+  serviceEnabled: boolean;
 };
 
 type DownloadPiperModelProps = {
@@ -318,11 +320,13 @@ export function setSetupPiperConfig({
   binaryPath,
   modelPath,
   libraryPath,
+  serviceEnabled,
 }: SetPiperConfigProps): SetPiperConfigResult {
   const values = {
     binaryPath: binaryPath.trim(),
     modelPath: modelPath.trim(),
     libraryPath: libraryPath.trim(),
+    serviceEnabled,
   };
 
   const envPath = join(dmBotRoot, '.env');
@@ -331,9 +335,16 @@ export function setSetupPiperConfig({
   setEnvInFile(envPath, 'BOT_PIPER_MODEL_PATH', values.modelPath);
   setEnvInFile(envPath, 'BOT_PIPER_LIBRARY_PATH', values.libraryPath);
 
+  setEnvInFile(
+    envPath,
+    'BOT_PIPER_SERVICE_ENABLED',
+    values.serviceEnabled ? '1' : '0',
+  );
+
   process.env.BOT_PIPER_BINARY_PATH = values.binaryPath;
   process.env.BOT_PIPER_MODEL_PATH = values.modelPath;
   process.env.BOT_PIPER_LIBRARY_PATH = values.libraryPath;
+  process.env.BOT_PIPER_SERVICE_ENABLED = values.serviceEnabled ? '1' : '0';
 
   return values;
 }

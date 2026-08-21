@@ -12,6 +12,7 @@ export type SetupStatus = {
     piperBinaryPath: boolean;
     piperModelPath: boolean;
     piperLibraryPath: boolean;
+    piperServiceEnabled: boolean;
   };
   defaults: SetupDefaults;
   runtime: {
@@ -29,6 +30,7 @@ export type SetupStatus = {
     modelPath: string;
     modelExists: boolean;
     libraryPath: string;
+    serviceEnabled: boolean;
   };
   dependencies: SetupDependencyStatus[];
 };
@@ -133,7 +135,16 @@ export type SetPiperConfigResponse = {
   binaryPath: string;
   modelPath: string;
   libraryPath: string;
+  serviceEnabled: boolean;
   status: SetupStatus;
+};
+
+type SetPiperConfigProps = {
+  token: string;
+  binaryPath: string;
+  modelPath: string;
+  libraryPath: string;
+  serviceEnabled: boolean;
 };
 
 export type DownloadPiperModelResponse = {
@@ -412,12 +423,9 @@ export async function setupWebPush(
   return (await res.json()) as SetupWebPushResponse;
 }
 
-export async function setPiperConfig(props: {
-  token: string;
-  binaryPath: string;
-  modelPath: string;
-  libraryPath: string;
-}): Promise<SetPiperConfigResponse> {
+export async function setPiperConfig(
+  props: SetPiperConfigProps,
+): Promise<SetPiperConfigResponse> {
   const res = await fetch('/api/setup/piper', {
     method: 'POST',
     headers: {
@@ -428,6 +436,7 @@ export async function setPiperConfig(props: {
       binaryPath: props.binaryPath,
       modelPath: props.modelPath,
       libraryPath: props.libraryPath,
+      serviceEnabled: props.serviceEnabled,
     }),
   });
 

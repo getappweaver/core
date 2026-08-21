@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.3.0] - 2026-08-21
+
+- feat: run piper as a service option added (766c46b)
+
 ## [v11.2.10] - 2026-08-21
 
-- fix: Cannot find module '../generated/plugins' when no plugin is installed (8c953cb)
+- fix: Cannot find module '../generated/plugins' when no plugin is installed (6df763f)
 
 ## [v11.2.9] - 2026-08-21
 

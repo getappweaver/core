@@ -23,6 +23,7 @@ type EnvStatus = {
   piperBinaryPath: boolean;
   piperModelPath: boolean;
   piperLibraryPath: boolean;
+  piperServiceEnabled: boolean;
 };
 
 type DependencyStatusProps = {
@@ -72,6 +73,7 @@ export type SetupStatus = {
     modelPath: string;
     modelExists: boolean;
     libraryPath: string;
+    serviceEnabled: boolean;
   };
   dependencies: SetupDependencyStatus[];
 };
@@ -189,6 +191,7 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
     piperBinaryPath: hasEnv('BOT_PIPER_BINARY_PATH'),
     piperModelPath: hasEnv('BOT_PIPER_MODEL_PATH'),
     piperLibraryPath: hasEnv('BOT_PIPER_LIBRARY_PATH'),
+    piperServiceEnabled: hasEnv('BOT_PIPER_SERVICE_ENABLED'),
   };
 
   return {
@@ -218,6 +221,7 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
       modelPath: piper.modelPath,
       modelExists: piper.modelExists,
       libraryPath: piper.libraryPath,
+      serviceEnabled: piper.serviceEnabled,
     },
     dependencies: setupDependencies(),
   };

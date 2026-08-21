@@ -112,7 +112,11 @@ import { asProviderDb } from './providers/db';
 import { getOrCreateCurrentSession } from './session';
 import { initializeWorkspaceSkills } from './skills/manager';
 import { openWalletDb } from './wallet/db';
-import { getNativePiperStatus } from './web/native-tts';
+import {
+  disposeNativePiperService,
+  getNativePiperStatus,
+  startNativePiperService,
+} from './web/native-tts';
 import { publishWidgetIcons } from './web/publish-widget-icons';
 import { notifyAllWebPushSubscriptions } from './web/push-send';
 import { resolveHost, resolvePort, startLocalWebServer } from './web/server';
@@ -147,6 +151,22 @@ async function closeActiveNostrResources(): Promise<void> {
 
 async function waitForever(): Promise<never> {
   return new Promise(() => {});
+}
+
+function startConfiguredPiperService(): void {
+  const status = getNativePiperStatus(dmBotRoot);
+
+  if (!status.serviceEnabled) {
+    return;
+  }
+
+  void startNativePiperService(dmBotRoot)
+    .then(() => log.info('Piper TTS service ready on http://127.0.0.1:5000/'))
+    .catch((err) => {
+      log.warn(
+        `Piper TTS service failed to start: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
 }
 
 function readPackageVersion(): string {
@@ -193,6 +213,17 @@ async function startSetupOnlyMode(props: {
 
   log.info(`${C.bold}Piper libs:${C.reset} ${piperStatus.libraryPath}`);
   log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
+  startConfiguredPiperService();
+
+  process.once('SIGINT', () => {
+    disposeNativePiperService();
+    process.exit(130);
+  });
+
+  process.once('SIGTERM', () => {
+    disposeNativePiperService();
+    process.exit(143);
+  });
 
   startLocalWebServer({
     prefix,
@@ -328,6 +359,7 @@ async function main() {
 
     shuttingDown = true;
     disposeOpencodeSdk();
+    disposeNativePiperService();
     await closeActiveNostrResources();
     process.exit(exitCode);
   }
@@ -364,6 +396,7 @@ async function main() {
 
   log.info(`${C.bold}Piper libs:${C.reset} ${piperStatus.libraryPath}`);
   log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
+  startConfiguredPiperService();
 
   const statusRep = createBotStatusRepresentation({
     botRelayUrls,
@@ -797,6 +830,7 @@ async function main() {
 main().catch(async (err) => {
   console.error(err);
   disposeOpencodeSdk();
+  disposeNativePiperService();
   await closeActiveNostrResources();
   process.exit(1);
 });

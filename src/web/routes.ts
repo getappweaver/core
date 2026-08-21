@@ -1068,13 +1068,15 @@ export function createWebFetchHandler(
               binaryPath?: unknown;
               modelPath?: unknown;
               libraryPath?: unknown;
+              serviceEnabled?: unknown;
             } | null;
 
             if (
               !input ||
               typeof input.binaryPath !== 'string' ||
               typeof input.modelPath !== 'string' ||
-              typeof input.libraryPath !== 'string'
+              typeof input.libraryPath !== 'string' ||
+              typeof input.serviceEnabled !== 'boolean'
             ) {
               throw new Error('invalid_piper_config');
             }
@@ -1084,6 +1086,7 @@ export function createWebFetchHandler(
               binaryPath: input.binaryPath,
               modelPath: input.modelPath,
               libraryPath: input.libraryPath,
+              serviceEnabled: input.serviceEnabled,
             });
 
             return jsonResponse({

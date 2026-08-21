@@ -32,6 +32,12 @@ export function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
     props.status.piper.libraryPath,
   );
 
+  const [serviceEnabled, setServiceEnabled] = createSignal(
+    props.status.env.piperServiceEnabled
+      ? props.status.piper.serviceEnabled
+      : true,
+  );
+
   const [saving, setSaving] = createSignal(false);
   const [downloading, setDownloading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -41,6 +47,12 @@ export function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
     setBinaryPath(props.status.piper.binaryPath);
     setModelPath(props.status.piper.modelPath);
     setLibraryPath(props.status.piper.libraryPath);
+
+    setServiceEnabled(
+      props.status.env.piperServiceEnabled
+        ? props.status.piper.serviceEnabled
+        : true,
+    );
   });
 
   async function save(): Promise<void> {
@@ -54,6 +66,7 @@ export function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
         binaryPath: binaryPath(),
         modelPath: modelPath(),
         libraryPath: libraryPath(),
+        serviceEnabled: serviceEnabled(),
       });
 
       setMessage('Piper environment saved.');
@@ -146,6 +159,21 @@ export function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
           </small>
         </label>
       </div>
+      <label class="field-block setup-checkbox-field">
+        <span class="setup-checkbox-row">
+          <input
+            type="checkbox"
+            class="checkbox-retro"
+            checked={serviceEnabled()}
+            onChange={(event) => setServiceEnabled(event.currentTarget.checked)}
+          />
+          Use Piper as a service
+        </span>
+        <small>
+          Keep Piper and its voice model loaded for faster speech generation.
+          Python module installations also require Flask.
+        </small>
+      </label>
       <div class="setup-step-actions">
         <Show when={detectedPiper()}>
           {(path) => (

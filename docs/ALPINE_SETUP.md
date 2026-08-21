@@ -33,7 +33,7 @@ doas apk add py3-pip
 doas vi /etc/apk/repositories
 # add `@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing`
 apk update
-apk add py3-piper-tts@testing
+apk add py3-piper-tts@testing py3-flask
 
 python3 -m piper.download_voices en_US-lessac-medium
 echo "Hello from Alpine Linux. Piper TTS is working perfectly." | \
@@ -51,6 +51,11 @@ cd ~/my-workspace
 git clone --depth=1 https://github.com/getappweaver/core.git appweaver
 cd appweaver
 bun install
+
+# AppWeaver Piper configuration
+printf '\nBOT_PIPER_BINARY_PATH=python3 -m piper\n' >> .env
+printf 'BOT_PIPER_MODEL_PATH=%s/piper/en_US-lessac-medium.onnx\n' "$HOME" >> .env
+printf 'BOT_PIPER_SERVICE_ENABLED=1\n' >> .env
 ```
 
 ## Caddy Setup
@@ -99,7 +104,24 @@ ssh -i ~/.ssh/lnvps_ed25519 alpine@vm-1903.lnvps.cloud 'mkdir -p ~/.local/share/
 scp -i ~/.ssh/lnvps_ed25519 ~/.local/share/opencode/auth.json alpine@vm-1903.lnvps.cloud:~/.local/share/opencode/auth.json
 ```
 
-Opencode: will try setup screen
+or
+
+Edit `/etc/ssh/sshd_config` to have:
+AllowTcpForwarding local
+DisableForwarding no
+PermitOpen 127.0.0.1:1455
+
+then
+
+```bash
+ssh -i ~/.ssh/lnvps_ed25519 \
+  -o ExitOnForwardFailure=yes \
+  -N \
+  -L 127.0.0.1:1455:127.0.0.1:1455 \
+  alpine@vm-1903.lnvps.cloud
+```
+
+to forward port so local call would reach to VPS's opencode port so the auth on setup page would work.
 
 ## RUN
 
