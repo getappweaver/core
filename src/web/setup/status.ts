@@ -88,7 +88,17 @@ function dependencyStatus(props: DependencyStatusProps): SetupDependencyStatus {
   };
 }
 
-function setupDependencies(): SetupDependencyStatus[] {
+function setupDependencies(piperConfigured: boolean): SetupDependencyStatus[] {
+  const piper = dependencyStatus({
+    name: 'Piper',
+    command: 'piper',
+    required: false,
+    installHint:
+      'Install Piper TTS, then reload this page. Use the detected path in Piper Speech below, or enter a command such as python3 -m piper.',
+    installUrl: 'https://github.com/OHF-Voice/piper1-gpl',
+    installCommand: 'pip install piper-tts',
+  });
+
   return [
     dependencyStatus({
       name: 'Bun',
@@ -157,15 +167,7 @@ function setupDependencies(): SetupDependencyStatus[] {
       installCommand:
         'curl -sSL https://raw.githubusercontent.com/fiatjaf/nak/master/install.sh | sh',
     }),
-    dependencyStatus({
-      name: 'Piper',
-      command: 'piper',
-      required: false,
-      installHint:
-        'Install Piper TTS, then reload this page. Use the detected path in Piper Speech below, or enter a command such as python3 -m piper.',
-      installUrl: 'https://github.com/OHF-Voice/piper1-gpl',
-      installCommand: 'pip install piper-tts',
-    }),
+    { ...piper, installed: piper.installed || piperConfigured },
   ];
 }
 
@@ -223,6 +225,6 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
       libraryPath: piper.libraryPath,
       serviceEnabled: piper.serviceEnabled,
     },
-    dependencies: setupDependencies(),
+    dependencies: setupDependencies(piper.binaryExists),
   };
 }
