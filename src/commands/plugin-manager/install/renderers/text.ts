@@ -8,6 +8,10 @@ function indentedChangelog(changelog: string): string[] {
   return changelog.split('\n').map((line) => `      ${line}`);
 }
 
+function testedCoreMajor(coreApiVersion: string): string {
+  return coreApiVersion.match(/\d+/)?.[0] ?? 'unknown';
+}
+
 export function renderPluginsInstallText(
   representation: PluginsInstallRepresentation,
   options: { prefix: string },
@@ -22,12 +26,9 @@ export function renderPluginsInstallText(
   ];
 
   for (const entry of representation.entries) {
-    const coreMajor =
-      representation.coreVersion.split('.')[0] || representation.coreVersion;
-
     const verification = entry.coreCompatibilityVerified
       ? ''
-      : `; unverified on core ${coreMajor}`;
+      : `; latest tested on core ${testedCoreMajor(entry.compatibleRef?.coreApiVersion ?? '')}`;
 
     const status = entry.installedAlias
       ? entry.updateAvailable || entry.blockedUpdateRef
@@ -36,7 +37,7 @@ export function renderPluginsInstallText(
       : entry.compatibleRef
         ? entry.coreCompatibilityVerified
           ? `compatible: ${entry.compatibleRef.tag}`
-          : `unverified on core ${coreMajor}: ${entry.compatibleRef.tag}`
+          : `latest tested on core ${testedCoreMajor(entry.compatibleRef.coreApiVersion)}`
         : `not compatible with core ${representation.coreVersion}`;
 
     lines.push(`- ${entry.title || entry.name} (${status})`);
@@ -51,7 +52,11 @@ export function renderPluginsInstallText(
     }
 
     if (entry.updateAvailable && entry.compatibleRef) {
-      lines.push(`  install: ${entry.compatibleRef.tag}`);
+      lines.push(
+        entry.coreCompatibilityVerified
+          ? `  install: ${entry.compatibleRef.tag}`
+          : `  install anyway: ${entry.compatibleRef.tag}`,
+      );
     }
 
     if (entry.blockedUpdateRef) {

@@ -76,13 +76,16 @@ const pluginsInstallStylesheet = {
   `,
 } as const;
 
+function testedCoreMajor(entry: PluginCatalogEntry): string {
+  return entry.compatibleRef?.coreApiVersion.match(/\d+/)?.[0] ?? 'unknown';
+}
+
 function versionStatus(
   entry: PluginCatalogEntry,
   coreVersion: string,
 ): WebNode {
   let label: string;
   let tone: 'muted' | 'success' | 'warning';
-  const coreMajor = coreVersion.split('.')[0] || coreVersion;
 
   if (entry.installedAlias) {
     const installedVersion = entry.installedVersion ?? 'unknown';
@@ -96,7 +99,7 @@ function versionStatus(
     }
 
     if (!entry.coreCompatibilityVerified) {
-      label += ` · unverified on core ${coreMajor}`;
+      label += ` · latest tested on core ${testedCoreMajor(entry)}`;
       tone = 'warning';
     }
   } else if (entry.compatibleRef) {
@@ -104,7 +107,7 @@ function versionStatus(
       label = `Compatible: ${entry.compatibleRef.tag}`;
       tone = 'success';
     } else {
-      label = `Unverified on core ${coreMajor}: ${entry.compatibleRef.tag}`;
+      label = `Latest tested on core ${testedCoreMajor(entry)}`;
       tone = 'warning';
     }
   } else {
@@ -135,7 +138,12 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
     return null;
   }
 
-  const label = `Install ${entry.compatibleRef.tag}`;
+  const label = entry.coreCompatibilityVerified
+    ? `Install ${entry.compatibleRef.tag}`
+    : isUpdate
+      ? 'Update anyway'
+      : 'Install anyway';
+
   const pending = isUpdate ? 'Updating' : 'Installing';
   const success = isUpdate ? 'Successfully updated' : 'Successfully installed';
 

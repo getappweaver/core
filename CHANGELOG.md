@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.3.1] - 2026-08-21
+
+- fix: small wording fixes on version mismatch when the app coreApiVersion is less than current AppWeaver version (b562ece)
+
 ## [v11.3.0] - 2026-08-21
 
-- feat: run piper as a service option added (766c46b)
+- feat: run piper as a service option added (bd4b900)
 
 ## [v11.2.10] - 2026-08-21
 
