@@ -118,7 +118,7 @@ export function PiperSetupCard(props: PiperSetupCardProps): JSX.Element {
           <small>
             {detectedPiper()
               ? `Detected on PATH: ${detectedPiper()}`
-              : 'Install Piper, then enter the full binary path.'}
+              : 'Enter an executable path or command, such as python3 -m piper.'}
           </small>
         </label>
         <label class="field-block">

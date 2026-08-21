@@ -4,10 +4,14 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.2.6] - 2026-08-21
+
+- fix: piper binary now accepts "python3 -m piper" (237d4fe)
+
 ## [v11.2.5] - 2026-08-20
 
 - fix: nak is an optional dependency --patch (8442bb7)
-- fix: setup redirect bug (a86034f)
+- fix: setup redirect bug (017d211)
 
 ## [v11.2.4] - 2026-08-20
 

@@ -1,6 +1,9 @@
 import { existsSync } from 'fs';
+import { homedir } from 'os';
 
 import { spawn } from 'bun';
+
+import { findExecutablePath } from '@src/executable';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TEXT_LENGTH = 20_000;
@@ -9,6 +12,11 @@ type NativePiperPaths = {
   binaryPath: string;
   modelPath: string;
   libraryPath: string;
+};
+
+type NativePiperCommand = {
+  executable: string;
+  prefixArgs: string[];
 };
 
 export type NativePiperStatus = NativePiperPaths & {
@@ -32,9 +40,30 @@ function resolveNativePiperPaths(dmBotRoot: string): NativePiperPaths {
 
   return {
     binaryPath: process.env.BOT_PIPER_BINARY_PATH?.trim() ?? '',
-    modelPath: process.env.BOT_PIPER_MODEL_PATH?.trim() ?? '',
-    libraryPath: process.env.BOT_PIPER_LIBRARY_PATH?.trim() ?? '',
+    modelPath: expandHomePath(process.env.BOT_PIPER_MODEL_PATH?.trim() ?? ''),
+    libraryPath: expandHomePath(
+      process.env.BOT_PIPER_LIBRARY_PATH?.trim() ?? '',
+    ),
   };
+}
+
+function expandHomePath(value: string): string {
+  return value.startsWith('~/') ? `${homedir()}/${value.slice(2)}` : value;
+}
+
+function resolveNativePiperCommand(
+  binaryPath: string,
+): NativePiperCommand | null {
+  const expanded = expandHomePath(binaryPath);
+
+  if (existsSync(expanded)) {
+    return { executable: expanded, prefixArgs: [] };
+  }
+
+  const [command, ...prefixArgs] = expanded.split(/\s+/).filter(Boolean);
+  const executable = command ? findExecutablePath(command) : null;
+
+  return executable ? { executable, prefixArgs } : null;
 }
 
 export function getNativePiperStatus(dmBotRoot: string): NativePiperStatus {
@@ -42,13 +71,13 @@ export function getNativePiperStatus(dmBotRoot: string): NativePiperStatus {
 
   return {
     ...paths,
-    binaryExists: paths.binaryPath.length > 0 && existsSync(paths.binaryPath),
+    binaryExists: resolveNativePiperCommand(paths.binaryPath) !== null,
     modelExists: paths.modelPath.length > 0 && existsSync(paths.modelPath),
   };
 }
 
 function assertNativePiperReady(paths: NativePiperPaths): void {
-  if (!existsSync(paths.binaryPath)) {
+  if (!resolveNativePiperCommand(paths.binaryPath)) {
     throw new Error(`native_piper_binary_missing:${paths.binaryPath}`);
   }
 
@@ -58,9 +87,16 @@ function assertNativePiperReady(paths: NativePiperPaths): void {
 }
 
 async function spawnNativePiper(props: SpawnNativePiperProps): Promise<Blob> {
+  const command = resolveNativePiperCommand(props.binaryPath);
+
+  if (!command) {
+    throw new Error(`native_piper_binary_missing:${props.binaryPath}`);
+  }
+
   const proc = spawn(
     [
-      props.binaryPath,
+      command.executable,
+      ...command.prefixArgs,
       '--model',
       props.modelPath,
       '--output_file',

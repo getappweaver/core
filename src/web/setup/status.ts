@@ -162,7 +162,7 @@ function setupDependencies(): SetupDependencyStatus[] {
       command: 'piper',
       required: false,
       installHint:
-        'Install Piper TTS, then reload this page. Use the detected path in Piper Speech below, or set BOT_PIPER_BINARY_PATH manually.',
+        'Install Piper TTS, then reload this page. Use the detected path in Piper Speech below, or enter a command such as python3 -m piper.',
       installUrl: 'https://github.com/OHF-Voice/piper1-gpl',
       installCommand: 'pip install piper-tts',
     }),
