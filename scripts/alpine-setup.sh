@@ -168,9 +168,9 @@ set_env BOT_SETUP_UI_ORIGIN "https://$DOMAIN"
 readonly CADDY_CONFIG="$(mktemp /tmp/appweaver-caddy.XXXXXX)"
 trap 'rm -f "$PIPER_TEST_FILE" "$CADDY_CONFIG"' EXIT
 printf '%s {\n\treverse_proxy 127.0.0.1:5551\n}\n' "$DOMAIN" > "$CADDY_CONFIG"
-caddy validate --config "$CADDY_CONFIG"
+caddy validate --config "$CADDY_CONFIG" --adapter caddyfile
 run_root tee /etc/caddy/Caddyfile < "$CADDY_CONFIG" >/dev/null
-run_root caddy validate --config /etc/caddy/Caddyfile
+run_root caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 run_root rc-update add caddy default
 run_root rc-service caddy restart
 

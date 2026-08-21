@@ -15,15 +15,12 @@ Before running it, ensure:
 Run these commands on a fresh Alpine Linux server:
 
 ```bash
+doas apk add git
 mkdir my-workspace && cd my-workspace
 git clone --depth=1 https://github.com/getappweaver/core.git appweaver
 cd appweaver
-doas chmod a+x scripts/alpine-setup.sh
 ./scripts/alpine-setup.sh
 ```
-
-`git` must already be available to clone the repository. If it is not included
-in the Alpine image, install it first with `doas apk add git`.
 
 The script is safe to rerun. It updates existing AppWeaver settings instead of
 adding duplicate entries to `.env` or `~/.profile`.

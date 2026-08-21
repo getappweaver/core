@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.4.1] - 2026-08-21
+
+- fix: alpine OS setup script on git dependency and caddy setup (64ab712)
+
 ## [v11.4.0] - 2026-08-21
 
-- feat: alpine OS setup script (c62cbd6)
+- feat: alpine OS setup script (b693618)
 
 ## [v11.3.1] - 2026-08-21
 
