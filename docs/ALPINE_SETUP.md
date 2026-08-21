@@ -28,6 +28,7 @@ adding duplicate entries to `.env` or `~/.profile`.
 ## Run
 
 ```bash
+. "$HOME/.profile"
 bun run scripts/run-start.ts --host 127.0.0.1
 ```
 

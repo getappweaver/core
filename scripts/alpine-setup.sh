@@ -176,5 +176,6 @@ run_root rc-service caddy restart
 
 info 'Alpine setup complete'
 printf 'Start AppWeaver from %s with:\n\n' "$APPWEAVER_DIR"
+printf '  . "$HOME/.profile"\n'
 printf '  bun run scripts/run-start.ts --host 127.0.0.1\n\n'
 printf 'Then open the HTTPS setup URL printed by AppWeaver.\n'
