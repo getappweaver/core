@@ -155,11 +155,18 @@ set_env BOT_PIPER_MODEL_PATH "$PIPER_MODEL"
 set_env BOT_PIPER_SERVICE_ENABLED '1'
 
 info 'Detecting the public hostname'
-PUBLIC_IP="$(ip -4 route get 1.1.1.1 | awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit } }')"
+if ! ROUTE_OUTPUT="$(ip -4 route get 1.1.1.1 2>&1)"; then
+  fail "Could not query the public IPv4 route: $ROUTE_OUTPUT"
+fi
+
+PUBLIC_IP="$(awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit } }' <<< "$ROUTE_OUTPUT")"
 [ -n "$PUBLIC_IP" ] || fail 'Could not detect the public IPv4 address.'
 
-REVERSE_DNS="$(dig +short -x "$PUBLIC_IP")"
-DOMAIN="$(printf '%s\n' "$REVERSE_DNS" | awk 'NF { sub(/\.$/, ""); print; exit }')"
+if ! REVERSE_DNS="$(dig +short -x "$PUBLIC_IP" 2>&1)"; then
+  fail "Reverse DNS lookup failed for $PUBLIC_IP: $REVERSE_DNS"
+fi
+
+DOMAIN="$(awk 'NF { sub(/\.$/, ""); print; exit }' <<< "$REVERSE_DNS")"
 [ -n "$DOMAIN" ] || fail "No reverse DNS hostname found for $PUBLIC_IP."
 printf 'Detected public hostname: %s\n' "$DOMAIN"
 
