@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.2.7] - 2026-08-21
+
+- fix: frontend setup page piper binary bug (9c16715)
+
 ## [v11.2.6] - 2026-08-21
 
-- fix: piper binary now accepts "python3 -m piper" (237d4fe)
+- fix: piper binary now accepts "python3 -m piper" (e72eee5)
 
 ## [v11.2.5] - 2026-08-20
 

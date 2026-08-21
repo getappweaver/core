@@ -1,5 +1,3 @@
-import { existsSync } from 'fs';
-
 import {
   getAgentBackend,
   getCurrentOrDefaultMode,
@@ -216,7 +214,7 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
     },
     piper: {
       binaryPath: process.env.BOT_PIPER_BINARY_PATH?.trim() ?? '',
-      binaryExists: piper.binaryPath.length > 0 && existsSync(piper.binaryPath),
+      binaryExists: piper.binaryExists,
       modelPath: piper.modelPath,
       modelExists: piper.modelExists,
       libraryPath: piper.libraryPath,
