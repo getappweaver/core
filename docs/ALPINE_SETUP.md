@@ -25,7 +25,25 @@ cd appweaver
 The script is safe to rerun. It updates existing AppWeaver settings instead of
 adding duplicate entries to `.env` or `~/.profile`.
 
+## OpenCode Authentication
+
+The setup script configures the Alpine SSH server to allow OpenCode's browser
+authentication callback on port 1455. Before starting AppWeaver, run this in a
+separate terminal on your local machine:
+
+```bash
+ssh -i ~/.ssh/lnvps_ed25519 \
+  -o ExitOnForwardFailure=yes \
+  -N \
+  -L 127.0.0.1:1455:127.0.0.1:1455 \
+  alpine@<reverse-dns-hostname>
+```
+
+Keep this command running until authentication finishes.
+
 ## Run
+
+Back in the Alpine SSH session, start AppWeaver:
 
 ```bash
 . "$HOME/.profile"
@@ -40,36 +58,3 @@ handled by the setup page.
 ```text
 https://<reverse-dns-hostname>/setup?secret=<generated-secret>
 ```
-
-## OpenCode Authentication
-
-OpenCode's browser authentication callback uses port 1455 on the server. Edit
-`/etc/ssh/sshd_config` on the Alpine server to allow only the required local
-forward:
-
-```text
-AllowTcpForwarding local
-DisableForwarding no
-PermitOpen 127.0.0.1:1455
-```
-
-Restart the SSH daemon after saving the file:
-
-```bash
-doas rc-service sshd restart
-```
-
-On your local machine, open the tunnel before starting OpenCode authentication
-from the setup page:
-
-```bash
-ssh -i ~/.ssh/lnvps_ed25519 \
-  -o ExitOnForwardFailure=yes \
-  -N \
-  -L 127.0.0.1:1455:127.0.0.1:1455 \
-  alpine@<reverse-dns-hostname>
-```
-
-Keep this command running until authentication finishes. It forwards the local
-callback to OpenCode's port on the Alpine server without copying credential
-files.

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.4.6] - 2026-08-22
+
+- fix: trying to simplify opencode port forwarding (1cf32c4)
+
 ## [v11.4.5] - 2026-08-21
 
-- fix: opencode timeout is 30s now, except EADDRINUSE (afbc2c4)
+- fix: opencode timeout is 30s now, except EADDRINUSE (8f13a00)
 
 ## [v11.4.4] - 2026-08-21
 

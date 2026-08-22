@@ -105,6 +105,7 @@ run_root apk add \
   iproute2 \
   nodejs \
   npm \
+  openssh-server \
   py3-flask \
   py3-pip \
   py3-piper-tts@testing \
@@ -181,7 +182,35 @@ run_root caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 run_root rc-update add caddy default
 run_root rc-service caddy restart
 
+info 'Configuring SSH port forwarding'
+readonly SSHD_CONFIG='/etc/ssh/sshd_config'
+[ -f "$SSHD_CONFIG" ] || fail "SSH server configuration not found at $SSHD_CONFIG."
+
+readonly SSHD_CONFIG_CANDIDATE="$(mktemp /tmp/appweaver-sshd-config.XXXXXX)"
+trap 'rm -f "$PIPER_TEST_FILE" "$CADDY_CONFIG" "$SSHD_CONFIG_CANDIDATE"' EXIT
+{
+  printf '%s\n' \
+    '# BEGIN APPWEAVER PORT FORWARDING' \
+    'AllowTcpForwarding local' \
+    'DisableForwarding no' \
+    'PermitOpen 127.0.0.1:1455' \
+    '# END APPWEAVER PORT FORWARDING'
+  run_root awk '
+    $0 == "# BEGIN APPWEAVER PORT FORWARDING" { managed = 1; next }
+    $0 == "# END APPWEAVER PORT FORWARDING" { managed = 0; next }
+    !managed { print }
+  ' "$SSHD_CONFIG"
+} > "$SSHD_CONFIG_CANDIDATE"
+
+run_root sshd -t -f "$SSHD_CONFIG_CANDIDATE"
+run_root tee "$SSHD_CONFIG" < "$SSHD_CONFIG_CANDIDATE" >/dev/null
+run_root sshd -t
+run_root rc-update add sshd default
+run_root rc-service sshd restart
+
 info 'Alpine setup complete'
+printf 'Before starting AppWeaver, open the authentication tunnel from a separate local terminal:\n\n'
+printf '  ssh -o ExitOnForwardFailure=yes -N -L 127.0.0.1:1455:127.0.0.1:1455 %s@%s\n\n' "$(id -un)" "$DOMAIN"
 printf 'Start AppWeaver from %s with:\n\n' "$APPWEAVER_DIR"
 printf '  . "$HOME/.profile"\n'
 printf '  bun run scripts/run-start.ts --host 127.0.0.1\n\n'
