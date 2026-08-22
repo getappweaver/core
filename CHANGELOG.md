@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.4.7] - 2026-08-22
+
+- fix: setup opencode config should have a retry button if /api/setup/opencode/auth (45s timeout) fails (064f3f2)
+
 ## [v11.4.6] - 2026-08-22
 
-- fix: trying to simplify opencode port forwarding (1cf32c4)
+- fix: trying to simplify opencode port forwarding (824d124)
 
 ## [v11.4.5] - 2026-08-21
 

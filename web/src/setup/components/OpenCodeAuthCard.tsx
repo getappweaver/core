@@ -490,7 +490,18 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
           <p class="setup-copy">Starting local OpenCode server...</p>
         </Match>
         <Match when={authStatus.error}>
-          <p class="setup-error-line">{String(authStatus.error)}</p>
+          <div>
+            <p class="setup-error-line">{String(authStatus.error)}</p>
+            <div class="setup-step-actions">
+              <button
+                type="button"
+                class="web-button"
+                onClick={() => void refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         </Match>
       </Switch>
     </section>

@@ -194,6 +194,7 @@ export type SetupSessionResponse = {
 };
 
 const SETUP_TOKEN_KEY = 'appweaver.setup.token';
+const OPENCODE_AUTH_STATUS_TIMEOUT_MS = 45_000;
 
 export function getSetupSecretFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get('secret');
@@ -502,6 +503,7 @@ export async function fetchOpenCodeAuthStatus(
 ): Promise<OpenCodeAuthStatus> {
   const res = await fetch('/api/setup/opencode/auth', {
     headers: setupAuthHeaders(token),
+    signal: AbortSignal.timeout(OPENCODE_AUTH_STATUS_TIMEOUT_MS),
   });
 
   if (!res.ok) {
