@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 // ---------------------------------------------------------------------------
 import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 
-import { debug, log } from '../logger';
+import { debug, log, stripAnsi } from '../logger';
 import { dmBotRoot } from '../paths';
 import type { ProviderName } from '../providers/types';
 import type { WebNode, WebNodeRoot } from '../web/ui-schema';
@@ -277,6 +277,7 @@ export type OpencodeSetupAuthorizeResult = {
   providerID: string;
   methodIndex: number;
   url: string | null;
+  code: string | null;
   method: string | null;
   instructions: string | null;
 };
@@ -865,6 +866,7 @@ async function startNativeOpenCodeAuth({
   methodLabel,
 }: StartNativeOpenCodeAuthProps): Promise<{
   url: string | null;
+  code: string | null;
   instructions: string | null;
 }> {
   return await new Promise((resolve, reject) => {
@@ -876,9 +878,11 @@ async function startNativeOpenCodeAuth({
 
     let output = '';
     let settled = false;
+    const isHeadless = /headless/i.test(methodLabel);
 
     function settle(value: {
       url: string | null;
+      code: string | null;
       instructions: string | null;
     }): void {
       if (settled) {
@@ -891,18 +895,53 @@ async function startNativeOpenCodeAuth({
       resolve(value);
     }
 
+    function failAuth(error: Error): void {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    }
+
+    function parseOutput(): { url: string | null; code: string | null } {
+      const text = stripAnsi(output);
+      const urlMatch = text.match(/https?:\/\/\S+/);
+      const codeMatch = text.match(/Enter code:\s*([A-Z0-9-]+)/i);
+
+      return {
+        url: urlMatch?.[0].replace(/[),.]+$/, '') ?? null,
+        code: codeMatch?.[1] ?? null,
+      };
+    }
+
     function scan(chunk: Buffer): void {
       output += chunk.toString('utf8');
-      const match = output.match(/https?:\/\/\S+/);
+      const result = parseOutput();
 
-      if (match) {
-        settle({ url: match[0].replace(/[),.]+$/, ''), instructions: null });
+      if (result.url && (!isHeadless || result.code)) {
+        settle({
+          ...result,
+          instructions: result.code
+            ? 'Open the authorization page, enter the one-time code, and complete sign-in. OpenCode will finish automatically.'
+            : 'Complete authorization in your browser. OpenCode will finish automatically.',
+        });
       }
     }
 
     const timer = setTimeout(() => {
+      const result = parseOutput();
+
+      if (isHeadless && !result.code) {
+        child.kill('SIGTERM');
+        failAuth(new Error('opencode_auth_device_code_not_found'));
+
+        return;
+      }
+
       settle({
-        url: null,
+        ...result,
         instructions:
           'OpenCode native auth login was started. Complete the provider flow in the browser or terminal, then refresh this status.',
       });
@@ -912,17 +951,11 @@ async function startNativeOpenCodeAuth({
     child.stderr?.on('data', scan);
 
     child.on('error', (err) => {
-      if (!settled) {
-        clearTimeout(timer);
-        reject(err);
-      }
+      failAuth(err);
     });
 
     child.on('exit', (code) => {
-      if (!settled) {
-        clearTimeout(timer);
-        reject(new Error(`opencode_auth_login_failed:${code ?? 'unknown'}`));
-      }
+      failAuth(new Error(`opencode_auth_login_failed:${code ?? 'unknown'}`));
     });
   });
 }
@@ -1027,6 +1060,7 @@ export async function authorizeOpencodeSetupProvider(props: {
     providerID: props.providerID,
     methodIndex: props.methodIndex,
     url: nativeResult.url,
+    code: nativeResult.code,
     method: method.type,
     instructions: nativeResult.instructions,
   };

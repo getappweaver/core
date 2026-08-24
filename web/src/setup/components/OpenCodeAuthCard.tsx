@@ -48,6 +48,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [envValues, setEnvValues] = createSignal<Record<string, string>>({});
   const [savingApiKey, setSavingApiKey] = createSignal(false);
   const [pollingAuth, setPollingAuth] = createSignal(false);
+  const [deviceCodeCopied, setDeviceCodeCopied] = createSignal(false);
 
   const [authorizeResult, setAuthorizeResult] =
     createSignal<OpenCodeAuthorizeResponse | null>(null);
@@ -113,6 +114,9 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
 
     return Boolean(method && method.type !== 'api');
   };
+
+  const selectedMethodIsHeadless = () =>
+    /headless/i.test(selectedAuthMethod()?.label ?? '');
 
   const shouldShowEnvInputs = () => {
     const provider = selectedProvider();
@@ -219,6 +223,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     setAuthorizing(true);
     setAuthorizeError(null);
     setAuthorizeResult(null);
+    setDeviceCodeCopied(false);
 
     try {
       const result = await authorizeOpenCodeProvider({
@@ -236,6 +241,15 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
       setAuthorizeError(err instanceof Error ? err.message : String(err));
     } finally {
       setAuthorizing(false);
+    }
+  }
+
+  async function copyDeviceCode(code: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(code);
+      setDeviceCodeCopied(true);
+    } catch (err) {
+      setAuthorizeError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -347,6 +361,14 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                               )}
                             </For>
                           </select>
+                          <Show when={selectedMethodIsHeadless()}>
+                            <small>
+                              For ChatGPT, first enable device code
+                              authorization in ChatGPT Settings &gt; Security.
+                              OpenCode will generate the one-time code after you
+                              start authentication.
+                            </small>
+                          </Show>
                         </label>
                       </Show>
                       <Show when={shouldShowEnvInputs()}>
@@ -463,9 +485,25 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                     <Show when={result().instructions}>
                       {(instructions) => <p>{instructions()}</p>}
                     </Show>
+                    <Show when={result().code}>
+                      {(code) => (
+                        <div class="setup-auth-device-code">
+                          <span>One-time code</span>
+                          <code>{code()}</code>
+                          <button
+                            type="button"
+                            class="web-button"
+                            onClick={() => void copyDeviceCode(code())}
+                          >
+                            {deviceCodeCopied() ? 'Copied' : 'Copy code'}
+                          </button>
+                        </div>
+                      )}
+                    </Show>
                     <p class="setup-copy">
-                      Complete the provider flow, then click Refresh. If a
-                      browser window did not open, use the link above.
+                      Complete the provider flow in the new tab. This section
+                      checks OpenCode automatically while authorization is in
+                      progress.
                     </p>
                   </div>
                 )}

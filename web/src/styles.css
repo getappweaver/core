@@ -692,6 +692,30 @@ pre {
   color: var(--color-text-muted);
 }
 
+.setup-auth-device-code {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.75rem 0;
+}
+
+.setup-auth-device-code span {
+  color: var(--color-text-muted);
+}
+
+.setup-auth-device-code code {
+  padding: 0.35rem 0.5rem;
+  color: var(--color-warning);
+  background: var(--color-background);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.setup-auth-device-code .web-button {
+  margin-left: auto;
+}
+
 .setup-inline-code {
   color: var(--color-warning);
   overflow-wrap: anywhere;
@@ -717,6 +741,15 @@ pre {
 }
 
 @media (max-width: 640px) {
+  .setup-auth-device-code {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .setup-auth-device-code .web-button {
+    margin-left: 0;
+  }
+
   .setup-card-head,
   .setup-status-row {
     align-items: flex-start;

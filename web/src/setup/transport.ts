@@ -184,6 +184,7 @@ export type OpenCodeAuthorizeResponse = {
   providerID: string;
   methodIndex: number;
   url: string | null;
+  code: string | null;
   method: string | null;
   instructions: string | null;
 };
