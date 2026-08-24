@@ -5,7 +5,7 @@ user dependencies, downloads the default Piper voice, installs the project
 packages, and configures Caddy using the machine's reverse DNS hostname.
 
 Before running it, ensure:
-
+- Preserve /var/lib/caddy between reinstalls. It contains the ACME account and issued certificates. Good for rate limits.
 - The current user can run `doas` commands, or run the script as root.
 - The server has a reverse DNS record pointing to its public IPv4 address.
 - Inbound TCP ports 80 and 443 are open.
