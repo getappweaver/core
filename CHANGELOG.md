@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v11.5.2] - 2026-08-24
+
+- fix: preserve Nostr reference sharing settings (6200291)
+
 ## [v11.5.1] - 2026-08-24
 
-- fix: settle interrupted OpenCode prompts safely (37f078b)
+- fix: settle interrupted OpenCode prompts safely (ed5b89b)
 
 ## [v11.5.0] - 2026-08-24
 

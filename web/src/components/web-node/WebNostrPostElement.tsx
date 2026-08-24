@@ -10,6 +10,7 @@ import {
   useContext,
 } from 'solid-js';
 
+import { nostrShareUrl, type NostrSharePrefixes } from '@src/web/nostr-share';
 import type {
   WebAction,
   WebNode,
@@ -519,7 +520,21 @@ function HighlightContent(props: HighlightContentProps): JSX.Element {
   );
 }
 
-function openNostrEventHref(reference: WebNostrPostReference): string | null {
+function effectiveSharePrefixes(
+  reference: WebNostrPostReference,
+  fallback?: WebNostrPostReference['sharePrefixes'],
+): NostrSharePrefixes {
+  return {
+    nevent: reference.sharePrefixes?.nevent ?? fallback?.nevent ?? 'nostr://',
+    nprofile:
+      reference.sharePrefixes?.nprofile ?? fallback?.nprofile ?? 'nostr://',
+  };
+}
+
+function openNostrEventHref(
+  reference: WebNostrPostReference,
+  fallbackSharePrefixes?: WebNostrPostReference['sharePrefixes'],
+): string | null {
   if (!reference.id) {
     return null;
   }
@@ -532,7 +547,11 @@ function openNostrEventHref(reference: WebNostrPostReference): string | null {
       kind: reference.kind,
     });
 
-    return `${reference.sharePrefixes?.nevent ?? 'nostr:'}${nevent}`;
+    return nostrShareUrl({
+      type: 'nevent',
+      identifier: nevent,
+      prefixes: effectiveSharePrefixes(reference, fallbackSharePrefixes),
+    });
   } catch {
     return null;
   }
@@ -1672,6 +1691,7 @@ function ReferenceCard(props: {
   onOpenImage: OpenImagePreview;
   onRetryResolution?: () => void;
   currentUserPubkey: string | null;
+  sharePrefixes?: WebNostrPostReference['sharePrefixes'];
   depth?: number;
   visitedIds?: Set<string>;
 }): JSX.Element {
@@ -1682,6 +1702,10 @@ function ReferenceCard(props: {
     createSignal<WebNostrPostReference | null>(null);
 
   const reference = () => referenceOverride() ?? props.reference;
+
+  const sharePrefixes = () =>
+    effectiveSharePrefixes(reference(), props.sharePrefixes);
+
   const depth = () => props.depth ?? 0;
   const visitedIds = () => props.visitedIds ?? new Set<string>();
   const name = () => referenceDisplayName(reference());
@@ -1700,10 +1724,11 @@ function ReferenceCard(props: {
   const showActions = () => reference().showActions !== false;
   const getEntityPending = useContext(WebPendingEntityContext);
 
-  const referencePending = () =>
-    reference().entityKey
-      ? getEntityPending(reference().entityKey).pending
-      : false;
+  const referencePending = () => {
+    const key = reference().entityKey;
+
+    return key ? getEntityPending(key).pending : false;
+  };
 
   const translation = createPostTranslation({
     runAction: props.runAction,
@@ -1727,7 +1752,12 @@ function ReferenceCard(props: {
   );
 
   const openProfile = () =>
-    props.runAction(profileActionForReference(reference()));
+    props.runAction(
+      profileActionForReference({
+        ...reference(),
+        sharePrefixes: sharePrefixes(),
+      }),
+    );
 
   const resolutionStatus = () => referenceResolutionStatus(reference());
 
@@ -1947,7 +1977,12 @@ function ReferenceCard(props: {
                       SUPPORTED_NOSTR_CONTENT_KINDS.has(reference().kind!)
                     }
                     fallback={
-                      <Show when={openNostrEventHref(reference())}>
+                      <Show
+                        when={openNostrEventHref(
+                          reference(),
+                          props.sharePrefixes,
+                        )}
+                      >
                         {(href) => (
                           <a
                             class="web-nostrPost__replyLink"
@@ -1979,7 +2014,7 @@ function ReferenceCard(props: {
                 <HighlightContent
                   content={reference().content ?? ''}
                   source={reference().source}
-                  sharePrefixes={reference().sharePrefixes}
+                  sharePrefixes={sharePrefixes()}
                   sourceLoaded={loadedSourceReference() !== null}
                   onToggleSource={toggleHighlightSource}
                   runAction={props.runAction}
@@ -1992,6 +2027,7 @@ function ReferenceCard(props: {
                     runAction={props.runAction}
                     onOpenImage={props.onOpenImage}
                     currentUserPubkey={props.currentUserPubkey}
+                    sharePrefixes={sharePrefixes()}
                     depth={depth() + 1}
                     visitedIds={new Set(visitedIds()).add(reference().id ?? '')}
                   />
@@ -2012,6 +2048,7 @@ function ReferenceCard(props: {
                         onOpenImage={props.onOpenImage}
                         onRetryResolution={props.onRetryResolution}
                         currentUserPubkey={props.currentUserPubkey}
+                        sharePrefixes={sharePrefixes()}
                         depth={depth() + 1}
                         visitedIds={new Set(visitedIds()).add(
                           reference().id ?? '',
@@ -2241,6 +2278,7 @@ export function WebNostrPostElement(
       includeDirectReplies: false,
       replyLimit: 1,
       threadContextOnly: true,
+      resolutionMode: unresolved[0]?.resolutionMode ?? 'persistent',
     })
       .then((response) => {
         const eventsById = new Map(
@@ -2568,6 +2606,7 @@ export function WebNostrPostElement(
                     onOpenImage={openLightboxImage}
                     onRetryResolution={() => void resolveThreadContext()}
                     currentUserPubkey={currentUserPubkey()}
+                    sharePrefixes={elementProps()?.nostrSharePrefixes}
                   />
                 )}
               </For>
@@ -2694,6 +2733,7 @@ export function WebNostrPostElement(
               runAction={props.runAction}
               onOpenImage={openLightboxImage}
               currentUserPubkey={currentUserPubkey()}
+              sharePrefixes={elementProps()?.nostrSharePrefixes}
             />
           )}
         </Show>
@@ -2718,6 +2758,7 @@ export function WebNostrPostElement(
                   runAction={props.runAction}
                   onOpenImage={openLightboxImage}
                   currentUserPubkey={currentUserPubkey()}
+                  sharePrefixes={elementProps()?.nostrSharePrefixes}
                 />
               )}
             </For>
