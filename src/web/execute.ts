@@ -64,6 +64,10 @@ function pushArgumentTokens(
   if (argument.variadic) {
     if (Array.isArray(value)) {
       for (const item of value) {
+        if (item === '') {
+          continue;
+        }
+
         tokens.push(stringifyScalar(item));
       }
 

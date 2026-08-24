@@ -705,7 +705,14 @@ function summarizeInvocation(
 
   for (const value of Object.values(values.arguments)) {
     if (value !== '' && value != null) {
-      parts.push(String(value));
+      parts.push(
+        Array.isArray(value)
+          ? value
+              .filter((item) => item !== '')
+              .map(String)
+              .join(' ')
+          : String(value),
+      );
     }
   }
 
@@ -713,7 +720,15 @@ function summarizeInvocation(
     if (value === true) {
       parts.push(`--${key}`);
     } else if (value !== false && value !== '' && value != null) {
-      parts.push(`--${key}`, String(value));
+      parts.push(
+        `--${key}`,
+        Array.isArray(value)
+          ? value
+              .filter((item) => item !== '')
+              .map(String)
+              .join(' ')
+          : String(value),
+      );
     }
   }
 

@@ -306,10 +306,10 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
         const target = optionFieldNames.has(key) ? mergedOptions : mergedArgs;
         const existing = target[key];
 
-        if (existing === undefined) {
+        if (existing === undefined || existing === '') {
           target[key] = value;
         } else if (Array.isArray(existing)) {
-          existing.push(value);
+          target[key] = [...existing.filter((item) => item !== ''), value];
         } else {
           target[key] = [existing, value];
         }
