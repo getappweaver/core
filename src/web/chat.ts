@@ -10,6 +10,7 @@ import {
   getWorkspaceInstructions,
 } from '@src/db';
 import { getWorkspaceTarget } from '@src/db';
+import { debug } from '@src/logger';
 import { getOrCreateCurrentSession } from '@src/session';
 
 import type { WebRouteContext } from './routes';
@@ -55,6 +56,14 @@ export async function runWebChat(
 
   onSessionReady?.(sessionId);
 
+  debug('web chat handing prompt to backend', {
+    backend: backendName,
+    sessionId,
+    contentLength: content.length,
+    contentPreview: content.slice(0, 120),
+    aborted: streamAbortSignal?.aborted ?? false,
+  });
+
   const useStream =
     (backendName === 'opencode' || backendName === 'cursor') &&
     onStreamChunk !== null &&
@@ -73,6 +82,14 @@ export async function runWebChat(
     modelOverride,
     onAgentStreamChunk: useStream ? onStreamChunk : null,
     streamAbortSignal: useStream ? streamAbortSignal : null,
+  });
+
+  debug('web chat backend returned', {
+    backend: backendName,
+    sessionId: result.sessionId,
+    resultType: result.type,
+    outputLength: getOutputString(result).length,
+    aborted: streamAbortSignal?.aborted ?? false,
   });
 
   return {

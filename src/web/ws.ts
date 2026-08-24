@@ -26,7 +26,7 @@ import {
   setInterventionMode,
 } from '@src/db';
 import { isDemoMode } from '@src/demo-mode';
-import { log } from '@src/logger';
+import { debug, log } from '@src/logger';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
@@ -83,6 +83,7 @@ import {
 export type WebSocketData = {
   promptSession: WebSocketPromptSession;
   currentChatAbort: AbortController | null;
+  currentChatRequestId: string | null;
   interventionEnabled: boolean;
   interventionBridge: InterventionBridge | null;
   /** Set from NIP-98 on HTTP upgrade and/or first `authenticate` message. */
@@ -1122,9 +1123,28 @@ async function handleChat(params: {
 
   const useStream = backendName === 'opencode' || backendName === 'cursor';
 
+  debug('websocket chat received', {
+    requestId: message.requestId,
+    timelineId: message.timelineId,
+    backend: backendName,
+    contentLength: message.content.length,
+    contentPreview: message.content.slice(0, 120),
+    activeRequestId: ws.data.currentChatRequestId,
+    activeAborted: ws.data.currentChatAbort?.signal.aborted ?? false,
+  });
+
+  if (ws.data.currentChatAbort) {
+    debug('websocket aborting previous chat for replacement prompt', {
+      previousRequestId: ws.data.currentChatRequestId,
+      replacementRequestId: message.requestId,
+      previousAlreadyAborted: ws.data.currentChatAbort.signal.aborted,
+    });
+  }
+
   ws.data.currentChatAbort?.abort();
   const chatAbort = new AbortController();
   ws.data.currentChatAbort = chatAbort;
+  ws.data.currentChatRequestId = message.requestId;
 
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
@@ -1163,6 +1183,12 @@ async function handleChat(params: {
       content: message.content,
       onSessionReady: (sessionId) => {
         registeredSessionId = sessionId;
+
+        debug('websocket chat session ready', {
+          requestId: message.requestId,
+          sessionId,
+          aborted: chatAbort.signal.aborted,
+        });
 
         registerOpencodeInterventionBridge({
           sessionId,
@@ -1318,12 +1344,30 @@ async function handleChat(params: {
     });
 
     log.info(`[websocket] chat run complete ${message.requestId}`);
+
+    debug('websocket chat result received', {
+      requestId: message.requestId,
+      sessionId: result.sessionId,
+      outputLength: result.output.length,
+      aborted: chatAbort.signal.aborted,
+    });
   } catch (err) {
+    debug('websocket chat run exception', {
+      requestId: message.requestId,
+      error: err instanceof Error ? err.message : String(err),
+      aborted: chatAbort.signal.aborted,
+      stillCurrent: ws.data.currentChatAbort === chatAbort,
+    });
+
     log.warn(
       `[websocket] chat run failed ${message.requestId}: ${err instanceof Error ? err.message : String(err)}`,
     );
 
-    ws.data.currentChatAbort = null;
+    if (ws.data.currentChatAbort === chatAbort) {
+      ws.data.currentChatAbort = null;
+      ws.data.currentChatRequestId = null;
+    }
+
     throw err;
   } finally {
     if (registeredSessionId) {
@@ -1335,7 +1379,14 @@ async function handleChat(params: {
 
     if (ws.data.currentChatAbort === chatAbort) {
       ws.data.currentChatAbort = null;
+      ws.data.currentChatRequestId = null;
     }
+
+    debug('websocket chat run finalized', {
+      requestId: message.requestId,
+      aborted: chatAbort.signal.aborted,
+      stillCurrent: ws.data.currentChatAbort === chatAbort,
+    });
   }
 
   const output = result.output;
@@ -1381,8 +1432,14 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
       ensureInterventionBridge(ws, ctx.seenDb);
     },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
+      debug('websocket closed while chat was active', {
+        requestId: ws.data.currentChatRequestId,
+        aborted: ws.data.currentChatAbort?.signal.aborted ?? false,
+      });
+
       ws.data.currentChatAbort?.abort();
       ws.data.currentChatAbort = null;
+      ws.data.currentChatRequestId = null;
       ws.data.promptSession.clearAll();
       ws.data.interventionEnabled = false;
 
@@ -1648,6 +1705,13 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             }
 
             case 'cancel_chat': {
+              debug('websocket cancel_chat received', {
+                cancelRequestId: message.requestId,
+                activeRequestId: ws.data.currentChatRequestId,
+                activeAborted:
+                  ws.data.currentChatAbort?.signal.aborted ?? false,
+              });
+
               ws.data.currentChatAbort?.abort();
 
               if (ws.data.interventionBridge) {

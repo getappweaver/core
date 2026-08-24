@@ -269,6 +269,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
             data: {
               promptSession: new WebSocketPromptSession(),
               currentChatAbort: null,
+              currentChatRequestId: null,
               interventionEnabled: getInterventionMode(options.seenDb),
               interventionBridge: null,
               nip98Authenticated: nip98.ok,

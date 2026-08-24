@@ -64,6 +64,9 @@ let lastStartedPort: number | null = null;
 const DEFAULT_PORT_START = 4099;
 const DEFAULT_PORT_COUNT = 12;
 const SERVER_START_TIMEOUT_MS = 30_000;
+const ABORT_SETTLE_DELAY_MS = 250;
+const ABORT_SETTLE_POLL_MS = 100;
+const ABORT_SETTLE_TIMEOUT_MS = 10_000;
 
 class OpenCodeServerStartTimeoutError extends Error {
   constructor() {
@@ -121,6 +124,58 @@ function shortLogText(value: string, maxLength: number = 500): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type WaitForSessionIdleProps = {
+  client: ReturnType<typeof createOpencodeClient>;
+  sessionId: string;
+  directory: string;
+};
+
+async function waitForSessionIdleAfterAbort({
+  client,
+  sessionId,
+  directory,
+}: WaitForSessionIdleProps): Promise<void> {
+  // session.abort() acknowledges the abort request before OpenCode has
+  // necessarily finished unwinding the prompt. Do not let a replacement
+  // prompt race that cleanup, or OpenCode can abort the replacement too.
+  await sleep(ABORT_SETTLE_DELAY_MS);
+
+  const deadline = Date.now() + ABORT_SETTLE_TIMEOUT_MS;
+  let consecutiveIdleStatuses = 0;
+
+  while (Date.now() < deadline) {
+    const statusResult = await client.session
+      .status({ directory })
+      .catch((err) => {
+        debug('opencode-sdk: status check after abort failed', String(err));
+
+        return null;
+      });
+
+    const status = statusResult?.data
+      ? (statusResult.data as Record<string, { type?: string }>)[sessionId]
+      : undefined;
+
+    if (status?.type === 'idle') {
+      consecutiveIdleStatuses += 1;
+
+      if (consecutiveIdleStatuses >= 2) {
+        debug('opencode-sdk: session idle after abort', { sessionId });
+
+        return;
+      }
+    } else {
+      consecutiveIdleStatuses = 0;
+    }
+
+    await sleep(ABORT_SETTLE_POLL_MS);
+  }
+
+  debug('opencode-sdk: timed out waiting for session idle after abort', {
+    sessionId,
+  });
 }
 
 function isFatalStreamErrorMessage(message: string): boolean {
@@ -1514,6 +1569,7 @@ function partsFromV2PromptData(data: {
   info?: {
     cost?: number;
     tokens?: { input: number; output: number };
+    error?: unknown;
     structured_output?: unknown;
   };
 }): OutputSegment[] {
@@ -1584,6 +1640,7 @@ function parsePromptSdkResult({
         info?: {
           cost?: number;
           tokens?: { input: number; output: number };
+          error?: unknown;
           structured_output?: unknown;
         };
         parts?: unknown[];
@@ -1625,6 +1682,31 @@ function parsePromptSdkResult({
   }
 
   const info = data.info;
+
+  if (info?.error != null) {
+    const error = info.error as
+      | { data?: { message?: string }; message?: string; name?: string }
+      | undefined;
+
+    const output =
+      error?.data?.message ??
+      error?.message ??
+      (error?.name === 'MessageAbortedError'
+        ? 'Request aborted'
+        : String(info.error));
+
+    debug('opencode-sdk prompt info error', {
+      sessionId,
+      error: info.error,
+      output,
+    });
+
+    return {
+      type: 'error',
+      output,
+      sessionId,
+    } satisfies AgentErrorResult;
+  }
 
   const tokens = info?.tokens
     ? {
@@ -1891,29 +1973,44 @@ export function createOpencodeSDKBackend({
 
       const stream = sse.stream;
       let stopConsumer = false;
+      let promptAccepted = false;
+      let externalAbortPromise: Promise<void> | null = null;
 
       const onExternalAbort = (): void => {
+        debug('opencode-sdk stream: external abort received', {
+          sessionId,
+          stopConsumer,
+        });
+
         stopConsumer = true;
         resolveStreamComplete();
 
-        void client.session
-          .abort({
-            sessionID: sessionId,
+        externalAbortPromise = (async () => {
+          await client.session
+            .abort({
+              sessionID: sessionId,
+              directory: cwd,
+            })
+            .catch((err) => {
+              debug(
+                'opencode-sdk stream: session.abort after external abort failed',
+                String(err),
+              );
+            });
+
+          await waitForSessionIdleAfterAbort({
+            client,
+            sessionId,
             directory: cwd,
-          })
-          .catch((err) => {
+          });
+
+          await stream.return(undefined).catch((err) => {
             debug(
-              'opencode-sdk stream: session.abort after external abort failed',
+              'opencode-sdk stream: stream.return during external abort failed',
               String(err),
             );
           });
-
-        void stream.return(undefined).catch((err) => {
-          debug(
-            'opencode-sdk stream: stream.return during external abort failed',
-            String(err),
-          );
-        });
+        })();
       };
 
       streamAbortSignal.addEventListener('abort', onExternalAbort, {
@@ -1923,6 +2020,10 @@ export function createOpencodeSDKBackend({
       const pollUntilSessionIdle = async (): Promise<void> => {
         while (!stopConsumer && !streamAbortSignal.aborted) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          if (!promptAccepted) {
+            continue;
+          }
 
           const statusResult = await client.session.status({ directory: cwd });
 
@@ -2040,9 +2141,28 @@ export function createOpencodeSDKBackend({
           } satisfies AgentErrorResult;
         }
 
+        promptAccepted = true;
+
         log.info(`OpenCode SDK stream waiting for completion: ${sessionId}`);
         await streamComplete;
         log.info(`OpenCode SDK stream completed: ${sessionId}`);
+
+        debug('opencode-sdk stream completion state', {
+          sessionId,
+          aborted: streamAbortSignal.aborted,
+          stopConsumer,
+          streamErrorMessage,
+        });
+
+        if (streamAbortSignal.aborted) {
+          await externalAbortPromise;
+
+          return {
+            type: 'error',
+            output: 'Request aborted',
+            sessionId,
+          } satisfies AgentErrorResult;
+        }
 
         if (streamErrorMessage) {
           log.warn(
