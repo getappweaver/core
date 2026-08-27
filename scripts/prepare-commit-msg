@@ -9,10 +9,20 @@ function getAbsoluteGitDir() {
 }
 
 const commitMsgFile = process.argv[2];
+const commitSource = process.argv[3];
+
+// post-commit amends the release commit after updating generated files.
+if (commitSource === 'commit') process.exit(0);
+
 let commitMsg = fs.readFileSync(commitMsgFile, 'utf8');
 
 const versionMatch = commitMsg.match(/--(major|minor|patch)/i);
-if (!versionMatch) process.exit(1);
+if (!versionMatch) {
+  console.error(
+    'Commit rejected: include --patch, --minor, or --major in the message.',
+  );
+  process.exit(1);
+}
 
 const bumpType = versionMatch[1].toLowerCase();
 

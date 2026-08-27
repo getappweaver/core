@@ -20,7 +20,7 @@
     "wallet:setup": "bun run scripts/setup-wallet.ts",
     "nostr:setup": "bun run scripts/nostr-setup.ts",
     "bot:setup": "bun run src/web/setup/bot-setup.ts",
-    "contrib:setup": "chmod +x scripts/commit-msg scripts/post-commit scripts/ngit-helper.sh && git config include.path ../.gitconfig",
+    "contrib:setup": "chmod +x scripts/prepare-commit-msg scripts/post-commit scripts/ngit-helper.sh && git config core.hooksPath scripts",
     "plugin:publish": "bun run scripts/publish-plugin.ts",
     "plugin:install": "bun run scripts/install-plugin.ts",
     "plugin:new": "bun run scripts/new-plugin.ts",

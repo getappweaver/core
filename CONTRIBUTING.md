@@ -8,7 +8,7 @@ After cloning, run this once to enable the version bump hook:
 bun run contrib:setup
 ```
 
-This makes Git load the repo’s `.gitconfig` (which sets `core.hooksPath = scripts`), so the `commit-msg` and `post-commit` hooks run.
+This sets the repo’s `core.hooksPath` to `scripts`, so the `prepare-commit-msg` and `post-commit` hooks run. The version flag check cannot be bypassed with `git commit --no-verify`.
 
 ## Versioning
 
@@ -50,7 +50,7 @@ Check the current version in `package.json`.
 
 ## Plugins (separate Git repo under `plugins/<alias>/`)
 
-If you use a **nested** Git repo for a plugin (for example `git init` in `plugins/todo` so you can tag releases separately), you can reuse the **same** hook scripts as the core repo—no need to copy `commit-msg` / `post-commit` into the plugin folder.
+If you use a **nested** Git repo for a plugin (for example `git init` in `plugins/todo` so you can tag releases separately), you can reuse the **same** hook scripts as the core repo—no need to copy `prepare-commit-msg` / `post-commit` into the plugin folder.
 
 From the plugin directory (repository root of that plugin), run once to point Git at the parent AppWeaver `scripts` directory (same hooks as the core repo):
 
