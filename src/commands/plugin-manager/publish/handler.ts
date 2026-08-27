@@ -419,7 +419,7 @@ async function prepareFirstReleaseRepository({
   authorPubkey,
 }: PrepareFirstReleaseRepositoryProps): Promise<void> {
   const pluginDir = join(dmBotRoot, 'plugins', alias);
-  const state = inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
+  const state = await inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
 
   if (state.changedFileCount > 0) {
     throw new Error(
@@ -918,7 +918,7 @@ export async function handlePluginsPublish(
   }
 
   if (published) {
-    pushPluginRelease({ dmBotRoot: ctx.dmBotRoot, alias, versionTag });
+    await pushPluginRelease({ dmBotRoot: ctx.dmBotRoot, alias, versionTag });
   }
 
   if (!published) {

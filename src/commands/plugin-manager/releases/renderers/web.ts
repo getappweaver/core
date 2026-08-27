@@ -250,15 +250,20 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
     );
 
   const metadataPublish = entry.status === 'metadata-publish-needed';
+  const cardId = `plugins-release-card-${entry.installed.alias}`;
   const reviewButtonId = `plugins-release-review-${entry.installed.alias}`;
-  const reviewStatusId = `plugins-release-review-status-${entry.installed.alias}`;
   const publishButtonId = `plugins-release-publish-${entry.installed.alias}`;
   const publishStatusId = `plugins-release-publish-status-${entry.installed.alias}`;
 
   return {
     type: 'element',
     tag: 'box',
-    props: { padding: 'md', className: 'plugins-release-card' },
+    props: {
+      id: cardId,
+      padding: 'md',
+      className: 'plugins-release-card',
+    },
+    renderKey: `plugins-release-card:${entry.installed.alias}`,
     children: [
       {
         type: 'element',
@@ -345,7 +350,6 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                 clientStatus: {
                                   background: true,
                                   activeTargetId: reviewButtonId,
-                                  statusTargetId: reviewStatusId,
                                   pending: 'Loading...',
                                   success: 'Loaded.',
                                 },
@@ -393,6 +397,9 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                   alias: entry.installed.alias,
                                 },
                                 options: {},
+                                surface: 'modal' as const,
+                                modalTitle:
+                                  `Publish ${entry.installed.alias} ${entry.localVersion ? `v${entry.localVersion}` : ''}`.trim(),
                                 recordInTimeline: false,
                                 pendingUi: { presentation: 'none' as const },
                                 clientStatus: {
@@ -463,6 +470,9 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                   subcommand: 'publish',
                                   arguments: { alias: entry.installed.alias },
                                   options: {},
+                                  surface: 'modal' as const,
+                                  modalTitle:
+                                    `Publish ${entry.installed.alias} ${entry.localVersion ? `v${entry.localVersion}` : ''}`.trim(),
                                   recordInTimeline: false,
                                   pendingUi: { presentation: 'none' as const },
                                   clientStatus: {

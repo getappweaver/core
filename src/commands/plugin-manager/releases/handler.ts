@@ -3,6 +3,7 @@ import { join, relative } from 'path';
 import { nip19 } from 'nostr-tools';
 
 import { handleBunkerList } from '@src/commands/bunker/list/handler';
+import { monitoring } from '@src/core/monitoring';
 import { resolveNip05Identity } from '@src/nostr/author-identity';
 import {
   parseNostrRepoAddress,
@@ -283,104 +284,220 @@ function matchPublishedPlugin({
 export async function handlePluginsReleases(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsReleasesWeb> | string> {
-  const installedPlugins = readInstalledPlugins(ctx.dmBotRoot);
-  const catalog = await queryPluginCatalog(ctx);
-  const signers = authorSigners(ctx);
-  const bunkerSigners = signers.filter((signer) => signer.source === 'bunker');
+  return monitoring.withSpan({
+    name: 'plugins.releases.handle',
+    attributes: { source: ctx.source },
+    parent: null,
+    run: async () => {
+      const spanInstalled = monitoring.startSpan({
+        name: 'plugins.releases.readInstalled',
+        attributes: {},
+        parent: null,
+      });
 
-  const resolvedEntries = await Promise.all(
-    installedPlugins.map(
-      async (installed): Promise<PluginReleaseEntry | null> => {
-        const match = matchPublishedPlugin({ installed, catalog, signers });
-        const published = latestPublishedPlugin(installed, catalog);
+      const aliasFromArgs = (() => {
+        const idx = ctx.args.indexOf('--alias');
 
-        if (published && !match) {
-          return null;
+        if (idx >= 0) {
+          return ctx.args[idx + 1]?.trim() ?? '';
         }
 
-        const localVersion = readLocalPluginPackageVersion({
-          dmBotRoot: ctx.dmBotRoot,
-          alias: installed.alias,
-        });
+        // Backward compat: /plugins releases todo (positional)
+        const subcommands = ['releases', 'release', 'publish-status'];
 
-        const versionTag = localVersion ? `v${localVersion}` : 'v0.0.0';
-
-        const git = inspectPluginReleaseGit({
-          dmBotRoot: ctx.dmBotRoot,
-          alias: installed.alias,
-          versionTag,
-        });
-
-        const pluginDir = join(ctx.dmBotRoot, 'plugins', installed.alias);
-
-        const expectedAuthorPubkey = published
-          ? published.pubkey
-          : await repositoryAuthorPubkey(installed.repo);
-
-        const publishSigners = bunkerSigners.filter(
-          (signer) =>
-            expectedAuthorPubkey === null ||
-            signer.pubkey === expectedAuthorPubkey,
+        const candidates = ctx.args.filter(
+          (arg) => !arg.startsWith('--') && !subcommands.includes(arg),
         );
 
-        return {
-          installed,
-          localVersion,
-          published: match?.published ?? null,
-          authorSigner: match?.signer ?? null,
-          publishSigners,
-          suggestedSignerName: publishSigners[0]?.connectionName ?? null,
-          git,
-          repositoryPath: relative(ctx.cwd, pluginDir).replace(/\\/g, '/'),
-          lastPublish: latestPluginPublishResult(installed.alias),
-          status: match
-            ? releaseStatus(
-                localVersion,
-                match.published,
-                git,
-                pluginMetadataMatchesPackage({
-                  dmBotRoot: ctx.dmBotRoot,
-                  alias: installed.alias,
-                  published: match.published,
-                }),
-              )
-            : isLocalPluginRepo(installed.repo)
-              ? 'local-draft'
-              : 'not-published',
-        };
-      },
-    ),
-  );
+        return candidates[0]?.trim() ?? '';
+      })();
 
-  const entries = resolvedEntries.filter(
-    (entry): entry is PluginReleaseEntry => entry !== null,
-  );
+      const aliasFilterRaw =
+        aliasFromArgs ||
+        (
+          (ctx.jsonPayload as { arguments?: { alias?: unknown } } | null)
+            ?.arguments?.alias as string | undefined
+        )?.trim() ||
+        (
+          (ctx.jsonPayload as { options?: { alias?: unknown } } | null)?.options
+            ?.alias as string | undefined
+        )?.trim() ||
+        '';
 
-  const publishedEntries = entries.filter((entry) => entry.published !== null);
+      const aliasFilter = aliasFilterRaw || null;
 
-  const unpublishedEntries = entries.filter(
-    (entry) => entry.published === null,
-  );
+      const allInstalled = readInstalledPlugins(ctx.dmBotRoot);
 
-  const representation: PluginsReleasesRepresentation = {
-    relays: PLUGIN_QUERY_RELAYS,
-    signerCount: signers.length,
-    bunkerSignerCount: bunkerSigners.length,
-    matchedSignerCount: new Set(
-      publishedEntries.flatMap((entry) =>
-        entry.authorSigner ? [entry.authorSigner.pubkey] : [],
-      ),
-    ).size,
-    installedCount: installedPlugins.length,
-    publishedCount: publishedEntries.length,
-    unpublishedCount: unpublishedEntries.length,
-    hiddenCount: installedPlugins.length - entries.length,
-    entries,
-  };
+      const installedPlugins = aliasFilter
+        ? allInstalled.filter((entry) => entry.alias === aliasFilter)
+        : allInstalled;
 
-  if (ctx.source === 'web') {
-    return renderPluginsReleasesWeb(representation);
-  }
+      spanInstalled.end();
 
-  return renderPluginsReleasesText(representation, { prefix: ctx.prefix });
+      if (aliasFilter && installedPlugins.length === 0) {
+        return `Plugin alias not found in plugins.json: ${aliasFilter}`;
+      }
+
+      const spanCatalog = monitoring.startSpan({
+        name: 'plugins.releases.queryCatalog',
+        attributes: { installedCount: installedPlugins.length },
+        parent: null,
+      });
+
+      const catalog = await queryPluginCatalog(ctx, undefined, undefined, {
+        skipIcons: true,
+      });
+
+      spanCatalog.end();
+
+      const spanSigners = monitoring.startSpan({
+        name: 'plugins.releases.authorSigners',
+        attributes: {},
+        parent: null,
+      });
+
+      const signers = authorSigners(ctx);
+
+      const bunkerSigners = signers.filter(
+        (signer) => signer.source === 'bunker',
+      );
+
+      spanSigners.end();
+
+      const spanResolve = monitoring.startSpan({
+        name: 'plugins.releases.resolveEntries',
+        attributes: { installedCount: installedPlugins.length },
+        parent: null,
+      });
+
+      const resolvedEntries = await Promise.all(
+        installedPlugins.map(
+          async (installed): Promise<PluginReleaseEntry | null> => {
+            const entrySpan = monitoring.startSpan({
+              name: 'plugins.releases.resolveEntry',
+              attributes: { alias: installed.alias },
+              parent: null,
+            });
+
+            const match = matchPublishedPlugin({
+              installed,
+              catalog,
+              signers,
+            });
+
+            const published = latestPublishedPlugin(installed, catalog);
+
+            if (published && !match) {
+              entrySpan.end();
+
+              return null;
+            }
+
+            const localVersion = readLocalPluginPackageVersion({
+              dmBotRoot: ctx.dmBotRoot,
+              alias: installed.alias,
+            });
+
+            const versionTag = localVersion ? `v${localVersion}` : 'v0.0.0';
+
+            const git = await inspectPluginReleaseGit({
+              dmBotRoot: ctx.dmBotRoot,
+              alias: installed.alias,
+              versionTag,
+            });
+
+            const pluginDir = join(ctx.dmBotRoot, 'plugins', installed.alias);
+
+            const expectedAuthorPubkey = published
+              ? published.pubkey
+              : await repositoryAuthorPubkey(installed.repo);
+
+            const publishSigners = bunkerSigners.filter(
+              (signer) =>
+                expectedAuthorPubkey === null ||
+                signer.pubkey === expectedAuthorPubkey,
+            );
+
+            const status = match
+              ? (() => {
+                  const spanMeta = monitoring.startSpan({
+                    name: 'plugins.releases.metadataMatch',
+                    attributes: { alias: installed.alias },
+                    parent: null,
+                  });
+
+                  const matches = pluginMetadataMatchesPackage({
+                    dmBotRoot: ctx.dmBotRoot,
+                    alias: installed.alias,
+                    published: match.published,
+                  });
+
+                  spanMeta.end();
+
+                  return releaseStatus(
+                    localVersion,
+                    match.published,
+                    git,
+                    matches,
+                  );
+                })()
+              : isLocalPluginRepo(installed.repo)
+                ? 'local-draft'
+                : 'not-published';
+
+            entrySpan.end();
+
+            return {
+              installed,
+              localVersion,
+              published: match?.published ?? null,
+              authorSigner: match?.signer ?? null,
+              publishSigners,
+              suggestedSignerName: publishSigners[0]?.connectionName ?? null,
+              git,
+              repositoryPath: relative(ctx.cwd, pluginDir).replace(/\\/g, '/'),
+              lastPublish: latestPluginPublishResult(installed.alias),
+              status,
+            };
+          },
+        ),
+      );
+
+      spanResolve.end();
+
+      const entries = resolvedEntries.filter(
+        (entry): entry is PluginReleaseEntry => entry !== null,
+      );
+
+      const publishedEntries = entries.filter(
+        (entry) => entry.published !== null,
+      );
+
+      const unpublishedEntries = entries.filter(
+        (entry) => entry.published === null,
+      );
+
+      const representation: PluginsReleasesRepresentation = {
+        relays: PLUGIN_QUERY_RELAYS,
+        signerCount: signers.length,
+        bunkerSignerCount: bunkerSigners.length,
+        matchedSignerCount: new Set(
+          publishedEntries.flatMap((entry) =>
+            entry.authorSigner ? [entry.authorSigner.pubkey] : [],
+          ),
+        ).size,
+        installedCount: installedPlugins.length,
+        publishedCount: publishedEntries.length,
+        unpublishedCount: unpublishedEntries.length,
+        hiddenCount: installedPlugins.length - entries.length,
+        entries,
+      };
+
+      if (ctx.source === 'web') {
+        return renderPluginsReleasesWeb(representation);
+      }
+
+      return renderPluginsReleasesText(representation, { prefix: ctx.prefix });
+    },
+  });
 }

@@ -13,6 +13,7 @@ import {
   type PluginCapabilityRelations,
 } from '@src/capabilities/relations';
 import { writeRestartRequestedFile } from '@src/commands/bot/request-watch-restart';
+import { monitoring } from '@src/core/monitoring';
 import type { CoreUpdateSnapshot } from '@src/core/update-check';
 import {
   authorHref,
@@ -111,6 +112,10 @@ type ResolvedPluginTarget = {
 type QueryPluginCatalogOptions = {
   relays: string[] | null;
   authors: string[] | null;
+};
+
+type QueryPluginCatalogFlags = {
+  skipIcons: boolean;
 };
 
 function isInstalledPluginEntry(entry: unknown): entry is InstalledPluginEntry {
@@ -1085,78 +1090,128 @@ export async function queryPluginCatalog(
   ctx: RouteCommandContext,
   options?: QueryPluginCatalogOptions,
   capabilityFilter?: CapabilityCatalogFilter,
+  flags?: QueryPluginCatalogFlags,
 ): Promise<PluginCatalogEntry[]> {
-  const eventsById = new Map<string, NostrEvent>();
+  return monitoring.withSpan({
+    name: 'plugins.catalog.query',
+    attributes: {
+      relays: uniqueRelays([...(options?.relays ?? []), ...PLUGIN_QUERY_RELAYS])
+        .length,
+      hasAuthorFilter: Boolean(options?.authors?.length),
+      skipIcons: flags?.skipIcons ?? false,
+    },
+    parent: null,
+    run: async () => {
+      const eventsById = new Map<string, NostrEvent>();
 
-  const relays = uniqueRelays([
-    ...(options?.relays ?? []),
-    ...PLUGIN_QUERY_RELAYS,
-  ]);
+      const relays = uniqueRelays([
+        ...(options?.relays ?? []),
+        ...PLUGIN_QUERY_RELAYS,
+      ]);
 
-  const filter = {
-    kinds: [PLUGIN_KIND],
-    ...(options?.authors ? { authors: options.authors } : {}),
-    ...(capabilityFilter
-      ? { '#l': [capabilityCatalogLabel(capabilityFilter)] }
-      : {}),
-    limit: 50,
-  };
+      const filter = {
+        kinds: [PLUGIN_KIND],
+        ...(options?.authors ? { authors: options.authors } : {}),
+        ...(capabilityFilter
+          ? { '#l': [capabilityCatalogLabel(capabilityFilter)] }
+          : {}),
+        limit: 50,
+      };
 
-  const events = await new Promise<NostrEvent[]>((resolve) => {
-    let settled = false;
-    const timer = setTimeout(() => finish('timeout'), PLUGIN_QUERY_MAX_WAIT_MS);
+      const spanSubscribe = monitoring.startSpan({
+        name: 'plugins.catalog.subscribeMany',
+        attributes: { relays: relays.length, limit: filter.limit },
+        parent: null,
+      });
 
-    const sub = ctx.pool.subscribeMany(relays, filter, {
-      maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
-      onevent: (event) => {
-        eventsById.set(event.id, event as NostrEvent);
-      },
-      oneose: () => finish('eose'),
-      onclose: () => {
-        finish('closed');
-      },
-    });
+      const events = await new Promise<NostrEvent[]>((resolve) => {
+        let settled = false;
 
-    function finish(reason: 'closed' | 'eose' | 'timeout'): void {
-      if (settled) {
-        return;
+        const timer = setTimeout(
+          () => finish('timeout'),
+          PLUGIN_QUERY_MAX_WAIT_MS,
+        );
+
+        const sub = ctx.pool.subscribeMany(relays, filter, {
+          maxWait: PLUGIN_QUERY_MAX_WAIT_MS,
+          onevent: (event) => {
+            eventsById.set(event.id, event as NostrEvent);
+          },
+          oneose: () => finish('eose'),
+          onclose: () => {
+            finish('closed');
+          },
+        });
+
+        function finish(reason: 'closed' | 'eose' | 'timeout'): void {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          clearTimeout(timer);
+          sub.close(`plugins install ${reason}`);
+          resolve([...eventsById.values()]);
+        }
+      });
+
+      spanSubscribe.end();
+
+      const latestByPlugin = new Map<string, PluginCatalogEntry>();
+
+      for (const event of events) {
+        const parsed = parsePluginEvent(event);
+
+        if (!parsed) {
+          continue;
+        }
+
+        const key = `${parsed.pubkey}:${parsed.name}`;
+        const existing = latestByPlugin.get(key);
+
+        if (!existing || parsed.createdAt > existing.createdAt) {
+          latestByPlugin.set(key, parsed);
+        }
       }
 
-      settled = true;
-      clearTimeout(timer);
-      sub.close(`plugins install ${reason}`);
-      resolve([...eventsById.values()]);
-    }
+      const entries = [...latestByPlugin.values()]
+        .filter((entry) =>
+          capabilityFilter
+            ? matchesCapabilityCatalogFilter(
+                entry.capabilities,
+                capabilityFilter,
+              )
+            : true,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const spanAuthors = monitoring.startSpan({
+        name: 'plugins.catalog.attachAuthorIdentities',
+        attributes: { entries: entries.length },
+        parent: null,
+      });
+
+      const entriesWithAuthors = await attachAuthorIdentities(ctx, entries);
+
+      spanAuthors.end();
+
+      if (flags?.skipIcons) {
+        return entriesWithAuthors;
+      }
+
+      const spanIcons = monitoring.startSpan({
+        name: 'plugins.catalog.attachResolvedIcons',
+        attributes: { entries: entriesWithAuthors.length },
+        parent: null,
+      });
+
+      const result = await attachResolvedIcons(ctx, entriesWithAuthors);
+
+      spanIcons.end();
+
+      return result;
+    },
   });
-
-  const latestByPlugin = new Map<string, PluginCatalogEntry>();
-
-  for (const event of events) {
-    const parsed = parsePluginEvent(event);
-
-    if (!parsed) {
-      continue;
-    }
-
-    const key = `${parsed.pubkey}:${parsed.name}`;
-    const existing = latestByPlugin.get(key);
-
-    if (!existing || parsed.createdAt > existing.createdAt) {
-      latestByPlugin.set(key, parsed);
-    }
-  }
-
-  const entries = [...latestByPlugin.values()]
-    .filter((entry) =>
-      capabilityFilter
-        ? matchesCapabilityCatalogFilter(entry.capabilities, capabilityFilter)
-        : true,
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const entriesWithAuthors = await attachAuthorIdentities(ctx, entries);
-
-  return attachResolvedIcons(ctx, entriesWithAuthors);
 }
 
 export async function handlePluginsInstall(

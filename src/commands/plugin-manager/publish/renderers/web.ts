@@ -39,6 +39,8 @@ export function renderPluginsPublishPreviewWeb(
   representation: PluginsPublishPreviewRepresentation,
 ): WebNodeRoot {
   const confirmButtonId = `plugins-publish-confirm-${representation.alias}`;
+  const publishStatusId = `plugins-publish-status-${representation.alias}`;
+  const cardHighlightId = `plugins-release-card-${representation.alias}`;
 
   return {
     kind: 'ui',
@@ -115,6 +117,11 @@ export function renderPluginsPublishPreviewWeb(
             ),
             {
               type: 'element',
+              tag: 'commandStatus',
+              props: { id: publishStatusId },
+            },
+            {
+              type: 'element',
               tag: 'row',
               props: { className: 'plugins-publish-actions' },
               children: [
@@ -143,12 +150,14 @@ export function renderPluginsPublishPreviewWeb(
                         subcommand: 'releases',
                         arguments: {},
                         options: {},
+                        highlightTargetIds: [cardHighlightId],
                         recordInTimeline: false,
                       },
                       pendingUi: { presentation: 'none' },
                       clientStatus: {
                         background: true,
                         activeTargetId: confirmButtonId,
+                        statusTargetId: publishStatusId,
                         pending: 'Publishing...',
                         success: 'Published.',
                       },

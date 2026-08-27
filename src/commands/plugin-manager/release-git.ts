@@ -1,10 +1,37 @@
 import { join } from 'path';
 
+import { monitoring } from '@src/core/monitoring';
+
 const RELEASE_REMOTES = ['origin', 'github'] as const;
 
 type ReleaseRemoteName = (typeof RELEASE_REMOTES)[number];
 
 const REQUIRED_RELEASE_REMOTES = new Set<ReleaseRemoteName>(['origin']);
+
+const REMOTE_CACHE_TTL_MS = 30_000;
+
+const remoteCache = new Map<
+  string,
+  { expiresAt: number; remotes: PluginReleaseRemoteState[] }
+>();
+
+function remoteCacheKey({
+  pluginDir,
+  branch,
+  versionTag,
+  head,
+}: {
+  pluginDir: string;
+  branch: string | null;
+  versionTag: string;
+  head: string;
+}): string {
+  return `${pluginDir}:${branch ?? ''}:${versionTag}:${head}`;
+}
+
+export function clearPluginReleaseRemoteCache(): void {
+  remoteCache.clear();
+}
 
 export type PluginReleaseRemoteState = {
   name: ReleaseRemoteName;
@@ -41,6 +68,32 @@ function runGit(pluginDir: string, args: string[]): RunGitResult {
     : { ok: false, error: stderr || stdout || 'Git command failed.' };
 }
 
+async function runGitAsync(
+  pluginDir: string,
+  args: string[],
+): Promise<RunGitResult> {
+  const proc = Bun.spawn(['git', ...args], {
+    cwd: pluginDir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  const [stdoutBuf, stderrBuf, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  const stdout = stdoutBuf.trim();
+  const stderr = stderrBuf.trim();
+
+  return exitCode === 0
+    ? { ok: true, stdout }
+    : { ok: false, error: stderr || stdout || 'Git command failed.' };
+}
+
+// Kept for synchronous callers (e.g. tests) — not used in hot path
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function requiredGitOutput(pluginDir: string, args: string[]): string {
   const result = runGit(pluginDir, args);
 
@@ -51,7 +104,7 @@ function requiredGitOutput(pluginDir: string, args: string[]): string {
   return result.stdout;
 }
 
-function remoteState({
+async function remoteState({
   pluginDir,
   name,
   branch,
@@ -63,7 +116,7 @@ function remoteState({
   branch: string | null;
   versionTag: string;
   head: string;
-}): PluginReleaseRemoteState {
+}): Promise<PluginReleaseRemoteState> {
   const configured = runGit(pluginDir, ['remote', 'get-url', name]).ok;
   const required = REQUIRED_RELEASE_REMOTES.has(name);
 
@@ -81,13 +134,21 @@ function remoteState({
   const branchRef = `refs/heads/${branch}`;
   const tagRef = `refs/tags/${versionTag}`;
 
-  const refs = runGit(pluginDir, [
+  const span = monitoring.startSpan({
+    name: 'plugins.releases.git.ls-remote',
+    attributes: { remote: name, branch: branch ?? '', versionTag },
+    parent: null,
+  });
+
+  const refs = await runGitAsync(pluginDir, [
     'ls-remote',
     name,
     branchRef,
     tagRef,
     `${tagRef}^{}`,
   ]);
+
+  span.end(refs.ok ? 'ok' : 'error');
 
   if (!refs.ok) {
     return {
@@ -122,7 +183,7 @@ function remoteState({
   };
 }
 
-export function inspectPluginReleaseGit({
+export async function inspectPluginReleaseGit({
   dmBotRoot,
   alias,
   versionTag,
@@ -130,57 +191,109 @@ export function inspectPluginReleaseGit({
   dmBotRoot: string;
   alias: string;
   versionTag: string;
-}): PluginReleaseGitState {
+}): Promise<PluginReleaseGitState> {
+  const span = monitoring.startSpan({
+    name: 'plugins.releases.git.inspect',
+    attributes: { alias, versionTag },
+    parent: null,
+  });
+
   const pluginDir = join(dmBotRoot, 'plugins', alias);
 
-  const status = requiredGitOutput(pluginDir, [
-    'status',
-    '--porcelain=v1',
-    '-z',
-  ]);
+  const localSpan = monitoring.startSpan({
+    name: 'plugins.releases.git.local',
+    attributes: { alias },
+    parent: null,
+  });
 
-  const statusEntries = status.split('\0').filter((entry) => entry.length > 0);
+  const [status, staged, unstaged, untracked, branchResult, head, tagCommit] =
+    await Promise.all([
+      runGitAsync(pluginDir, ['status', '--porcelain=v1', '-z']),
+      runGitAsync(pluginDir, ['diff', '--cached', '--name-only', '-z']),
+      runGitAsync(pluginDir, ['diff', '--name-only', '-z']),
+      runGitAsync(pluginDir, [
+        'ls-files',
+        '--others',
+        '--exclude-standard',
+        '-z',
+      ]),
+      runGitAsync(pluginDir, ['symbolic-ref', '--short', 'HEAD']),
+      runGitAsync(pluginDir, ['rev-parse', 'HEAD']),
+      runGitAsync(pluginDir, ['rev-list', '-n', '1', versionTag]),
+    ]);
 
-  const staged = requiredGitOutput(pluginDir, [
-    'diff',
-    '--cached',
-    '--name-only',
-    '-z',
-  ]);
-
-  const unstaged = requiredGitOutput(pluginDir, ['diff', '--name-only', '-z']);
-
-  const untracked = requiredGitOutput(pluginDir, [
-    'ls-files',
-    '--others',
-    '--exclude-standard',
-    '-z',
-  ]);
-
-  const branchResult = runGit(pluginDir, ['symbolic-ref', '--short', 'HEAD']);
+  const statusStr = status.ok ? status.stdout : '';
+  const stagedStr = staged.ok ? staged.stdout : '';
+  const unstagedStr = unstaged.ok ? unstaged.stdout : '';
+  const untrackedStr = untracked.ok ? untracked.stdout : '';
 
   const branch =
     branchResult.ok && branchResult.stdout ? branchResult.stdout : null;
 
-  const head = requiredGitOutput(pluginDir, ['rev-parse', 'HEAD']);
-  const tagCommit = runGit(pluginDir, ['rev-list', '-n', '1', versionTag]);
+  const headStr = head.ok ? head.stdout : '';
+  const localTagAtHead = tagCommit.ok && tagCommit.stdout === headStr;
+
+  if (!status.ok) {
+    throw new Error(status.error);
+  }
+
+  if (!head.ok) {
+    throw new Error(head.error);
+  }
+
+  const statusEntries = statusStr
+    .split('\0')
+    .filter((entry) => entry.length > 0);
+
+  localSpan.end();
+
+  const cacheKey = remoteCacheKey({
+    pluginDir,
+    branch,
+    versionTag,
+    head: headStr,
+  });
+
+  const cached = remoteCache.get(cacheKey);
+
+  const remotes =
+    cached && cached.expiresAt > Date.now()
+      ? cached.remotes
+      : await Promise.all(
+          RELEASE_REMOTES.map((name) =>
+            remoteState({
+              pluginDir,
+              name,
+              branch,
+              versionTag,
+              head: headStr,
+            }),
+          ),
+        );
+
+  if (!cached || cached.expiresAt <= Date.now()) {
+    remoteCache.set(cacheKey, {
+      expiresAt: Date.now() + REMOTE_CACHE_TTL_MS,
+      remotes,
+    });
+  }
+
+  span.end();
 
   return {
     branch,
     changedFileCount: statusEntries.length,
-    stagedFileCount: staged.split('\0').filter((entry) => entry.length > 0)
+    stagedFileCount: stagedStr.split('\0').filter((entry) => entry.length > 0)
       .length,
     unstagedFileCount:
-      unstaged.split('\0').filter((entry) => entry.length > 0).length +
-      untracked.split('\0').filter((entry) => entry.length > 0).length,
-    localTagAtHead: tagCommit.ok && tagCommit.stdout === head,
-    remotes: RELEASE_REMOTES.map((name) =>
-      remoteState({ pluginDir, name, branch, versionTag, head }),
-    ),
+      unstagedStr.split('\0').filter((entry) => entry.length > 0).length +
+      untrackedStr.split('\0').filter((entry) => entry.length > 0).length,
+    localTagAtHead,
+    remotes,
   };
 }
 
-export function pushPluginRelease({
+export async function pushPluginRelease({
   dmBotRoot,
   alias,
   versionTag,
@@ -188,9 +301,9 @@ export function pushPluginRelease({
   dmBotRoot: string;
   alias: string;
   versionTag: string;
-}): void {
+}): Promise<void> {
   const pluginDir = join(dmBotRoot, 'plugins', alias);
-  const state = inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
+  const state = await inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
 
   if (state.changedFileCount > 0) {
     throw new Error(
@@ -229,7 +342,13 @@ export function pushPluginRelease({
     }
   }
 
-  const verified = inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
+  clearPluginReleaseRemoteCache();
+
+  const verified = await inspectPluginReleaseGit({
+    dmBotRoot,
+    alias,
+    versionTag,
+  });
 
   const incomplete = verified.remotes.filter(
     (remote) => remote.configured && (!remote.branchReady || !remote.tagReady),

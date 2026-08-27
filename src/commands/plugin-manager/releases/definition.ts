@@ -9,7 +9,22 @@ export function getPluginsReleasesSubcommandDefinition(
       'Review local plugin development, release, and publication readiness.',
     aliases: ['release', 'publish-status'],
     arguments: [],
-    options: [],
-    examples: [`${prefix}plugins releases`],
+    options: [
+      {
+        name: 'alias',
+        summary: 'Optional plugin alias to filter to a single release card.',
+        flag: '--alias',
+        kind: 'string',
+        required: false,
+      },
+    ],
+    examples: [
+      `${prefix}plugins releases`,
+      `${prefix}plugins releases --alias todo`,
+    ],
+    monitoring: {
+      name: 'plugins.releases',
+      attributes: { command: 'plugins', subcommand: 'releases' },
+    },
   };
 }
