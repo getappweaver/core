@@ -4,6 +4,11 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.0.1] - 2026-08-27
+
+- docs: update changelog for v12.0.0 (d8a5f7ac)
+- fix: removed loading messages from "Review changes" (file diff) (24c26d05)
+
 ## [v12.0.0] - 2026-08-27
 
 - test hook 3 (591a1f81)

@@ -347,12 +347,6 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                 },
                                 recordInTimeline: true,
                                 pendingUi: { presentation: 'none' as const },
-                                clientStatus: {
-                                  background: true,
-                                  activeTargetId: reviewButtonId,
-                                  pending: 'Loading...',
-                                  success: 'Loaded.',
-                                },
                               },
                             },
                           },
