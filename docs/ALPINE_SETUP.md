@@ -5,10 +5,43 @@ user dependencies, downloads the default Piper voice, installs the project
 packages, and configures Caddy using the machine's reverse DNS hostname.
 
 Before running it, ensure:
-- Preserve /var/lib/caddy between reinstalls. It contains the ACME account and issued certificates. Good for rate limits.
+- Preserve `/var/lib/caddy` between reinstalls (see [Backup Caddy certificates](#backup-caddy-certificates)). It contains the ACME account and issued certificates. Good for rate limits.
 - The current user can run `doas` commands, or run the script as root.
 - The server has a reverse DNS record pointing to its public IPv4 address.
 - Inbound TCP ports 80 and 443 are open.
+
+## Backup Caddy certificates
+
+Caddy stores its ACME account and TLS certificates under `/var/lib/caddy/`.
+Back this up before reinstalling the server or moving to a new machine to avoid
+Let's Encrypt rate limits.
+
+On the Alpine server, create an archive:
+
+```bash
+doas tar czf /tmp/caddy-backup.tgz -C /var/lib caddy
+doas chown "$(id -un):$(id -gn)" /tmp/caddy-backup.tgz
+```
+
+From your local machine, download it with `scp`:
+
+```bash
+scp -i ~/.ssh/lnvps_ed25519 \
+  alpine@<reverse-dns-hostname>:/tmp/caddy-backup.tgz \
+  ~/backups/caddy-backup.tgz
+```
+
+To restore after a reinstall, upload the archive and extract it before running
+the setup script:
+
+```bash
+scp -i ~/.ssh/lnvps_ed25519 \
+  ~/backups/caddy-backup.tgz \
+  alpine@<reverse-dns-hostname>:/tmp/caddy-backup.tgz
+
+doas tar xzf /tmp/caddy-backup.tgz -C /var/lib
+doas chown -R caddy:caddy /var/lib/caddy
+```
 
 ## Install
 
