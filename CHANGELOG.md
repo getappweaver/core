@@ -4,6 +4,12 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.0.0] - 2026-08-27
+
+- test hook 3 (591a1f81)
+- fix: testing new git commit hook flow --patch (7fbd8b8a)
+- chore: start v12 release (304f075a)
+
 ## [v11.5.3] - 2026-08-27
 
 - feat: breaking change: introduced new PluginAgentService in PluginContext, removed AGENTS.md loading from opencode --major (170f508e)
@@ -13,7 +19,7 @@ You can also run `bun run release:changelog` to rewrite this file from tags.
 - fix: hide forms when action is done --patch (d42292e8)
 - fix: improved plugins releases widget performance --patch (0df50900)
 - fix: checking git hooks (cc67b385)
-- fix: checking git hook 2 (543c4d88)
+- fix: checking git hook 2 (f5c3f11f)
 
 ## [v11.5.2] - 2026-08-24
 
