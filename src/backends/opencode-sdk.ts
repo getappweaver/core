@@ -15,6 +15,7 @@ import { dmBotRoot } from '../paths';
 import type { ProviderName } from '../providers/types';
 import type { WebNode, WebNodeRoot } from '../web/ui-schema';
 
+import { buildAgentRuntimeContent } from './agent-runtime-context';
 import {
   coerceFileDiff,
   createOpencodeStreamLogState,
@@ -35,7 +36,6 @@ import {
   segmentsToOutputs,
   unwrapOpenCodeEventRecord,
 } from './opencode-parts';
-import { buildOpenCodeRuntimeContent } from './opencode-runtime-context';
 import {
   createStreamDebugMetrics,
   logStreamDebugSummary,
@@ -631,13 +631,20 @@ async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
     join(pluginDir, 'appweaver-intervention.ts'),
   );
 
+  copyFileSync(
+    join(dmBotRoot, 'templates', 'opencode-plugins', 'appweaver-system-log.ts'),
+    join(pluginDir, 'appweaver-system-log.ts'),
+  );
+
   const interventionPluginPath = join(pluginDir, 'appweaver-intervention.ts');
+  const systemLogPluginPath = join(pluginDir, 'appweaver-system-log.ts');
+  const systemLogEnabled = process.env.OPENCODE_SYSTEM_LOG === '1';
 
   const database = process.env.OPENCODE_DB?.trim() || join(cwd, 'opencode.db');
   const intervention = getOpencodeInterventionEnvironment();
 
   log.info(
-    `opencode-sdk: installed AppWeaver intervention plugin in ${pluginDir}`,
+    `opencode-sdk: installed AppWeaver OpenCode plugins in ${pluginDir}`,
   );
 
   const proc = spawn(
@@ -649,9 +656,15 @@ async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
       env: {
         ...process.env,
         OPENCODE_CONFIG_CONTENT: JSON.stringify({
-          plugin: [pathToFileURL(interventionPluginPath).href],
+          plugin: [
+            pathToFileURL(interventionPluginPath).href,
+            ...(systemLogEnabled
+              ? [pathToFileURL(systemLogPluginPath).href]
+              : []),
+          ],
         }),
         OPENCODE_DB: database,
+        APPWEAVER_ROOT: dmBotRoot,
         APPWEAVER_INTERVENTION_URL: intervention.callbackUrl,
         APPWEAVER_INTERVENTION_TOKEN: intervention.token,
       },
@@ -1790,26 +1803,15 @@ export function createOpencodeSDKBackend({
         content,
         opencodeAgentName,
         cwd,
-        workspaceInstructions,
+        context,
         modelOverride,
         onAgentStreamChunk,
         streamAbortSignal,
-        skipRuntimeContext,
       } = props;
 
       const selectedAgentName = opencodeAgentName ?? agentName;
 
-      const runContent =
-        skipRuntimeContext === true
-          ? content
-          : buildOpenCodeRuntimeContent({
-              backendName: 'opencode',
-              agentName: selectedAgentName,
-              dmBotRoot,
-              cwd,
-              workspaceInstructions: workspaceInstructions ?? '',
-              content,
-            });
+      const runContent = buildAgentRuntimeContent({ context, content });
 
       const { client } = await getOrInitSdk();
 
@@ -2288,7 +2290,7 @@ export function createOpencodeSDKBackend({
           cursorMode: 'ask',
           opencodeAgentName: 'ask',
           cwd: props.cwd,
-          workspaceInstructions: '',
+          context: null,
           getRoutstrSkKey: () => null,
           modelOverride: props.model,
           onAgentStreamChunk: (chunk) => {
@@ -2302,7 +2304,6 @@ export function createOpencodeSDKBackend({
             }
           },
           streamAbortSignal: props.abortSignal,
-          skipRuntimeContext: true,
         });
 
         if (result.type === 'error') {

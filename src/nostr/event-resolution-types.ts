@@ -195,11 +195,7 @@ export type EventQueryResult = {
 };
 
 export type CountNewerResult =
-  | 'zero'
-  | 'positive'
-  | 'unsupported'
-  | 'failed'
-  | 'deadline';
+  'zero' | 'positive' | 'unsupported' | 'failed' | 'deadline';
 
 export type QueryFirstValidEventProps = {
   relays: string[];

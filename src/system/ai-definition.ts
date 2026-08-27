@@ -1,6 +1,8 @@
 import type { SimplePool } from 'nostr-tools';
 import type { z } from 'zod';
 
+import type { PluginAgentService } from '@src/core/plugin';
+
 import type { StoryDefinition } from './story-definition';
 
 export type AiExecuteToolProps<TCall = unknown, TDb = unknown> = {
@@ -8,6 +10,7 @@ export type AiExecuteToolProps<TCall = unknown, TDb = unknown> = {
   prefix: string;
   call: TCall;
   db: TDb;
+  agent: PluginAgentService;
   pool?: SimplePool;
   masterPubkey?: string;
   getWotScore?: (pubkey: string, rootPubkey?: string) => number | null;

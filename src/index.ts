@@ -36,7 +36,6 @@ import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
-import { listOpencodeModelCatalog } from './backends/opencode-config';
 import {
   disposeOpencodeSdk,
   getOpenCodeAuthJsonPath,
@@ -47,10 +46,10 @@ import { createBotStatusRepresentation } from './commands/bot/status/representat
 import { routeCommand } from './commands/dispatch';
 import {
   getPromptPayloadValue,
-  type PluginDefaults,
   type PluginHostContext,
   type PromptPayload,
 } from './core/plugin';
+import { createPluginAgentService } from './core/plugin-agent';
 import { finalizePluginRegistration } from './core/registry';
 import { createCoreUpdateChecker } from './core/update-check';
 import {
@@ -63,7 +62,6 @@ import {
   getProviderName,
   getDmCommandPrefix,
   getWorkspaceTarget,
-  getWorkspaceInstructions,
   getRoutstrSkKey,
   needsSetupBillboard,
   readSetupConfigurationSnapshot,
@@ -109,7 +107,6 @@ import {
 } from './paths';
 import { PROMPT_SESSION_EXIT } from './prompt-session';
 import { asProviderDb } from './providers/db';
-import { getOrCreateCurrentSession } from './session';
 import { initializeWorkspaceSkills } from './skills/manager';
 import { openWalletDb } from './wallet/db';
 import {
@@ -482,44 +479,6 @@ async function main() {
     signAuthEvent,
   });
 
-  function getCurrentPluginDefaults(): PluginDefaults {
-    const currentBackendName = getAgentBackend(seenDb);
-
-    return {
-      backend: currentBackendName,
-      provider: getProviderName(seenDb),
-      model: getModelOverride(seenDb, currentBackendName),
-      mode: getCurrentOrDefaultMode(seenDb),
-      workspace_target: getWorkspaceTarget(seenDb),
-    };
-  }
-
-  async function getAvailablePluginModels(): Promise<string[]> {
-    const backendName = getAgentBackend(seenDb);
-
-    const cwd =
-      getWorkspaceTarget(seenDb) === 'appweaver' ? dmBotRoot : parentOfBotRoot;
-
-    if (backendName === 'opencode') {
-      return listOpencodeModelCatalog(cwd).map((choice) => choice.value);
-    }
-
-    const executionProfile = getBackendExecutionProfile(seenDb, backendName);
-
-    const backend = createBackend({
-      backendName,
-      dmBotRoot,
-      cursorMode: getCurrentOrDefaultMode(seenDb),
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-      attachUrl: opencodeServeUrl,
-      modelOverride: getModelOverride(seenDb, backendName),
-      providerName: getProviderName(seenDb),
-    });
-
-    return backend.availableModels();
-  }
-
   let pendingPrompt: ((answer: string) => void) | null = null;
 
   /** Plugin `sendReply` / `promptFn` mirrors the current inbound message source. */
@@ -551,10 +510,17 @@ async function main() {
   }
 
   // --- Plugins ---
+  const pluginAgent = createPluginAgentService({
+    db: seenDb,
+    dmBotRoot,
+    parentOfBotRoot,
+    attachUrl: opencodeServeUrl,
+  });
+
   const pluginContext: PluginHostContext = {
     pool,
     masterPubkey,
-    runAgent: null, // will set later in the conversation loop
+    agent: pluginAgent,
     sendReply: (message: string) => sendReplyForSource(replySource, message),
     sendDm: (message: string) =>
       sendDm({
@@ -605,13 +571,11 @@ async function main() {
             pendingPrompt = resolve;
           });
         },
-        runAgent: pluginContext.runAgent,
+        agent: pluginContext.agent,
         bunkerName,
       }),
 
     getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
-    getAvailableModels: getAvailablePluginModels,
-    defaults: getCurrentPluginDefaults(),
   };
 
   // Register plugins if generated/plugins.ts exists (created by install-plugin script)
@@ -667,8 +631,6 @@ async function main() {
     const executionProfile = getBackendExecutionProfile(seenDb, backendName);
     const modelOverride = getModelOverride(seenDb, backendName);
 
-    pluginContext.defaults = getCurrentPluginDefaults();
-
     const backend = createBackend({
       backendName,
       dmBotRoot,
@@ -682,31 +644,6 @@ async function main() {
 
     const input = content.trim();
     const dmPrefix = getDmCommandPrefix(seenDb);
-
-    const cwd =
-      getWorkspaceTarget(seenDb) === 'appweaver' ? dmBotRoot : parentOfBotRoot;
-
-    pluginContext.runAgent = async (prompt: string) =>
-      backend.runMessage({
-        sessionId: await getOrCreateCurrentSession({
-          db: seenDb,
-          backend,
-          cwd,
-        }),
-        content: prompt,
-        cursorMode: mode,
-        opencodeAgentName:
-          executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-        cwd,
-        workspaceInstructions: getWorkspaceInstructions(
-          seenDb,
-          getWorkspaceTarget(seenDb),
-        ).instructions,
-        getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
-        modelOverride,
-        onAgentStreamChunk: null,
-        streamAbortSignal: null,
-      });
 
     // Core built-in commands + plugins (prefix from core DB; default /)
     if (input.startsWith(dmPrefix)) {

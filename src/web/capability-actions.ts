@@ -129,83 +129,81 @@ function chooserRoot({
         tag: 'text',
         children: [text('Choose a capability provider:')],
       },
-      ...providers.map(
-        (provider): WebNode => ({
-          type: 'element',
-          tag: 'box',
-          props: { padding: 'sm' },
-          children: [
-            {
-              type: 'element',
-              tag: 'row',
-              props: { gap: 'sm', itemAlign: 'center' },
-              children: [
-                ...(provider.source.iconUrl
-                  ? [
-                      {
-                        type: 'element' as const,
-                        tag: 'image' as const,
-                        props: {
-                          src: provider.source.iconUrl,
-                          alt: '',
-                          size: 'sm' as const,
-                        },
+      ...providers.map((provider): WebNode => ({
+        type: 'element',
+        tag: 'box',
+        props: { padding: 'sm' },
+        children: [
+          {
+            type: 'element',
+            tag: 'row',
+            props: { gap: 'sm', itemAlign: 'center' },
+            children: [
+              ...(provider.source.iconUrl
+                ? [
+                    {
+                      type: 'element' as const,
+                      tag: 'image' as const,
+                      props: {
+                        src: provider.source.iconUrl,
+                        alt: '',
+                        size: 'sm' as const,
                       },
-                    ]
-                  : []),
-                {
-                  type: 'element',
-                  tag: 'stack',
-                  props: { gap: 'xs', fill: true },
-                  children: [
-                    {
-                      type: 'element',
-                      tag: 'text',
-                      props: { weight: 'bold' },
-                      children: [text(provider.source.title)],
                     },
-                    {
-                      type: 'element',
-                      tag: 'text',
-                      props: { tone: 'muted', size: 'sm' },
-                      children: [
-                        text(
-                          `${provider.source.alias} · v${provider.source.version}`,
-                        ),
-                      ],
-                    },
-                    ...(provider.source.description
-                      ? [
-                          {
-                            type: 'element' as const,
-                            tag: 'text' as const,
-                            props: { tone: 'muted' as const },
-                            children: [text(provider.source.description)],
-                          },
-                        ]
-                      : []),
-                  ],
-                },
-              ],
-            },
-            {
-              type: 'element',
-              tag: 'button',
-              props: {
-                label: 'Use provider',
-                action: providerAction({
-                  consumerAlias,
-                  operation,
-                  input,
-                  providerId: provider.providerId,
-                  surface,
-                  modalTitle,
-                }),
+                  ]
+                : []),
+              {
+                type: 'element',
+                tag: 'stack',
+                props: { gap: 'xs', fill: true },
+                children: [
+                  {
+                    type: 'element',
+                    tag: 'text',
+                    props: { weight: 'bold' },
+                    children: [text(provider.source.title)],
+                  },
+                  {
+                    type: 'element',
+                    tag: 'text',
+                    props: { tone: 'muted', size: 'sm' },
+                    children: [
+                      text(
+                        `${provider.source.alias} · v${provider.source.version}`,
+                      ),
+                    ],
+                  },
+                  ...(provider.source.description
+                    ? [
+                        {
+                          type: 'element' as const,
+                          tag: 'text' as const,
+                          props: { tone: 'muted' as const },
+                          children: [text(provider.source.description)],
+                        },
+                      ]
+                    : []),
+                ],
               },
+            ],
+          },
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: 'Use provider',
+              action: providerAction({
+                consumerAlias,
+                operation,
+                input,
+                providerId: provider.providerId,
+                surface,
+                modalTitle,
+              }),
             },
-          ],
-        }),
-      ),
+          },
+        ],
+      })),
     ],
   });
 }

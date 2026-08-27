@@ -1,6 +1,8 @@
+import { buildActiveRuntimeContext } from '@src/backends/agent-runtime-context';
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import { createBackend } from '@src/backends/factory';
 import { getOutputString } from '@src/backends/types';
+import { readAgentsInstructions } from '@src/core/agent-instructions';
 import {
   getAgentBackend,
   getBackendExecutionProfile,
@@ -76,8 +78,26 @@ export async function runWebChat(
     opencodeAgentName:
       executionProfile.kind === 'opencode' ? executionProfile.agent : null,
     cwd,
-    workspaceInstructions: getWorkspaceInstructions(ctx.seenDb, workspace)
-      .instructions,
+    context: {
+      runtimeContext: buildActiveRuntimeContext({
+        backendName,
+        agentName:
+          executionProfile.kind === 'opencode' ? executionProfile.agent : mode,
+        dmBotRoot: ctx.dmBotRoot,
+        cwd,
+      }),
+      workspaceInstructions: getWorkspaceInstructions(ctx.seenDb, workspace)
+        .instructions,
+      agentsInstructions:
+        workspace === 'appweaver'
+          ? readAgentsInstructions({
+              workspaceTarget: workspace,
+              dmBotRoot: ctx.dmBotRoot,
+              parentOfBotRoot: ctx.parentOfBotRoot,
+            })
+          : null,
+      extraInstructions: null,
+    },
     getRoutstrSkKey: () => null,
     modelOverride,
     onAgentStreamChunk: useStream ? onStreamChunk : null,

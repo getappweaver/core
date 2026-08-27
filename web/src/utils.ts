@@ -408,8 +408,7 @@ export function getResultSubcommandTag(
 // ---------------------------------------------------------------------------
 
 let _getToken:
-  | ((url: string, method: string) => Promise<string | null>)
-  | null = null;
+  ((url: string, method: string) => Promise<string | null>) | null = null;
 
 export function setAuthTokenProvider(
   fn: (url: string, method: string) => Promise<string | null>,

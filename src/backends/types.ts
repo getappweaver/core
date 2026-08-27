@@ -69,13 +69,18 @@ export type RunMessageProps = {
   cursorMode: AgentMode;
   opencodeAgentName: string | null;
   cwd: string;
-  /** Core chat calls supply the active workspace value; specialized plugin AI calls may omit it. */
-  workspaceInstructions?: string;
+  context: AgentRunContext | null;
   getRoutstrSkKey: () => string | null;
   modelOverride: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   streamAbortSignal: AbortSignal | null;
-  skipRuntimeContext?: boolean;
+};
+
+export type AgentRunContext = {
+  runtimeContext: string | null;
+  workspaceInstructions: string | null;
+  agentsInstructions: string | null;
+  extraInstructions: string | null;
 };
 
 export type AgentBackend = {

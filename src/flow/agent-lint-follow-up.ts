@@ -2,9 +2,11 @@
 // src/flow/agent-lint-follow-up.ts — Run agent round(s) with optional lint follow-up
 // ---------------------------------------------------------------------------
 
+import { buildActiveRuntimeContext } from '../backends/agent-runtime-context';
 import { createBackend } from '../backends/factory';
 import type { AgentRunResult } from '../backends/types';
 import { getOutputString } from '../backends/types';
+import { readAgentsInstructions } from '../core/agent-instructions';
 import type {
   AgentBackendName,
   AgentMode,
@@ -95,8 +97,30 @@ export async function runAgentWithLintFollowUp({
       opencodeAgentName:
         executionProfile.kind === 'opencode' ? executionProfile.agent : null,
       cwd,
-      workspaceInstructions: getWorkspaceInstructions(coreDb, currentWorkspace)
-        .instructions,
+      context: {
+        runtimeContext: buildActiveRuntimeContext({
+          backendName: backendNameFromDb,
+          agentName:
+            executionProfile.kind === 'opencode'
+              ? executionProfile.agent
+              : mode,
+          dmBotRoot,
+          cwd,
+        }),
+        workspaceInstructions: getWorkspaceInstructions(
+          coreDb,
+          currentWorkspace,
+        ).instructions,
+        agentsInstructions:
+          currentWorkspace === 'appweaver'
+            ? readAgentsInstructions({
+                workspaceTarget: currentWorkspace,
+                dmBotRoot,
+                parentOfBotRoot: cwd,
+              })
+            : null,
+        extraInstructions: null,
+      },
       getRoutstrSkKey: () => getRoutstrSkKey(coreDb),
       modelOverride: effectiveModelOverride,
       onAgentStreamChunk: null,

@@ -74,9 +74,7 @@ export type SubcommandDefinition = {
   webWidget?: WebWidget;
   /** Override generated web behavior for commands that are safe to run with provided action values. */
   webExecutionMode?:
-    | 'requires_input'
-    | 'runnable_default'
-    | 'runnable_customizable';
+    'requires_input' | 'runnable_default' | 'runnable_customizable';
   /** Optional end-to-end browser/server trace for web execution. */
   monitoring?: {
     name: string;

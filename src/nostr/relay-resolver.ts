@@ -41,11 +41,7 @@ export type RelayProvenance =
   | 'fallback';
 
 export type RelayGroupSource =
-  | 'explicit'
-  | 'cached'
-  | 'nip65-write'
-  | 'context'
-  | 'fallback';
+  'explicit' | 'cached' | 'nip65-write' | 'context' | 'fallback';
 
 export type ResolvedRelay = {
   url: string;
@@ -504,9 +500,10 @@ export function createRelayResolver({
       );
     });
 
-    const sharedResult = pending.then(
-      (result): WaitForInFlightResult => ({ result, callerTimedOut: false }),
-    );
+    const sharedResult = pending.then((result): WaitForInFlightResult => ({
+      result,
+      callerTimedOut: false,
+    }));
 
     const outcome = await Promise.race([sharedResult, deadlineResult]);
 

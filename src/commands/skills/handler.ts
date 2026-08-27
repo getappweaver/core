@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-import { buildOpenCodeActiveRuntimeContext } from '@src/backends/opencode-runtime-context';
+import { buildActiveRuntimeContext } from '@src/backends/agent-runtime-context';
 import {
   deleteToolInvocationRule,
   getSelectedOpencodeAgent,
@@ -341,8 +341,14 @@ function sectionTitle(label: string, status: string): WebNode {
   };
 }
 
-function readAgentsMarkdown(cwd: string): string | null {
-  const path = join(cwd, 'AGENTS.md');
+function readAgentsMarkdown(
+  cwd: string,
+  workspace: 'parent' | 'appweaver',
+): string | null {
+  const path =
+    workspace === 'appweaver'
+      ? join(cwd, '.appweaver', 'AGENTS.md')
+      : join(cwd, 'AGENTS.md');
 
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }
@@ -620,7 +626,7 @@ export const handleSkillsRoot: BuiltinHandler = async (ctx) => {
           dmBotRoot: ctx.dmBotRoot,
           workspaceRoot: ctx.cwd,
         }),
-        runtimeContext: buildOpenCodeActiveRuntimeContext({
+        runtimeContext: buildActiveRuntimeContext({
           backendName: 'opencode',
           agentName: getSelectedOpencodeAgent(ctx.seenDb),
           dmBotRoot: ctx.dmBotRoot,
@@ -629,7 +635,7 @@ export const handleSkillsRoot: BuiltinHandler = async (ctx) => {
         workspace,
         workspaceInstructions: configuredInstructions.instructions,
         customized: configuredInstructions.customized,
-        agentsMarkdown: readAgentsMarkdown(ctx.cwd),
+        agentsMarkdown: readAgentsMarkdown(ctx.cwd, workspace),
         defaultActiveTab:
           sub === 'list'
             ? 'skills'

@@ -20,9 +20,7 @@ import type {
 } from '@src/system/command-definition';
 
 export type InferredWebExecutionMode =
-  | 'requires_input'
-  | 'runnable_default'
-  | 'runnable_customizable';
+  'requires_input' | 'runnable_default' | 'runnable_customizable';
 
 export type InferredWebSupport = {
   generated: true;

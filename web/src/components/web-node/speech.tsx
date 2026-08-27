@@ -325,8 +325,7 @@ type SpeechHighlightBoxProps = {
   speechSentences: Accessor<string[] | undefined> | undefined;
   activeSpeechSentenceIndex: Accessor<number | null | undefined> | undefined;
   onSpeechSentenceClick:
-    | Accessor<((index: number) => void) | null | undefined>
-    | undefined;
+    Accessor<((index: number) => void) | null | undefined> | undefined;
 };
 
 // Forward declaration — the actual WebNodeRenderer is imported by the file

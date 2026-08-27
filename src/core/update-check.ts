@@ -1,10 +1,7 @@
 import { log } from '@src/logger';
 
 export type CoreUpdateState =
-  | 'checking'
-  | 'available'
-  | 'up_to_date'
-  | 'unavailable';
+  'checking' | 'available' | 'up_to_date' | 'unavailable';
 
 export type CoreUpdateLevel = 'major' | 'minor' | 'patch' | 'same' | 'unknown';
 

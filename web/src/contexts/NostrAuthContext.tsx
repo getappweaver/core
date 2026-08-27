@@ -135,8 +135,7 @@ type SignedNostrEvent = EventTemplate & {
 };
 
 type SignEventChoice =
-  | { method: 'current' }
-  | { method: 'bunker'; bunkerData: BunkerSignerData };
+  { method: 'current' } | { method: 'bunker'; bunkerData: BunkerSignerData };
 
 type SignEventRequest = {
   title: string;

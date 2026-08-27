@@ -4,7 +4,7 @@ import type { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
 
 import { getOutputString } from '@src/backends/types';
-import type { RunAgentFn, SendReplyFn } from '@src/core/plugin';
+import type { PluginAgentService, SendReplyFn } from '@src/core/plugin';
 
 import type { CoreDb } from '../db';
 import { PROMPT_SESSION_EXIT } from '../prompt-session';
@@ -37,7 +37,7 @@ export type SignWithBunkerInteractiveProps = {
   eventTemplate: EventTemplate;
   sendReply: SendReplyFn;
   promptFn: PromptFn;
-  runAgent: RunAgentFn | null;
+  agent: PluginAgentService;
   bunkerName?: string;
 };
 
@@ -80,12 +80,12 @@ ${JSON.stringify(eventTemplate, null, 2)}
 async function editEventTemplateWithAi(props: {
   eventTemplate: EventTemplate;
   instruction: string;
-  runAgent: RunAgentFn;
+  agent: PluginAgentService;
 }): Promise<EventTemplate> {
-  const { eventTemplate, instruction, runAgent } = props;
+  const { eventTemplate, instruction, agent } = props;
 
-  const result =
-    await runAgent(`You are editing a Nostr unsigned event template JSON.
+  const result = await agent.run({
+    prompt: `You are editing a Nostr unsigned event template JSON.
 
 Current event template:
 ${JSON.stringify(eventTemplate, null, 2)}
@@ -93,7 +93,18 @@ ${JSON.stringify(eventTemplate, null, 2)}
 User instruction:
 ${instruction}
 
-Return only valid JSON for the full edited event template. Do not use markdown fences. Preserve the existing kind unless the user explicitly asked to change it.`);
+Return only valid JSON for the full edited event template. Do not use markdown fences. Preserve the existing kind unless the user explicitly asked to change it.`,
+    sessionId: null,
+    backend: null,
+    provider: null,
+    model: null,
+    mode: null,
+    workspaceTarget: null,
+    cwd: null,
+    onAgentStreamChunk: null,
+    abortSignal: null,
+    context: null,
+  });
 
   const raw = stripCodeFence(getOutputString(result));
 
@@ -246,7 +257,7 @@ export async function signWithBunkerInteractive({
   eventTemplate,
   sendReply,
   promptFn,
-  runAgent,
+  agent,
   bunkerName,
 }: SignWithBunkerInteractiveProps): Promise<NostrEvent> {
   let currentTemplate = eventTemplate;
@@ -272,14 +283,6 @@ export async function signWithBunkerInteractive({
     }
 
     if (lowered.startsWith('e ') || lowered === 'e') {
-      if (!runAgent) {
-        await sendReply(
-          'AI editing requires an agent backend for this session.',
-        );
-
-        continue;
-      }
-
       const instruction = answer.slice(1).trim();
 
       if (!instruction) {
@@ -291,7 +294,7 @@ export async function signWithBunkerInteractive({
       currentTemplate = await editEventTemplateWithAi({
         eventTemplate: currentTemplate,
         instruction,
-        runAgent,
+        agent,
       });
 
       continue;

@@ -7,6 +7,7 @@ import { spawn } from 'bun';
 
 import { debug, log } from '../logger';
 
+import { buildAgentRuntimeContent } from './agent-runtime-context';
 import { serializeChatCompletionMessages } from './chat-completion';
 import {
   createStreamDebugMetrics,
@@ -388,6 +389,7 @@ export function createCursorSdkBackend(
     async runMessage({
       sessionId,
       content,
+      context,
       cwd,
       modelOverride,
       onAgentStreamChunk,
@@ -403,7 +405,7 @@ export function createCursorSdkBackend(
           cwd,
           model,
           sessionId,
-          content,
+          content: buildAgentRuntimeContent({ context, content }),
         },
         onTextDelta: (text) => {
           recordStreamDebugChunk(streamMetrics, text);
@@ -447,7 +449,7 @@ export function createCursorSdkBackend(
         cursorMode: 'ask',
         opencodeAgentName: null,
         cwd: props.cwd,
-        workspaceInstructions: '',
+        context: null,
         getRoutstrSkKey: () => null,
         modelOverride: props.model,
         onAgentStreamChunk: (chunk) => {
@@ -458,7 +460,6 @@ export function createCursorSdkBackend(
           }
         },
         streamAbortSignal: props.abortSignal,
-        skipRuntimeContext: true,
       });
 
       if (result.type === 'error') {

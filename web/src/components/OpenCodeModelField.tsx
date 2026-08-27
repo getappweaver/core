@@ -9,13 +9,7 @@ export type OpenCodeModelFieldProps = {
   /** From `opencode.json`; use `[]` when there is no catalog (plain text field). */
   choices: WebArgumentFieldChoice[];
   enterKeyHint?:
-    | 'done'
-    | 'enter'
-    | 'go'
-    | 'next'
-    | 'previous'
-    | 'search'
-    | 'send';
+    'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send';
   onChange: (value: string) => void;
 };
 

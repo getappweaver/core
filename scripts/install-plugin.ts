@@ -58,8 +58,7 @@ type RefEntry = {
 const PLUGIN_VERSION_HEAD = 'HEAD';
 
 type SelectedPluginVersion =
-  | { kind: 'catalog'; ref: RefEntry }
-  | { kind: 'head' };
+  { kind: 'catalog'; ref: RefEntry } | { kind: 'head' };
 
 type PluginEvent = {
   id: string;

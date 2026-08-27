@@ -7,6 +7,7 @@ import { basename, join } from 'path';
 import type { EventTemplate, NostrEvent, SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
+import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { AgentRunResult } from '@src/backends/types';
 import {
   normalizeCapabilityRelations,
@@ -36,7 +37,53 @@ import type { Monitoring } from './monitoring';
 
 // ---------------------------------------------------------------------------
 export type SendReplyFn = (message: string) => Promise<void>;
-export type RunAgentFn = (prompt: string) => Promise<AgentRunResult>;
+export type PluginAgentDefaults = {
+  backend: AgentBackendName;
+  provider: ProviderName;
+  model: string | null;
+  effectiveModel: string;
+  mode: AgentMode;
+  workspaceTarget: WorkspaceTarget;
+};
+
+export type PluginAgentRunProps = {
+  prompt: string;
+  sessionId: string | null;
+  backend: AgentBackendName | null;
+  provider: ProviderName | null;
+  model: string | null;
+  mode: AgentMode | null;
+  workspaceTarget: WorkspaceTarget | null;
+  cwd: string | null;
+  onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
+  abortSignal: AbortSignal | null;
+  context: PluginAgentContextOptions | null;
+};
+
+export type PluginAgentContextOptions = {
+  runtimeContext: boolean;
+  workspaceInstructions: boolean;
+  agentsInstructions: boolean;
+  extraInstructions: string | null;
+};
+
+export type PluginAgentRunResult = AgentRunResult & {
+  backend: AgentBackendName;
+};
+
+export type PluginAgentService = {
+  getDefaults(): PluginAgentDefaults;
+  getEffectiveModel(props: {
+    backend: AgentBackendName | null;
+    model: string | null;
+    mode: AgentMode | null;
+    workspaceTarget: WorkspaceTarget | null;
+  }): string;
+  getAvailableModels(props: {
+    backend: AgentBackendName | null;
+  }): Promise<string[]>;
+  run(props: PluginAgentRunProps): Promise<PluginAgentRunResult>;
+};
 export type TextPromptPayload = {
   type: 'text-prompt';
   value: string;
@@ -92,25 +139,16 @@ export function getPromptPayloadValue(
   return message.value;
 }
 
-export type PluginDefaults = {
-  backend: AgentBackendName;
-  provider: ProviderName;
-  model: string | null;
-  mode: AgentMode;
-  workspace_target: WorkspaceTarget;
-};
-
 /**
  * Shared context for plugins. Mutating handlers run after `onInit(ctx)` has been called.
  *
  * - **getRoutstrSkKey** — Routstr API key from DB when applicable.
- * - **defaults** — UI defaults when a user message is handled; for authoritative DB state prefer
- *   `openCoreDb()` inside the plugin (see job plugin CLI tools).
+ * - **agent** — Core-owned agent execution with fresh sessions by default and explicit resumption.
  */
 export type PluginContext = {
   pool: SimplePool;
   masterPubkey: string;
-  runAgent: RunAgentFn | null;
+  agent: PluginAgentService;
   sendReply: SendReplyFn;
   sendDm: SendReplyFn;
   sendWebPush: SendWebPushNotificationFn;
@@ -124,13 +162,10 @@ export type PluginContext = {
     bunkerName?: string,
   ) => Promise<NostrEvent>;
   getRoutstrSkKey: () => string | null;
-  /** Model ids available to editable plugin model fields for the active backend. */
-  getAvailableModels: () => Promise<string[]>;
   /** Plugin-scoped client for invoking registered capability operations. */
   capabilities: CapabilityClient;
   /** Best-effort tracing facade. No registered provider means spans are discarded. */
   monitoring: Monitoring;
-  defaults: PluginDefaults;
 };
 
 /** Core-owned context before a plugin-scoped capability client is attached. */
@@ -233,7 +268,7 @@ export type PluginIdentity = {
 export type PluginInvocationContext = {
   prefix: string;
   source: MessageSource;
-  runAgent: RunAgentFn;
+  agent: PluginAgentService;
   sendReply?: SendReplyFn;
   promptFn?: PromptFn;
   jsonPayload?: unknown;

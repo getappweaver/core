@@ -17,8 +17,7 @@ export type VerifyNip98AuthorizationParams = {
 };
 
 export type VerifyNip98AuthorizationResult =
-  | { ok: true }
-  | { ok: false; reason: string };
+  { ok: true } | { ok: false; reason: string };
 
 export function verifyNip98Authorization(
   params: VerifyNip98AuthorizationParams,

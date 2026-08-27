@@ -19,13 +19,7 @@ type CommandFormCardProps = {
 };
 
 type FormInputEnterKeyHint =
-  | 'done'
-  | 'enter'
-  | 'go'
-  | 'next'
-  | 'previous'
-  | 'search'
-  | 'send';
+  'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send';
 
 function OptionHintLine(props: {
   formItem: Extract<TimelineItem, { type: 'command_form' }>;

@@ -40,9 +40,9 @@ export const CrawlWotParamsSchema = z.object({
   concurrency: z.number().int().positive().default(3),
   relays: z.array(z.string()).optional(),
   onProgress: z
-    .custom<
-      (message: string) => void | Promise<void>
-    >((value) => value === undefined || typeof value === 'function')
+    .custom<(message: string) => void | Promise<void>>(
+      (value) => value === undefined || typeof value === 'function',
+    )
     .optional(),
 });
 

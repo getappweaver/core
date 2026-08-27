@@ -20,6 +20,7 @@ TOOLS.md
 .claude/skills/skill-status/
 .appweaver/skills/appweaver*
 .logs/
+.logs/system/
 .piper-test/
 models/piper/
 apps/landing/dist/

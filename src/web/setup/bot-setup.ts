@@ -678,7 +678,7 @@ async function main(): Promise<void> {
   if (isParent) {
     console.log(`\n  Parent root:       ${PARENT_ROOT}`);
 
-    console.log('  Symlinks: opencode.json, AGENTS.md');
+    console.log('  Symlinks: opencode.json');
   }
 
   console.log('\n✓ Setup complete. Run `bun run start` to start the bot.\n');

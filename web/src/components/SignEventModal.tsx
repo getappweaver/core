@@ -18,8 +18,7 @@ import type { BunkerSignerData } from '../nostr/storage';
 import { WebButton } from './WebButton';
 
 type SignEventChoice =
-  | { method: 'current' }
-  | { method: 'bunker'; bunkerData: BunkerSignerData };
+  { method: 'current' } | { method: 'bunker'; bunkerData: BunkerSignerData };
 
 type SignEventModalProps = {
   title: string;

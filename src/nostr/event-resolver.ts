@@ -710,12 +710,10 @@ export function createEventResolver({
       );
     });
 
-    const completed = entry.promise.then(
-      (outcome): WaitForRefreshResult => ({
-        outcome,
-        callerTimedOut: false,
-      }),
-    );
+    const completed = entry.promise.then((outcome): WaitForRefreshResult => ({
+      outcome,
+      callerTimedOut: false,
+    }));
 
     const result = await Promise.race([completed, timeout]);
 

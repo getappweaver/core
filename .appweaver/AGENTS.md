@@ -1,4 +1,4 @@
-# AppWeaver Plugin Tools
+# AppWeaver Agent Instructions
 
 This repo uses a CLI-based tool system for AI agents.
 
@@ -122,6 +122,16 @@ Before running a package script, the agent should:
 ---
 
 ## Commits
+
+### Release preparation
+
+Before preparing a release commit:
+
+1. Inspect both unstaged and staged changes with `git --no-pager diff` and `git --no-pager diff --staged`.
+2. Summarize the scope, files, and behavior changed in plain language.
+3. Use one concise conventional commit subject that includes the appropriate version bump flag below.
+
+Release hooks update the version, `vX.Y.Z` tag, and `CHANGELOG.md`. To regenerate the changelog from tags only, run `bun run release:changelog`.
 
 Before making a commit, include a version bump flag in the commit message:
 

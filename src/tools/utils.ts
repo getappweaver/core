@@ -7,8 +7,7 @@ import type { z } from 'zod';
 export type ParseSettledFulfilled<T> = { status: 'fulfilled'; value: T };
 export type ParseSettledRejected = { status: 'rejected'; reason: Error };
 export type ParseSettledResult<T> =
-  | ParseSettledFulfilled<T>
-  | ParseSettledRejected;
+  ParseSettledFulfilled<T> | ParseSettledRejected;
 
 function stripCodeFences(s: string): string {
   return s

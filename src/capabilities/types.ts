@@ -116,7 +116,9 @@ type ContractOperationById<
 > = Extract<ContractOperation<TContract>, { id: TId }>;
 
 type RequiredContractOperationId<TContract extends AnyCapabilityContract> = {
-  [TKey in keyof TContract['operations']]: TContract['operations'][TKey] extends {
+  [
+    TKey in keyof TContract['operations']
+  ]: TContract['operations'][TKey] extends {
     required: true;
     id: infer TId extends CapabilityOperationId;
   }

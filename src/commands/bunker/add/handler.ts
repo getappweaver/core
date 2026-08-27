@@ -15,8 +15,7 @@ type HandleBunkerAddProps = {
 };
 
 export type BunkerAddHandlerResult =
-  | ReturnType<typeof createBunkerUsageRepresentation>
-  | BunkerAddRepresentation;
+  ReturnType<typeof createBunkerUsageRepresentation> | BunkerAddRepresentation;
 
 export async function handleBunkerAdd(
   props: HandleBunkerAddProps,

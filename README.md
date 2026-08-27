@@ -171,7 +171,7 @@ For contribution hooks:
 bun run contrib:setup
 ```
 
-When changing AppWeaver core code, run targeted checks where possible or `bun run lint` for broad changes. See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for contributor and AI-agent workflow details.
+When changing AppWeaver core code, run targeted checks where possible or `bun run lint` for broad changes. See [.appweaver/AGENTS.md](.appweaver/AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for contributor and AI-agent workflow details.
 
 If you want AppWeaver to work on its own core code, set the workspace to `appweaver` in setup or the web UI.
 

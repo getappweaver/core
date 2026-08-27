@@ -5,7 +5,8 @@
 import type { VerifiedEvent } from 'nostr-tools';
 import type { SimplePool } from 'nostr-tools/pool';
 
-import type { PromptFn, RunAgentFn, SendReplyFn } from '@src/core/plugin';
+import type { PromptFn, SendReplyFn } from '@src/core/plugin';
+import { createPluginAgentService } from '@src/core/plugin-agent';
 import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { MessageSource } from '@src/messaging';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
@@ -14,58 +15,14 @@ import type { WebHandlerResult } from '@src/web/ui-schema';
 import type { AgentBackend } from '../backends/types';
 import { dispatchPluginCommand } from '../core/registry';
 import type { CoreDb } from '../db';
-import {
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
-  getModelOverride,
-  getRoutstrSkKey,
-  getWorkspaceInstructions,
-  getWorkspaceTarget,
-} from '../db';
+import { getWorkspaceTarget } from '../db';
 import type { BotConfig } from '../env';
 import { log } from '../logger';
 import type { ProviderDb } from '../providers/db';
-import { getOrCreateCurrentSession } from '../session';
 import type { WalletDb } from '../wallet/db';
 
 import { parseBuiltinTokens } from './parse-prefixed';
 import { builtinCommandHandlers } from './prefixed-handlers';
-
-async function createRunAgentForPluginDispatch(props: {
-  seenDb: CoreDb;
-  backend: AgentBackend;
-  cwd: string;
-}): Promise<RunAgentFn> {
-  const { seenDb, backend, cwd } = props;
-  const modelOverride = getModelOverride(seenDb, backend.name);
-  const executionProfile = getBackendExecutionProfile(seenDb, backend.name);
-  const workspace = getWorkspaceTarget(seenDb);
-
-  const sessionId = await getOrCreateCurrentSession({
-    db: seenDb,
-    backend,
-    cwd,
-  });
-
-  return async (prompt: string) =>
-    backend.runMessage({
-      sessionId,
-      content: prompt,
-      cursorMode:
-        executionProfile.kind === 'cursor'
-          ? executionProfile.mode
-          : getCurrentOrDefaultMode(seenDb),
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-      cwd,
-      workspaceInstructions: getWorkspaceInstructions(seenDb, workspace)
-        .instructions,
-      getRoutstrSkKey: () => getRoutstrSkKey(seenDb),
-      modelOverride,
-      onAgentStreamChunk: null,
-      streamAbortSignal: null,
-    });
-}
 
 // --- types
 
@@ -135,7 +92,6 @@ export async function routeCommand(
     seenDb,
     parentOfBotRoot,
     dmBotRoot,
-    backend,
     source,
     sendReply,
     promptFn,
@@ -167,16 +123,17 @@ export async function routeCommand(
     return builtIn(ctx);
   }
 
-  const runAgent: RunAgentFn = await createRunAgentForPluginDispatch({
-    seenDb,
-    backend,
-    cwd,
+  const agent = createPluginAgentService({
+    db: seenDb,
+    dmBotRoot,
+    parentOfBotRoot,
+    attachUrl: props.attachUrl,
   });
 
   const pluginResult = await dispatchPluginCommand(cmd, args, {
     prefix,
     source,
-    runAgent,
+    agent,
     sendReply,
     promptFn,
     jsonPayload: props.jsonPayload,

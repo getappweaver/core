@@ -610,8 +610,7 @@ export function getWotDepth(
       'SELECT root_pubkey, pubkey, depth, contact_list_created_at, follow_list_fetched_at, source_event_id FROM wot_nodes WHERE root_pubkey = ? AND pubkey = ?',
     )
     .get(normalizedRootPubkey, normalizedPubkey) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   if (!row) {
     return null;
@@ -633,8 +632,7 @@ export function getWotFollowerCount(
       'SELECT COUNT(*) AS follower_count FROM wot_edges WHERE root_pubkey = ? AND followed_pubkey = ?',
     )
     .get(normalizedRootPubkey, normalizedPubkey) as
-    | { follower_count: number }
-    | undefined;
+    { follower_count: number } | undefined;
 
   return SqliteIntSchema.parse(row?.follower_count ?? 0);
 }
@@ -706,8 +704,7 @@ export function getWotDepthCount(
       'SELECT COUNT(*) AS node_count FROM wot_nodes WHERE root_pubkey = ? AND depth = ?',
     )
     .get(normalizedRootPubkey, normalizedDepth) as
-    | { node_count: number }
-    | undefined;
+    { node_count: number } | undefined;
 
   return SqliteIntSchema.parse(row?.node_count ?? 0);
 }
@@ -733,8 +730,7 @@ export function getWotFollowingCount(
       'SELECT COUNT(*) AS following_count FROM wot_edges WHERE root_pubkey = ? AND follower_pubkey = ?',
     )
     .get(normalizedRootPubkey, normalizedPubkey) as
-    | { following_count: number }
-    | undefined;
+    { following_count: number } | undefined;
 
   return SqliteIntSchema.parse(row?.following_count ?? 0);
 }
@@ -818,8 +814,7 @@ export function getWotRootStats(
     `,
     )
     .get(normalizedRootPubkey, normalizedRootPubkey, normalizedRootPubkey) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   if (!row || Number(row.node_count ?? 0) === 0) {
     return null;

@@ -11,9 +11,10 @@ import { z } from 'zod';
 import { cliRegistry } from '../generated/cli-registry';
 
 import { disposeOpencodeSdk } from './backends/opencode-sdk';
+import { createPluginAgentService } from './core/plugin-agent';
 import { getDmCommandPrefix, getWotScore, openCoreDb } from './db';
 import { loadBotConfig } from './env';
-import { dmBotRoot } from './paths';
+import { dmBotRoot, getParentWorkspaceRoot } from './paths';
 
 type CliArgs = {
   alias: string | null;
@@ -193,6 +194,7 @@ async function main(): Promise<void> {
         prefix: string;
         call: unknown;
         db: Database;
+        agent: ReturnType<typeof createPluginAgentService>;
         pool?: SimplePool;
         masterPubkey?: string;
         getWotScore?: (pubkey: string, rootPubkey?: string) => number | null;
@@ -224,11 +226,19 @@ async function main(): Promise<void> {
 
     const prefix = getDmCommandPrefix(coreDb);
 
+    const agent = createPluginAgentService({
+      db: coreDb,
+      dmBotRoot,
+      parentOfBotRoot: getParentWorkspaceRoot(),
+      attachUrl: process.env.BOT_OPENCODE_SERVE_URL ?? null,
+    });
+
     const result = await aiDefinition.executeTool({
       alias,
       prefix,
       call: parsed.data,
       db,
+      agent,
       pool,
       masterPubkey: config.masterPubkey,
       getWotScore: (pubkey: string, rootPubkey = config.masterPubkey) =>
