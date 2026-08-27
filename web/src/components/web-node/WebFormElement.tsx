@@ -27,6 +27,7 @@ import { WebButton } from '../WebButton';
 import {
   TreeExpandRequestSetterContext,
   TreeItemExpandedStateContext,
+  WebRevealContext,
 } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
 import { expandTreeItemsForAction } from './tree-state';
@@ -55,7 +56,32 @@ type WebFormElementProps = {
 export function WebFormElement(props: WebFormElementProps): JSX.Element {
   const expandedById = useContext(TreeItemExpandedStateContext);
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
+  const revealContext = useContext(WebRevealContext);
   let formEl: HTMLFormElement | undefined;
+
+  function hideRevealedFormIfNeeded(form: HTMLFormElement): void {
+    const revealId = props.element.props?.revealId;
+
+    if (
+      revealId &&
+      props.element.props?.hiddenUntilRevealed === true &&
+      revealContext?.isRevealed(revealId) === true
+    ) {
+      revealContext.hideReveal(revealId);
+    }
+
+    // Reset text fields so reopening the same inline form starts empty.
+    form.reset();
+
+    // Ensure controlled inputs (value prop) also clear if form was reused via reconciliation.
+    for (const el of form.querySelectorAll<
+      HTMLInputElement | HTMLTextAreaElement
+    >('input[name], textarea[name], select[name]')) {
+      if (el.defaultValue !== undefined) {
+        el.value = el.defaultValue;
+      }
+    }
+  }
 
   function updatePositiveIntegerSubmitButtons(): void {
     if (!formEl) {
@@ -212,6 +238,8 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
           },
         );
 
+        hideRevealedFormIfNeeded(formEl);
+
         return;
       }
 
@@ -236,6 +264,8 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
           promptRequestId: props.promptRequestId,
         },
       );
+
+      hideRevealedFormIfNeeded(formEl);
 
       return;
     }
@@ -271,6 +301,8 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
           promptRequestId: props.promptRequestId,
         },
       );
+
+      hideRevealedFormIfNeeded(formEl);
 
       return;
     }
@@ -329,6 +361,8 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
       onReplaceRoot: props.onReplaceRoot,
       promptRequestId: props.promptRequestId,
     });
+
+    hideRevealedFormIfNeeded(formEl);
   };
 
   return (

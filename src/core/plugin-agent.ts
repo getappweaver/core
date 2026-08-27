@@ -68,8 +68,9 @@ export function createPluginAgentService({
     const provider = getProviderName(db);
     const mode = props.mode ?? getCurrentOrDefaultMode(db);
     const workspaceTarget = props.workspaceTarget ?? getWorkspaceTarget(db);
-    const cwd =
-      workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
+    const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
     const executionProfile = getBackendExecutionProfile(db, backend);
 
     return createBackend({
@@ -94,6 +95,7 @@ export function createPluginAgentService({
     const model = getModelOverride(db, backend);
     const mode = getCurrentOrDefaultMode(db);
     const workspaceTarget = getWorkspaceTarget(db);
+
     const effectiveModel = getEffectiveModel({
       backend,
       model,
