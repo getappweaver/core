@@ -61,6 +61,11 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   const [envValues, setEnvValues] = createSignal<Record<string, string>>({});
   const [savingApiKey, setSavingApiKey] = createSignal(false);
   const [pollingAuth, setPollingAuth] = createSignal(false);
+
+  const [confirmedAuthProviderID, setConfirmedAuthProviderID] = createSignal<
+    string | null
+  >(null);
+
   const [deviceCodeCopied, setDeviceCodeCopied] = createSignal(false);
 
   const [authorizeResult, setAuthorizeResult] =
@@ -237,6 +242,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     setAuthorizing(true);
     setAuthorizeError(null);
     setAuthorizeResult(null);
+    setConfirmedAuthProviderID(null);
     setDeviceCodeCopied(false);
 
     try {
@@ -248,7 +254,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
 
       setAuthorizeResult(result);
 
-      if (result.url) {
+      if (result.url || selectedMethodIsHeadless()) {
         void waitForProviderAuth(provider.id);
       }
     } catch (err) {
@@ -256,6 +262,20 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     } finally {
       setAuthorizing(false);
     }
+  }
+
+  function confirmAuth(): void {
+    const provider = selectedProvider();
+
+    if (!provider) {
+      return;
+    }
+
+    stopAuthPolling?.();
+    stopAuthPolling = null;
+    setPollingAuth(false);
+    setConfirmedAuthProviderID(provider.id);
+    void refetch();
   }
 
   async function copyDeviceCode(code: string): Promise<void> {
@@ -339,6 +359,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                       storeProviderID(event.currentTarget.value);
                       setSelectedMethodIndex(0);
                       setAuthorizeResult(null);
+                      setConfirmedAuthProviderID(null);
                     }}
                   >
                     <For each={loaded().providers}>
@@ -462,14 +483,19 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                 {(provider) => (
                   <div
                     class="setup-step setup-auth-step"
-                    classList={{ 'is-ok': selectedProviderConfigured() }}
+                    classList={{
+                      'is-ok':
+                        selectedProviderConfigured() ||
+                        confirmedAuthProviderID() === provider().id,
+                    }}
                   >
                     <span class="setup-step-marker">✓</span>
                     <div class="setup-step-body">
                       <h2>{provider().name} auth</h2>
                       <p>
-                        {selectedProviderConfigured()
-                          ? 'OpenCode reports stored credentials for this provider.'
+                        {selectedProviderConfigured() ||
+                        confirmedAuthProviderID() === provider().id
+                          ? 'Authentication complete.'
                           : pollingAuth()
                             ? 'Waiting for the provider callback to complete...'
                             : 'Start auth, complete the provider login, then this will turn green when OpenCode reports stored credentials.'}
@@ -519,6 +545,21 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
                       checks OpenCode automatically while authorization is in
                       progress.
                     </p>
+                    <Show
+                      when={
+                        selectedMethodIsHeadless() &&
+                        !selectedProviderConfigured() &&
+                        confirmedAuthProviderID() !== selectedProviderID()
+                      }
+                    >
+                      <button
+                        type="button"
+                        class="web-button"
+                        onClick={confirmAuth}
+                      >
+                        I&apos;ve completed authentication
+                      </button>
+                    </Show>
                   </div>
                 )}
               </Show>
