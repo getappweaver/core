@@ -21,6 +21,7 @@ import {
   fetchOpenCodeAuthStatus,
   setProviderApiKey,
   type OpenCodeAuthorizeResponse,
+  type OpenCodeAuthStatusResult,
   type SetupStatus,
 } from '../transport';
 
@@ -38,6 +39,18 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
     () => props.token,
     fetchOpenCodeAuthStatus,
   );
+
+  const authStatusData = () => {
+    const result = authStatus();
+
+    return result?.ok ? result : null;
+  };
+
+  const authStatusError = () => {
+    const result = authStatus() as OpenCodeAuthStatusResult | undefined;
+
+    return result && !result.ok ? result.error : null;
+  };
 
   const [selectedProviderID, setSelectedProviderID] = createSignal(
     getStoredProviderID(),
@@ -62,7 +75,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   onCleanup(() => stopAuthPolling?.());
 
   createEffect(() => {
-    const providers = authStatus()?.providers ?? [];
+    const providers = authStatusData()?.providers ?? [];
     const selected = selectedProviderID();
 
     if (providers.length === 0) {
@@ -90,7 +103,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
   });
 
   const selectedProvider = () =>
-    authStatus()?.providers.find(
+    authStatusData()?.providers.find(
       (provider) => provider.id === selectedProviderID(),
     ) ?? null;
 
@@ -172,8 +185,9 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
 
       try {
         const nextStatus = await refetch();
+        const successfulStatus = nextStatus?.ok ? nextStatus : null;
 
-        if (providerIsConfigured(nextStatus, providerID)) {
+        if (providerIsConfigured(successfulStatus, providerID)) {
           stopAuthPolling?.();
           stopAuthPolling = null;
 
@@ -311,7 +325,7 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
       </p>
 
       <Switch>
-        <Match when={authStatus()}>
+        <Match when={authStatusData()}>
           {(loaded) => (
             <>
               <div class="setup-defaults-grid">
@@ -527,9 +541,11 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
         <Match when={authStatus.loading}>
           <p class="setup-copy">Starting local OpenCode server...</p>
         </Match>
-        <Match when={authStatus.error}>
+        <Match when={authStatusError() || authStatus.error}>
           <div>
-            <p class="setup-error-line">{String(authStatus.error)}</p>
+            <p class="setup-error-line">
+              {authStatusError() ?? String(authStatus.error)}
+            </p>
             <div class="setup-step-actions">
               <button
                 type="button"

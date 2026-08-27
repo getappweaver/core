@@ -179,6 +179,14 @@ export type OpenCodeAuthStatus = {
   providers: OpenCodeAuthProvider[];
 };
 
+export type OpenCodeAuthStatusResult =
+  | OpenCodeAuthStatus
+  | {
+      ok: false;
+      error: string;
+      status: number | null;
+    };
+
 export type OpenCodeAuthorizeResponse = {
   ok: true;
   providerID: string;
@@ -501,17 +509,29 @@ export async function restartSetupApp(
 
 export async function fetchOpenCodeAuthStatus(
   token: string,
-): Promise<OpenCodeAuthStatus> {
-  const res = await fetch('/api/setup/opencode/auth', {
-    headers: setupAuthHeaders(token),
-    signal: AbortSignal.timeout(OPENCODE_AUTH_STATUS_TIMEOUT_MS),
-  });
+): Promise<OpenCodeAuthStatusResult> {
+  try {
+    const res = await fetch('/api/setup/opencode/auth', {
+      headers: setupAuthHeaders(token),
+      signal: AbortSignal.timeout(OPENCODE_AUTH_STATUS_TIMEOUT_MS),
+    });
 
-  if (!res.ok) {
-    throw new Error(`opencode_auth_status_failed:${res.status}`);
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `opencode_auth_status_failed:${res.status}`,
+        status: res.status,
+      };
+    }
+
+    return (await res.json()) as OpenCodeAuthStatus;
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      status: null,
+    };
   }
-
-  return (await res.json()) as OpenCodeAuthStatus;
 }
 
 export async function authorizeOpenCodeProvider(props: {
