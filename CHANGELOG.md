@@ -4,10 +4,14 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.1.0] - 2026-08-28
+
+- feat: add Alpine image for managed hosting (6ba82e75)
+
 ## [v12.0.1] - 2026-08-27
 
 - docs: update changelog for v12.0.0 (d8a5f7ac)
-- fix: removed loading messages from "Review changes" (file diff) (24c26d05)
+- fix: removed loading messages from "Review changes" (file diff) (eb2dbb9b)
 
 ## [v12.0.0] - 2026-08-27
 

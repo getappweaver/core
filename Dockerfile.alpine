@@ -1,0 +1,66 @@
+FROM alpine:edge
+
+ARG TESTING_REPOSITORY="https://dl-cdn.alpinelinux.org/alpine/edge/testing"
+ARG PIPER_VOICE=en_US-lessac-medium
+
+ENV BUN_INSTALL=/opt/bun \
+    HOME=/workspace/appweaver/.data/home \
+    XDG_CONFIG_HOME=/workspace/appweaver/.data/xdg/config \
+    XDG_DATA_HOME=/workspace/appweaver/.data/xdg/share \
+    XDG_CACHE_HOME=/workspace/appweaver/.data/xdg/cache \
+    PATH=/opt/bun/bin:/opt/appweaver/.local/bin:/opt/appweaver/.opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    APPWEAVER_REPO_URL=https://github.com/getappweaver/core.git \
+    APPWEAVER_GIT_REF=main \
+    BOT_WEB_HOST=0.0.0.0 \
+    BOT_WEB_PORT=5551 \
+    BOT_PIPER_BINARY_PATH="python3 -m piper" \
+    BOT_PIPER_MODEL_PATH=/opt/piper/en_US-lessac-medium.onnx \
+    BOT_PIPER_SERVICE_ENABLED=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+RUN printf '%s\n' "@testing ${TESTING_REPOSITORY}" >> /etc/apk/repositories \
+    && apk add --no-cache \
+      bash \
+      ca-certificates \
+      curl \
+      git \
+      nodejs \
+      npm \
+      openssh-client \
+      py3-flask \
+      py3-piper-tts@testing \
+      python3 \
+      unzip \
+    && addgroup -g 1000 appweaver \
+    && adduser -D -u 1000 -G appweaver appweaver \
+    && mkdir -p /opt/appweaver /opt/bun /opt/piper /workspace/appweaver \
+    && chown -R appweaver:appweaver /opt/appweaver /opt/bun /opt/piper /workspace
+
+USER appweaver
+
+RUN export HOME=/opt/appweaver \
+    XDG_CONFIG_HOME=/tmp/xdg/config \
+    XDG_DATA_HOME=/tmp/xdg/share \
+    XDG_CACHE_HOME=/tmp/xdg/cache \
+    && curl -fsSL https://bun.sh/install | bash \
+    && curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path \
+    && curl -fsSL https://ngit.dev/install.sh | bash \
+    && bun --version \
+    && node --version \
+    && opencode --version \
+    && ngit --version
+
+RUN HOME=/tmp XDG_CONFIG_HOME=/tmp/xdg/config XDG_DATA_HOME=/tmp/xdg/share XDG_CACHE_HOME=/tmp/xdg/cache \
+      python3 -m piper.download_voices --data-dir /opt/piper "${PIPER_VOICE}" \
+    && printf '%s\n' 'AppWeaver Piper test.' \
+      | python3 -m piper --model "/opt/piper/${PIPER_VOICE}.onnx" --output-file /tmp/piper-test.wav \
+    && test -s /tmp/piper-test.wav \
+    && rm /tmp/piper-test.wav
+
+COPY --chown=appweaver:appweaver --chmod=755 scripts/docker-entrypoint-alpine.sh /usr/local/bin/appweaver-entrypoint
+
+WORKDIR /workspace/appweaver
+
+EXPOSE 5551
+
+CMD ["appweaver-entrypoint"]
