@@ -116,15 +116,19 @@ function context({
     botRelayUrls: ['wss://context.example/'],
     config: { masterPubkey },
     nostrResolution: service,
+    setupSecret: 'test-secret',
+    setupMode: true,
   } as WebRouteContext;
 }
 
 function authorizationHeader({
   secretKey,
   url,
+  method = 'POST',
 }: {
   secretKey: Uint8Array;
   url: string;
+  method?: string;
 }): string {
   const event = finalizeEvent(
     {
@@ -133,7 +137,7 @@ function authorizationHeader({
       content: '',
       tags: [
         ['url', url],
-        ['method', 'POST'],
+        ['method', method],
       ],
     },
     secretKey,
@@ -141,6 +145,119 @@ function authorizationHeader({
 
   return `Nostr ${btoa(JSON.stringify(event))}`;
 }
+
+describe('Setup authentication', () => {
+  test('reports Nostr authentication when a master pubkey is configured', async () => {
+    const secretKey = generateSecretKey();
+    const masterPubkey = getPublicKey(secretKey);
+
+    const handler = createWebFetchHandler(
+      context({ masterPubkey, service: null }),
+    );
+
+    const response = await handler(
+      new Request('http://localhost/api/setup/auth'),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      method: 'nostr',
+      masterPubkey,
+    });
+  });
+
+  test('exchanges an owner NIP-98 event for a setup session', async () => {
+    const secretKey = generateSecretKey();
+    const masterPubkey = getPublicKey(secretKey);
+
+    const handler = createWebFetchHandler(
+      context({ masterPubkey, service: null }),
+    );
+
+    const sessionUrl = 'http://localhost/api/setup/session';
+
+    const unauthorized = await handler(
+      new Request(`${sessionUrl}?secret=test-secret`, { method: 'POST' }),
+    );
+
+    expect(unauthorized.status).toBe(401);
+
+    const response = await handler(
+      new Request(sessionUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authorizationHeader({ secretKey, url: sessionUrl }),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { token: string };
+    expect(body.token.length).toBeGreaterThan(20);
+
+    const authorized = await handler(
+      new Request('http://localhost/api/setup/unknown', {
+        headers: { Authorization: `Bearer ${body.token}` },
+      }),
+    );
+
+    expect(authorized.status).toBe(404);
+  });
+
+  test('rejects NIP-98 events from a different pubkey', async () => {
+    const ownerSecretKey = generateSecretKey();
+    const otherSecretKey = generateSecretKey();
+
+    const handler = createWebFetchHandler(
+      context({
+        masterPubkey: getPublicKey(ownerSecretKey),
+        service: null,
+      }),
+    );
+
+    const sessionUrl = 'http://localhost/api/setup/session';
+
+    const response = await handler(
+      new Request(sessionUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authorizationHeader({
+            secretKey: otherSecretKey,
+            url: sessionUrl,
+          }),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(401);
+
+    expect(await response.json()).toEqual({
+      error: 'unauthorized',
+      reason: 'wrong_pubkey',
+    });
+  });
+
+  test('keeps secret authentication when no master pubkey is configured', async () => {
+    const handler = createWebFetchHandler(
+      context({ masterPubkey: '', service: null }),
+    );
+
+    const authResponse = await handler(
+      new Request('http://localhost/api/setup/auth'),
+    );
+
+    expect(await authResponse.json()).toEqual({ method: 'secret' });
+
+    const sessionResponse = await handler(
+      new Request('http://localhost/api/setup/session?secret=test-secret', {
+        method: 'POST',
+      }),
+    );
+
+    expect(sessionResponse.status).toBe(200);
+  });
+});
 
 describe('Nostr profile-posts route', () => {
   test('requires NIP-98 authentication when the service is available', async () => {
@@ -190,7 +307,7 @@ describe('Nostr profile-posts route', () => {
     });
   });
 
-  test('uses the injected service with fixed bounded graph policy', async () => {
+  test('uses the injected service with a bounded fresh query', async () => {
     const secretKey = generateSecretKey();
     const pubkey = getPublicKey(secretKey);
 
@@ -224,25 +341,13 @@ describe('Nostr profile-posts route', () => {
 
     expect(response.status).toBe(200);
     expect(fake.queryCalls).toHaveLength(1);
-    expect(fake.graphCalls).toHaveLength(1);
+    expect(fake.graphCalls).toHaveLength(0);
     expect(fake.queryCalls[0]?.refreshMode).toBe('require-fresh');
-
-    expect(fake.queryCalls[0]?.deadlineAtMs).toBe(
-      fake.graphCalls[0]?.deadlineAtMs,
-    );
-
-    expect(fake.graphCalls[0]?.policy).toMatchObject({
-      includeThread: true,
-      includeEmbeds: true,
-      includeReplies: false,
-      maxDepth: 2,
-      maxEvents: 50,
-      maxReferencesPerEvent: 8,
-    });
 
     expect(await response.json()).toMatchObject({
       ok: true,
       primaryEvents: [{ id: event.id }],
+      graph: { events: [{ id: event.id }], edges: [], missing: [] },
     });
   });
 

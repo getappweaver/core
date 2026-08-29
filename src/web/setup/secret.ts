@@ -1,6 +1,10 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
 
 export function createSetupSecret(): string {
+  if (process.env.BOT_MASTER_PUBKEY?.trim()) {
+    return '';
+  }
+
   const fromEnv = process.env.SETUP_SECRET?.trim();
 
   if (fromEnv) {

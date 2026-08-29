@@ -81,7 +81,9 @@ function displayHost(host: string): string {
 }
 
 function setupUrl(origin: string, setupSecret: string): string {
-  return `${origin}/setup?secret=${setupSecret}`;
+  return setupSecret
+    ? `${origin}/setup?secret=${setupSecret}`
+    : `${origin}/setup`;
 }
 
 function originWithTrailingSlash(origin: string): string {
@@ -193,16 +195,25 @@ function logWebLocalUrlBillboard(origin: string): void {
 type LogSetupUrlProps = {
   origin: string;
   setupSecret: string;
+  masterPubkey: string;
 };
 
-function logSetupUrl({ origin, setupSecret }: LogSetupUrlProps): void {
+function logSetupUrl({
+  origin,
+  setupSecret,
+  masterPubkey,
+}: LogSetupUrlProps): void {
   const url = setupUrl(origin, setupSecret);
+
+  const instructions = masterPubkey
+    ? 'Open setup and authenticate with the configured master Nostr key.'
+    : 'Open setup: Ctrl+Click the link in your terminal.';
 
   logBillboard([
     'Setup web',
     ...linkedUrlLines(url),
     '',
-    'Open setup: Ctrl+Click the link in your terminal.',
+    ...wrapWords(instructions, BILLBOARD_INNER_WIDTH),
     ...wrapWords(
       'If your terminal does not open links, copy and paste it into your browser.',
       BILLBOARD_INNER_WIDTH,
@@ -303,6 +314,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
       logSetupUrl({
         origin: preferredOrigin,
         setupSecret: options.setupSecret,
+        masterPubkey: options.config.masterPubkey,
       });
     }
   } catch (err) {

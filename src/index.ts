@@ -197,6 +197,7 @@ async function startSetupOnlyMode(props: {
   pool.allowConnectingToRelay = allowRelayOperation;
   installRelayNoticeTracking(pool);
   const providerDb = asProviderDb(seenDb);
+  const masterPubkey = process.env.BOT_MASTER_PUBKEY?.trim() ?? '';
 
   log.warn(
     `Setup mode: missing required env ${props.missingEnv.join(', ')}. Starting setup web server only.`,
@@ -238,7 +239,7 @@ async function startSetupOnlyMode(props: {
     config: {
       botKeyHex: '',
       botPubkey: null,
-      masterPubkey: '',
+      masterPubkey,
       botRelayUrls: [],
       opencodeServeUrl: null,
       cashuMnemonic: null,

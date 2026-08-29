@@ -658,8 +658,27 @@ function verifySetupSession(req: Request): Response | null {
   return jsonResponse({ error: 'unauthorized' }, { status: 401 });
 }
 
-function createSetupSession(ctx: WebRouteContext, url: URL): Response {
-  if (!isSetupSecretValid(url.searchParams.get('secret'), ctx.setupSecret)) {
+function setupAuthMethod(ctx: WebRouteContext): 'nostr' | 'secret' {
+  return ctx.config.masterPubkey.trim() ? 'nostr' : 'secret';
+}
+
+function createSetupSession(
+  ctx: WebRouteContext,
+  req: Request,
+  url: URL,
+): Response {
+  if (setupAuthMethod(ctx) === 'nostr') {
+    const authFail = verifyNip98Auth({
+      req,
+      masterPubkey: ctx.config.masterPubkey,
+    });
+
+    if (authFail) {
+      return authFail;
+    }
+  } else if (
+    !isSetupSecretValid(url.searchParams.get('secret'), ctx.setupSecret)
+  ) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -725,8 +744,19 @@ export function createWebFetchHandler(
     }
 
     if (path.startsWith('/api/setup/')) {
+      if (req.method === 'GET' && path === '/api/setup/auth') {
+        const method = setupAuthMethod(ctx);
+
+        return jsonResponse({
+          method,
+          ...(method === 'nostr'
+            ? { masterPubkey: ctx.config.masterPubkey }
+            : {}),
+        });
+      }
+
       if (req.method === 'POST' && path === '/api/setup/session') {
-        return createSetupSession(ctx, url);
+        return createSetupSession(ctx, req, url);
       }
 
       const authFail = verifySetupSession(req);

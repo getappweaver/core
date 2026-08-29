@@ -6,7 +6,10 @@ import type { SetupStatus } from '../transport';
 
 import { StatusRow } from './StatusRow';
 
-export function SetupStatusCard(props: { status: SetupStatus }): JSX.Element {
+export function SetupStatusCard(props: {
+  status: SetupStatus;
+  authMethod: 'nostr' | 'secret';
+}): JSX.Element {
   const status = () => props.status;
 
   return (
@@ -21,8 +24,9 @@ export function SetupStatusCard(props: { status: SetupStatus }): JSX.Element {
       </div>
 
       <p class="setup-copy">
-        This setup screen is protected by the boot secret printed in the server
-        logs. The secret changes on restart unless SETUP_SECRET is set.
+        {props.authMethod === 'nostr'
+          ? 'This setup screen is protected by the configured master Nostr key.'
+          : 'This setup screen is protected by the boot secret printed in the server logs. The secret changes on restart unless SETUP_SECRET is set.'}
       </p>
 
       <dl class="setup-runtime-grid">

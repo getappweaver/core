@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.1.4] - 2026-08-30
+
+- fix: make setup page accessable via nostr if BOT_MASTER_PUBKEY is defined and matches (19b75e53)
+
 ## [v12.1.3] - 2026-08-28
 
-- fix: update container actions for Node 24 (e59b7df7)
+- fix: update container actions for Node 24 (fbb152dd)
 
 ## [v12.1.2] - 2026-08-28
 

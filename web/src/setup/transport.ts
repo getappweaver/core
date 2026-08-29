@@ -202,6 +202,13 @@ export type SetupSessionResponse = {
   token: string;
 };
 
+export type SetupSessionResult =
+  | { success: true; token: string }
+  | { success: false; error: string; reason: string | null };
+
+export type SetupAuth =
+  { method: 'secret' } | { method: 'nostr'; masterPubkey: string };
+
 const SETUP_TOKEN_KEY = 'appweaver.setup.token';
 const OPENCODE_AUTH_STATUS_TIMEOUT_MS = 45_000;
 
@@ -228,6 +235,10 @@ function setupApiUrl(path: string, secret: string): string {
   return url.toString();
 }
 
+export function getStoredSetupSessionToken(): string | null {
+  return window.sessionStorage.getItem(SETUP_TOKEN_KEY);
+}
+
 function setupAuthHeaders(token: string): HeadersInit {
   return {
     Accept: 'application/json',
@@ -235,35 +246,102 @@ function setupAuthHeaders(token: string): HeadersInit {
   };
 }
 
-export async function initializeSetupSession(): Promise<string | null> {
-  const stored = window.sessionStorage.getItem(SETUP_TOKEN_KEY);
-
-  if (stored) {
-    removeSetupSecretFromUrl();
-
-    return stored;
-  }
-
-  const secret = getSetupSecretFromUrl();
-
-  if (!secret) {
-    return null;
-  }
-
-  const res = await fetch(setupApiUrl('/api/setup/session', secret), {
-    method: 'POST',
+export async function fetchSetupAuth(): Promise<SetupAuth> {
+  const res = await fetch('/api/setup/auth', {
     headers: { Accept: 'application/json' },
   });
 
   if (!res.ok) {
-    throw new Error(`setup_session_failed:${res.status}`);
+    throw new Error(`setup_auth_failed:${res.status}`);
   }
 
-  const body = (await res.json()) as SetupSessionResponse;
-  window.sessionStorage.setItem(SETUP_TOKEN_KEY, body.token);
-  removeSetupSecretFromUrl();
+  return (await res.json()) as SetupAuth;
+}
 
-  return body.token;
+export async function initializeSetupSession(props: {
+  auth: SetupAuth;
+  getNip98Token: (url: string, method: string) => Promise<string | null>;
+}): Promise<SetupSessionResult> {
+  try {
+    const stored = getStoredSetupSessionToken();
+
+    if (stored) {
+      const statusResponse = await fetch('/api/setup/status', {
+        headers: setupAuthHeaders(stored),
+      });
+
+      if (statusResponse.status !== 401) {
+        removeSetupSecretFromUrl();
+
+        return { success: true, token: stored };
+      }
+
+      window.sessionStorage.removeItem(SETUP_TOKEN_KEY);
+    }
+
+    const secret =
+      props.auth.method === 'secret' ? getSetupSecretFromUrl() : null;
+
+    if (props.auth.method === 'secret' && !secret) {
+      return {
+        success: false,
+        error: 'missing_setup_secret',
+        reason: 'missing_setup_secret',
+      };
+    }
+
+    const sessionUrl = secret
+      ? setupApiUrl('/api/setup/session', secret)
+      : new URL('/api/setup/session', window.location.origin).toString();
+
+    const nip98Token =
+      props.auth.method === 'nostr'
+        ? await props.getNip98Token(sessionUrl, 'POST')
+        : null;
+
+    if (props.auth.method === 'nostr' && !nip98Token) {
+      return {
+        success: false,
+        error: 'nostr_signature_unavailable',
+        reason: 'nostr_signature_unavailable',
+      };
+    }
+
+    const res = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(nip98Token ? { Authorization: `Nostr ${nip98Token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      const errorBody = (await res.json().catch(() => null)) as {
+        reason?: unknown;
+      } | null;
+
+      const reason =
+        typeof errorBody?.reason === 'string' ? errorBody.reason : null;
+
+      return {
+        success: false,
+        error: `setup_session_failed:${res.status}${reason ? `:${reason}` : ''}`,
+        reason,
+      };
+    }
+
+    const body = (await res.json()) as SetupSessionResponse;
+    window.sessionStorage.setItem(SETUP_TOKEN_KEY, body.token);
+    removeSetupSecretFromUrl();
+
+    return { success: true, token: body.token };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      reason: null,
+    };
+  }
 }
 
 export async function fetchSetupStatus(token: string): Promise<SetupStatus> {
