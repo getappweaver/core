@@ -2,7 +2,7 @@ import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 
 import type { WebAction } from '@src/web/ui-schema';
 
-import type { RunWebActionParams } from '../commands/types';
+import type { RunWebActionParams } from '../../commands/types';
 
 type ComposerProviderMenuButtonProps = {
   provider: string;

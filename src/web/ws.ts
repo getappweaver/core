@@ -57,11 +57,12 @@ import type { WebSocketPromptSession } from './ws-prompt-session';
 import {
   AuthenticateClientMessageSchema,
   type ChatClientMessage,
+  createCapabilityProvidersResultMessage,
   createChatResultMessage,
   createChatStreamChunkMessage,
   createCommandResultMessage,
-  createComposerAiStateResultMessage,
   createCommandsResultMessage,
+  createComposerAiStateResultMessage,
   createDoneMessage,
   createErrorMessage,
   createInterventionRequestMessage,
@@ -69,6 +70,7 @@ import {
   type DeleteTimelineEventClientMessage,
   formatWebSocketClientParseFailure,
   type JsonCommandClientMessage,
+  type ListCapabilityProvidersClientMessage,
   type LoadTimelineBeforeClientMessage,
   type LoadTimelineClientMessage,
   type RunCapabilityClientMessage,
@@ -558,6 +560,17 @@ async function handleDemoWebSocketMessage(params: {
         createErrorMessage({
           requestId: message.requestId,
           message: 'demo_mode_json_command_not_allowed',
+        }),
+      );
+
+      return;
+
+    case 'list_capability_providers':
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: 'demo_mode_capability_not_allowed',
         }),
       );
 
@@ -1064,12 +1077,102 @@ async function handleJsonCommand(params: {
   sendMessage(ws, createDoneMessage(message.requestId));
 }
 
+async function handleListCapabilityProviders(params: {
+  ws: Bun.ServerWebSocket<WebSocketData>;
+  message: ListCapabilityProvidersClientMessage;
+}): Promise<void> {
+  const { ws, message } = params;
+
+  const { capabilityRegistry } =
+    await import('@src/core/capabilities/registry');
+
+  const providers = capabilityRegistry.listProviders(message.capability);
+
+  sendMessage(
+    ws,
+    createCapabilityProvidersResultMessage({
+      requestId: message.requestId,
+      capability: message.capability,
+      providers,
+    }),
+  );
+
+  sendMessage(ws, createDoneMessage(message.requestId));
+}
+
 async function handleRunCapability(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
   message: RunCapabilityClientMessage;
 }): Promise<void> {
   const { ws, ctx, message } = params;
+
+  // Raw capability path for fuzzy-file-search (composer picker needs JSON output, not WebNodeRoot)
+  if (message.operation === 'capability:v1:fuzzy-file-search.search') {
+    const { capabilityRegistry } =
+      await import('@src/core/capabilities/registry');
+
+    const { getPluginByAlias } = await import('@src/core/registry');
+
+    const consumer = getPluginByAlias(message.consumerAlias);
+
+    if (!consumer) {
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: `Unknown capability consumer: ${message.consumerAlias}`,
+        }),
+      );
+
+      return;
+    }
+
+    const result = await capabilityRegistry.invokeById({
+      operationId: message.operation,
+      provider: message.providerId ?? 'auto',
+      input: message.input,
+      caller: {
+        type: 'plugin',
+        pluginName: consumer.identity.name,
+        alias: consumer.identity.alias,
+      },
+    });
+
+    if (result.status === 'success') {
+      const { createCapabilityResultMessage } = await import('./ws-schema');
+
+      sendMessage(
+        ws,
+        createCapabilityResultMessage({
+          requestId: message.requestId,
+          operation: message.operation,
+          output: result.output,
+          provider: result.provider,
+        }),
+      );
+    } else if (result.status === 'missing') {
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: `Capability provider missing for ${message.operation}`,
+        }),
+      );
+    } else if (result.status === 'selection-required') {
+      sendMessage(
+        ws,
+        createErrorMessage({
+          requestId: message.requestId,
+          message: `Capability provider selection required for ${message.operation}`,
+        }),
+      );
+    }
+
+    sendMessage(ws, createDoneMessage(message.requestId));
+
+    return;
+  }
 
   const output = await executeWebCapability({
     operation: message.operation,
@@ -1647,6 +1750,12 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ctx,
                 message,
               });
+
+              return;
+            }
+
+            case 'list_capability_providers': {
+              await handleListCapabilityProviders({ ws, message });
 
               return;
             }

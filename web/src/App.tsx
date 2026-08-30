@@ -26,15 +26,16 @@ import {
 import type { ComposerAiState } from './commands/types';
 import { useCommandForms } from './commands/useCommandForms';
 import { useCommands } from './commands/useCommands';
-import { Composer } from './components/Composer';
-import { ComposerContextMenuButton } from './components/ComposerContextMenuButton';
-import { ComposerInterventionButton } from './components/ComposerInterventionButton';
-import { ComposerModelOverrideButton } from './components/ComposerModelOverrideButton';
-import { ComposerProviderMenuButton } from './components/ComposerProviderMenuButton';
-import { ComposerSkillsButton } from './components/ComposerSkillsButton';
-import { ComposerWorkingButton } from './components/ComposerWorkingButton';
 import { NostrSearchRelaysModal } from './components/NostrSearchRelaysModal';
 import { TimelineView } from './components/timeline/TimelineView';
+import { Composer } from './composer/components/Composer';
+import { ComposerContextMenuButton } from './composer/components/ComposerContextMenuButton';
+import { ComposerFilePicker } from './composer/components/ComposerFilePicker';
+import { ComposerInterventionButton } from './composer/components/ComposerInterventionButton';
+import { ComposerModelOverrideButton } from './composer/components/ComposerModelOverrideButton';
+import { ComposerProviderMenuButton } from './composer/components/ComposerProviderMenuButton';
+import { ComposerSkillsButton } from './composer/components/ComposerSkillsButton';
+import { ComposerWorkingButton } from './composer/components/ComposerWorkingButton';
 import { useComposer } from './composer/useComposer';
 import { ConnectOverlays } from './connect/ConnectOverlays';
 import { useConnect } from './connect/useConnect';
@@ -2900,129 +2901,147 @@ function AppInner(): JSX.Element {
                 });
               }}
             />
-            <Composer
-              setInputRef={(el) => {
-                composerInputEl = el;
-              }}
-              value={composerText()}
-              footer={
-                <div class="composer-meta">
-                  <button
-                    type="button"
-                    class="composer-chip"
-                    classList={{
-                      'composer-chip--info':
-                        composerAiState()?.executionProfileColor === 'info',
-                      'composer-chip--warning':
-                        composerAiState()?.executionProfileColor === 'warning',
-                      'composer-chip--danger':
-                        composerAiState()?.executionProfileColor === 'danger',
-                      'composer-chip--success':
-                        composerAiState()?.executionProfileColor === 'success',
-                    }}
-                    disabled={!wsConnected()}
-                    onClick={() => {
-                      openChromeWidget({
-                        command: 'ai',
-                        subcommand: 'agents',
-                        title: 'OpenCode Agents',
-                      });
-                    }}
-                    title={
-                      wsConnected()
-                        ? 'Open OpenCode agent manager'
-                        : 'Connect WebSocket first'
-                    }
-                  >
-                    {composerAiState()
-                      ? composerAiState()!.executionProfileName
-                      : 'Agent'}
-                  </button>
-                  <ComposerSkillsButton
-                    iconUrl={SKILLS_MANAGER_ICON_URL}
-                    disabled={!wsConnected()}
-                    onOpen={() => {
-                      openChromeWidget({
-                        command: 'skills',
-                        subcommand: 'manager',
-                        title: 'AI Configuration',
-                        iconUrl: SKILLS_MANAGER_ICON_URL,
-                      });
-                    }}
-                  />
-                  <ComposerInterventionButton
-                    active={interventionMode()}
-                    disabled={
-                      !wsConnected() ||
-                      composerAiState()?.interventionAvailable !== true
-                    }
-                    onToggle={toggleInterventionMode}
-                  />
-                  <Show when={composerAiState() !== null}>
-                    <ComposerModelOverrideButton
-                      state={composerAiState()!}
-                      wsConnected={wsConnected()}
-                      onRunWebAction={runWebAction}
-                    />
-                    <ComposerProviderMenuButton
-                      provider={composerAiState()!.provider}
-                      wsConnected={wsConnected()}
-                      onRunWebAction={runWebAction}
-                    />
-                    <ComposerWorkingButton
-                      working={agentWorking()}
-                      runStatus={chatRunStatus()}
-                      onStop={() => chat.cancelChat()}
-                    />
+            <div class="composer-shell">
+              <Composer
+                setInputRef={(el) => {
+                  composerInputEl = el;
+                }}
+                value={composerText()}
+                footer={
+                  <div class="composer-meta">
                     <button
                       type="button"
-                      class="composer-session-diff"
-                      disabled={sessionDiffFiles().length === 0}
-                      onClick={showSessionDiff}
-                      title="Show session changes"
-                    >
-                      {sessionDiffSummary().fileCount} files{' '}
-                      <span class="diff-card__stat diff-card__stat--add">
-                        +{sessionDiffSummary().additions}
-                      </span>{' '}
-                      <span class="diff-card__stat diff-card__stat--del">
-                        -{sessionDiffSummary().deletions}
-                      </span>
-                    </button>
-                    <ComposerContextMenuButton
-                      backend={composerAiState()!.backend}
-                      label={
-                        formatComposerContextStats(composerAiState()) ??
-                        'session'
+                      class="composer-chip"
+                      classList={{
+                        'composer-chip--info':
+                          composerAiState()?.executionProfileColor === 'info',
+                        'composer-chip--warning':
+                          composerAiState()?.executionProfileColor ===
+                          'warning',
+                        'composer-chip--danger':
+                          composerAiState()?.executionProfileColor === 'danger',
+                        'composer-chip--success':
+                          composerAiState()?.executionProfileColor ===
+                          'success',
+                      }}
+                      disabled={!wsConnected()}
+                      onClick={() => {
+                        openChromeWidget({
+                          command: 'ai',
+                          subcommand: 'agents',
+                          title: 'OpenCode Agents',
+                        });
+                      }}
+                      title={
+                        wsConnected()
+                          ? 'Open OpenCode agent manager'
+                          : 'Connect WebSocket first'
                       }
-                      wsConnected={wsConnected()}
-                      compacting={compactSessionRequestId() !== null}
-                      sessionDiffAvailable={sessionDiffFiles().length > 0}
-                      onShowSessionDiff={showSessionDiff}
-                      onCompact={compactCurrentSession}
-                      onCreateNewSession={() => {
-                        void createNewSessionFromComposerMenu();
+                    >
+                      {composerAiState()
+                        ? composerAiState()!.executionProfileName
+                        : 'Agent'}
+                    </button>
+                    <ComposerSkillsButton
+                      iconUrl={SKILLS_MANAGER_ICON_URL}
+                      disabled={!wsConnected()}
+                      onOpen={() => {
+                        openChromeWidget({
+                          command: 'skills',
+                          subcommand: 'manager',
+                          title: 'AI Configuration',
+                          iconUrl: SKILLS_MANAGER_ICON_URL,
+                        });
                       }}
                     />
-                  </Show>
-                </div>
-              }
-              onOpenPalette={openPalette}
-              onInput={(event) => {
-                const value = event.currentTarget.value;
-                setComposerText(value);
+                    <ComposerInterventionButton
+                      active={interventionMode()}
+                      disabled={
+                        !wsConnected() ||
+                        composerAiState()?.interventionAvailable !== true
+                      }
+                      onToggle={toggleInterventionMode}
+                    />
+                    <Show when={composerAiState() !== null}>
+                      <ComposerModelOverrideButton
+                        state={composerAiState()!}
+                        wsConnected={wsConnected()}
+                        onRunWebAction={runWebAction}
+                      />
+                      <ComposerProviderMenuButton
+                        provider={composerAiState()!.provider}
+                        wsConnected={wsConnected()}
+                        onRunWebAction={runWebAction}
+                      />
+                      <ComposerWorkingButton
+                        working={agentWorking()}
+                        runStatus={chatRunStatus()}
+                        onStop={() => chat.cancelChat()}
+                      />
+                      <button
+                        type="button"
+                        class="composer-session-diff"
+                        disabled={sessionDiffFiles().length === 0}
+                        onClick={showSessionDiff}
+                        title="Show session changes"
+                      >
+                        {sessionDiffSummary().fileCount} files{' '}
+                        <span class="diff-card__stat diff-card__stat--add">
+                          +{sessionDiffSummary().additions}
+                        </span>{' '}
+                        <span class="diff-card__stat diff-card__stat--del">
+                          -{sessionDiffSummary().deletions}
+                        </span>
+                      </button>
+                      <ComposerContextMenuButton
+                        backend={composerAiState()!.backend}
+                        label={
+                          formatComposerContextStats(composerAiState()) ??
+                          'session'
+                        }
+                        wsConnected={wsConnected()}
+                        compacting={compactSessionRequestId() !== null}
+                        sessionDiffAvailable={sessionDiffFiles().length > 0}
+                        onShowSessionDiff={showSessionDiff}
+                        onCompact={compactCurrentSession}
+                        onCreateNewSession={() => {
+                          void createNewSessionFromComposerMenu();
+                        }}
+                      />
+                    </Show>
+                  </div>
+                }
+                onOpenPalette={openPalette}
+                onInput={(event) => {
+                  const value = event.currentTarget.value;
+                  setComposerText(value);
 
-                if (value.startsWith('/')) {
-                  openPalette();
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  void submitComposer();
-                }
-              }}
-            />
+                  if (value.startsWith('/')) {
+                    openPalette();
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.defaultPrevented) {
+                    return;
+                  }
+
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void submitComposer();
+                  }
+                }}
+              />
+              <ComposerFilePicker
+                textareaRef={() => composerInputEl}
+                composerText={composerText}
+                setComposerText={setComposerText}
+                wsConnected={wsConnected}
+                pendingRequests={pendingRequests}
+                sendSocketMessage={sendSocketMessage}
+                createId={createId}
+                timelineId={timelineId}
+              />
+            </div>
           </main>
         </div>
       </div>

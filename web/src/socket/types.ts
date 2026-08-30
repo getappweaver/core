@@ -6,6 +6,8 @@ import type { ChatHook } from '../chat/types';
 import type { NostrAuthContextValue } from '../contexts/NostrAuthContext';
 import type { CommandDetail, TimelineItem } from '../types';
 import type {
+  CapabilityProvidersResultServerMessage,
+  CapabilityResultServerMessage,
   ChatResultServerMessage,
   ChatStreamChunkServerMessage,
   CommandResultServerMessage,
@@ -22,11 +24,16 @@ import type {
 
 export type PendingRequest = {
   recordInTimeline?: boolean;
+  suppressErrorUi?: boolean;
   onCommandsResult?: (message: CommandsResultServerMessage) => void;
   onComposerAiStateResult?: (
     message: ComposerAiStateResultServerMessage,
   ) => void;
   onTimelineEventsResult?: (message: TimelineEventsResultServerMessage) => void;
+  onCapabilityProvidersResult?: (
+    message: CapabilityProvidersResultServerMessage,
+  ) => void;
+  onCapabilityResult?: (message: CapabilityResultServerMessage) => void;
   onCommandResult?: (message: CommandResultServerMessage) => void;
   onPrompt?: (message: PromptServerMessage) => void;
   onChatResult?: (message: ChatResultServerMessage) => void;
@@ -38,6 +45,8 @@ export type IncomingServerMessage =
   | CommandsResultServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
+  | CapabilityProvidersResultServerMessage
+  | CapabilityResultServerMessage
   | CommandResultServerMessage
   | PromptServerMessage
   | ChatStreamChunkServerMessage

@@ -157,6 +157,15 @@ export const ResolveInterventionClientMessageSchema = z.object({
   rulePattern: z.string().min(1).nullable(),
 });
 
+export const ListCapabilityProvidersClientMessageSchema = z.object({
+  type: z.literal('list_capability_providers'),
+  requestId: RequestIdSchema,
+  capability: z.object({
+    name: z.string().min(1),
+    version: z.number().int().positive(),
+  }),
+});
+
 export const SaveTimelineFormClientMessageSchema = z.object({
   type: z.literal('save_timeline_form'),
   requestId: RequestIdSchema,
@@ -250,6 +259,7 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   ResolveInterventionClientMessageSchema,
   SaveTimelineFormClientMessageSchema,
   DeleteTimelineEventClientMessageSchema,
+  ListCapabilityProvidersClientMessageSchema,
 ]);
 
 function summarizeWebSocketPayloadTypeField(payload: unknown): string {
@@ -362,6 +372,9 @@ export type SaveTimelineFormClientMessage = z.infer<
 export type DeleteTimelineEventClientMessage = z.infer<
   typeof DeleteTimelineEventClientMessageSchema
 >;
+export type ListCapabilityProvidersClientMessage = z.infer<
+  typeof ListCapabilityProvidersClientMessageSchema
+>;
 export type WebSocketClientMessage = z.infer<
   typeof WebSocketClientMessageSchema
 >;
@@ -426,6 +439,21 @@ export type InterventionRequestServerMessage = {
   };
 };
 
+export type CapabilityProvidersResultServerMessage = {
+  type: 'capability_providers_result';
+  requestId: string;
+  capability: { name: string; version: number };
+  providers: import('@src/capabilities/types').CapabilityProviderSummary[];
+};
+
+export type CapabilityResultServerMessage = {
+  type: 'capability_result';
+  requestId: string;
+  operation: import('@src/capabilities/types').CapabilityOperationId;
+  output: unknown;
+  provider: import('@src/capabilities/types').CapabilityProviderSummary;
+};
+
 export type DoneServerMessage = {
   type: 'done';
   requestId: string;
@@ -446,8 +474,38 @@ export type WebSocketServerMessage =
   | ChatStreamChunkServerMessage
   | InterventionRequestServerMessage
   | ChatResultServerMessage
+  | CapabilityProvidersResultServerMessage
+  | CapabilityResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
+
+export function createCapabilityProvidersResultMessage(params: {
+  requestId: string;
+  capability: { name: string; version: number };
+  providers: import('@src/capabilities/types').CapabilityProviderSummary[];
+}): CapabilityProvidersResultServerMessage {
+  return {
+    type: 'capability_providers_result',
+    requestId: params.requestId,
+    capability: params.capability,
+    providers: params.providers,
+  };
+}
+
+export function createCapabilityResultMessage(params: {
+  requestId: string;
+  operation: import('@src/capabilities/types').CapabilityOperationId;
+  output: unknown;
+  provider: import('@src/capabilities/types').CapabilityProviderSummary;
+}): CapabilityResultServerMessage {
+  return {
+    type: 'capability_result',
+    requestId: params.requestId,
+    operation: params.operation,
+    output: params.output,
+    provider: params.provider,
+  };
+}
 
 export function createCommandsResultMessage(params: {
   requestId: string;

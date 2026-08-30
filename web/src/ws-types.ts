@@ -1,4 +1,5 @@
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
+import type { CapabilityProviderSummary } from '@src/capabilities/types';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type {
   ClientViewRoot,
@@ -43,6 +44,21 @@ export type TimelineEventsResultServerMessage = {
   timelineId: string;
   items: TimelineHistoryItem[];
   hasMore: boolean;
+};
+
+export type CapabilityProvidersResultServerMessage = {
+  type: 'capability_providers_result';
+  requestId: string;
+  capability: { name: string; version: number };
+  providers: CapabilityProviderSummary[];
+};
+
+export type CapabilityResultServerMessage = {
+  type: 'capability_result';
+  requestId: string;
+  operation: import('@src/capabilities/types').CapabilityOperationId;
+  output: unknown;
+  provider: CapabilityProviderSummary;
 };
 
 export type PromptServerMessage = {
@@ -97,6 +113,8 @@ export type WebSocketServerMessage =
   | CommandsResultServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
+  | CapabilityProvidersResultServerMessage
+  | CapabilityResultServerMessage
   | CommandResultServerMessage
   | PromptServerMessage
   | ChatStreamChunkServerMessage

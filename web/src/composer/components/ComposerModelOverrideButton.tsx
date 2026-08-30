@@ -2,8 +2,9 @@ import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 
 import type { WebAction } from '@src/web/ui-schema';
 
-import type { ComposerAiState } from '../commands/types';
-import { buildModelOverrideMenuWebActions } from '../composer/buildModelOverrideMenuWebActions';
+import type { ComposerAiState } from '../../commands/types';
+
+import { buildModelOverrideMenuWebActions } from '../buildModelOverrideMenuWebActions';
 
 type ComposerModelOverrideButtonProps = {
   state: ComposerAiState;

@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createEffect, onMount } from 'solid-js';
 
-import { WebButton } from './WebButton';
+import { WebButton } from '../../components/WebButton';
 
 type ComposerProps = {
   setInputRef?: (el: HTMLTextAreaElement) => void;

@@ -1,4 +1,4 @@
-import { WebButton } from './WebButton';
+import { WebButton } from '../../components/WebButton';
 
 type ComposerInterventionButtonProps = {
   active: boolean;

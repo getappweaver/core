@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, onMount } from 'solid-js';
 
-import type { ChatRunStatus } from '../chat/types';
+import type { ChatRunStatus } from '../../chat/types';
 
 const SQUARES = 6;
 // full bounce cycle: 0→5→0 = 10 steps, period in ms

@@ -127,6 +127,14 @@ export function handleServerMessage(params: {
       pending?.onTimelineEventsResult?.(message);
 
       return;
+    case 'capability_providers_result':
+      pending?.onCapabilityProvidersResult?.(message);
+
+      return;
+    case 'capability_result':
+      pending?.onCapabilityResult?.(message);
+
+      return;
     case 'command_result':
       pending?.onCommandResult?.(message);
 
@@ -267,7 +275,12 @@ export function handleServerMessage(params: {
       pending?.onError?.(message);
       pendingRequests.delete(message.requestId);
       adapters.chat.clearRequest(message.requestId);
-      adapters.appendSystemMessage(message.message);
+
+      if (pending?.suppressErrorUi) {
+        console.error('WebSocket request failed:', message.message);
+      } else {
+        adapters.appendSystemMessage(message.message);
+      }
 
       return;
   }
