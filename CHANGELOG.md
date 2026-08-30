@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.3.0] - 2026-08-30
+
+- feat: added currentDirectory and relativeDirectory to contract output (81c9867b)
+
 ## [v12.2.0] - 2026-08-30
 
-- feat: introduced fuzzy-file-search.v1 capability and composer file picker (739c292b)
+- feat: introduced fuzzy-file-search.v1 capability and composer file picker (7ab9c720)
 
 ## [v12.1.4] - 2026-08-30
 

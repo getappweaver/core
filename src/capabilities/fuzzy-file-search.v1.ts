@@ -34,6 +34,8 @@ export const FuzzyFileSearchInputV1Schema = z.object({
 export const FuzzyFileSearchOutputV1Schema = z.object({
   files: z.array(z.string()),
   truncated: z.boolean(),
+  currentDirectory: z.string(),
+  relativeDirectory: z.string(),
 });
 
 export const FuzzyFileSearchV1 = defineCapability({

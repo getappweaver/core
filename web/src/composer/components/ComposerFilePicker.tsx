@@ -44,6 +44,54 @@ function getAtQuery(text: string, cursorPos: number): AtQuery | null {
   return { atPos, query };
 }
 
+function normalizeDirectory(path: string): string {
+  const segments: string[] = [];
+
+  for (const segment of path.split('/')) {
+    if (!segment || segment === '.') {
+      continue;
+    }
+
+    if (segment === '..' && segments.at(-1) !== '..') {
+      if (segments.length > 0) {
+        segments.pop();
+      } else {
+        segments.push('..');
+      }
+    } else {
+      segments.push(segment);
+    }
+  }
+
+  return segments.join('/');
+}
+
+function directoryForQuery(query: string): string {
+  const slashIndex = query.lastIndexOf('/');
+
+  if (slashIndex === -1) {
+    return '';
+  }
+
+  return normalizeDirectory(query.slice(0, slashIndex));
+}
+
+function parentDirectory(directory: string): string {
+  if (!directory) {
+    return '..';
+  }
+
+  const segments = directory.split('/');
+
+  if (segments.every((segment) => segment === '..')) {
+    return [...segments, '..'].join('/');
+  }
+
+  segments.pop();
+
+  return segments.join('/');
+}
+
 export function ComposerFilePicker(props: ComposerFilePickerProps) {
   const [enabled, setEnabled] = createSignal(false);
 
@@ -55,7 +103,12 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
   const [files, setFiles] = createSignal<string[]>([]);
   const [selected, setSelected] = createSignal(0);
   const [loading, setLoading] = createSignal(false);
+  const [truncated, setTruncated] = createSignal(false);
+  const [absoluteDirectory, setAbsoluteDirectory] = createSignal('');
+  const [relativeDirectory, setRelativeDirectory] = createSignal('');
+  const [pathHidden, setPathHidden] = createSignal(false);
   const [atInfo, setAtInfo] = createSignal<AtQuery | null>(null);
+  const [scrollThumb, setScrollThumb] = createSignal({ top: 0, height: 100 });
 
   let debounceTimer: number | null = null;
   let capabilityRequestId: string | null = null;
@@ -65,6 +118,12 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
   let dismissedQueryKey: string | null = null;
   let listEl: HTMLDivElement | undefined;
   let pickerEl: HTMLDivElement | undefined;
+  let scrollbarEl: HTMLDivElement | undefined;
+  let headerEl: HTMLDivElement | undefined;
+  let titleEl: HTMLSpanElement | undefined;
+  let pathEl: HTMLElement | undefined;
+  let hintEl: HTMLSpanElement | undefined;
+  let naturalPathWidth = 0;
 
   function clearDebounce(): void {
     if (debounceTimer === null) {
@@ -93,11 +152,63 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     setFiles([]);
     setSelected(0);
     setLoading(false);
+    setTruncated(false);
   }
 
   function dismiss(): void {
     dismissedQueryKey = currentQueryKey;
     close();
+  }
+
+  function currentDirectory(): string {
+    return directoryForQuery(atInfo()?.query ?? '');
+  }
+
+  function absoluteDirectoryParts(): { base: string; relative: string } {
+    const absolute = absoluteDirectory();
+    const relative = relativeDirectory();
+
+    if (!relative || !absolute.endsWith(relative)) {
+      return { base: absolute, relative: '' };
+    }
+
+    return {
+      base: absolute.slice(0, -relative.length),
+      relative,
+    };
+  }
+
+  function updatePathVisibility(): void {
+    if (!headerEl || !titleEl || !hintEl) {
+      return;
+    }
+
+    if (pathEl && !pathHidden()) {
+      naturalPathWidth = Math.max(naturalPathWidth, pathEl.scrollWidth);
+    }
+
+    const available =
+      headerEl.clientWidth - titleEl.offsetWidth - hintEl.offsetWidth - 32;
+
+    setPathHidden(naturalPathWidth > available);
+  }
+
+  function updateScrollThumb(): void {
+    if (!listEl || listEl.scrollHeight <= listEl.clientHeight) {
+      setScrollThumb({ top: 0, height: 100 });
+
+      return;
+    }
+
+    const height = Math.max(
+      12,
+      (listEl.clientHeight / listEl.scrollHeight) * 100,
+    );
+
+    const maxScroll = listEl.scrollHeight - listEl.clientHeight;
+    const top = (listEl.scrollTop / maxScroll) * (100 - height);
+
+    setScrollThumb({ top, height });
   }
 
   function updateFromTextarea(): void {
@@ -141,10 +252,11 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     setFiles([]);
     setSelected(0);
     setLoading(true);
+    setTruncated(false);
 
     debounceTimer = window.setTimeout(() => {
       debounceTimer = null;
-      runSearch(info.query, generation);
+      runSearch(info.query, generation, false);
     }, 150);
   }
 
@@ -191,7 +303,11 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     }
   }
 
-  function runSearch(rawQuery: string, generation: number): void {
+  function runSearch(
+    rawQuery: string,
+    generation: number,
+    withoutLimit: boolean,
+  ): void {
     if (!enabled() || generation !== searchGeneration) {
       return;
     }
@@ -212,7 +328,12 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
           return;
         }
 
-        const output = message.output as { files?: unknown } | null;
+        const output = message.output as {
+          files?: unknown;
+          truncated?: unknown;
+          currentDirectory?: unknown;
+          relativeDirectory?: unknown;
+        } | null;
 
         const nextFiles = Array.isArray(output?.files)
           ? output.files.filter(
@@ -221,7 +342,21 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
           : [];
 
         setFiles(nextFiles);
-        setSelected(0);
+        setSelected(nextFiles.length > 0 ? 1 : 0);
+        setTruncated(output?.truncated === true);
+
+        setAbsoluteDirectory(
+          typeof output?.currentDirectory === 'string'
+            ? output.currentDirectory
+            : '',
+        );
+
+        setRelativeDirectory(
+          typeof output?.relativeDirectory === 'string'
+            ? output.relativeDirectory
+            : '',
+        );
+
         setLoading(false);
       },
       onError: () => {
@@ -250,7 +385,7 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
         operation: 'capability:v1:fuzzy-file-search.search',
         input: {
           query,
-          limit: 30,
+          ...(!withoutLimit && { limit: 30 }),
           isRegex,
           includeIgnored: false,
           includeDirectories: true,
@@ -269,6 +404,22 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
 
       console.error('Failed to search workspace files', error);
     }
+  }
+
+  function showAll(): void {
+    const info = atInfo();
+
+    if (!info) {
+      return;
+    }
+
+    const generation = searchGeneration + 1;
+    searchGeneration = generation;
+    clearDebounce();
+    forgetActiveSearch();
+    setLoading(true);
+    setTruncated(false);
+    runSearch(info.query, generation, true);
   }
 
   function insertPath(path: string): void {
@@ -309,6 +460,37 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     });
   }
 
+  function navigateToDirectory(directory: string): void {
+    const info = atInfo();
+    const textarea = props.textareaRef();
+
+    if (!info || !textarea) {
+      return;
+    }
+
+    const text = props.composerText();
+    const cursor = textarea.selectionStart ?? text.length;
+    const before = text.slice(0, info.atPos);
+    const after = text.slice(cursor);
+    const query = directory ? `${directory}/` : '';
+    const insert = `@${query}`;
+
+    dismissedQueryKey = null;
+    currentQueryKey = null;
+    setFiles([]);
+    setSelected(0);
+    setLoading(true);
+    setTruncated(false);
+    props.setComposerText(`${before}${insert}${after}`);
+
+    queueMicrotask(() => {
+      const nextPos = before.length + insert.length;
+      textarea.focus();
+      textarea.setSelectionRange(nextPos, nextPos);
+      updateFromTextarea();
+    });
+  }
+
   function handleKeyDown(event: KeyboardEvent): void {
     if (!open()) {
       return;
@@ -318,9 +500,7 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
       event.preventDefault();
       event.stopPropagation();
 
-      setSelected((index) =>
-        Math.min(index + 1, Math.max(files().length - 1, 0)),
-      );
+      setSelected((index) => Math.min(index + 1, files().length));
 
       return;
     }
@@ -333,10 +513,15 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
       return;
     }
 
-    if ((event.key === 'Enter' || event.key === 'Tab') && files().length > 0) {
+    if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault();
       event.stopPropagation();
-      insertPath(files()[selected()]!);
+
+      if (selected() === 0) {
+        navigateToDirectory(parentDirectory(currentDirectory()));
+      } else {
+        insertPath(files()[selected() - 1]!);
+      }
 
       return;
     }
@@ -362,6 +547,26 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     }
 
     checkCapability();
+  });
+
+  createEffect(() => {
+    void absoluteDirectory();
+    void relativeDirectory();
+
+    setPathHidden(false);
+    naturalPathWidth = 0;
+    queueMicrotask(updatePathVisibility);
+  });
+
+  createEffect(() => {
+    if (!headerEl) {
+      return;
+    }
+
+    const observer = new ResizeObserver(updatePathVisibility);
+    observer.observe(headerEl);
+
+    onCleanup(() => observer.disconnect());
   });
 
   createEffect(() => {
@@ -391,18 +596,67 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
   });
 
   createEffect(() => {
-    if (!open() || files().length === 0) {
+    if (!open()) {
       return;
     }
 
+    void files().length;
     void selected();
 
     queueMicrotask(() => {
       listEl
         ?.querySelector<HTMLElement>('.composer-file-picker__item.selected')
         ?.scrollIntoView({ block: 'nearest' });
+
+      updateScrollThumb();
     });
   });
+
+  createEffect(() => {
+    void loading();
+    void files().length;
+
+    if (!listEl) {
+      return;
+    }
+
+    const observer = new ResizeObserver(updateScrollThumb);
+    observer.observe(listEl);
+
+    onCleanup(() => observer.disconnect());
+  });
+
+  function handleScrollbarPointerDown(event: PointerEvent): void {
+    if (!listEl || !scrollbarEl) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const startY = event.clientY;
+    const startScrollTop = listEl.scrollTop;
+    const maxScroll = listEl.scrollHeight - listEl.clientHeight;
+    const thumbHeight = (scrollThumb().height / 100) * scrollbarEl.clientHeight;
+    const availableTrack = scrollbarEl.clientHeight - thumbHeight;
+
+    if (maxScroll <= 0 || availableTrack <= 0) {
+      return;
+    }
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      listEl!.scrollTop =
+        startScrollTop +
+        ((moveEvent.clientY - startY) / availableTrack) * maxScroll;
+    };
+
+    const onPointerUp = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  }
 
   createEffect(() => {
     const textarea = props.textareaRef();
@@ -444,9 +698,23 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
         role="listbox"
         aria-label="File suggestions"
       >
-        <div class="composer-file-picker__header">
-          <span>Files</span>
-          <span class="composer-file-picker__hint">Enter to insert</span>
+        <div class="composer-file-picker__header" ref={headerEl}>
+          <span class="composer-file-picker__title" ref={titleEl}>
+            Files
+          </span>
+          <code
+            class="composer-file-picker__cwd"
+            classList={{ hidden: pathHidden() }}
+            ref={pathEl}
+          >
+            <span>{absoluteDirectoryParts().base}</span>
+            <span class="composer-file-picker__cwd-relative">
+              {absoluteDirectoryParts().relative}
+            </span>
+          </code>
+          <span class="composer-file-picker__hint" ref={hintEl}>
+            Enter to insert
+          </span>
         </div>
         <Show
           when={!loading()}
@@ -454,25 +722,39 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
             <div class="composer-file-picker__status">Searching...</div>
           }
         >
-          <Show
-            when={files().length > 0}
-            fallback={
-              <div class="composer-file-picker__status">No files found</div>
-            }
-          >
-            <div class="composer-file-picker__list" ref={listEl}>
+          <div class="composer-file-picker__results">
+            <div
+              class="composer-file-picker__list"
+              ref={listEl}
+              onScroll={updateScrollThumb}
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={selected() === 0}
+                class="composer-file-picker__item directory"
+                classList={{ selected: selected() === 0 }}
+                onMouseEnter={() => setSelected(0)}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  navigateToDirectory(parentDirectory(currentDirectory()));
+                }}
+              >
+                <span class="composer-file-picker__marker">dir</span>
+                <span class="composer-file-picker__path">../</span>
+              </button>
               <For each={files()}>
                 {(file, index) => (
                   <button
                     type="button"
                     role="option"
-                    aria-selected={index() === selected()}
+                    aria-selected={index() + 1 === selected()}
                     class="composer-file-picker__item"
                     classList={{
-                      selected: index() === selected(),
+                      selected: index() + 1 === selected(),
                       directory: file.endsWith('/'),
                     }}
-                    onMouseEnter={() => setSelected(index())}
+                    onMouseEnter={() => setSelected(index() + 1)}
                     onMouseDown={(event) => {
                       event.preventDefault();
                       insertPath(file);
@@ -485,8 +767,35 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
                   </button>
                 )}
               </For>
+              <Show when={files().length === 0}>
+                <div class="composer-file-picker__status">No files found</div>
+              </Show>
+              <Show when={truncated()}>
+                <button
+                  type="button"
+                  class="composer-file-picker__show-all"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={showAll}
+                >
+                  Truncated - Show all
+                </button>
+              </Show>
             </div>
-          </Show>
+            <div
+              class="composer-file-picker__scrollbar"
+              ref={scrollbarEl}
+              onPointerDown={handleScrollbarPointerDown}
+              aria-hidden="true"
+            >
+              <div
+                class="composer-file-picker__scrollbar-thumb"
+                style={{
+                  top: `${scrollThumb().top}%`,
+                  height: `${scrollThumb().height}%`,
+                }}
+              />
+            </div>
+          </div>
         </Show>
       </div>
     </Show>

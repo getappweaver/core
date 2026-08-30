@@ -2889,8 +2889,9 @@ a.diff-line__number:focus-visible {
 }
 
 .composer-file-picker__header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 1rem;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--color-border);
@@ -2901,6 +2902,22 @@ a.diff-line__number:focus-visible {
   text-transform: uppercase;
 }
 
+.composer-file-picker__cwd {
+  color: var(--color-text);
+  font-size: 0.78rem;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.composer-file-picker__cwd.hidden {
+  display: none;
+}
+
+.composer-file-picker__cwd-relative {
+  color: var(--color-accent);
+}
+
 .composer-file-picker__hint {
   color: var(--color-text-muted);
   font-weight: 400;
@@ -2908,31 +2925,49 @@ a.diff-line__number:focus-visible {
   text-transform: none;
 }
 
+.composer-file-picker__results {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .composer-file-picker__list {
   display: grid;
+  align-content: start;
+  height: 100%;
   min-height: 0;
   overflow-y: scroll;
   overscroll-behavior: contain;
-  padding: 0.35rem;
-  scrollbar-color: var(--color-warning) var(--color-surface-alt);
-  scrollbar-gutter: stable;
-  scrollbar-width: auto;
+  padding: 0.35rem 1rem 0.35rem 0.35rem;
+  scrollbar-width: none;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
 
 .composer-file-picker__list::-webkit-scrollbar {
-  width: 10px;
-  background: var(--color-surface-alt);
+  display: none;
 }
 
-.composer-file-picker__list::-webkit-scrollbar-thumb {
-  border: 2px solid var(--color-surface-alt);
-  border-radius: 0;
+.composer-file-picker__scrollbar {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.3rem;
+  bottom: 0.35rem;
+  width: 8px;
+  background: var(--color-surface-alt);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.composer-file-picker__scrollbar-thumb {
+  position: absolute;
+  right: 0;
+  left: 0;
+  min-height: 12px;
   background: var(--color-warning);
 }
 
-.composer-file-picker__list::-webkit-scrollbar-thumb:hover {
+.composer-file-picker__scrollbar:hover .composer-file-picker__scrollbar-thumb {
   background: color-mix(in srgb, var(--color-warning) 78%, #fff);
 }
 
@@ -2992,6 +3027,26 @@ button.composer-file-picker__item.selected .composer-file-picker__marker {
   color: var(--color-text-muted);
   font-size: 0.86rem;
   text-align: center;
+}
+
+button.composer-file-picker__show-all {
+  width: calc(100% - 0.5rem);
+  margin: 0.35rem 0.25rem 0.15rem;
+  padding: 0.45rem;
+  border: 1px solid var(--color-warning);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-warning);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+button.composer-file-picker__show-all:hover,
+button.composer-file-picker__show-all:focus-visible {
+  background: var(--color-warning);
+  color: #000;
+  transform: none;
+  box-shadow: none;
 }
 
 @media (max-width: 640px) {
