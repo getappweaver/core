@@ -69,6 +69,57 @@ function diffFile(line: string): string | null {
   return match?.[1] ?? null;
 }
 
+const ELIDED_CONTEXT_KEEP = 5;
+
+function isElidableContext(line: RenderedDiffLine): boolean {
+  return (
+    line.className === 'diff-line' &&
+    line.oldLine !== null &&
+    line.newLine !== null
+  );
+}
+
+function elisionMarker(file: string | null): RenderedDiffLine {
+  return {
+    text: '⋮',
+    className: 'diff-line diff-line--meta',
+    oldLine: null,
+    newLine: null,
+    file,
+  };
+}
+
+function elideUnchangedRuns(lines: RenderedDiffLine[]): RenderedDiffLine[] {
+  const collapsed: RenderedDiffLine[] = [];
+  let run: RenderedDiffLine[] = [];
+
+  const flushRun = () => {
+    if (run.length > ELIDED_CONTEXT_KEEP * 2) {
+      collapsed.push(...run.slice(0, ELIDED_CONTEXT_KEEP));
+      collapsed.push(elisionMarker(run[0]?.file ?? null));
+      collapsed.push(...run.slice(run.length - ELIDED_CONTEXT_KEEP));
+    } else {
+      collapsed.push(...run);
+    }
+
+    run = [];
+  };
+
+  for (const line of lines) {
+    if (isElidableContext(line)) {
+      run.push(line);
+      continue;
+    }
+
+    flushRun();
+    collapsed.push(line);
+  }
+
+  flushRun();
+
+  return collapsed;
+}
+
 export function renderDiffPatchLines(patch: string): RenderedDiffLine[] {
   const rendered: RenderedDiffLine[] = [];
   let oldLine: number | null = null;
@@ -168,5 +219,5 @@ export function renderDiffPatchLines(patch: string): RenderedDiffLine[] {
     newLine += 1;
   }
 
-  return rendered;
+  return elideUnchangedRuns(rendered);
 }
