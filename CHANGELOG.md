@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.4.1] - 2026-09-03
+
+- fix: todo card rendering (e8ef7fca)
+
 ## [v12.4.0] - 2026-09-03
 
-- feat: support structured bottom-up review surfaces (0362f2a3)
+- feat: support structured bottom-up review surfaces (8f5d99a5)
 
 ## [v12.3.0] - 2026-08-30
 

@@ -1508,51 +1508,57 @@ function todoStatusMarker(status: string): string {
 function TimelineTodoWriteCard(props: { tool: TimelineTool }) {
   const todos = () => parseTodoWriteItems(props.tool);
 
-  if (props.tool.status !== 'completed' || todos().length === 0) {
-    return (
-      <div class={`card tool-card tool-card--${props.tool.status}`}>
-        <div class="tool-card__line" title={toolStatusLabel(props.tool.status)}>
-          <span class="tool-card__arrow">~</span>
-          <span>Updating todos...</span>
+  return (
+    <Show
+      when={props.tool.status === 'completed' && todos().length > 0}
+      fallback={
+        <div class={`card tool-card tool-card--${props.tool.status}`}>
+          <div
+            class="tool-card__line"
+            title={toolStatusLabel(props.tool.status)}
+          >
+            <span class="tool-card__arrow">~</span>
+            <span>Updating todos...</span>
+          </div>
+        </div>
+      }
+    >
+      <div class="card todo-tool-card">
+        <div class="todo-tool-card__head">
+          <span class="tag mode-tag">todos</span>
+          <span class="diff-card__summary">
+            {todos().length} {todos().length === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+        <div class="todo-tool-card__list">
+          <For each={todos()}>
+            {(todo) => (
+              <div
+                class="todo-tool-card__item"
+                classList={{
+                  'todo-tool-card__item--completed':
+                    todo.status === 'completed',
+                  'todo-tool-card__item--in-progress':
+                    todo.status === 'in_progress',
+                  'todo-tool-card__item--cancelled':
+                    todo.status === 'cancelled',
+                }}
+              >
+                <span class="todo-tool-card__marker">
+                  {todoStatusMarker(todo.status)}
+                </span>
+                <span class="todo-tool-card__content">{todo.content}</span>
+                <Show when={todo.priority}>
+                  {(priority) => (
+                    <span class="todo-tool-card__priority">{priority()}</span>
+                  )}
+                </Show>
+              </div>
+            )}
+          </For>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div class="card todo-tool-card">
-      <div class="todo-tool-card__head">
-        <span class="tag mode-tag">todos</span>
-        <span class="diff-card__summary">
-          {todos().length} {todos().length === 1 ? 'item' : 'items'}
-        </span>
-      </div>
-      <div class="todo-tool-card__list">
-        <For each={todos()}>
-          {(todo) => (
-            <div
-              class="todo-tool-card__item"
-              classList={{
-                'todo-tool-card__item--completed': todo.status === 'completed',
-                'todo-tool-card__item--in-progress':
-                  todo.status === 'in_progress',
-                'todo-tool-card__item--cancelled': todo.status === 'cancelled',
-              }}
-            >
-              <span class="todo-tool-card__marker">
-                {todoStatusMarker(todo.status)}
-              </span>
-              <span class="todo-tool-card__content">{todo.content}</span>
-              <Show when={todo.priority}>
-                {(priority) => (
-                  <span class="todo-tool-card__priority">{priority()}</span>
-                )}
-              </Show>
-            </div>
-          )}
-        </For>
-      </div>
-    </div>
+    </Show>
   );
 }
 
