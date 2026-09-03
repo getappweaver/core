@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.4.3] - 2026-09-03
+
+- fix: archive button update (87ff8cd6)
+
 ## [v12.4.2] - 2026-09-03
 
-- fix: session diff patch showing only changed lines (7282e846)
+- fix: session diff patch showing only changed lines (27ad42a9)
 
 ## [v12.4.1] - 2026-09-03
 

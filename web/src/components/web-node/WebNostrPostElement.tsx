@@ -1635,7 +1635,7 @@ function referenceActionItems(
       label: reference.archived === true ? 'Unarchive' : 'Archive',
       action: reference.archiveAction,
       disabled: false,
-      success: false,
+      success: reference.archived === true,
     });
   }
 
