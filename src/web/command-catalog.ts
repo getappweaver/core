@@ -27,8 +27,12 @@ export type InferredWebSupport = {
   executionMode: InferredWebExecutionMode;
 };
 
-export type WebCommandArgument = CommandArgumentDefinition;
-export type WebCommandOption = CommandOptionDefinition;
+export type WebCommandArgument = Omit<CommandArgumentDefinition, 'choices'> & {
+  choices?: string[];
+};
+export type WebCommandOption = Omit<CommandOptionDefinition, 'choices'> & {
+  choices?: string[];
+};
 
 export type WebSubcommandDetail = {
   name: string;
@@ -75,6 +79,16 @@ function hasAnyInputs(subcommand: SubcommandDefinition): boolean {
   return subcommand.arguments.length > 0 || subcommand.options.length > 0;
 }
 
+export function serializeCommandFieldForWeb<
+  T extends CommandArgumentDefinition | CommandOptionDefinition,
+>(field: T): Omit<T, 'choices'> & { choices?: string[] } {
+  const { choices, ...rest } = field;
+
+  return choices === null || choices === undefined
+    ? rest
+    : { ...rest, choices };
+}
+
 export function inferWebExecutionMode(
   subcommand: SubcommandDefinition,
 ): InferredWebExecutionMode {
@@ -101,8 +115,8 @@ function serializeSubcommandForWeb(
     summary: subcommand.summary,
     usage: buildSubcommandUsage(subcommand),
     aliases: subcommand.aliases,
-    arguments: subcommand.arguments,
-    options: subcommand.options,
+    arguments: subcommand.arguments.map(serializeCommandFieldForWeb),
+    options: subcommand.options.map(serializeCommandFieldForWeb),
     examples: subcommand.examples,
     inferredWeb: {
       generated: true,

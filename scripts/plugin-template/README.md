@@ -15,4 +15,4 @@ Replace this README with documentation for your plugin:
 
 See PLUGINS.md in the repo root for the full plugin author guide.
 
-After you change structure or behavior, refresh `__BOTTOMUP.md` for this plugin directory (appweaver-file `bottomup` tools; root file uses `scope_root: true`).
+After you change structure or behavior, use the appweaver-file `bottomup.generate`, `bottomup.summarize`, and `bottomup.enrich` tools to refresh `.BOTTOMUP.json` knowledge.

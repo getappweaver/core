@@ -16,6 +16,7 @@ import {
   emitStoryTargetHovered,
 } from '../story/events';
 
+import { DiffPatch } from './DiffPatch';
 import type { WebNodeRendererProps } from './web-node/contexts';
 import {
   TreeExpandRequestSetterContext,
@@ -169,6 +170,14 @@ function renderElement({
           data-ui={elementUi(element)}
           style={elementStyle(element)}
           aria-hidden="true"
+        />
+      </Match>
+
+      <Match when={element.tag === 'diffPatch'}>
+        <DiffPatch
+          patch={element.props?.diffPatch ?? ''}
+          file={element.props?.diffFilePath}
+          class={elementClass(element)}
         />
       </Match>
 

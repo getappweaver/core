@@ -110,7 +110,7 @@ my-plugin/
   format.ts                 ← display helpers
   reply-tone.ts             ← tone hints for plain-text replies (optional pattern)
   renderers/text.ts         ← render*Text + shared representation union
-  __BOTTOMUP.md             ← optional; scope_root for appweaver-file bottom-up docs
+  .BOTTOMUP.json            ← optional; generated appweaver-file knowledge index
   commands/
     help/module.ts          ← get*CommandDefinition + get*HelpLines
     help/adapter.ts

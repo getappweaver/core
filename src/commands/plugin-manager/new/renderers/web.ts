@@ -119,7 +119,7 @@ function formView(coreApiVersion: string): WebNode {
 function createdView(representation: PluginsNewCreatedRepresentation): WebNode {
   const developmentPrompt = [
     `Develop the new AppWeaver plugin at ${representation.pluginPath}.`,
-    `Read ${representation.pluginPath}/AGENTS.md and ${representation.pluginPath}/__BOTTOMUP.md before changing it.`,
+    `Read ${representation.pluginPath}/AGENTS.md and available .BOTTOMUP.json knowledge before changing it.`,
     `Product goal: ${representation.description}`,
     'Inspect the generated scaffold, ask focused product questions when needed, and implement the app end-to-end while preserving the draft/review conventions.',
   ].join('\n\n');

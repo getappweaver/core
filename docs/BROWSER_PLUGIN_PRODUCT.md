@@ -143,7 +143,7 @@ Notes:
 
 - Avoid generic `shared/` until duplication is real
 - Avoid generic `db/` and `runtime/` buckets when capability-local modules can own their files
-- Keep modules locally understandable for future `__BOTTOMUP.md` documentation
+- Keep modules locally understandable for generated `.BOTTOMUP.json` knowledge
 
 ## MVP DB Schema Direction
 

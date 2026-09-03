@@ -599,6 +599,10 @@ export const WebBasePropsSchema = z.object({
   editableTextValue: z.string().optional(),
   /** `editableText`: render a live line-number gutter. */
   showLineNumbers: z.literal(true).optional(),
+  /** `diffPatch`: unified diff text rendered with colors and line numbers. */
+  diffPatch: z.string().optional(),
+  /** `diffPatch`: fallback file path for copyable current-line references. */
+  diffFilePath: z.string().min(1).optional(),
   action: WebActionSchema.optional(),
   stopPropagation: z.boolean().optional(),
   /** `textField`: name submitted with parent `form` (FormData / merge into command `arguments`). */
@@ -701,6 +705,7 @@ export const WebElementTagSchema = z.enum([
   'textArea',
   /** Browser-side editable text surface with optional live line numbers. */
   'editableText',
+  'diffPatch',
   /**
    * Group fields and submit: `action` is merged with `FormData` on the client.
    * - `command`: FormData keys map into `arguments`
@@ -738,6 +743,7 @@ export const WebGenericElementTagSchema = z.enum([
   'choiceField',
   'textArea',
   'editableText',
+  'diffPatch',
   'form',
 ]);
 

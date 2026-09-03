@@ -216,7 +216,7 @@ allowed-tools: Bash
 
 ${instructions.trim()}
 ${skillNotes ? `\n${skillNotes.trim()}\n` : ''}
-> **Plugin docs root:** \`${pluginDir}\`. Always use \`working_dir: "${pluginDir}"\` as the starting point when exploring this plugin — do not call \`bottomup_context\` with \`working_dir: null\` as the plugin directory is not visible from the workspace root.
+> **Plugin root:** \`${pluginDir}\`. Use this path as the starting point for workspace file and knowledge tools.
 
 ## CLI Interface
 

@@ -20,10 +20,10 @@ import {
   isSystemItem,
   isToolItem,
 } from '../../types';
-import { writeClipboardText } from '../../utils/clipboard';
 import type { ToolIntervention } from '../../ws-types';
 
 import { ChatMarkdown } from '../ChatMarkdown';
+import { DiffPatch } from '../DiffPatch';
 import { WebButton } from '../WebButton';
 
 import { TimelineCollapsibleCard } from './TimelineCollapsibleCard';
@@ -713,167 +713,6 @@ type TimelineDiffSummaryRowProps = {
   summary: Extract<TimelineItem, { type: 'diff_summary' }>['summary'];
 };
 
-function diffLineClass(line: string): string {
-  if (
-    line.startsWith('+++') ||
-    line.startsWith('---') ||
-    line.startsWith('diff --git ') ||
-    line.startsWith('index ') ||
-    line.startsWith('⋮')
-  ) {
-    return 'diff-line diff-line--meta';
-  }
-
-  if (line.startsWith('+')) {
-    return 'diff-line diff-line--add';
-  }
-
-  if (line.startsWith('-')) {
-    return 'diff-line diff-line--del';
-  }
-
-  if (line.startsWith('@@')) {
-    return 'diff-line diff-line--hunk';
-  }
-
-  return 'diff-line';
-}
-
-type RenderedDiffLine = {
-  text: string;
-  className: string;
-  oldLine: number | null;
-  newLine: number | null;
-};
-
-function parseDiffHunkStart(
-  line: string,
-): { oldLine: number; newLine: number } | null {
-  const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    oldLine: Number(match[1]),
-    newLine: Number(match[2]),
-  };
-}
-
-function parseDiffElision(
-  line: string,
-): { oldLine: number; newLine: number } | null {
-  const match = /^⋮ @@ -(\d+) \+(\d+) @@$/.exec(line);
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    oldLine: Number(match[1]),
-    newLine: Number(match[2]),
-  };
-}
-
-function renderDiffPatchLines(patch: string): RenderedDiffLine[] {
-  const rendered: RenderedDiffLine[] = [];
-  let oldLine: number | null = null;
-  let newLine: number | null = null;
-
-  for (const line of patch.split('\n')) {
-    const hunkStart = parseDiffHunkStart(line);
-
-    if (hunkStart) {
-      oldLine = hunkStart.oldLine;
-      newLine = hunkStart.newLine;
-
-      rendered.push({
-        text: line,
-        className: diffLineClass(line),
-        oldLine: null,
-        newLine: null,
-      });
-
-      continue;
-    }
-
-    const elision = parseDiffElision(line);
-
-    if (elision) {
-      oldLine = elision.oldLine;
-      newLine = elision.newLine;
-
-      rendered.push({
-        text: '⋮',
-        className: diffLineClass(line),
-        oldLine: null,
-        newLine: null,
-      });
-
-      continue;
-    }
-
-    if (
-      oldLine === null ||
-      newLine === null ||
-      line.startsWith('diff --git ') ||
-      line.startsWith('index ') ||
-      line.startsWith('---') ||
-      line.startsWith('+++')
-    ) {
-      rendered.push({
-        text: line,
-        className: diffLineClass(line),
-        oldLine: null,
-        newLine: null,
-      });
-
-      continue;
-    }
-
-    if (line.startsWith('+')) {
-      rendered.push({
-        text: line,
-        className: diffLineClass(line),
-        oldLine: null,
-        newLine,
-      });
-
-      newLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('-')) {
-      rendered.push({
-        text: line,
-        className: diffLineClass(line),
-        oldLine,
-        newLine: null,
-      });
-
-      oldLine += 1;
-      continue;
-    }
-
-    rendered.push({
-      text: line,
-      className: diffLineClass(line),
-      oldLine,
-      newLine,
-    });
-
-    oldLine += 1;
-    newLine += 1;
-  }
-
-  return rendered;
-}
-
-function copyLineReference(text: string): void {
-  void writeClipboardText(text).catch(() => {});
-}
-
 export function TimelineDiffCard(props: TimelineDiffCardProps) {
   let cardEl: HTMLDivElement | undefined;
   let messageEl: HTMLTextAreaElement | undefined;
@@ -1224,36 +1063,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
                   </button>
                 </div>
               </Show>
-              <pre class="diff-file__patch">
-                <For each={renderDiffPatchLines(file.patch)}>
-                  {(line) => (
-                    <span class={line.className}>
-                      <span class="diff-line__number">
-                        {line.oldLine ?? ''}
-                      </span>
-                      <Show
-                        when={line.newLine}
-                        fallback={<span class="diff-line__number" />}
-                      >
-                        {(newLine) => (
-                          <a
-                            class="diff-line__number diff-line__number--current"
-                            href="#"
-                            title="Copy line reference"
-                            onClick={(event) => {
-                              event.preventDefault();
-                              copyLineReference(`${file.file}:${newLine()}`);
-                            }}
-                          >
-                            {newLine()}
-                          </a>
-                        )}
-                      </Show>
-                      <span class="diff-line__text">{line.text || ' '}</span>
-                    </span>
-                  )}
-                </For>
-              </pre>
+              <DiffPatch patch={file.patch} file={file.file} />
             </Show>
           </div>
         )}

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.4.0] - 2026-09-03
+
+- feat: support structured bottom-up review surfaces (0362f2a3)
+
 ## [v12.3.0] - 2026-08-30
 
-- feat: added currentDirectory and relativeDirectory to contract output (81c9867b)
+- feat: added currentDirectory and relativeDirectory to contract output (a344bcf9)
 
 ## [v12.2.0] - 2026-08-30
 

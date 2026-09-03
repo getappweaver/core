@@ -2,8 +2,8 @@
 
 This directory is an independent plugin repository generated from AppWeaver's full draft/review scaffold.
 
-- Read `README.md` and `__BOTTOMUP.md` before changing behavior.
-- Keep `__BOTTOMUP.md` current when files, responsibilities, persistence, commands, or rendering change.
+- Read `README.md` and available `.BOTTOMUP.json` knowledge before changing behavior.
+- Keep `.BOTTOMUP.json` knowledge current when files, responsibilities, persistence, commands, or rendering change.
 - Preserve the draft/accept/decline flow for mutating operations unless the product explicitly requires another review model.
 - Keep plugin-specific code in this repository. Do not add plugin-specific branches or imports to AppWeaver `src/` or `web/`.
 - Update `package.json` metadata and `appweaver.capabilities` as the product becomes concrete.

@@ -23,6 +23,7 @@ import type {
 import baseWebUiCss from '../webview/base-web-ui.css?raw';
 import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
 
+import diffPatchCss from './diff-patch.css?raw';
 import { applyOptimisticMutationsToRoot } from './web-node/optimistic';
 import { reconcileWebNodeRoot } from './web-node/reconcile';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
@@ -68,7 +69,7 @@ type WebNodeShadowRootProps = {
   onRunAction?: (action: WebAction, params?: RunWebActionParams) => void;
 };
 
-const BASE_STYLE_TEXT = `${baseWebUiCss}\n${webOverflowPanelCss}\n${hljsGithubDarkCss}`;
+const BASE_STYLE_TEXT = `${baseWebUiCss}\n${webOverflowPanelCss}\n${diffPatchCss}\n${hljsGithubDarkCss}`;
 
 type ShadowMountContext = {
   shadow: ShadowRoot;

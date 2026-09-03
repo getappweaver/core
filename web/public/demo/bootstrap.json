@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T21:50:07.828Z",
+  "generatedAt": "2026-09-01T18:26:35.717Z",
   "prefix": "/",
   "widgets": [
     {
@@ -24,7 +24,7 @@
       "alias": "todo",
       "name": "appweaver-todo-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/todo",
-      "version": "5.6.0",
+      "version": "5.7.1",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
@@ -32,7 +32,7 @@
       "alias": "job",
       "name": "appweaver-job-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/job",
-      "version": "4.1.1",
+      "version": "4.5.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     },
@@ -40,7 +40,7 @@
       "alias": "bm",
       "name": "appweaver-bm-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/bm",
-      "version": "4.2.1",
+      "version": "4.6.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     },
@@ -48,7 +48,7 @@
       "alias": "file",
       "name": "appweaver-file-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/file",
-      "version": "3.3.1",
+      "version": "3.6.0",
       "commandStoryCount": 3,
       "aiStoryCount": 0
     },
@@ -56,7 +56,7 @@
       "alias": "browser",
       "name": "appweaver-browser-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/browser",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "commandStoryCount": 0,
       "aiStoryCount": 0
     },
@@ -64,7 +64,7 @@
       "alias": "journal",
       "name": "appweaver-journal-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/journal",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "commandStoryCount": 1,
       "aiStoryCount": 0
     },
@@ -72,7 +72,23 @@
       "alias": "nr",
       "name": "appweaver-nr-plugin",
       "repo": "nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar",
-      "version": "0.2.0",
+      "version": "3.1.0",
+      "commandStoryCount": 0,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "translate",
+      "name": "appweaver-ai-translate-plugin",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/translate",
+      "version": "1.1.0",
+      "commandStoryCount": 0,
+      "aiStoryCount": 0
+    },
+    {
+      "alias": "monitor",
+      "name": "appweaver-monitor-plugin",
+      "repo": "nostr://_@getappweaver.com/relay.ngit.dev/monitor",
+      "version": "1.1.0",
       "commandStoryCount": 0,
       "aiStoryCount": 0
     }
