@@ -953,13 +953,24 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 typeof command.command === 'string' &&
                 typeof command.subcommand === 'string'
               ) {
+                const currentMeta = completionParams?.getWebRoot?.().meta;
+
+                const inheritedOptions =
+                  currentMeta?.command === command.command &&
+                  currentMeta.subcommand === command.subcommand
+                    ? (currentMeta.options ?? {})
+                    : {};
+
                 runWebAction(
                   {
                     type: 'command',
                     command: command.command,
                     subcommand: command.subcommand,
                     arguments: stringRecordValue(command.arguments),
-                    options: stringRecordValue(command.options),
+                    options: {
+                      ...inheritedOptions,
+                      ...stringRecordValue(command.options),
+                    },
                     recordInTimeline: false,
                   },
                   {

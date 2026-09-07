@@ -470,6 +470,8 @@ export const WebNostrPostPropsSchema = z.object({
   nostrInlineProfiles: WebNostrInlineProfilesSchema.optional(),
   /** NIP-10 reply/root context supplied by the plugin; renderer is view-only. */
   nostrReplyContext: z.array(WebNostrPostReferenceSchema).optional(),
+  /** Conversation replies rendered inside the main post card. */
+  nostrConversationReplies: z.array(WebNostrPostReferenceSchema).optional(),
   /** Render supplied reply/root context. Defaults to false until compact UX settles. */
   nostrShowReplyContext: z.boolean().optional(),
   /** Explicit media attachments supplied by the plugin. */

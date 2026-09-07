@@ -38,6 +38,10 @@ const [interactionByEventId, setInteractionByEventId] = createSignal<
   Record<string, NostrInteractionFlags>
 >({});
 
+const [archivedByEventId, setArchivedByEventId] = createSignal<
+  Record<string, boolean>
+>({});
+
 function interactionKey(userPubkey: string, eventId: string): string {
   return `${userPubkey}:${eventId}`;
 }
@@ -88,4 +92,43 @@ export function getNostrInteractionFlags({
     interactionByEventId()[eventId] ??
     EMPTY_FLAGS
   );
+}
+
+const NOSTR_EVENT_ENTITY_PREFIX = 'nostr-event:';
+
+export function markNostrArchived({
+  entityKey,
+  eventId,
+  archived,
+}: {
+  entityKey?: string | null;
+  eventId?: string | null;
+  archived: boolean;
+}): void {
+  const id =
+    eventId ||
+    (typeof entityKey === 'string' &&
+    entityKey.startsWith(NOSTR_EVENT_ENTITY_PREFIX)
+      ? entityKey.slice(NOSTR_EVENT_ENTITY_PREFIX.length)
+      : null);
+
+  if (!id) {
+    return;
+  }
+
+  setArchivedByEventId((current) =>
+    current[id] === archived ? current : { ...current, [id]: archived },
+  );
+}
+
+export function nostrArchivedOverride(
+  eventId: string | null | undefined,
+): boolean | undefined {
+  if (!eventId) {
+    return undefined;
+  }
+
+  const value = archivedByEventId()[eventId];
+
+  return typeof value === 'boolean' ? value : undefined;
 }

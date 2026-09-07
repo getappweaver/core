@@ -5,6 +5,8 @@ import type {
   WebOptimisticMutation,
 } from '@src/web/ui-schema';
 
+import { markNostrArchived } from '../../nostr/interactionState';
+
 function isElement(node: WebNode): node is WebElementNode {
   return node.type === 'element';
 }
@@ -73,6 +75,13 @@ function applyToNode(
       node.props?.entityKey === mutation.entityKey
     ) {
       node.props = { ...node.props, ...mutation.props };
+
+      if (typeof mutation.props.nostrArchived === 'boolean') {
+        markNostrArchived({
+          entityKey: mutation.entityKey,
+          archived: mutation.props.nostrArchived,
+        });
+      }
     }
 
     if (
