@@ -511,7 +511,7 @@ function writePluginsJson(dmBotRoot: string, data: PluginsJson): void {
 }
 
 function parseVersionParts(value: string): [number, number, number] | null {
-  const match = value.trim().match(/^(?:\^)?(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  const match = value.trim().match(/^(?:\^)?v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
 
   if (!match) {
     return null;
@@ -545,8 +545,10 @@ function coreVersionSatisfies(coreVersion: string, range: string): boolean {
     return false;
   }
 
-  if (/^\d+$/.test(normalizedRange)) {
-    return String(core[0]) === normalizedRange;
+  const majorOnly = normalizedRange.match(/^v?(\d+)$/i);
+
+  if (majorOnly) {
+    return String(core[0]) === majorOnly[1];
   }
 
   const minimum = parseVersionParts(normalizedRange);
@@ -926,7 +928,7 @@ async function installCatalogEntry({
 }: InstallCatalogEntryProps): Promise<InstallCatalogEntryResult> {
   const resolvedTarget = await resolvePluginTarget(ctx, target);
 
-  const entries = attachInstalledState({
+  const entries = await attachInstalledState({
     entries: await queryPluginCatalog(ctx, {
       relays: resolvedTarget?.relays ?? null,
       authors: resolvedTarget ? [resolvedTarget.pubkey] : null,
@@ -1032,20 +1034,125 @@ type AttachInstalledStateProps = {
   dmBotRoot: string;
 };
 
-function attachInstalledState({
+function resolveRepoAuthorPubkey(
+  authorHint: string,
+  cache: Map<string, Promise<string | null>>,
+): Promise<string | null> {
+  const cached = cache.get(authorHint);
+
+  if (cached) {
+    return cached;
+  }
+
+  const hints = authorHint
+    .split('|')
+    .map((hint) => hint.trim())
+    .filter(Boolean);
+
+  for (const hint of hints) {
+    const npubPubkey = repoAddressAuthorNpub(hint);
+
+    if (npubPubkey) {
+      const resolved = Promise.resolve(npubPubkey);
+
+      cache.set(authorHint, resolved);
+
+      return resolved;
+    }
+  }
+
+  const nip05Hint = hints
+    .map((hint) => repoAddressAuthorNip05(hint))
+    .find((hint): hint is string => hint !== null);
+
+  if (!nip05Hint) {
+    const resolved = Promise.resolve(null);
+
+    cache.set(authorHint, resolved);
+
+    return resolved;
+  }
+
+  const pending = resolveNip05Identity(nip05Hint)
+    .then((identity) => identity?.pubkey ?? null)
+    .catch(() => null);
+
+  cache.set(authorHint, pending);
+
+  return pending;
+}
+
+type FindInstalledForEntryProps = {
+  entry: PluginCatalogEntry;
+  installedPlugins: InstalledPluginEntry[];
+  pubkeyCache: Map<string, Promise<string | null>>;
+};
+
+async function findInstalledForEntry({
+  entry,
+  installedPlugins,
+  pubkeyCache,
+}: FindInstalledForEntryProps): Promise<InstalledPluginEntry | undefined> {
+  const fastMatch = installedPlugins.find(
+    (plugin) =>
+      plugin.repo === entry.repo ||
+      plugin.name === entry.name ||
+      plugin.alias === entry.name ||
+      plugin.alias === suggestedAlias(entry.name),
+  );
+
+  if (fastMatch) {
+    return fastMatch;
+  }
+
+  const entryParsed = parseNostrRepoAddress(entry.repo);
+
+  if (!entryParsed) {
+    return undefined;
+  }
+
+  const entryRepoId = entryParsed.repoId.toLowerCase();
+
+  for (const plugin of installedPlugins) {
+    const installedParsed = parseNostrRepoAddress(plugin.repo);
+
+    if (!installedParsed) {
+      continue;
+    }
+
+    if (installedParsed.repoId.toLowerCase() !== entryRepoId) {
+      continue;
+    }
+
+    const installedPubkey = await resolveRepoAuthorPubkey(
+      installedParsed.authorHint,
+      pubkeyCache,
+    );
+
+    if (installedPubkey && installedPubkey === entry.pubkey) {
+      return plugin;
+    }
+  }
+
+  return undefined;
+}
+
+async function attachInstalledState({
   entries,
   installedPlugins,
   coreVersion,
   coreUpdate,
   dmBotRoot,
-}: AttachInstalledStateProps): PluginCatalogEntry[] {
-  return entries.map((entry) => {
-    const installed = installedPlugins.find(
-      (plugin) =>
-        plugin.repo === entry.repo ||
-        plugin.name === entry.name ||
-        plugin.alias === entry.name,
-    );
+}: AttachInstalledStateProps): Promise<PluginCatalogEntry[]> {
+  const pubkeyCache = new Map<string, Promise<string | null>>();
+  const attached: PluginCatalogEntry[] = [];
+
+  for (const entry of entries) {
+    const installed = await findInstalledForEntry({
+      entry,
+      installedPlugins,
+      pubkeyCache,
+    });
 
     const verifiedRef = latestCompatibleRef(entry.refs, coreVersion);
     const latestRef = entry.refs.at(-1) ?? null;
@@ -1062,7 +1169,7 @@ function attachInstalledState({
       compatibleRef,
     });
 
-    return {
+    attached.push({
       ...entry,
       installedAlias: installed?.alias ?? null,
       installedVersion,
@@ -1082,8 +1189,10 @@ function attachInstalledState({
       updateAvailable: installed
         ? isUpdateAvailable(installedVersion, compatibleRef)
         : false,
-    };
-  });
+    });
+  }
+
+  return attached;
 }
 
 export async function queryPluginCatalog(
@@ -1235,7 +1344,7 @@ export async function handlePluginsInstall(
       return result.message;
     }
 
-    const entries = attachInstalledState({
+    const entries = await attachInstalledState({
       entries: await queryPluginCatalog(ctx),
       installedPlugins: readInstalledPlugins(ctx.dmBotRoot),
       coreVersion,
@@ -1252,7 +1361,7 @@ export async function handlePluginsInstall(
     });
   }
 
-  const entries = attachInstalledState({
+  const entries = await attachInstalledState({
     entries: await queryPluginCatalog(
       ctx,
       undefined,
