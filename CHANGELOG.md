@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.7.0] - 2026-09-08
+
+- feat: scheduler.v2 supporting direct command execution (d3ee957b)
+
 ## [v12.6.1] - 2026-09-08
 
-- fix: nostrPost reply section aligned center, buttons moved to under them (b376ff58)
+- fix: nostrPost reply section aligned center, buttons moved to under them (9b0ec283)
 
 ## [v12.6.0] - 2026-09-07
 

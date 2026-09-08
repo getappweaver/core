@@ -21,6 +21,7 @@ import {
 import { monitoring } from './monitoring';
 import type {
   BotPlugin,
+  ExecutePluginToolProps,
   PluginContext,
   PluginHostContext,
   PluginInvocationContext,
@@ -29,6 +30,7 @@ import type {
 import { parsePluginPackageJson } from './plugin';
 
 const byAlias = new Map<string, BotPlugin>();
+const contextByAlias = new Map<string, PluginContext>();
 const capabilityRelationsByAlias = new Map<string, PluginCapabilityRelations>();
 
 type RegisterPluginProps = {
@@ -162,10 +164,69 @@ export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
   }
 
   byAlias.set(installedAlias, plugin);
+  contextByAlias.set(installedAlias, scopedContext);
   capabilityRelationsByAlias.set(installedAlias, pkg.capabilities);
 }
 
-export function finalizePluginRegistration(): void {
+type ExecuteRegisteredPluginToolProps = ExecutePluginToolProps & {
+  prefix: string;
+};
+
+function closeToolDatabase(db: unknown): void {
+  if (
+    db &&
+    typeof db === 'object' &&
+    'close' in db &&
+    typeof db.close === 'function'
+  ) {
+    db.close();
+  }
+}
+
+export async function executeRegisteredPluginTool({
+  alias,
+  toolName,
+  input,
+  prefix,
+}: ExecuteRegisteredPluginToolProps): Promise<string> {
+  const plugin = byAlias.get(alias);
+  const ctx = contextByAlias.get(alias);
+  const definition = plugin?.aiDefinition;
+
+  if (!plugin || !ctx || !definition) {
+    throw new Error(`Plugin tool target is unavailable: ${alias}`);
+  }
+
+  const parsed = definition.toolCallSchema.safeParse({
+    ...input,
+    type: toolName,
+  });
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid input for ${alias}.${toolName}: ${parsed.error.message}`,
+    );
+  }
+
+  const db = definition.openDb();
+
+  try {
+    return await definition.executeTool({
+      alias,
+      prefix,
+      call: parsed.data,
+      db,
+      agent: ctx.agent,
+      pool: ctx.pool,
+      masterPubkey: ctx.masterPubkey,
+      getWotScore: ctx.getWotScore,
+    });
+  } finally {
+    closeToolDatabase(db);
+  }
+}
+
+export async function finalizePluginRegistration(): Promise<void> {
   capabilityRegistry.finalize();
 
   for (const [alias, relations] of capabilityRelationsByAlias) {
@@ -175,6 +236,14 @@ export function finalizePluginRegistration(): void {
           `Plugin ${alias} requires missing capability ${required.name}:v${required.version}`,
         );
       }
+    }
+  }
+
+  for (const [alias, plugin] of byAlias) {
+    const ctx = contextByAlias.get(alias);
+
+    if (ctx && plugin.onReady) {
+      await plugin.onReady(ctx);
     }
   }
 }

@@ -50,7 +50,10 @@ import {
   type PromptPayload,
 } from './core/plugin';
 import { createPluginAgentService } from './core/plugin-agent';
-import { finalizePluginRegistration } from './core/registry';
+import {
+  executeRegisteredPluginTool,
+  finalizePluginRegistration,
+} from './core/registry';
 import { createCoreUpdateChecker } from './core/update-check';
 import {
   openCoreDb,
@@ -547,6 +550,11 @@ async function main() {
 
       return { status: 'complete' as const, ...summary };
     },
+    executePluginTool: (props) =>
+      executeRegisteredPluginTool({
+        ...props,
+        prefix: getDmCommandPrefix(seenDb),
+      }),
     promptFn: async (message: string | PromptPayload): Promise<string> => {
       await sendReplyForSource(replySource, getPromptPayloadValue(message));
 
@@ -589,7 +597,7 @@ async function main() {
     log.error(`Failed to register plugins: ${String(err)}`);
     log.error(`Run 'bun run scripts/install-plugin.ts' to install plugins`);
   } finally {
-    finalizePluginRegistration();
+    await finalizePluginRegistration();
   }
 
   publishWidgetIcons(getDmCommandPrefix(seenDb));

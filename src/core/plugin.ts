@@ -115,6 +115,16 @@ export type SendWebPushNotificationFn = (
   notification: SendWebPushNotificationProps,
 ) => Promise<SendWebPushNotificationResult>;
 
+export type ExecutePluginToolProps = {
+  alias: string;
+  toolName: string;
+  input: Record<string, unknown>;
+};
+
+export type ExecutePluginToolFn = (
+  props: ExecutePluginToolProps,
+) => Promise<string>;
+
 export function createTextPrompt(value: string): TextPromptPayload {
   return {
     type: 'text-prompt',
@@ -152,6 +162,7 @@ export type PluginContext = {
   sendReply: SendReplyFn;
   sendDm: SendReplyFn;
   sendWebPush: SendWebPushNotificationFn;
+  executePluginTool: ExecutePluginToolFn;
   promptFn: PromptFn;
   wot: WotServices;
   nostrResolution: NostrResolutionService;
@@ -281,6 +292,7 @@ export type PluginStoriesProvider =
 export type BotPlugin = {
   identity: PluginIdentity;
   onInit: (ctx: PluginContext) => void;
+  onReady?: (ctx: PluginContext) => void | Promise<void>;
   handler: (
     args: string[],
     context: PluginInvocationContext,
