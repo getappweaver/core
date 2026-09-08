@@ -1872,6 +1872,25 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.tool-card__line--expandable {
+  cursor: pointer;
+  list-style: none;
+}
+
+.tool-card__line--expandable::-webkit-details-marker {
+  display: none;
+}
+
+.tool-card__output {
+  background: color-mix(in srgb, var(--color-panel) 82%, #000);
+  color: var(--color-text);
+  margin: 0.35rem 0 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.5rem;
+  white-space: pre-wrap;
+}
+
 .todo-tool-card {
   background: color-mix(in srgb, var(--color-panel) 88%, #000);
   border-left: 3px solid color-mix(in srgb, var(--color-accent) 64%, #fff);

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.7.2] - 2026-09-09
+
+- fix: edit patch card rendering (d82c5ddd)
+
 ## [v12.7.1] - 2026-09-08
 
-- fix: plugins install widget version mismatch with v prefix, also repo match of npub vs nip05 (43ddacdc)
+- fix: plugins install widget version mismatch with v prefix, also repo match of npub vs nip05 (4b2f1fa1)
 
 ## [v12.7.0] - 2026-09-08
 
