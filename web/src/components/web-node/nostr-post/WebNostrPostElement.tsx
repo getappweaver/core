@@ -2776,14 +2776,6 @@ export function WebNostrPostElement(
           </div>
         </Show>
 
-        <Show when={showActions() && footerActionItems().length > 0}>
-          <ActionRow
-            items={footerActionItems()}
-            runAction={props.runAction}
-            disabled={entityPending().pending}
-          />
-        </Show>
-
         <NostrPostReplies
           replies={elementProps()?.nostrConversationReplies ?? []}
           renderReply={(reply) => (
@@ -2796,6 +2788,14 @@ export function WebNostrPostElement(
             />
           )}
         />
+
+        <Show when={showActions() && footerActionItems().length > 0}>
+          <ActionRow
+            items={footerActionItems()}
+            runAction={props.runAction}
+            disabled={entityPending().pending}
+          />
+        </Show>
       </div>
       <ImageLightbox
         url={lightboxImageUrl()}

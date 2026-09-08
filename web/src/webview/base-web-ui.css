@@ -710,7 +710,7 @@ a.web-button:focus-visible {
 
 .web-nostrPost__conversation {
   display: grid;
-  justify-items: start;
+  justify-items: center;
   gap: 0.25rem;
   margin-top: 0.35rem;
   padding-top: 0.4rem;
