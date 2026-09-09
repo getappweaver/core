@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.7.3] - 2026-09-09
+
+- fix: edit tool output to patch card (d7dcbf08)
+
 ## [v12.7.2] - 2026-09-09
 
-- fix: edit patch card rendering (d82c5ddd)
+- fix: edit patch card rendering (01a4f8c3)
 
 ## [v12.7.1] - 2026-09-08
 

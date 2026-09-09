@@ -1453,6 +1453,10 @@ function isApplyPatchTool(tool: TimelineTool): boolean {
   return tool.tool === 'apply_patch' || tool.tool.endsWith('.apply_patch');
 }
 
+function isEditTool(tool: TimelineTool): boolean {
+  return tool.tool === 'edit' || tool.tool.endsWith('.edit');
+}
+
 function isTodoWriteTool(tool: TimelineTool): boolean {
   return tool.tool === 'todowrite' || tool.tool.endsWith('.todowrite');
 }
@@ -1588,6 +1592,18 @@ function getApplyPatchText(tool: TimelineTool): string | null {
   return getToolInputValue(tool, ['patchText', 'patch', 'diff']);
 }
 
+function getToolInputString(tool: TimelineTool, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = tool.input[key];
+
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function parseApplyPatchFiles(tool: TimelineTool): TimelineFileDiff[] {
   const patchText = getApplyPatchText(tool);
 
@@ -1647,6 +1663,66 @@ function parseApplyPatchFiles(tool: TimelineTool): TimelineFileDiff[] {
   return files.filter((file) => file.file.length > 0);
 }
 
+function changedLines(value: string): string[] {
+  return value.length === 0 ? [] : value.split('\n');
+}
+
+function parseEditToolFiles(tool: TimelineTool): TimelineFileDiff[] {
+  const file = getToolInputValue(tool, [
+    'filePath',
+    'filepath',
+    'path',
+    'file',
+  ]);
+
+  const before = getToolInputString(tool, [
+    'oldString',
+    'old_string',
+    'oldText',
+    'before',
+  ]);
+
+  const after = getToolInputString(tool, [
+    'newString',
+    'new_string',
+    'newText',
+    'after',
+  ]);
+
+  if (!file || before === null || after === null || before === after) {
+    return [];
+  }
+
+  const deleted = changedLines(before);
+  const added = changedLines(after);
+
+  const patch = [
+    `--- a/${file}`,
+    `+++ b/${file}`,
+    `@@ -1,${deleted.length} +1,${added.length} @@`,
+    ...deleted.map((line) => `-${line}`),
+    ...added.map((line) => `+${line}`),
+  ].join('\n');
+
+  return [
+    {
+      file,
+      patch,
+      additions: added.length,
+      deletions: deleted.length,
+      status: 'modified',
+    },
+  ];
+}
+
+function parseToolPatchFiles(tool: TimelineTool): TimelineFileDiff[] {
+  if (isApplyPatchTool(tool)) {
+    return parseApplyPatchFiles(tool);
+  }
+
+  return isEditTool(tool) ? parseEditToolFiles(tool) : [];
+}
+
 function TimelinePreparingPatchToolCard(props: { tool: TimelineTool }) {
   return (
     <div class={`card tool-card tool-card--${props.tool.status}`}>
@@ -1658,9 +1734,52 @@ function TimelinePreparingPatchToolCard(props: { tool: TimelineTool }) {
   );
 }
 
+function TimelineGenericToolCard(props: { tool: TimelineTool }) {
+  const output = () => props.tool.error ?? props.tool.output;
+
+  const summary = () => (
+    <>
+      <span class="tool-card__arrow">{compactToolArrow(props.tool)}</span>
+      <span>{compactToolSummary(props.tool)}</span>
+    </>
+  );
+
+  return (
+    <div class={`card tool-card tool-card--${props.tool.status}`}>
+      <Show
+        when={output()}
+        fallback={
+          <div
+            class="tool-card__line"
+            title={toolStatusLabel(props.tool.status)}
+          >
+            {summary()}
+          </div>
+        }
+      >
+        {(visibleOutput) => (
+          <details class="tool-card__details">
+            <summary
+              class="tool-card__line tool-card__line--expandable"
+              title={`${toolStatusLabel(props.tool.status)}; show output`}
+            >
+              {summary()}
+            </summary>
+            <pre class="tool-card__output">{visibleOutput()}</pre>
+          </details>
+        )}
+      </Show>
+    </div>
+  );
+}
+
 export function TimelineToolCard(props: TimelineToolCardProps) {
   const tool = () => props.item.tool;
   const [submittedPanelOpen, setSubmittedPanelOpen] = createSignal(false);
+
+  const patchFiles = createMemo(() =>
+    tool().status === 'completed' ? parseToolPatchFiles(tool()) : [],
+  );
 
   if (props.intervention && props.onResolveIntervention) {
     if (props.intervention.matchedRuleId) {
@@ -1711,22 +1830,15 @@ export function TimelineToolCard(props: TimelineToolCardProps) {
     );
   }
 
-  if (isApplyPatchTool(tool()) && tool().status !== 'completed') {
-    return <TimelinePreparingPatchToolCard tool={tool()} />;
-  }
-
-  if (isTodoWriteTool(tool())) {
-    return <TimelineTodoWriteCard tool={tool()} />;
-  }
-
-  const patchFiles = () =>
-    isApplyPatchTool(tool()) && tool().status === 'completed'
-      ? parseApplyPatchFiles(tool())
-      : [];
-
-  if (patchFiles().length > 0) {
-    return (
-      <>
+  return (
+    <Switch fallback={<TimelineGenericToolCard tool={tool()} />}>
+      <Match when={isApplyPatchTool(tool()) && tool().status !== 'completed'}>
+        <TimelinePreparingPatchToolCard tool={tool()} />
+      </Match>
+      <Match when={isTodoWriteTool(tool())}>
+        <TimelineTodoWriteCard tool={tool()} />
+      </Match>
+      <Match when={patchFiles().length > 0}>
         <For each={patchFiles()}>
           {(file, index) => (
             <TimelineDiffCard
@@ -1758,16 +1870,7 @@ export function TimelineToolCard(props: TimelineToolCardProps) {
             />
           )}
         </For>
-      </>
-    );
-  }
-
-  return (
-    <div class={`card tool-card tool-card--${tool().status}`}>
-      <div class="tool-card__line" title={toolStatusLabel(tool().status)}>
-        <span class="tool-card__arrow">{compactToolArrow(tool())}</span>
-        <span>{compactToolSummary(tool())}</span>
-      </div>
-    </div>
+      </Match>
+    </Switch>
   );
 }
