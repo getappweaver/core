@@ -49,17 +49,13 @@ import {
   getConnection,
   type BunkerSignerData,
 } from '../src/nostr/connections';
+import { NIP65_DISCOVERY_RELAYS } from '../src/nostr/relays';
 
 const PLUGIN_KIND = 32107;
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
 
-const PROFILE_RELAYS = [
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.nostr.band',
-];
+const PROFILE_RELAYS = [...NIP65_DISCOVERY_RELAYS];
 
 const PLUGIN_PUBLISH_RELAYS = [
   'wss://relay.ditto.pub',

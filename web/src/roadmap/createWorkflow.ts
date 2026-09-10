@@ -6,19 +6,14 @@ import {
   renderRoadmapNewWorkflowWeb,
   type RoadmapProjectPayload,
 } from '@src/commands/roadmap/renderers/web';
+import { NIP65_DISCOVERY_RELAYS } from '@src/nostr/relays';
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
 const WORKFLOW_KIND = 39010;
 const REPO_KIND = '30617';
 const NIP65_KIND = 10002;
 
-const DISCOVERY_RELAYS = [
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.ditto.pub',
-  'wss://relay.primal.net',
-] as const;
+const DISCOVERY_RELAYS = NIP65_DISCOVERY_RELAYS;
 
 const ProjectSchema = z.object({
   address: z.string().min(1),

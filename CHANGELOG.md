@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.7.4] - 2026-09-10
+
+- fix: replace purplepag.es relay with relay.vertaxlab.io (8aee7d16)
+
 ## [v12.7.3] - 2026-09-09
 
-- fix: edit tool output to patch card (d7dcbf08)
+- fix: edit tool output to patch card (7cff67aa)
 
 ## [v12.7.2] - 2026-09-09
 

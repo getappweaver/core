@@ -17,12 +17,9 @@ import { alreadyHaveEvent, markSeen } from '../db';
 import { ensureWss } from '../env';
 import { C, debug, log, stripAnsi } from '../logger';
 
-export const PROFILE_RELAYS = new Set([
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.nostr.band',
-]);
+import { DM_DISCOVERY_RELAYS_10050 } from './relays';
+
+export const PROFILE_RELAYS = new Set(DM_DISCOVERY_RELAYS_10050);
 
 export type CreateSignAuthEventProps = {
   botSecretKey: Uint8Array;

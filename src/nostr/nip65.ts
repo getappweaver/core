@@ -4,6 +4,8 @@
 
 import type { SimplePool } from 'nostr-tools/pool';
 
+import { NIP65_DISCOVERY_RELAYS } from './relays';
+
 /** Kind 10002 — relay list metadata (NIP-65). */
 export const NIP65_RELAY_LIST_KIND = 10002;
 
@@ -11,13 +13,8 @@ export const NIP65_RELAY_LIST_KIND = 10002;
 export const DM_RELAY_LIST_KIND = 10050;
 
 /** Relays used to find a pubkey's relay-list events. */
-export const PROFILE_RELAYS_FOR_QUERY: readonly string[] = [
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.ditto.pub',
-  'wss://relay.primal.net',
-];
+export const PROFILE_RELAYS_FOR_QUERY: readonly string[] =
+  NIP65_DISCOVERY_RELAYS;
 
 export function normalizeRelay(raw: string): string | null {
   const trimmed = raw.trim();

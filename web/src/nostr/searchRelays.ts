@@ -1,16 +1,12 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
 
+import { NIP65_DISCOVERY_RELAYS } from '@src/nostr/relays';
+
 const NIP65_KIND = 10002;
 const SEARCH_RELAYS_KIND = 10007;
 
-export const SEARCH_RELAY_DISCOVERY_RELAYS = [
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.ditto.pub',
-  'wss://relay.primal.net',
-];
+export const SEARCH_RELAY_DISCOVERY_RELAYS = [...NIP65_DISCOVERY_RELAYS];
 
 export type SearchRelaysState = {
   relays: string[];

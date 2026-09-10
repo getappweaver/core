@@ -9,17 +9,12 @@ import {
 } from 'nostr-tools/pure';
 
 import { getOrSetEnvVar } from '../src/env-file';
+import {
+  DM_DISCOVERY_RELAYS_10050,
+  PROFILE_PUBLISH_RELAYS,
+} from '../src/nostr/relays';
 
 const ENV_PATH = '.env';
-
-const PROFILE_PUBLISH_RELAYS = [
-  'wss://purplepag.es',
-  'wss://relay.nos.social',
-  'wss://user.kindpag.es',
-  'wss://relay.ditto.pub',
-  'wss://relay.primal.net',
-  'wss://relay.0xchat.com',
-];
 
 type Nip65Relays = {
   readRelays: string[];
@@ -152,7 +147,7 @@ async function main() {
   const signedKind0 = finalizeEvent(kind0Event, secretKey);
 
   const kind0Results = await Promise.allSettled(
-    pool.publish(PROFILE_PUBLISH_RELAYS, signedKind0),
+    pool.publish([...PROFILE_PUBLISH_RELAYS], signedKind0),
   );
 
   for (const [idx, result] of kind0Results.entries()) {
@@ -175,12 +170,7 @@ async function main() {
   };
 
   // fetch master's nip65 relays
-  const PROFILE_RELAYS = [
-    'wss://purplepag.es',
-    'wss://relay.nos.social',
-    'wss://user.kindpag.es',
-    'wss://relay.nostr.band',
-  ];
+  const PROFILE_RELAYS = [...DM_DISCOVERY_RELAYS_10050];
 
   const nip65Event = await pool.get(PROFILE_RELAYS, {
     kinds: [10050],

@@ -469,7 +469,7 @@ The MVP should start on repo relays instead of requiring an AppWeaver-controlled
 Discovery/bootstrap relays:
 
 ```text
-wss://purplepag.es
+wss://relay.vertexlab.io
 wss://relay.nos.social
 wss://user.kindpag.es
 wss://relay.primal.net
