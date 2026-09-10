@@ -2428,6 +2428,7 @@ export function WebNostrPostElement(
         authorPicture: activity.actorPicture,
         authorAbout: activity.actorAbout,
         relayHints: [],
+        sharePrefixes: elementProps()?.nostrSharePrefixes,
         profileActions: activity.profileActions,
         profileActionsReadAction: activity.profileActionsReadAction,
       }),

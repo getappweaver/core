@@ -921,6 +921,7 @@ function latestPostNode({
           nostrAuthorPicture: profile.picture ?? undefined,
           nostrAuthorAbout: profile.about ?? undefined,
           nostrRelayHints: relayHints,
+          nostrSharePrefixes: profile.sharePrefixes,
           nostrProfileActions: profile.profileActions,
           nostrProfileActionsReadAction: profile.profileActionsReadAction,
           nostrCreatedAt: post.createdAt,
