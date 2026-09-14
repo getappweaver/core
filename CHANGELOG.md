@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.7.6] - 2026-09-14
+
+- fix: donations@getappweaver.com redirect to dhalsim@blink.sv was failing (24ef9c88)
+
 ## [v12.7.5] - 2026-09-10
 
-- fix: profile page "open event" menu button should respect Event share URL of NR (8cb3cadf)
+- fix: profile page "open event" menu button should respect Event share URL of NR (e60b6667)
 
 ## [v12.7.4] - 2026-09-10
 

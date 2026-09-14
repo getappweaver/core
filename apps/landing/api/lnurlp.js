@@ -1,22 +1,8 @@
 import { URL } from 'node:url';
 
 const ADDRESSES = Object.freeze({
-  donations_test: Object.freeze({
-    callback: 'https://getappweaver.com/api/lnurlp-test-callback',
-    minSendable: 1000,
-    maxSendable: 100000000000,
-    metadata: JSON.stringify([
-      ['text/plain', 'Payment to donations_test@getappweaver.com'],
-      ['text/identifier', 'donations_test@getappweaver.com'],
-    ]),
-    commentAllowed: 280,
-    tag: 'payRequest',
-    allowsNostr: true,
-    nostrPubkey:
-      '7f03798189409ba693ddecabad996a7ba3fa02e8103b84ae26b31b6bc8709628',
-  }),
   donations: Object.freeze({
-    callback: 'https://blink.sv/lnurlp/dhalsim/callback',
+    callback: 'https://lnurl.blink.sv/lnurlp/blink.sv/dhalsim/invoice',
     minSendable: 1000,
     maxSendable: 100000000000,
     metadata: JSON.stringify([
@@ -30,7 +16,7 @@ const ADDRESSES = Object.freeze({
       '8fe53b37518e3dbe9bab26d912292001d8b882de9456b7b08b615f912dc8bf4a',
   }),
   dhalsim: Object.freeze({
-    callback: 'https://blink.sv/lnurlp/dhalsim/callback',
+    callback: 'https://lnurl.blink.sv/lnurlp/blink.sv/dhalsim/invoice',
     minSendable: 1000,
     maxSendable: 100000000000,
     metadata: JSON.stringify([
