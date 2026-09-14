@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.8.2] - 2026-09-15
+
+- fix: added appweaver fixed version tag for cloning in alpine dockerfile (7ff3f702)
+
 ## [v12.8.1] - 2026-09-14
 
-- fix: made alpine docker image and dependencies fixed (beae4451)
+- fix: made alpine docker image and dependencies fixed (28ef614f)
 
 ## [v12.8.0] - 2026-09-14
 
