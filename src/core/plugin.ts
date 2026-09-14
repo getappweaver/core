@@ -28,6 +28,7 @@ import { log } from '@src/logger';
 import type { MessageSource } from '@src/messaging';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import type { WotServices } from '@src/nostr/wot-service';
+import type { InteractivePaymentService } from '@src/payments/types';
 import type { AiDefinition } from '@src/system/ai-definition';
 import type { CommandDefinition } from '@src/system/command-definition';
 import type { StoryDefinition } from '@src/system/story-definition';
@@ -150,7 +151,11 @@ export function getPromptPayloadValue(
 }
 
 /**
- * Shared context for plugins. Mutating handlers run after `onInit(ctx)` has been called.
+ * Long-lived services scoped to one installed plugin.
+ *
+ * Core creates this once during plugin registration and passes it to `onInit`.
+ * Plugins may retain it for background work, so it must not contain state tied
+ * to a command, transport, browser connection, or interactive prompt session.
  *
  * - **getRoutstrSkKey** — Routstr API key from DB when applicable.
  * - **agent** — Core-owned agent execution with fresh sessions by default and explicit resumption.
@@ -163,7 +168,6 @@ export type PluginContext = {
   sendDm: SendReplyFn;
   sendWebPush: SendWebPushNotificationFn;
   executePluginTool: ExecutePluginToolFn;
-  promptFn: PromptFn;
   wot: WotServices;
   nostrResolution: NostrResolutionService;
   /** @deprecated Use `wot.getWotScore`. Kept temporarily for older plugins. */
@@ -276,12 +280,22 @@ export type PluginIdentity = {
   description?: string;
 };
 
+/**
+ * Request-scoped context for one plugin command invocation.
+ *
+ * Core creates this during dispatch. Transport-bound functions such as
+ * `promptFn` are valid only while the handler is running and must not be
+ * retained for scheduled or other background work.
+ */
 export type PluginInvocationContext = {
   prefix: string;
   source: MessageSource;
   agent: PluginAgentService;
   sendReply?: SendReplyFn;
+  /** Present only when the current transport can carry a correlated answer. */
   promptFn?: PromptFn;
+  /** Core-owned, request-scoped payment broker; unsupported transports return a typed result. */
+  payments: InteractivePaymentService;
   jsonPayload?: unknown;
 };
 

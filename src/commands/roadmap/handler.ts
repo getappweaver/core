@@ -10,6 +10,7 @@ import {
   type IssueView,
   type RoadmapView,
 } from './model';
+import { handleRoadmapPayment } from './payment';
 import { renderRoadmapFundWeb, renderRoadmapWeb } from './renderers/web';
 import {
   defaultRoadmapRepoAddresses,
@@ -238,6 +239,10 @@ export const handleRoadmapRoot: BuiltinHandler = (ctx) => {
 
   if (sub === 'fund' || sub === 'zap') {
     return Promise.resolve(handleRoadmapFund(ctx));
+  }
+
+  if (sub === 'pay') {
+    return handleRoadmapPayment(ctx);
   }
 
   if (sub === 'new' || sub === 'add') {

@@ -7,6 +7,8 @@ import type { CommandDefinition } from '@src/system/command-definition';
 import { getAiCommandDefinition } from './ai/definition';
 import { getBotCommandDefinition } from './bot/definition';
 import { getBunkerCommandDefinition } from './bunker/definition';
+import { getCashuCommandDefinition } from './cashu/definition';
+import { getNwcCommandDefinition } from './nwc/definition';
 import { getPluginsCommandDefinition } from './plugin-manager/definition';
 import { getRoadmapCommandDefinition } from './roadmap/definition';
 import { getRoutstrCommandDefinition } from './routstr/definition';
@@ -26,6 +28,8 @@ export const BUILTIN_ROOT_NAMES = [
   'roadmap',
   'ai',
   'routstr',
+  'nwc',
+  'cashu',
   'wallet',
   'bunker',
   'wot',
@@ -106,6 +110,10 @@ export function getBuiltinCommandDefinition({
       return getAiCommandDefinition({ prefix });
     case 'routstr':
       return getRoutstrCommandDefinition({ prefix });
+    case 'nwc':
+      return getNwcCommandDefinition({ prefix });
+    case 'cashu':
+      return getCashuCommandDefinition({ prefix });
     case 'wallet':
       return getWalletCommandDefinition({ prefix });
     case 'bunker':
@@ -135,6 +143,8 @@ export function getBuiltinDefinitionsMap({
     roadmap: getRoadmapCommandDefinition({ prefix }),
     ai: getAiCommandDefinition({ prefix }),
     routstr: getRoutstrCommandDefinition({ prefix }),
+    nwc: getNwcCommandDefinition({ prefix }),
+    cashu: getCashuCommandDefinition({ prefix }),
     wallet: getWalletCommandDefinition({ prefix }),
     bunker: getBunkerCommandDefinition({ prefix }),
     wot: getWotCommandDefinition({ prefix }),

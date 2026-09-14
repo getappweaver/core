@@ -1,0 +1,372 @@
+// ---------------------------------------------------------------------------
+// src/commands/cashu/handler.ts - cashu <subcommand> DM builtin root
+// ---------------------------------------------------------------------------
+
+import { getWalletDefaultMintUrl } from '@src/db';
+import { Satoshi } from '@src/payments/amount';
+import { createUnsupportedInteractivePaymentService } from '@src/payments/service';
+import { CashuWallet } from '@src/wallet/cashu';
+import {
+  hydrateDeterministicWalletStateWithDecrypt,
+  resolveDeterministicWalletStateRelays,
+} from '@src/wallet/nostr-state';
+
+import { handleError, type BuiltinHandler } from '../dispatch';
+import { renderBuiltinHelpText } from '../help/renderers/text';
+
+import { handleWalletBalance } from './balance/handler';
+import { renderWalletCli } from './cli-representation';
+import { handleWalletDecode } from './decode/handler';
+import { handleWalletHistory } from './history/handler';
+import { renderWalletHistoryWeb } from './history/renderers/web';
+import { handleWalletList } from './list/handler';
+import { renderWalletListWeb } from './list/renderers/web';
+import { handleWalletMelt } from './melt/handler';
+import { renderWalletMeltWeb } from './melt/renderers/web';
+import { handleWalletMint } from './mint/handler';
+import { handleWalletMints } from './mints/handler';
+import { handleWalletPay } from './pay/handler';
+import { renderWalletPayWeb } from './pay/renderers/web';
+import type { WalletPayRepresentation } from './pay/representation';
+import { handleWalletReceive } from './receive/handler';
+import { renderWalletReceiveWeb } from './receive/renderers/web';
+import { handleWalletSend } from './send/handler';
+import { renderWalletSendWeb } from './send/renderers/web';
+import { buildWalletUsageRepresentation } from './usage/representation';
+
+function paymentFailureRepresentation(
+  message: string,
+): WalletPayRepresentation {
+  return {
+    kind: 'cashu.pay',
+    version: 1,
+    meta: { command: 'cashu', subcommand: 'pay' },
+    data: { view: 'failure', message },
+  };
+}
+
+async function requestCashuMintPayment(
+  ctx: Parameters<BuiltinHandler>[0],
+  quote: Extract<WalletPayRepresentation['data'], { view: 'quote' }>,
+) {
+  const payments = ctx.interactivePaymentServiceFactory
+    ? ctx.interactivePaymentServiceFactory({
+        pluginName: 'appweaver-core',
+        pluginAlias: 'cashu',
+        title: 'Cashu Wallet',
+        iconUrl:
+          '/builtin-icons/src__commands__wallet__list__renderers__wallet.svg',
+      })
+    : createUnsupportedInteractivePaymentService();
+
+  const wallet = new CashuWallet({
+    mnemonic: ctx.config.cashuMnemonic!,
+    mintUrl: quote.mintUrl,
+  });
+
+  return payments.requestPayment({
+    purpose: `Mint ${quote.amountSats} sats to Cashu`,
+    recipient: quote.mintUrl,
+    options: [
+      {
+        type: 'lightning',
+        amount: Satoshi.parse(String(quote.amountSats)),
+        freshlyCreated: true,
+        refreshable: false,
+        createInvoice: async () => ({
+          invoice: quote.invoice,
+          checkSettlement: async () =>
+            (await wallet.checkMintQuoteBolt11(quote.quote))
+              ? { status: 'settled' as const }
+              : { status: 'pending' as const },
+        }),
+      },
+    ],
+  });
+}
+
+export const handleCashuRoot: BuiltinHandler = (ctx) => {
+  const input = ctx;
+  const p = input.prefix;
+  const mnemonic = input.config.cashuMnemonic;
+  const defaultMintUrl = input.config.cashuDefaultMintUrl;
+  const args = input.args;
+  const subcmd = args[0]?.toLowerCase();
+
+  const render = (rep: Parameters<typeof renderWalletCli>[0]) =>
+    renderWalletCli(rep, { prefix: p });
+
+  const getWalletStateWriteRelays = async () => {
+    const relays = await resolveDeterministicWalletStateRelays({
+      pool: input.pool,
+      ownerPubkey: input.config.masterPubkey,
+      fallbackRelays: input.botRelayUrls,
+    });
+
+    return relays.writeRelays;
+  };
+
+  const optionValue = (flag: string): string | null => {
+    const flagIndex = args.findIndex((arg) => arg === flag);
+
+    if (flagIndex < 0) {
+      return null;
+    }
+
+    const value = args[flagIndex + 1];
+
+    return value && !value.startsWith('--') ? value : null;
+  };
+
+  const booleanOptionValue = (flag: string): boolean =>
+    args.some((arg) => arg === flag);
+
+  const hydrateWalletStateIfAvailable = async () => {
+    if (input.source === 'web' || !input.walletDb || !mnemonic) {
+      return;
+    }
+
+    if (!input.decryptSelfContent) {
+      return;
+    }
+
+    const relays = await resolveDeterministicWalletStateRelays({
+      pool: input.pool,
+      ownerPubkey: input.config.masterPubkey,
+      fallbackRelays: input.botRelayUrls,
+    });
+
+    await hydrateDeterministicWalletStateWithDecrypt({
+      pool: input.pool,
+      readRelays: relays.readRelays,
+      ownerPubkey: input.config.masterPubkey,
+      walletDb: input.walletDb,
+      mnemonic,
+      decryptSelfContent: input.decryptSelfContent,
+    });
+  };
+
+  if (subcmd === 'help') {
+    const topic = args[1]?.toLowerCase() ?? null;
+
+    return Promise.resolve(
+      renderBuiltinHelpText({
+        prefix: p,
+        root: 'cashu',
+        topic,
+      }),
+    );
+  }
+
+  if (subcmd === 'mint') {
+    const url = args[1];
+
+    return handleError(
+      async () =>
+        render(
+          handleWalletMint({
+            seenDb: input.seenDb,
+            defaultMintUrl,
+            url,
+            prefix: p,
+          }),
+        ),
+      'Failed to set mint',
+    );
+  }
+
+  const mint = getWalletDefaultMintUrl(input.seenDb, defaultMintUrl);
+
+  if (subcmd === 'melt') {
+    return handleError(async () => {
+      await hydrateWalletStateIfAvailable();
+
+      const rep = await handleWalletMelt({
+        mnemonic,
+        walletDb: input.walletDb,
+        mintUrl: optionValue('--mint') ?? mint,
+        amountArg: args[1],
+        invoiceArg: args[2],
+        prefix: p,
+        botKeyHex: input.config.botKeyHex,
+        signerPubkey: input.botPubkey,
+        ownerPubkey: input.config.masterPubkey,
+        walletStateWriteRelays: await getWalletStateWriteRelays(),
+        signEncryptedSelfEvent:
+          input.source === 'web'
+            ? null
+            : (input.signEncryptedSelfEvent ?? null),
+      });
+
+      return input.source === 'web' ? renderWalletMeltWeb(rep) : render(rep);
+    }, 'Failed to melt invoice');
+  }
+
+  if (subcmd === 'mints') {
+    return handleError(
+      async () =>
+        render(
+          handleWalletMints({
+            walletDb: input.walletDb,
+            defaultMintUrl: mint,
+          }),
+        ),
+      'Failed to list mints',
+    );
+  }
+
+  if (subcmd === 'list') {
+    return handleError(async () => {
+      const rep = handleWalletList({
+        walletDb: input.walletDb,
+        defaultMintUrl: mint,
+      });
+
+      if (input.source === 'web') {
+        return renderWalletListWeb(rep);
+      }
+
+      return `Cashu list is available in the web UI for now. Use ${p}cashu mints for text mint balances.`;
+    }, 'Failed to show wallet list');
+  }
+
+  if (subcmd === 'pay') {
+    return handleError(async () => {
+      await hydrateWalletStateIfAvailable();
+
+      const paymentProps = {
+        mnemonic,
+        walletDb: input.walletDb,
+        mintUrl: optionValue('--mint') ?? mint,
+        amountArg: args[1],
+        quoteArg: optionValue('--quote') ?? undefined,
+        claim: booleanOptionValue('--claim'),
+        prefix: p,
+        botKeyHex: input.config.botKeyHex,
+        signerPubkey: input.botPubkey,
+        ownerPubkey: input.config.masterPubkey,
+        walletStateWriteRelays: await getWalletStateWriteRelays(),
+        signEncryptedSelfEvent:
+          input.source === 'web'
+            ? null
+            : (input.signEncryptedSelfEvent ?? null),
+      };
+
+      let rep = await handleWalletPay(paymentProps);
+
+      if (input.source === 'web' && rep.data.view === 'quote') {
+        const payment = await requestCashuMintPayment(input, rep.data);
+
+        if (payment.status === 'success') {
+          rep = await handleWalletPay({
+            ...paymentProps,
+            amountArg: undefined,
+            quoteArg: rep.data.quote,
+            claim: true,
+          });
+        } else if (payment.status === 'rejected') {
+          rep = paymentFailureRepresentation('Cashu mint payment cancelled.');
+        } else if (payment.status === 'unsupported') {
+          rep = paymentFailureRepresentation(
+            payment.reasons.map((reason) => reason.message).join(' '),
+          );
+        } else {
+          rep = paymentFailureRepresentation(payment.error.message);
+        }
+      }
+
+      return input.source === 'web' ? renderWalletPayWeb(rep) : render(rep);
+    }, 'Failed to mint');
+  }
+
+  switch (subcmd) {
+    case 'balance':
+      return handleError(
+        async () =>
+          render(
+            await handleWalletBalance({
+              walletDb: input.walletDb,
+              mintUrl: mint,
+              prefix: p,
+            }),
+          ),
+        'Failed to get balance',
+      );
+
+    case 'decode':
+      return handleError(
+        async () =>
+          render(
+            handleWalletDecode({
+              token: args[1],
+              prefix: p,
+            }),
+          ),
+        'Failed to decode token',
+      );
+
+    case 'receive':
+      return handleError(async () => {
+        await hydrateWalletStateIfAvailable();
+
+        const rep = await handleWalletReceive({
+          mnemonic,
+          walletDb: input.walletDb,
+          token: args[1],
+          prefix: p,
+          botKeyHex: input.config.botKeyHex,
+          signerPubkey: input.botPubkey,
+          ownerPubkey: input.config.masterPubkey,
+          walletStateWriteRelays: await getWalletStateWriteRelays(),
+          signEncryptedSelfEvent:
+            input.source === 'web'
+              ? null
+              : (input.signEncryptedSelfEvent ?? null),
+        });
+
+        return input.source === 'web'
+          ? renderWalletReceiveWeb(rep)
+          : render(rep);
+      }, 'Failed to receive token');
+
+    case 'send':
+      return handleError(async () => {
+        await hydrateWalletStateIfAvailable();
+
+        const rep = await handleWalletSend({
+          mnemonic,
+          walletDb: input.walletDb,
+          mintUrl: optionValue('--mint') ?? mint,
+          amountArg: args[1],
+          prefix: p,
+          botKeyHex: input.config.botKeyHex,
+          signerPubkey: input.botPubkey,
+          ownerPubkey: input.config.masterPubkey,
+          walletStateWriteRelays: await getWalletStateWriteRelays(),
+          signEncryptedSelfEvent:
+            input.source === 'web'
+              ? null
+              : (input.signEncryptedSelfEvent ?? null),
+        });
+
+        return input.source === 'web' ? renderWalletSendWeb(rep) : render(rep);
+      }, 'Failed to send token');
+
+    case 'history':
+      return handleError(async () => {
+        const rep = handleWalletHistory({
+          walletDb: input.walletDb,
+          showToken: args[1] === '--token',
+        });
+
+        return input.source === 'web'
+          ? renderWalletHistoryWeb(rep)
+          : render(rep);
+      }, 'Failed to get history');
+
+    default:
+      return Promise.resolve(
+        render(buildWalletUsageRepresentation({ prefix: p })),
+      );
+  }
+};

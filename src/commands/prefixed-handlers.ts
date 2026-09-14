@@ -5,8 +5,10 @@
 import { handleAiRoot } from './ai/handler';
 import { handleBotRoot } from './bot/handler';
 import { handleBunkerRoot } from './bunker/handler';
+import { handleCashuRoot } from './cashu/handler';
 import type { BuiltinHandler } from './dispatch';
 import { handleHelpRoot } from './help/handlers';
+import { handleNwcRoot } from './nwc/handler';
 import { handlePluginsRoot } from './plugin-manager/handler';
 import { handleRoadmapRoot } from './roadmap/handler';
 import { handleRoutstrRoot } from './routstr/handler';
@@ -32,6 +34,8 @@ export const builtinCommandHandlers: Record<string, BuiltinHandler> = {
   roadmap: handleRoadmapRoot,
   ai: handleAiRoot,
   routstr: handleRoutstrRoot,
+  nwc: handleNwcRoot,
+  cashu: handleCashuRoot,
   wallet: handleWalletRoot,
   bunker: handleBunkerRoot,
   wot: handleWotRoot,

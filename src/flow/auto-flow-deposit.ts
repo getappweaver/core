@@ -34,7 +34,7 @@ export async function prepareAutoFlowDeposit({
   const mintUrl = getWalletDefaultMintUrl(seenDb, cashuDefaultMintUrl);
 
   if (!mintUrl) {
-    return 'No mint configured. Use !wallet mint <url> first.';
+    return 'No mint configured. Use !cashu mint <url> first.';
   }
 
   if (!cashuMnemonic) {
@@ -63,7 +63,7 @@ export async function prepareAutoFlowDeposit({
     return null;
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
-      return `Insufficient local balance: ${err.available} sats available, ${err.required} needed.\nTop up with: !wallet receive <token>`;
+      return `Insufficient local balance: ${err.available} sats available, ${err.required} needed.\nTop up with: !cashu receive <token>`;
     }
 
     return `Deposit failed: ${String(err)}`;

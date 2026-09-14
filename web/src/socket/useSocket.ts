@@ -407,6 +407,8 @@ export function useSocket(adapters: SocketAppAdapters) {
             setAgentWorking: adapters.setAgentWorking,
             setTimeline: adapters.setTimeline,
             setToolInterventions: adapters.setToolInterventions,
+            setPaymentRequest: adapters.setPaymentRequest,
+            setPaymentStatus: adapters.setPaymentStatus,
           },
         });
       },
@@ -731,6 +733,8 @@ export function useSocket(adapters: SocketAppAdapters) {
         clearWebPendingState: () => {
           setWebUiBusyCounts({});
           setWebEntityPending({});
+          adapters.setPaymentRequest(null);
+          adapters.setPaymentStatus(null);
         },
         scheduleSocketReconnect: () => {
           if (adapters.auth.authState().status === 'connected') {
@@ -835,6 +839,8 @@ export function useSocket(adapters: SocketAppAdapters) {
             setAgentWorking: adapters.setAgentWorking,
             setTimeline: adapters.setTimeline,
             setToolInterventions: adapters.setToolInterventions,
+            setPaymentRequest: adapters.setPaymentRequest,
+            setPaymentStatus: adapters.setPaymentStatus,
           },
         });
       } catch (err) {

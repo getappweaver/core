@@ -8,6 +8,7 @@ import type { PluginCapabilityRelations } from '@src/capabilities/relations';
 import type { CapabilityProviderSource } from '@src/capabilities/types';
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
+import type { PaymentApp } from '@src/payments/types';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 import {
   isRemoteWidgetIcon,
@@ -32,6 +33,7 @@ import { parsePluginPackageJson } from './plugin';
 const byAlias = new Map<string, BotPlugin>();
 const contextByAlias = new Map<string, PluginContext>();
 const capabilityRelationsByAlias = new Map<string, PluginCapabilityRelations>();
+const paymentAppByAlias = new Map<string, PaymentApp>();
 
 type RegisterPluginProps = {
   alias?: string;
@@ -166,6 +168,13 @@ export function registerPlugin({ alias, plugin, ctx }: RegisterPluginProps) {
   byAlias.set(installedAlias, plugin);
   contextByAlias.set(installedAlias, scopedContext);
   capabilityRelationsByAlias.set(installedAlias, pkg.capabilities);
+
+  paymentAppByAlias.set(installedAlias, {
+    pluginName: pkg.name,
+    pluginAlias: installedAlias,
+    title: pkg.title,
+    iconUrl: providerIconUrl(pkg.icon, installedAlias),
+  });
 }
 
 type ExecuteRegisteredPluginToolProps = ExecutePluginToolProps & {
@@ -250,6 +259,10 @@ export async function finalizePluginRegistration(): Promise<void> {
 
 export function getPluginByAlias(alias: string): BotPlugin | undefined {
   return byAlias.get(alias);
+}
+
+export function getPluginPaymentApp(alias: string): PaymentApp | null {
+  return paymentAppByAlias.get(alias) ?? null;
 }
 
 export function listRegisteredPlugins(): BotPlugin[] {

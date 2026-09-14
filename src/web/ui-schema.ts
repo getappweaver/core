@@ -670,6 +670,8 @@ export const WebElementTagSchema = z.enum([
   'nostrPost',
   /** Local browser-side command progress/status target keyed by `props.id`. */
   'commandStatus',
+  /** Browser-local WebLN detector and explicit connection control. */
+  'browserWallet',
   'button',
   'checkbox',
   'divider',
@@ -725,6 +727,7 @@ export const WebGenericElementTagSchema = z.enum([
   'badge',
   'image',
   'commandStatus',
+  'browserWallet',
   'button',
   'checkbox',
   'divider',

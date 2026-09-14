@@ -69,6 +69,8 @@ function renderGlobalHelpIndex(prefix: string): string {
     'session',
     'bot',
     'ai',
+    'nwc',
+    'cashu',
     'wallet',
     'bunker',
     'wot',

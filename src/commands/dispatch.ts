@@ -10,10 +10,12 @@ import { createPluginAgentService } from '@src/core/plugin-agent';
 import type { CoreUpdateChecker } from '@src/core/update-check';
 import type { MessageSource } from '@src/messaging';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
+import { createUnsupportedInteractivePaymentService } from '@src/payments/service';
+import type { InteractivePaymentServiceFactory } from '@src/payments/types';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { AgentBackend } from '../backends/types';
-import { dispatchPluginCommand } from '../core/registry';
+import { dispatchPluginCommand, getPluginPaymentApp } from '../core/registry';
 import type { CoreDb } from '../db';
 import { getWorkspaceTarget } from '../db';
 import type { BotConfig } from '../env';
@@ -56,6 +58,7 @@ export type RouteCommandProps = {
   }) => Promise<VerifiedEvent>;
   decryptSelfContent?: (ciphertext: string) => Promise<string>;
   jsonPayload?: unknown;
+  interactivePaymentServiceFactory?: InteractivePaymentServiceFactory;
 };
 
 export type RouteCommandContext = RouteCommandProps & {
@@ -136,6 +139,13 @@ export async function routeCommand(
     agent,
     sendReply,
     promptFn,
+    payments: (() => {
+      const app = getPluginPaymentApp(cmd);
+
+      return app && props.interactivePaymentServiceFactory
+        ? props.interactivePaymentServiceFactory(app)
+        : createUnsupportedInteractivePaymentService();
+    })(),
     jsonPayload: props.jsonPayload,
   });
 

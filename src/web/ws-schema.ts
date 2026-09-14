@@ -4,6 +4,10 @@ import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import { MonitoringSpanV1Schema } from '@src/capabilities/monitoring.v1';
 import { CapabilityOperationIdSchema } from '@src/capabilities/types';
 import type { PromptPayload } from '@src/core/plugin';
+import type {
+  WebPaymentRequest,
+  WebPaymentStatus,
+} from '@src/payments/web-types';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type { WebCommandListItem } from '@src/web/command-catalog';
 import type {
@@ -126,6 +130,26 @@ export const PromptAnswerClientMessageSchema = z.object({
   type: z.literal('prompt_answer'),
   requestId: RequestIdSchema,
   answer: z.string(),
+});
+
+export const PaymentActionClientMessageSchema = z.object({
+  type: z.literal('payment_action'),
+  requestId: RequestIdSchema,
+  attemptId: z.string().uuid(),
+  action: z.enum([
+    'reject',
+    'close',
+    'refresh_invoice',
+    'pay_nwc',
+    'webln_result',
+    'check_settlement',
+  ]),
+  sourceId: z.string().min(1).optional(),
+  preimage: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i)
+    .optional(),
+  error: z.string().max(500).optional(),
 });
 
 export const ChatClientMessageSchema = z.object({
@@ -253,6 +277,7 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   JsonCommandClientMessageSchema,
   RunCapabilityClientMessageSchema,
   PromptAnswerClientMessageSchema,
+  PaymentActionClientMessageSchema,
   ChatClientMessageSchema,
   CancelChatClientMessageSchema,
   SetInterventionModeClientMessageSchema,
@@ -362,6 +387,9 @@ export type LoadTimelineBeforeClientMessage = z.infer<
 export type PromptAnswerClientMessage = z.infer<
   typeof PromptAnswerClientMessageSchema
 >;
+export type PaymentActionClientMessage = z.infer<
+  typeof PaymentActionClientMessageSchema
+>;
 export type ChatClientMessage = z.infer<typeof ChatClientMessageSchema>;
 export type ResolveInterventionClientMessage = z.infer<
   typeof ResolveInterventionClientMessageSchema
@@ -465,6 +493,18 @@ export type ErrorServerMessage = {
   message: string;
 };
 
+export type PaymentRequestServerMessage = {
+  type: 'payment_request';
+  requestId: string;
+  payment: WebPaymentRequest;
+};
+
+export type PaymentStatusServerMessage = {
+  type: 'payment_status';
+  requestId: string;
+  status: WebPaymentStatus;
+};
+
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
   | ComposerAiStateResultServerMessage
@@ -476,6 +516,8 @@ export type WebSocketServerMessage =
   | ChatResultServerMessage
   | CapabilityProvidersResultServerMessage
   | CapabilityResultServerMessage
+  | PaymentRequestServerMessage
+  | PaymentStatusServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
 
@@ -614,5 +656,25 @@ export function createErrorMessage(params: {
     type: 'error',
     requestId: params.requestId,
     message: params.message,
+  };
+}
+
+export function createPaymentRequestMessage(
+  payment: WebPaymentRequest,
+): PaymentRequestServerMessage {
+  return {
+    type: 'payment_request',
+    requestId: payment.attemptId,
+    payment,
+  };
+}
+
+export function createPaymentStatusMessage(
+  status: WebPaymentStatus,
+): PaymentStatusServerMessage {
+  return {
+    type: 'payment_status',
+    requestId: status.attemptId,
+    status,
   };
 }

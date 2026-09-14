@@ -10,6 +10,7 @@ import {
   getModelOverride,
   getProviderName,
 } from '@src/db';
+import type { InteractivePaymentServiceFactory } from '@src/payments/types';
 import type {
   CommandArgumentDefinition,
   CommandDefinition,
@@ -34,6 +35,7 @@ type ExecuteBuiltinCommandProps = {
   payload: unknown;
   sendReply?: SendReplyFn;
   promptFn?: PromptFn;
+  interactivePaymentServiceFactory?: InteractivePaymentServiceFactory;
 };
 
 function stringifyScalar(value: unknown): string {
@@ -149,6 +151,7 @@ export async function executeBuiltinCommand({
   payload,
   sendReply,
   promptFn,
+  interactivePaymentServiceFactory,
 }: ExecuteBuiltinCommandProps): Promise<{
   invocation: ExecuteCommandRequest;
   input: string;
@@ -197,6 +200,7 @@ export async function executeBuiltinCommand({
     source: 'web',
     sendReply,
     promptFn,
+    interactivePaymentServiceFactory,
     jsonPayload: payload,
   });
 
@@ -212,6 +216,7 @@ export async function executeBuiltinJsonCommand(params: {
   command: CommandDefinition;
   subcommand: SubcommandDefinition;
   payload: unknown;
+  interactivePaymentServiceFactory?: InteractivePaymentServiceFactory;
 }): Promise<WebHandlerResult> {
   const { ctx, command, subcommand, payload } = params;
   const backendName = getAgentBackend(ctx.seenDb);
@@ -247,6 +252,7 @@ export async function executeBuiltinJsonCommand(params: {
     config: ctx.config,
     source: 'web',
     jsonPayload: payload,
+    interactivePaymentServiceFactory: params.interactivePaymentServiceFactory,
   });
 
   return output ?? '';

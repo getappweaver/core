@@ -1,294 +1,114 @@
-// ---------------------------------------------------------------------------
-// src/commands/wallet/handler.ts — wallet <subcommand> DM builtin root
-// ---------------------------------------------------------------------------
-
+import type {
+  BuiltinHandler,
+  RouteCommandContext,
+} from '@src/commands/dispatch';
+import { renderBuiltinHelpText } from '@src/commands/help/renderers/text';
 import { getWalletDefaultMintUrl } from '@src/db';
+import { NwcClient } from '@src/nwc/client';
+import { parseNwcConnectionUri } from '@src/nwc/connection';
+import { getStoredNwcConnection, listNwcConnections } from '@src/nwc/state';
+import { getCashuMints } from '@src/wallet/db';
+
 import {
-  hydrateDeterministicWalletStateWithDecrypt,
-  resolveDeterministicWalletStateRelays,
-} from '@src/wallet/nostr-state';
+  renderWalletOverviewText,
+  renderWalletOverviewWeb,
+  type WalletOverviewNwc,
+} from './renderers';
 
-import { handleError, type BuiltinHandler } from '../dispatch';
-import { renderBuiltinHelpText } from '../help/renderers/text';
+async function inspectNwcConnection(
+  ctx: RouteCommandContext,
+  id: string,
+): Promise<WalletOverviewNwc> {
+  const summary = listNwcConnections(ctx.seenDb).find(
+    (connection) => connection.id === id,
+  );
 
-import { handleWalletBalance } from './balance/handler';
-import { renderWalletCli } from './cli-representation';
-import { handleWalletDecode } from './decode/handler';
-import { handleWalletHistory } from './history/handler';
-import { renderWalletHistoryWeb } from './history/renderers/web';
-import { handleWalletList } from './list/handler';
-import { renderWalletListWeb } from './list/renderers/web';
-import { handleWalletMelt } from './melt/handler';
-import { renderWalletMeltWeb } from './melt/renderers/web';
-import { handleWalletMint } from './mint/handler';
-import { handleWalletMints } from './mints/handler';
-import { handleWalletPay } from './pay/handler';
-import { renderWalletPayWeb } from './pay/renderers/web';
-import { handleWalletReceive } from './receive/handler';
-import { renderWalletReceiveWeb } from './receive/renderers/web';
-import { handleWalletSend } from './send/handler';
-import { renderWalletSendWeb } from './send/renderers/web';
-import { buildWalletUsageRepresentation } from './usage/representation';
+  const stored = getStoredNwcConnection(ctx.seenDb, id);
 
-export const handleWalletRoot: BuiltinHandler = (ctx) => {
-  const input = ctx;
-  const p = input.prefix;
-  const mnemonic = input.config.cashuMnemonic;
-  const defaultMintUrl = input.config.cashuDefaultMintUrl;
-  const args = input.args;
-  const subcmd = args[0]?.toLowerCase();
+  if (!summary || !stored) {
+    throw new Error('NWC connection not found.');
+  }
 
-  const render = (rep: Parameters<typeof renderWalletCli>[0]) =>
-    renderWalletCli(rep, { prefix: p });
-
-  const getWalletStateWriteRelays = async () => {
-    const relays = await resolveDeterministicWalletStateRelays({
-      pool: input.pool,
-      ownerPubkey: input.config.masterPubkey,
-      fallbackRelays: input.botRelayUrls,
+  try {
+    const client = new NwcClient({
+      transport: ctx.pool,
+      connection: parseNwcConnectionUri(stored.connectionUri),
+      infoTimeoutMs: 5_000,
+      publishTimeoutMs: 5_000,
+      replyTimeoutMs: 10_000,
     });
 
-    return relays.writeRelays;
-  };
+    const service = await client.getWalletServiceInfo();
 
-  const optionValue = (flag: string): string | null => {
-    const flagIndex = args.findIndex((arg) => arg === flag);
-
-    if (flagIndex < 0) {
-      return null;
+    if (!service.methods.includes('get_balance')) {
+      return { summary, availability: 'available', balance: null };
     }
 
-    const value = args[flagIndex + 1];
+    const balance = await client.getBalance();
 
-    return value && !value.startsWith('--') ? value : null;
-  };
+    return {
+      summary,
+      availability: 'available',
+      balance: balance.toSatoshiFloor().toString(),
+    };
+  } catch {
+    return { summary, availability: 'unavailable', balance: null };
+  }
+}
 
-  const booleanOptionValue = (flag: string): boolean =>
-    args.some((arg) => arg === flag);
+export const handleWalletRoot: BuiltinHandler = async (ctx) => {
+  const subcommand = ctx.args[0]?.toLowerCase() ?? 'list';
 
-  const hydrateWalletStateIfAvailable = async () => {
-    if (input.source === 'web' || !input.walletDb || !mnemonic) {
-      return;
-    }
-
-    if (!input.decryptSelfContent) {
-      return;
-    }
-
-    const relays = await resolveDeterministicWalletStateRelays({
-      pool: input.pool,
-      ownerPubkey: input.config.masterPubkey,
-      fallbackRelays: input.botRelayUrls,
+  if (subcommand === 'help') {
+    return renderBuiltinHelpText({
+      prefix: ctx.prefix,
+      root: 'wallet',
+      topic: ctx.args[1]?.toLowerCase() ?? null,
     });
-
-    await hydrateDeterministicWalletStateWithDecrypt({
-      pool: input.pool,
-      readRelays: relays.readRelays,
-      ownerPubkey: input.config.masterPubkey,
-      walletDb: input.walletDb,
-      mnemonic,
-      decryptSelfContent: input.decryptSelfContent,
-    });
-  };
-
-  if (subcmd === 'help') {
-    const topic = args[1]?.toLowerCase() ?? null;
-
-    return Promise.resolve(
-      renderBuiltinHelpText({
-        prefix: p,
-        root: 'wallet',
-        topic,
-      }),
-    );
   }
 
-  if (subcmd === 'mint') {
-    const url = args[1];
-
-    return handleError(
-      async () =>
-        render(
-          handleWalletMint({
-            seenDb: input.seenDb,
-            defaultMintUrl,
-            url,
-            prefix: p,
-          }),
-        ),
-      'Failed to set mint',
-    );
+  if (subcommand !== 'list') {
+    return `Unknown wallet subcommand: ${subcommand}. Cashu commands now use ${ctx.prefix}cashu.`;
   }
 
-  const mint = getWalletDefaultMintUrl(input.seenDb, defaultMintUrl);
+  const nwcSummaries = listNwcConnections(ctx.seenDb);
 
-  if (subcmd === 'melt') {
-    return handleError(async () => {
-      await hydrateWalletStateIfAvailable();
+  const nwc = await Promise.all(
+    nwcSummaries.map((connection) => inspectNwcConnection(ctx, connection.id)),
+  );
 
-      const rep = await handleWalletMelt({
-        mnemonic,
-        walletDb: input.walletDb,
-        mintUrl: optionValue('--mint') ?? mint,
-        amountArg: args[1],
-        invoiceArg: args[2],
-        prefix: p,
-        botKeyHex: input.config.botKeyHex,
-        signerPubkey: input.botPubkey,
-        ownerPubkey: input.config.masterPubkey,
-        walletStateWriteRelays: await getWalletStateWriteRelays(),
-        signEncryptedSelfEvent:
-          input.source === 'web'
-            ? null
-            : (input.signEncryptedSelfEvent ?? null),
-      });
+  const defaultMintUrl = getWalletDefaultMintUrl(
+    ctx.seenDb,
+    ctx.config.cashuDefaultMintUrl,
+  );
 
-      return input.source === 'web' ? renderWalletMeltWeb(rep) : render(rep);
-    }, 'Failed to melt invoice');
-  }
+  const cashuMints = ctx.walletDb ? getCashuMints(ctx.walletDb) : null;
 
-  if (subcmd === 'mints') {
-    return handleError(
-      async () =>
-        render(
-          handleWalletMints({
-            walletDb: input.walletDb,
-            defaultMintUrl: mint,
-          }),
-        ),
-      'Failed to list mints',
-    );
-  }
+  const cashu = cashuMints
+    ? [
+        ...cashuMints,
+        ...(defaultMintUrl &&
+        !cashuMints.some((mint) => mint.mint === defaultMintUrl)
+          ? [{ mint: defaultMintUrl, total_amount: 0 }]
+          : []),
+      ]
+        .map((mint) => ({
+          mintUrl: mint.mint,
+          balance: mint.total_amount,
+          isDefault: mint.mint === defaultMintUrl,
+        }))
+        .sort((left, right) =>
+          left.isDefault === right.isDefault
+            ? left.mintUrl.localeCompare(right.mintUrl)
+            : left.isDefault
+              ? -1
+              : 1,
+        )
+    : null;
 
-  if (subcmd === 'list') {
-    return handleError(async () => {
-      const rep = handleWalletList({
-        walletDb: input.walletDb,
-        defaultMintUrl: mint,
-      });
+  const overview = { nwc, cashu };
 
-      if (input.source === 'web') {
-        return renderWalletListWeb(rep);
-      }
-
-      return `Wallet list is available in the web UI for now. Use ${p}wallet mints for text mint balances.`;
-    }, 'Failed to show wallet list');
-  }
-
-  if (subcmd === 'pay') {
-    return handleError(async () => {
-      await hydrateWalletStateIfAvailable();
-
-      const rep = await handleWalletPay({
-        mnemonic,
-        walletDb: input.walletDb,
-        mintUrl: optionValue('--mint') ?? mint,
-        amountArg: args[1],
-        quoteArg: optionValue('--quote') ?? undefined,
-        claim: booleanOptionValue('--claim'),
-        prefix: p,
-        botKeyHex: input.config.botKeyHex,
-        signerPubkey: input.botPubkey,
-        ownerPubkey: input.config.masterPubkey,
-        walletStateWriteRelays: await getWalletStateWriteRelays(),
-        signEncryptedSelfEvent:
-          input.source === 'web'
-            ? null
-            : (input.signEncryptedSelfEvent ?? null),
-      });
-
-      return input.source === 'web' ? renderWalletPayWeb(rep) : render(rep);
-    }, 'Failed to mint');
-  }
-
-  switch (subcmd) {
-    case 'balance':
-      return handleError(
-        async () =>
-          render(
-            await handleWalletBalance({
-              walletDb: input.walletDb,
-              mintUrl: mint,
-              prefix: p,
-            }),
-          ),
-        'Failed to get balance',
-      );
-
-    case 'decode':
-      return handleError(
-        async () =>
-          render(
-            handleWalletDecode({
-              token: args[1],
-              prefix: p,
-            }),
-          ),
-        'Failed to decode token',
-      );
-
-    case 'receive':
-      return handleError(async () => {
-        await hydrateWalletStateIfAvailable();
-
-        const rep = await handleWalletReceive({
-          mnemonic,
-          walletDb: input.walletDb,
-          token: args[1],
-          prefix: p,
-          botKeyHex: input.config.botKeyHex,
-          signerPubkey: input.botPubkey,
-          ownerPubkey: input.config.masterPubkey,
-          walletStateWriteRelays: await getWalletStateWriteRelays(),
-          signEncryptedSelfEvent:
-            input.source === 'web'
-              ? null
-              : (input.signEncryptedSelfEvent ?? null),
-        });
-
-        return input.source === 'web'
-          ? renderWalletReceiveWeb(rep)
-          : render(rep);
-      }, 'Failed to receive token');
-
-    case 'send':
-      return handleError(async () => {
-        await hydrateWalletStateIfAvailable();
-
-        const rep = await handleWalletSend({
-          mnemonic,
-          walletDb: input.walletDb,
-          mintUrl: optionValue('--mint') ?? mint,
-          amountArg: args[1],
-          prefix: p,
-          botKeyHex: input.config.botKeyHex,
-          signerPubkey: input.botPubkey,
-          ownerPubkey: input.config.masterPubkey,
-          walletStateWriteRelays: await getWalletStateWriteRelays(),
-          signEncryptedSelfEvent:
-            input.source === 'web'
-              ? null
-              : (input.signEncryptedSelfEvent ?? null),
-        });
-
-        return input.source === 'web' ? renderWalletSendWeb(rep) : render(rep);
-      }, 'Failed to send token');
-
-    case 'history':
-      return handleError(async () => {
-        const rep = handleWalletHistory({
-          walletDb: input.walletDb,
-          showToken: args[1] === '--token',
-        });
-
-        return input.source === 'web'
-          ? renderWalletHistoryWeb(rep)
-          : render(rep);
-      }, 'Failed to get history');
-
-    default:
-      return Promise.resolve(
-        render(buildWalletUsageRepresentation({ prefix: p })),
-      );
-  }
+  return ctx.source === 'web'
+    ? renderWalletOverviewWeb(overview)
+    : renderWalletOverviewText(overview, ctx.prefix);
 };

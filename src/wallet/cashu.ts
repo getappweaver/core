@@ -87,6 +87,13 @@ export class CashuWallet {
     });
   }
 
+  async checkMintQuoteBolt11(quote: string): Promise<boolean> {
+    const wallet = await this.getWallet();
+    const quoteResponse = await wallet.mint.checkMintQuoteBolt11(quote);
+
+    return quoteResponse.state === 'PAID';
+  }
+
   async claimMintQuoteBolt11(quote: string): Promise<{
     actuallyReceived: number;
     fee: number;

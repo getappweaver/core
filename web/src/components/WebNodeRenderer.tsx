@@ -45,6 +45,7 @@ import {
   SpeechHighlightBox,
 } from './web-node/speech';
 import { runLocalWebAction } from './web-node/tree-state';
+import { WebBrowserWalletElement } from './web-node/WebBrowserWalletElement';
 import { WebCheckboxControl } from './web-node/WebCheckboxControl';
 import { WebCommandStatusElement } from './web-node/WebCommandStatusElement';
 import { WebCountdownElement } from './web-node/WebCountdownElement';
@@ -179,6 +180,10 @@ function renderElement({
           file={element.props?.diffFilePath}
           class={elementClass(element)}
         />
+      </Match>
+
+      <Match when={element.tag === 'browserWallet'}>
+        <WebBrowserWalletElement />
       </Match>
 
       <Match when={element.tag === 'button'}>

@@ -109,6 +109,8 @@ export function handleServerMessage(params: {
     | 'setAgentWorking'
     | 'setTimeline'
     | 'setToolInterventions'
+    | 'setPaymentRequest'
+    | 'setPaymentStatus'
   >;
 }): void {
   const { message, pendingRequests, adapters } = params;
@@ -141,6 +143,14 @@ export function handleServerMessage(params: {
       return;
     case 'prompt':
       pending?.onPrompt?.(message);
+
+      return;
+    case 'payment_request':
+      adapters.setPaymentRequest(message.payment);
+
+      return;
+    case 'payment_status':
+      adapters.setPaymentStatus(message.status);
 
       return;
     case 'chat_stream_chunk': {

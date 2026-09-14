@@ -1050,10 +1050,28 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           handleRoadmapLightningZap({
             action,
             signEvent: adapters.signEvent,
-            setChromeWeb: adapters.setChromeWeb,
             setChromeText: adapters.setChromeText,
             setChromeError: adapters.setChromeError,
             setChromeLoading: adapters.setChromeLoading,
+            requestPayment: (payload) =>
+              runWebAction(
+                {
+                  type: 'command',
+                  command: 'roadmap',
+                  subcommand: 'pay',
+                  arguments: payload,
+                  options: {},
+                  recordInTimeline: false,
+                },
+                {
+                  ...params,
+                  uiExecutionPolicy: {
+                    ...params?.uiExecutionPolicy,
+                    recordInTimeline: false,
+                    suppressSystemMessage: true,
+                  },
+                },
+              ),
           }),
         );
       } else if (clientActionName === 'editableText.runCommand') {
@@ -1394,45 +1412,6 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             setChromeError: adapters.setChromeError,
             setChromeLoading: adapters.setChromeLoading,
             appendSystemMessage: adapters.appendSystemMessage,
-          }),
-        );
-      } else if (clientActionName === 'wallet.payInvoice') {
-        runClientAction(
-          (async () => {
-            adapters.setChromeError(null);
-            adapters.setChromeLoading(true);
-
-            const invoice = action.payload?.invoice;
-
-            if (typeof invoice !== 'string' || invoice.length === 0) {
-              throw new Error('Missing invoice.');
-            }
-
-            const webln = window.webln;
-
-            if (!webln) {
-              throw new Error('WebLN not available.');
-            }
-
-            const isEnabled =
-              typeof webln.isEnabled === 'function'
-                ? await webln.isEnabled()
-                : Boolean(webln.isEnabled);
-
-            if (!isEnabled) {
-              await webln.enable();
-            }
-
-            await webln.sendPayment(invoice);
-            adapters.setChromeLoading(false);
-          })().catch((err) => {
-            adapters.setChromeError(
-              err instanceof Error ? err.message : String(err),
-            );
-
-            adapters.setChromeLoading(false);
-
-            return false;
           }),
         );
       } else {

@@ -47,6 +47,7 @@ import { routeCommand } from './commands/dispatch';
 import {
   getPromptPayloadValue,
   type PluginHostContext,
+  type PromptFn,
   type PromptPayload,
 } from './core/plugin';
 import { createPluginAgentService } from './core/plugin-agent';
@@ -483,15 +484,27 @@ async function main() {
     signAuthEvent,
   });
 
-  let pendingPrompt: ((answer: string) => void) | null = null;
+  const pendingPrompts = new Map<MessageSource, (answer: string) => void>();
 
-  /** Plugin `sendReply` / `promptFn` mirrors the current inbound message source. */
+  /** Plugin `sendReply` mirrors the current inbound message source. */
   let replySource: MessageSource = 'nostr';
+
+  function createPromptFnForSource(source: MessageSource): PromptFn {
+    return async (message: string | PromptPayload): Promise<string> => {
+      await sendReplyForSource(source, getPromptPayloadValue(message));
+
+      return new Promise((resolve) => {
+        pendingPrompts.set(source, resolve);
+      });
+    };
+  }
 
   async function resolvePendingPromptIfAny(
     content: string,
     source: MessageSource,
   ): Promise<boolean> {
+    const pendingPrompt = pendingPrompts.get(source);
+
     if (!pendingPrompt) {
       return false;
     }
@@ -499,16 +512,14 @@ async function main() {
     if (content.trim().startsWith(`${getDmCommandPrefix(seenDb)}exit`)) {
       await sendReplyForSource(source, 'Exiting...');
 
-      const resolve = pendingPrompt;
-      pendingPrompt = null;
-      resolve(PROMPT_SESSION_EXIT);
+      pendingPrompts.delete(source);
+      pendingPrompt(PROMPT_SESSION_EXIT);
 
       return true;
     }
 
-    const resolve = pendingPrompt;
-    pendingPrompt = null;
-    resolve(content);
+    pendingPrompts.delete(source);
+    pendingPrompt(content);
 
     return true;
   }
@@ -555,13 +566,6 @@ async function main() {
         ...props,
         prefix: getDmCommandPrefix(seenDb),
       }),
-    promptFn: async (message: string | PromptPayload): Promise<string> => {
-      await sendReplyForSource(replySource, getPromptPayloadValue(message));
-
-      return new Promise((resolve) => {
-        pendingPrompt = resolve;
-      });
-    },
     wot,
     nostrResolution,
     getWotScore: (pubkey: string, rootPubkey?: string) =>
@@ -573,13 +577,7 @@ async function main() {
         eventTemplate,
         sendReply: (message: string) =>
           sendReplyForSource(replySource, message),
-        promptFn: async (message: string | PromptPayload): Promise<string> => {
-          await sendReplyForSource(replySource, getPromptPayloadValue(message));
-
-          return new Promise((resolve) => {
-            pendingPrompt = resolve;
-          });
-        },
+        promptFn: createPromptFnForSource(replySource),
         agent: pluginContext.agent,
         bunkerName,
       }),
@@ -633,6 +631,8 @@ async function main() {
       return;
     }
 
+    const promptFn = createPromptFnForSource(source);
+
     process.stdout.write(`${C.dim}${C.magenta} > ${content}${C.reset}\n`);
 
     const mode = getCurrentOrDefaultMode(seenDb);
@@ -676,7 +676,7 @@ async function main() {
         source,
         sendReply: (message: string) => sendReplyForSource(source, message),
         sendDm: pluginContext.sendDm,
-        promptFn: pluginContext.promptFn,
+        promptFn,
         signEncryptedSelfEvent: ({ kind, plaintext, tags }) =>
           signEncryptedSelfEventWithBunkerInteractive({
             db: seenDb,
@@ -686,15 +686,7 @@ async function main() {
             plaintext,
             tags,
             sendReply: (message: string) => sendReplyForSource(source, message),
-            promptFn: async (
-              message: string | PromptPayload,
-            ): Promise<string> => {
-              await sendReplyForSource(source, getPromptPayloadValue(message));
-
-              return new Promise((resolve) => {
-                pendingPrompt = resolve;
-              });
-            },
+            promptFn,
           }),
         decryptSelfContent: (ciphertext) =>
           decryptSelfContentWithBunkerInteractive({
@@ -703,15 +695,7 @@ async function main() {
             ownerPubkey: masterPubkey,
             ciphertext,
             sendReply: (message: string) => sendReplyForSource(source, message),
-            promptFn: async (
-              message: string | PromptPayload,
-            ): Promise<string> => {
-              await sendReplyForSource(source, getPromptPayloadValue(message));
-
-              return new Promise((resolve) => {
-                pendingPrompt = resolve;
-              });
-            },
+            promptFn,
           }),
       });
 

@@ -12,7 +12,7 @@ export function renderProviderDepositCli(
     case 'usage':
       return `Usage: ${d.prefix}routstr deposit <sats> [--new] [--mint <url>]`;
     case 'no-mint':
-      return `No mint configured. Use ${d.prefix}wallet mint <url> first.`;
+      return `No mint configured. Use ${d.prefix}cashu mint <url> first.`;
     case 'no-mnemonic':
       return 'CASHU_MNEMONIC not set.';
     case 'no-provider-db':
@@ -20,7 +20,7 @@ export function renderProviderDepositCli(
     case 'no-wallet-db':
       return 'Wallet DB not available.';
     case 'insufficient-balance':
-      return `Insufficient balance: ${d.balanceSats} sats available in mint ${d.mintUrl}.\nTop up with ${d.prefix}wallet receive <token> or check ${d.prefix}wallet balance`;
+      return `Insufficient balance: ${d.balanceSats} sats available in mint ${d.mintUrl}.\nTop up with ${d.prefix}cashu receive <token> or check ${d.prefix}cashu balance`;
     case 'no-session-key':
       return 'could not get sk-key from routstr while depositing';
     case 'success': {

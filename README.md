@@ -131,8 +131,8 @@ AppWeaver's built-in wallet stores Cashu eCash tokens. It does not mint via Ligh
 Basic flow:
 
 1. Configure or generate a Cashu wallet in setup.
-2. Set a mint with `/wallet mint <mintURL>` if needed.
-3. Receive tokens with `/wallet receive <token>`.
+2. Set a mint with `/cashu mint <mintURL>` if needed.
+3. Receive tokens with `/cashu receive <token>`.
 4. Switch to Routstr with `/ai provider set routstr`.
 5. Deposit with `/ai provider deposit <sats>` or append a budget suffix to a prompt, such as `fix this bug !!1000sats`.
 
@@ -140,10 +140,11 @@ Useful commands:
 
 | Command                       | Description                                     |
 | ----------------------------- | ----------------------------------------------- |
-| `/wallet mint [url]`          | Show or set your Cashu mint URL                 |
-| `/wallet balance`             | Show local wallet balance                       |
-| `/wallet receive <token>`     | Receive a Cashu token                           |
-| `/wallet history`             | Show recent spend history                       |
+| `/cashu mint [url]`           | Show or set your Cashu mint URL                 |
+| `/cashu balance`              | Show local Cashu wallet balance                 |
+| `/cashu receive <token>`      | Receive a Cashu token                           |
+| `/cashu history`              | Show recent Cashu spend history                 |
+| `/wallet list`                | Show the aggregate wallet overview              |
 | `/ai provider deposit <sats>` | Move sats to a Routstr session                  |
 | `/ai provider refund`         | Recover unspent Routstr balance                 |
 | `/ai provider balance`        | Check Routstr session balance                   |

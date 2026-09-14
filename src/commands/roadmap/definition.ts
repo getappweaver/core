@@ -134,6 +134,33 @@ export function getRoadmapCommandDefinition({
         webExecutionMode: 'runnable_customizable',
       },
       {
+        name: 'pay',
+        summary:
+          'Complete a browser-created roadmap zap through core payments.',
+        textHidden: true,
+        aliases: [],
+        arguments: [
+          'invoice',
+          'amount',
+          'title',
+          'recipient',
+          'issueId',
+          'recipientPubkey',
+          'receiptPubkey',
+          'zapRequestId',
+          'relays',
+        ].map((name) => ({
+          name,
+          summary: 'Core payment handoff value.',
+          kind: 'string' as const,
+          required: true,
+          variadic: false,
+        })),
+        options: [],
+        examples: [],
+        webExecutionMode: 'requires_input',
+      },
+      {
         name: 'board',
         summary: 'Open one roadmap board by workflow id.',
         aliases: [],

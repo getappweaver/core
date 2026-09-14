@@ -1,15 +1,16 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import { finalizeEvent, generateSecretKey } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
-import QRCode from 'qrcode';
 import { z } from 'zod';
 
 import { PROFILE_RELAYS_FOR_QUERY } from '@src/nostr/nip65';
-import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
+import type { WebAction } from '@src/web/ui-schema';
 
 const ISSUE_KIND = 1621;
 const REPO_KIND = 30617;
 const PROFILE_KIND = 0;
+const RELAY_TIMEOUT_MS = 12_000;
+const HTTP_TIMEOUT_MS = 20_000;
 
 const LOG_PREFIX = '[roadmap.lightningZap]';
 
@@ -25,7 +26,7 @@ const LightningZapPayloadSchema = z.object({
 
 const LnUrlpResponseSchema = z.object({
   callback: z.string().url(),
-  nostrPubkey: z.string().min(1),
+  nostrPubkey: z.string().regex(/^[0-9a-f]{64}$/i),
   allowsNostr: z.boolean(),
   minSendable: z.number(),
   maxSendable: z.number(),
@@ -40,10 +41,20 @@ type LightningProfile = {
 type LightningZapDeps = {
   action: Extract<WebAction, { type: 'clientAction' }>;
   signEvent: (event: EventTemplate) => Promise<NostrEvent | null>;
-  setChromeWeb: (root: WebNodeRoot | null) => void;
   setChromeText: (text: string | null) => void;
   setChromeError: (text: string | null) => void;
   setChromeLoading: (loading: boolean) => void;
+  requestPayment: (payload: {
+    invoice: string;
+    amount: string;
+    title: string;
+    recipient: string;
+    issueId: string;
+    recipientPubkey: string;
+    receiptPubkey: string;
+    zapRequestId: string;
+    relays: string;
+  }) => void;
 };
 
 type SignZapRequestProps = {
@@ -59,18 +70,43 @@ type FetchInvoiceProps = {
   comment: string;
 };
 
-declare global {
-  interface Window {
-    webln?: {
-      enable(): Promise<void>;
-      isEnabled?(): Promise<boolean>;
-      sendPayment(invoice: string): Promise<unknown>;
-    };
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timer: number | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== null) {
+      window.clearTimeout(timer);
+    }
   }
 }
 
-function text(value: string): WebNodeRoot['tree'] {
-  return { type: 'element', tag: 'text', children: [{ type: 'text', value }] };
+async function fetchJson(url: string, stage: string): Promise<unknown> {
+  const response = await withTimeout(
+    fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) }),
+    HTTP_TIMEOUT_MS,
+    `${stage} timed out.`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`${stage} failed with HTTP ${response.status}.`);
+  }
+
+  return withTimeout(
+    response.json(),
+    HTTP_TIMEOUT_MS,
+    `${stage} returned an incomplete response.`,
+  );
 }
 
 function tagValue(event: NostrEvent, name: string): string {
@@ -227,9 +263,10 @@ async function fetchInvoice({
   url.searchParams.set('nostr', JSON.stringify(zapRequest));
   url.searchParams.set('comment', comment);
 
-  const response = await fetch(url);
-
-  const json = (await response.json()) as {
+  const json = (await fetchJson(
+    url.toString(),
+    'Lightning invoice creation',
+  )) as {
     pr?: string;
     status?: string;
     reason?: string;
@@ -242,69 +279,13 @@ async function fetchInvoice({
   return json.pr;
 }
 
-function statusRoot(title: string, body: string): WebNodeRoot {
-  return {
-    kind: 'ui',
-    version: 1,
-    meta: { command: 'roadmap', subcommand: 'fund' },
-    tree: {
-      type: 'element',
-      tag: 'stack',
-      props: { gap: 'md' },
-      children: [
-        {
-          type: 'element',
-          tag: 'text',
-          props: { weight: 'bold' },
-          children: [{ type: 'text', value: title }],
-        },
-        text(body),
-      ],
-    },
-  };
-}
-
-async function invoiceRoot(invoice: string): Promise<WebNodeRoot> {
-  const dataUrl = await QRCode.toDataURL(invoice, { margin: 1, width: 280 });
-
-  return {
-    kind: 'ui',
-    version: 1,
-    meta: { command: 'roadmap', subcommand: 'fund' },
-    tree: {
-      type: 'element',
-      tag: 'stack',
-      props: { gap: 'md' },
-      children: [
-        {
-          type: 'element',
-          tag: 'text',
-          props: { weight: 'bold' },
-          children: [{ type: 'text', value: 'Pay Lightning invoice' }],
-        },
-        {
-          type: 'element',
-          tag: 'image',
-          props: { src: dataUrl, alt: 'Lightning invoice QR code' },
-        },
-        {
-          type: 'element',
-          tag: 'text',
-          props: { whiteSpace: 'pre-wrap' },
-          children: [{ type: 'text', value: invoice }],
-        },
-      ],
-    },
-  };
-}
-
 export async function handleRoadmapLightningZap({
   action,
   signEvent,
-  setChromeWeb,
   setChromeText,
   setChromeError,
   setChromeLoading,
+  requestPayment,
 }: LightningZapDeps): Promise<void> {
   setChromeLoading(true);
   setChromeError(null);
@@ -317,6 +298,8 @@ export async function handleRoadmapLightningZap({
     if (!Number.isFinite(amountSats) || amountSats <= 0) {
       throw new Error('Enter a positive amount in sats.');
     }
+
+    setChromeText('Loading Lightning recipient...');
 
     const pool = new SimplePool();
 
@@ -339,10 +322,14 @@ export async function handleRoadmapLightningZap({
     });
 
     try {
-      issue = await pool.get(relays, {
-        ids: [payload.issueId],
-        kinds: [ISSUE_KIND],
-      });
+      issue = await withTimeout(
+        pool.get(relays, {
+          ids: [payload.issueId],
+          kinds: [ISSUE_KIND],
+        }),
+        RELAY_TIMEOUT_MS,
+        'Roadmap issue lookup timed out.',
+      );
 
       console.info(LOG_PREFIX, 'issue result', {
         found: Boolean(issue),
@@ -372,17 +359,21 @@ export async function handleRoadmapLightningZap({
         relays,
       });
 
-      profileEvent = await pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
-        kinds: [PROFILE_KIND],
-        authors: [repoOwner],
-      });
+      profileEvent = await withTimeout(
+        pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
+          kinds: [PROFILE_KIND],
+          authors: [repoOwner],
+        }),
+        RELAY_TIMEOUT_MS,
+        'Lightning profile lookup timed out.',
+      );
 
       console.info(LOG_PREFIX, 'profile result', {
         found: Boolean(profileEvent),
         event: profileEvent,
       });
     } finally {
-      pool.close(relays);
+      pool.close(Array.from(new Set([...relays, ...PROFILE_RELAYS_FOR_QUERY])));
     }
 
     if (!profileEvent) {
@@ -408,7 +399,7 @@ export async function handleRoadmapLightningZap({
     }
 
     const lnurlData = LnUrlpResponseSchema.parse(
-      await (await fetch(lnurl)).json(),
+      await fetchJson(lnurl, 'Lightning address lookup'),
     );
 
     if (!lnurlData.allowsNostr) {
@@ -445,6 +436,8 @@ export async function handleRoadmapLightningZap({
       ],
     };
 
+    setChromeText('Approve the Nostr zap request...');
+
     const zapRequest = await signZapRequest({
       anonymous,
       signEvent,
@@ -455,6 +448,8 @@ export async function handleRoadmapLightningZap({
       throw new Error('Could not sign zap request.');
     }
 
+    setChromeText('Creating Lightning invoice...');
+
     const invoice = await fetchInvoice({
       callback: lnurlData.callback,
       amountMsats,
@@ -462,35 +457,21 @@ export async function handleRoadmapLightningZap({
       comment,
     });
 
-    try {
-      if (!window.webln) {
-        throw new Error('WebLN not available.');
-      }
-
-      if (window.webln.isEnabled) {
-        const enabled = await window.webln.isEnabled();
-
-        if (!enabled) {
-          await window.webln.enable();
-        }
-      } else {
-        await window.webln.enable();
-      }
-
-      await window.webln.sendPayment(invoice);
-
-      setChromeWeb(
-        statusRoot(
-          'Payment sent',
-          'Waiting for AppWeaver relay verification...',
-        ),
-      );
-    } catch {
-      setChromeWeb(await invoiceRoot(invoice));
-    }
+    requestPayment({
+      invoice,
+      amount: String(amountSats),
+      title: payload.title,
+      recipient: profile?.lud16 || profile?.lud06 || lnurl,
+      issueId: issue.id,
+      recipientPubkey: repoOwner,
+      receiptPubkey: lnurlData.nostrPubkey,
+      zapRequestId: zapRequest.id,
+      relays: zapRelays.join(','),
+    });
   } catch (error) {
     setChromeError(error instanceof Error ? error.message : String(error));
   } finally {
+    setChromeText(null);
     setChromeLoading(false);
   }
 }

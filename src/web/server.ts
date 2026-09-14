@@ -2,6 +2,8 @@
 // src/web/server.ts — localhost HTTP bootstrap for discovery UI + JSON API
 // ---------------------------------------------------------------------------
 
+import { randomUUID } from 'node:crypto';
+
 import type { SimplePool } from 'nostr-tools/pool';
 
 import {
@@ -16,6 +18,8 @@ import type { BotConfig } from '@src/env';
 import { log } from '@src/logger';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
 import type { WotServices } from '@src/nostr/wot-service';
+import { InteractivePaymentBroker } from '@src/payments/service';
+import { WebSocketPaymentSession } from '@src/payments/web-prompt';
 import type { ProviderDb } from '@src/providers/db';
 import type { WalletDb } from '@src/wallet/db';
 
@@ -276,6 +280,17 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
             masterPubkey: options.config.masterPubkey,
           });
 
+          const paymentSession = new WebSocketPaymentSession({
+            coreDb: options.seenDb,
+            pool: options.pool,
+          });
+
+          const paymentBroker = new InteractivePaymentBroker({
+            coreDb: options.seenDb,
+            walletDb: options.walletDb,
+            presenter: paymentSession.present,
+          });
+
           const upgraded = server.upgrade(req, {
             data: {
               promptSession: new WebSocketPromptSession(),
@@ -285,6 +300,9 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
               interventionBridge: null,
               nip98Authenticated: nip98.ok,
               demoAuthenticated: false,
+              paymentScopeId: randomUUID(),
+              paymentSession,
+              paymentBroker,
             },
           });
 

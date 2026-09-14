@@ -9,6 +9,10 @@ import {
   Show,
 } from 'solid-js';
 
+import type {
+  WebPaymentRequest,
+  WebPaymentStatus,
+} from '@src/payments/web-types';
 import {
   summarizeTimelineDiffFiles,
   type TimelineFileDiff,
@@ -57,6 +61,7 @@ import {
 import { resolveWidgetIconUrl } from './layout/widgetIcons';
 import { PaletteView } from './palette/PaletteView';
 import { usePalette } from './palette/usePalette';
+import { PaymentModal } from './payments/PaymentModal';
 import { registerWebPushNotifications } from './register-web-push';
 import { SetupView } from './setup/SetupView';
 import { useSocket } from './socket/useSocket';
@@ -282,6 +287,13 @@ function AppInner(): JSX.Element {
   const [composerText, setComposerText] = createSignal('');
   const [loadingCommands, setLoadingCommands] = createSignal(true);
   const [agentWorking, setAgentWorking] = createSignal(false);
+
+  const [paymentRequest, setPaymentRequest] =
+    createSignal<WebPaymentRequest | null>(null);
+
+  const [paymentStatus, setPaymentStatus] =
+    createSignal<WebPaymentStatus | null>(null);
+
   const [interventionMode, setInterventionMode] = createSignal(false);
 
   const [toolInterventions, setToolInterventions] = createSignal<
@@ -449,6 +461,8 @@ function AppInner(): JSX.Element {
     setAgentWorking,
     setSessionDiffFiles,
     setToolInterventions,
+    setPaymentRequest,
+    setPaymentStatus,
     appendSystemMessage,
     createId,
     chat: {
@@ -3064,6 +3078,19 @@ function AppInner(): JSX.Element {
         onClose={closeChromeModal}
         onRunWebAction={runWebAction}
       />
+      <Show when={paymentRequest()} keyed>
+        {(payment) => (
+          <PaymentModal
+            payment={payment}
+            status={paymentStatus()}
+            send={sendSocketMessage}
+            onDismiss={() => {
+              setPaymentRequest(null);
+              setPaymentStatus(null);
+            }}
+          />
+        )}
+      </Show>
       <Show when={storyWalkthrough()}>
         {(walkthrough) => (
           <WalkthroughOverlay

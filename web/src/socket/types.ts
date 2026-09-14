@@ -1,6 +1,10 @@
 import type { Accessor, Setter } from 'solid-js';
 
 import type { AgentFileDiff } from '@src/backends/agent-stream-chunk';
+import type {
+  WebPaymentRequest,
+  WebPaymentStatus,
+} from '@src/payments/web-types';
 
 import type { ChatHook } from '../chat/types';
 import type { NostrAuthContextValue } from '../contexts/NostrAuthContext';
@@ -70,6 +74,8 @@ export type SocketAppAdapters = {
   setLoadingCommands: Setter<boolean>;
   setAgentWorking: Setter<boolean>;
   setToolInterventions: Setter<Record<string, ToolIntervention>>;
+  setPaymentRequest: Setter<WebPaymentRequest | null>;
+  setPaymentStatus: Setter<WebPaymentStatus | null>;
   setSessionDiffFiles: Setter<AgentFileDiff[]>;
   setTimeline: Setter<TimelineItem[]>;
   appendSystemMessage: (text: string) => void;

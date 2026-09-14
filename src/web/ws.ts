@@ -27,6 +27,9 @@ import {
 } from '@src/db';
 import { isDemoMode } from '@src/demo-mode';
 import { debug, log } from '@src/logger';
+import type { InteractivePaymentBroker } from '@src/payments/service';
+import { createBrokerPaymentServiceFactory } from '@src/payments/service';
+import type { WebSocketPaymentSession } from '@src/payments/web-prompt';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
@@ -92,6 +95,10 @@ export type WebSocketData = {
   nip98Authenticated: boolean;
   /** Demo sessions are intentionally restricted; they are not full backend auth. */
   demoAuthenticated: boolean;
+  /** Stable identity for interactive-payment concurrency on this browser connection. */
+  paymentScopeId: string;
+  paymentSession: WebSocketPaymentSession;
+  paymentBroker: InteractivePaymentBroker;
 };
 
 function isTimelineEventOutput(
@@ -852,6 +859,7 @@ async function handleRunCommand(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
   message: RunCommandClientMessage;
+  paymentBroker?: InteractivePaymentBroker;
 }): Promise<void> {
   const { ws, ctx, message } = params;
   const command = getCommandDefinitionForWeb(ctx.prefix, message.command);
@@ -973,6 +981,12 @@ async function handleRunCommand(params: {
       );
     },
     promptFn,
+    interactivePaymentServiceFactory: params.paymentBroker
+      ? createBrokerPaymentServiceFactory({
+          broker: params.paymentBroker,
+          scopeId: ws.data.paymentScopeId,
+        })
+      : undefined,
   });
 
   if (recordTl && isTimelineEventOutput(result.output)) {
@@ -1029,6 +1043,7 @@ async function handleJsonCommand(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
   message: JsonCommandClientMessage;
+  paymentBroker?: InteractivePaymentBroker;
 }): Promise<void> {
   const { ws, ctx, message } = params;
   const command = getCommandDefinitionForWeb(ctx.prefix, message.command);
@@ -1064,6 +1079,12 @@ async function handleJsonCommand(params: {
     command,
     subcommand,
     payload: message.payload,
+    interactivePaymentServiceFactory: params.paymentBroker
+      ? createBrokerPaymentServiceFactory({
+          broker: params.paymentBroker,
+          scopeId: ws.data.paymentScopeId,
+        })
+      : undefined,
   });
 
   sendMessage(
@@ -1533,6 +1554,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
   return {
     open(ws: Bun.ServerWebSocket<WebSocketData>): void {
       ensureInterventionBridge(ws, ctx.seenDb);
+      ws.data.paymentSession.setSender((message) => sendMessage(ws, message));
     },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
       debug('websocket closed while chat was active', {
@@ -1544,6 +1566,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
       ws.data.currentChatAbort = null;
       ws.data.currentChatRequestId = null;
       ws.data.promptSession.clearAll();
+      ws.data.paymentSession.close();
       ws.data.interventionEnabled = false;
 
       if (ws.data.interventionBridge) {
@@ -1727,11 +1750,22 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                       subcommand: message.subcommand,
                     },
                     parent: null,
-                    run: () => handleRunCommand({ ws, ctx, message }),
+                    run: () =>
+                      handleRunCommand({
+                        ws,
+                        ctx,
+                        message,
+                        paymentBroker: ws.data.paymentBroker,
+                      }),
                   }),
                 );
               } else {
-                await handleRunCommand({ ws, ctx, message });
+                await handleRunCommand({
+                  ws,
+                  ctx,
+                  message,
+                  paymentBroker: ws.data.paymentBroker,
+                });
               }
 
               return;
@@ -1749,7 +1783,14 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ws,
                 ctx,
                 message,
+                paymentBroker: ws.data.paymentBroker,
               });
+
+              return;
+            }
+
+            case 'payment_action': {
+              await ws.data.paymentSession.handleAction(message);
 
               return;
             }

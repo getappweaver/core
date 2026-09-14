@@ -31,7 +31,7 @@ export async function prepareProviderRun({
     }
 
     if (e instanceof InsufficientFundsError) {
-      return `Wallet balance too low. Have ${e.available} sats, need ${e.required} sats. Top up with: !wallet receive <cashuXXX>`;
+      return `Wallet balance too low. Have ${e.available} sats, need ${e.required} sats. Top up with: !cashu receive <cashuXXX>`;
     }
 
     throw e;

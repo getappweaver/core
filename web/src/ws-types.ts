@@ -1,5 +1,9 @@
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
 import type { CapabilityProviderSummary } from '@src/capabilities/types';
+import type {
+  WebPaymentRequest,
+  WebPaymentStatus,
+} from '@src/payments/web-types';
 import type { TimelineHistoryItem } from '@src/timeline/types';
 import type {
   ClientViewRoot,
@@ -109,6 +113,18 @@ export type ErrorServerMessage = {
   message: string;
 };
 
+export type PaymentRequestServerMessage = {
+  type: 'payment_request';
+  requestId: string;
+  payment: WebPaymentRequest;
+};
+
+export type PaymentStatusServerMessage = {
+  type: 'payment_status';
+  requestId: string;
+  status: WebPaymentStatus;
+};
+
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
   | ComposerAiStateResultServerMessage
@@ -119,6 +135,8 @@ export type WebSocketServerMessage =
   | PromptServerMessage
   | ChatStreamChunkServerMessage
   | InterventionRequestServerMessage
+  | PaymentRequestServerMessage
+  | PaymentStatusServerMessage
   | ChatResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
