@@ -1,7 +1,16 @@
-FROM alpine:edge
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 ARG TESTING_REPOSITORY="https://dl-cdn.alpinelinux.org/alpine/edge/testing"
+ARG BUN_VERSION=1.4.2
+ARG BUN_SHA256=4835eca59d6da70f4674f5642f6e459dcadab773695b2ed9922d131057989742
+ARG OPENCODE_VERSION=1.18.30
+ARG OPENCODE_SHA256=a4eb84374d4f262ac46fe8b25c9e193a54a6f40f44bbe155a29c9c6309a34a5e
+ARG NGIT_VERSION=3.0.1
+ARG NGIT_SHA256=5c3768b0544af3db2b2fdfc47e4e25b94d1ba86dec09793555908fbcfcccf1be
+ARG PIPER_VERSION=1.7.0-r0
 ARG PIPER_VOICE=en_US-lessac-medium
+ARG PIPER_VOICE_SHA256=5efe09e69902187827af646e1a6e9d269dee769f9877d17b16b1b46eeaaf019f
+ARG PIPER_VOICE_CONFIG_SHA256=efe19c417bed055f2d69908248c6ba650fa135bc868b0e6abb3da181dab690a0
 
 ENV BUN_INSTALL=/opt/bun \
     HOME=/workspace/appweaver/.data/home \
@@ -28,34 +37,66 @@ RUN printf '%s\n' "@testing ${TESTING_REPOSITORY}" >> /etc/apk/repositories \
       npm \
       openssh-client \
       py3-flask \
-      py3-piper-tts@testing \
+      "py3-piper-tts@testing=${PIPER_VERSION}" \
       python3 \
       unzip \
     && addgroup -g 1000 appweaver \
     && adduser -D -u 1000 -G appweaver appweaver \
-    && mkdir -p /opt/appweaver /opt/bun /opt/piper /workspace/appweaver \
+    && mkdir -p /opt/appweaver /opt/bun/bin /opt/piper /workspace/appweaver \
     && chown -R appweaver:appweaver /opt/appweaver /opt/bun /opt/piper /workspace
 
-USER appweaver
-
-RUN export HOME=/opt/appweaver \
-    XDG_CONFIG_HOME=/tmp/xdg/config \
-    XDG_DATA_HOME=/tmp/xdg/share \
-    XDG_CACHE_HOME=/tmp/xdg/cache \
-    && curl -fsSL https://bun.sh/install | bash \
-    && curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path \
-    && curl -fsSL https://ngit.dev/install.sh | bash \
-    && bun --version \
+RUN export HOME=/tmp \
+      XDG_CONFIG_HOME=/tmp/xdg/config \
+      XDG_DATA_HOME=/tmp/xdg/share \
+      XDG_CACHE_HOME=/tmp/xdg/cache \
+    && curl --fail --location --proto '=https' --tlsv1.2 \
+      "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64-musl.zip" \
+      --output /tmp/bun.zip \
+    && echo "${BUN_SHA256}  /tmp/bun.zip" | sha256sum -c - \
+    && unzip -q /tmp/bun.zip -d /tmp/bun \
+    && install -m 0755 /tmp/bun/bun-linux-x64-musl/bun /opt/bun/bin/bun \
+    && ln -s bun /opt/bun/bin/bunx \
+    && curl --fail --location --proto '=https' --tlsv1.2 \
+      "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64-musl.tar.gz" \
+      --output /tmp/opencode.tar.gz \
+    && echo "${OPENCODE_SHA256}  /tmp/opencode.tar.gz" | sha256sum -c - \
+    && mkdir -p /opt/appweaver/.opencode/bin \
+    && tar -xzf /tmp/opencode.tar.gz -C /opt/appweaver/.opencode/bin \
+    && curl --fail --location --proto '=https' --tlsv1.2 \
+      "https://blossom.ditto.pub/${NGIT_SHA256}.gz" \
+      --output /tmp/ngit.tar.gz \
+    && echo "${NGIT_SHA256}  /tmp/ngit.tar.gz" | sha256sum -c - \
+    && mkdir -p /opt/appweaver/.local/bin \
+    && tar -xzf /tmp/ngit.tar.gz -C /opt/appweaver/.local/bin \
+    && chmod 0755 \
+      /opt/appweaver/.local/bin/ngit \
+      /opt/appweaver/.local/bin/git-remote-nostr \
+      /opt/appweaver/.opencode/bin/opencode \
+    && rm -rf /tmp/bun /tmp/bun.zip /tmp/opencode.tar.gz /tmp/ngit.tar.gz \
+    && test "$(bun --version)" = "${BUN_VERSION}" \
     && node --version \
-    && opencode --version \
-    && ngit --version
+    && test "$(opencode --version)" = "${OPENCODE_VERSION}" \
+    && test "$(ngit --version)" = "ngit ${NGIT_VERSION}"
 
-RUN HOME=/tmp XDG_CONFIG_HOME=/tmp/xdg/config XDG_DATA_HOME=/tmp/xdg/share XDG_CACHE_HOME=/tmp/xdg/cache \
-      python3 -m piper.download_voices --data-dir /opt/piper "${PIPER_VOICE}" \
+RUN export HOME=/tmp \
+      XDG_CONFIG_HOME=/tmp/xdg/config \
+      XDG_DATA_HOME=/tmp/xdg/share \
+      XDG_CACHE_HOME=/tmp/xdg/cache \
+    && curl --fail --location --proto '=https' --tlsv1.2 \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${PIPER_VOICE}.onnx" \
+      --output "/opt/piper/${PIPER_VOICE}.onnx" \
+    && echo "${PIPER_VOICE_SHA256}  /opt/piper/${PIPER_VOICE}.onnx" | sha256sum -c - \
+    && curl --fail --location --proto '=https' --tlsv1.2 \
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${PIPER_VOICE}.onnx.json" \
+      --output "/opt/piper/${PIPER_VOICE}.onnx.json" \
+    && echo "${PIPER_VOICE_CONFIG_SHA256}  /opt/piper/${PIPER_VOICE}.onnx.json" | sha256sum -c - \
     && printf '%s\n' 'AppWeaver Piper test.' \
       | python3 -m piper --model "/opt/piper/${PIPER_VOICE}.onnx" --output-file /tmp/piper-test.wav \
     && test -s /tmp/piper-test.wav \
-    && rm /tmp/piper-test.wav
+    && rm /tmp/piper-test.wav \
+    && chown -R appweaver:appweaver /opt/appweaver /opt/bun /opt/piper
+
+USER appweaver
 
 COPY --chown=appweaver:appweaver --chmod=755 scripts/docker-entrypoint-alpine.sh /usr/local/bin/appweaver-entrypoint
 
