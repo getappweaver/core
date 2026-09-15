@@ -15,6 +15,7 @@ import {
   TRACKER_KIND,
   WORKFLOW_KIND,
   ZAP_KIND,
+  repoNip65ReadRelaysForProject,
   repoRelaysForProject,
   uniqueRoadmapRelays,
 } from '@src/commands/roadmap/model';
@@ -161,7 +162,13 @@ export async function loadRoadmapSnapshot({
     const repoRelays = repoRelaysForProject(project, relayListsByPubkey);
     const dataRelays = uniqueRoadmapRelays([...targetRelays, ...repoRelays]);
 
+    const zapReceiptRelays = uniqueRoadmapRelays([
+      ...repoNip65ReadRelaysForProject(project, relayListsByPubkey),
+      ...dataRelays,
+    ]);
+
     dataRelays.forEach((relay) => openedRelays.add(relay));
+    zapReceiptRelays.forEach((relay) => openedRelays.add(relay));
 
     const projectAddress = `${PROJECT_KIND}:${target.ownerPubkey}:${target.repoId}`;
 
@@ -252,7 +259,7 @@ export async function loadRoadmapSnapshot({
         ? Promise.all(
             chunks(issueIds).map((ids) =>
               pool.querySync(
-                dataRelays,
+                zapReceiptRelays,
                 {
                   kinds: [DELETE_KIND, ZAP_KIND],
                   '#e': ids,

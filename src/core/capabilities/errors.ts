@@ -78,9 +78,16 @@ export class CapabilityInvocationFailedError extends CapabilityError {
     providerId: string,
     cause: unknown,
   ) {
+    const causeMessage =
+      cause instanceof Error
+        ? cause.message.trim()
+        : typeof cause === 'string'
+          ? cause.trim()
+          : '';
+
     super(
       'CAPABILITY_INVOCATION_FAILED',
-      `Provider ${providerId} failed while invoking ${operation}.`,
+      `Provider ${providerId} failed while invoking ${operation}.${causeMessage ? ` ${causeMessage}` : ''}`,
       cause,
     );
   }

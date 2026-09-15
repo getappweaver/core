@@ -3,7 +3,11 @@ import { finalizeEvent, generateSecretKey } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
 
-import { PROFILE_RELAYS_FOR_QUERY } from '@src/nostr/nip65';
+import {
+  NIP65_RELAY_LIST_KIND,
+  parseNip65RelayTags,
+  PROFILE_RELAYS_FOR_QUERY,
+} from '@src/nostr/nip65';
 import type { WebAction } from '@src/web/ui-schema';
 
 const ISSUE_KIND = 1621;
@@ -313,6 +317,7 @@ export async function handleRoadmapLightningZap({
 
     let issue: NostrEvent | null = null;
     let profileEvent: NostrEvent | null = null;
+    let relayListEvent: NostrEvent | null = null;
     let repoOwner = '';
 
     console.info(LOG_PREFIX, 'query issue', {
@@ -359,13 +364,19 @@ export async function handleRoadmapLightningZap({
         relays,
       });
 
-      profileEvent = await withTimeout(
-        pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
-          kinds: [PROFILE_KIND],
-          authors: [repoOwner],
-        }),
+      [profileEvent, relayListEvent] = await withTimeout(
+        Promise.all([
+          pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
+            kinds: [PROFILE_KIND],
+            authors: [repoOwner],
+          }),
+          pool.get(PROFILE_RELAYS_FOR_QUERY as string[], {
+            kinds: [NIP65_RELAY_LIST_KIND],
+            authors: [repoOwner],
+          }),
+        ]),
         RELAY_TIMEOUT_MS,
-        'Lightning profile lookup timed out.',
+        'Lightning profile and relay lookup timed out.',
       );
 
       console.info(LOG_PREFIX, 'profile result', {
@@ -420,8 +431,16 @@ export async function handleRoadmapLightningZap({
     const comment = payload.comment?.trim() ?? '';
     const anonymous = payload.anonymous === 'on';
 
+    const recipientReadRelays = parseNip65RelayTags(
+      relayListEvent?.tags ?? [],
+    ).readRelays;
+
     const zapRelays = Array.from(
-      new Set([payload.relay, ...(payload.relays ?? [])]),
+      new Set([
+        ...recipientReadRelays,
+        payload.relay,
+        ...(payload.relays ?? []),
+      ]),
     );
 
     const zapTemplate: EventTemplate = {

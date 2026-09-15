@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.8.4] - 2026-09-15
+
+- fix: display sats properly by using correct relays for the roadmap issues (4e55d4f4)
+
 ## [v12.8.3] - 2026-09-15
 
-- fix: appweaver logo to use cyan version for PWA (db3fd835)
+- fix: appweaver logo to use cyan version for PWA (0e0ecfc4)
 
 ## [v12.8.2] - 2026-09-15
 

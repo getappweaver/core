@@ -1,4 +1,5 @@
 import type { NostrEvent } from 'nostr-tools';
+import { verifyEvent } from 'nostr-tools';
 
 import {
   authorHref,
@@ -228,6 +229,21 @@ export function repoNip65RelaysForProject(
   return relays.length > 0 ? relays : [...ROADMAP_RELAY_DISCOVERY_RELAYS];
 }
 
+export function repoNip65ReadRelaysForProject(
+  event: NostrEvent | null,
+  relayListsByPubkey: Map<string, NostrEvent> | null,
+): string[] {
+  if (!event) {
+    return [...ROADMAP_RELAY_DISCOVERY_RELAYS];
+  }
+
+  const relays = parseNip65RelayTags(
+    relayListsByPubkey?.get(event.pubkey)?.tags ?? [],
+  ).readRelays;
+
+  return relays.length > 0 ? relays : [...ROADMAP_RELAY_DISCOVERY_RELAYS];
+}
+
 function workflowProjectAddress(event: NostrEvent): string {
   return tags(event, 'a').find((tag) => tag[3] === 'project')?.[1] ?? '';
 }
@@ -236,8 +252,33 @@ function workflowReference(event: NostrEvent): string {
   return tags(event, 'a').find((tag) => tag[3] === 'workflow')?.[1] ?? '';
 }
 
+function zapAmountMsats(event: NostrEvent): number {
+  const directAmount = Number(tagValue(event, 'amount'));
+
+  if (Number.isFinite(directAmount) && directAmount > 0) {
+    return directAmount;
+  }
+
+  try {
+    const request = JSON.parse(tagValue(event, 'description')) as NostrEvent;
+
+    if (
+      request.kind !== 9734 ||
+      !verifyEvent(request) ||
+      tagValue(request, 'e') !== tagValue(event, 'e') ||
+      tagValue(request, 'p') !== tagValue(event, 'p')
+    ) {
+      return 0;
+    }
+
+    return Number(tagValue(request, 'amount'));
+  } catch {
+    return 0;
+  }
+}
+
 function amountSats(event: NostrEvent): number {
-  const amount = Number(tagValue(event, 'amount'));
+  const amount = zapAmountMsats(event);
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return 0;
