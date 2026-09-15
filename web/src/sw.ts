@@ -52,8 +52,12 @@ self.addEventListener('push', (event: PushEvent) => {
   const body = data.body ?? 'New activity';
   const url = data.url ?? '/';
 
-  const iconUrl = new URL('/appweaver-pwa-192.png', self.location.origin).href;
-  const badgeUrl = new URL('/appweaver-pwa-192.png', self.location.origin).href;
+  const iconUrl = new URL(
+    'favicon/android-chrome-192x192.png',
+    self.registration.scope,
+  ).href;
+
+  const badgeUrl = iconUrl;
 
   event.waitUntil(
     self.registration.showNotification(title, {
