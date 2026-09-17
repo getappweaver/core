@@ -1359,6 +1359,10 @@ a {
   border-top: 1px solid rgb(255 255 255 / 12%);
 }
 
+.plugin-feature-gallery-item--reverse {
+  grid-template-columns: minmax(0, 1.28fr) minmax(14rem, 0.72fr);
+}
+
 .plugin-feature-gallery-item--reverse .plugin-feature-gallery-copy {
   order: 2;
 }
@@ -1477,6 +1481,10 @@ a {
   .plugin-feature-gallery-item {
     grid-template-columns: 1fr;
     gap: 1.25rem;
+  }
+
+  .plugin-feature-gallery-item--reverse {
+    grid-template-columns: 1fr;
   }
 
   .plugin-feature-gallery-item--reverse .plugin-feature-gallery-copy,

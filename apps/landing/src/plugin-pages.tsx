@@ -340,7 +340,7 @@ const pluginPagePresentations: Record<string, PluginPagePresentation> = {
             'Filter both Timeline and For You by time slot, or use mass reading to clear an unwanted topic from either view.',
             'Click Read all on a topic to quickly remove posts matching that keyword. Add recurring unwanted topics to Unpreferred Topics to skip them in the future, or add topics to Preferred Topics to influence scoring.',
           ],
-          mediaSrc: '/gifs/nostr-radar/filtering.gif',
+          mediaSrc: '/screenshots/nostr-radar/filtering.png',
           mediaAlt:
             'Nostr Radar filtering posts by time slot and removing posts with Read all',
           mediaLabel: 'Filtering demo',
@@ -638,7 +638,6 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
                   <For each={item.description}>{(paragraph) => <p>{paragraph}</p>}</For>
                 </div>
                 <figure class="plugin-feature-gallery-media">
-                  <figcaption>{item.mediaLabel}</figcaption>
                   <button
                     type="button"
                     class="plugin-feature-gallery-media-button"

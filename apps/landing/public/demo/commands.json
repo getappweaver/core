@@ -1109,6 +1109,83 @@
         }
       },
       {
+        "name": "pay",
+        "summary": "Complete a browser-created roadmap zap through core payments.",
+        "usage": "pay <invoice> <amount> <title> <recipient> <issueId> <recipientPubkey> <receiptPubkey> <zapRequestId> <relays>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "invoice",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "amount",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "title",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "recipient",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "issueId",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "recipientPubkey",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "receiptPubkey",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "zapRequestId",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "relays",
+            "summary": "Core payment handoff value.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
         "name": "board",
         "summary": "Open one roadmap board by workflow id.",
         "usage": "board <id> [--relay <relay>]",
@@ -2241,14 +2318,227 @@
     ]
   },
   {
-    "name": "wallet",
+    "name": "nwc",
+    "summary": "Manage Nostr Wallet Connect connections.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for nwc or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: list, add, info, balance, pay, rename, or remove.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc help",
+          "/nwc help list",
+          "/nwc help info",
+          "/nwc help balance",
+          "/nwc help pay"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List and manage NWC connections.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/nwc list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Open the secure web form for adding an NWC connection.",
+        "usage": "add",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/nwc add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "save",
+        "summary": "Save an NWC connection submitted by the core web form.",
+        "usage": "save",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "info",
+        "summary": "Connect and show wallet identity and supported methods.",
+        "usage": "info [<connection>]",
+        "aliases": [
+          "test"
+        ],
+        "arguments": [
+          {
+            "name": "connection",
+            "summary": "Connection ID or label. Optional when exactly one exists.",
+            "kind": "string",
+            "choices": null,
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc info",
+          "/nwc info personal"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "balance",
+        "summary": "Show an NWC wallet balance.",
+        "usage": "balance [<connection>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "connection",
+            "summary": "Connection ID or label. Optional when exactly one exists.",
+            "kind": "string",
+            "choices": null,
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc balance",
+          "/nwc balance personal"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "pay",
+        "summary": "Pay a BOLT-11 invoice through core confirmation.",
+        "usage": "pay <invoice>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "invoice",
+            "summary": "BOLT-11 invoice to pay.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc pay <bolt11-invoice>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "rename",
+        "summary": "Rename a saved NWC connection.",
+        "usage": "rename <connection> <label>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "connection",
+            "summary": "Connection ID or current label.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "label",
+            "summary": "New connection label.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc rename personal spending"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "remove",
+        "summary": "Remove an NWC connection.",
+        "usage": "remove [<connection>]",
+        "aliases": [
+          "delete"
+        ],
+        "arguments": [
+          {
+            "name": "connection",
+            "summary": "Connection ID or label. Optional when exactly one exists.",
+            "kind": "string",
+            "choices": null,
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nwc remove",
+          "/nwc remove personal"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "cashu",
     "summary": "Cashu wallet: mint, melt, balance, receive, send, history.",
     "aliases": [],
     "source": "builtin",
     "subcommands": [
       {
         "name": "help",
-        "summary": "Show command help for wallet or one of its subcommands.",
+        "summary": "Show command help for cashu or one of its subcommands.",
         "usage": "help [<topic>]",
         "aliases": [],
         "arguments": [
@@ -2262,9 +2552,9 @@
         ],
         "options": [],
         "examples": [
-          "/wallet help",
-          "/wallet help mint",
-          "/wallet help balance"
+          "/cashu help",
+          "/cashu help mint",
+          "/cashu help balance"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2279,19 +2569,11 @@
         "arguments": [],
         "options": [],
         "examples": [
-          "/wallet list"
+          "/cashu list"
         ],
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
-        },
-        "webWidget": {
-          "placement": "header",
-          "surface": "modal",
-          "label": "Wallet",
-          "modalTitle": "Cashu Wallet",
-          "icon": "/src/commands/wallet/list/renderers/wallet.svg",
-          "order": 30
         }
       },
       {
@@ -2310,8 +2592,8 @@
         ],
         "options": [],
         "examples": [
-          "/wallet mint",
-          "/wallet mint <url>"
+          "/cashu mint",
+          "/cashu mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2350,8 +2632,8 @@
           }
         ],
         "examples": [
-          "/wallet melt <sats> <bolt11-invoice>",
-          "/wallet melt <sats> <bolt11-invoice> --mint <url>"
+          "/cashu melt <sats> <bolt11-invoice>",
+          "/cashu melt <sats> <bolt11-invoice> --mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2399,8 +2681,8 @@
           }
         ],
         "examples": [
-          "/wallet pay <sats>",
-          "/wallet pay <sats> --mint <url>"
+          "/cashu pay <sats>",
+          "/cashu pay <sats> --mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2415,7 +2697,7 @@
         "arguments": [],
         "options": [],
         "examples": [
-          "/wallet mints"
+          "/cashu mints"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2430,7 +2712,7 @@
         "arguments": [],
         "options": [],
         "examples": [
-          "/wallet balance"
+          "/cashu balance"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2453,7 +2735,7 @@
         ],
         "options": [],
         "examples": [
-          "/wallet decode <token>"
+          "/cashu decode <token>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2476,7 +2758,7 @@
         ],
         "options": [],
         "examples": [
-          "/wallet receive <token>"
+          "/cashu receive <token>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2508,8 +2790,8 @@
           }
         ],
         "examples": [
-          "/wallet send <sats>",
-          "/wallet send <sats> --mint <url>"
+          "/cashu send <sats>",
+          "/cashu send <sats> --mint <url>"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2532,12 +2814,67 @@
         ],
         "options": [],
         "examples": [
-          "/wallet history",
-          "/wallet history --token"
+          "/cashu history",
+          "/cashu history --token"
         ],
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "wallet",
+    "summary": "Overview of available Lightning and Cashu wallets.",
+    "aliases": [],
+    "source": "builtin",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for wallet or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: list",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/wallet help",
+          "/wallet help list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "Show the aggregate wallet overview.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/wallet list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "modal",
+          "label": "Wallet",
+          "modalTitle": "Wallets",
+          "icon": "/src/commands/wallet/list/renderers/wallet.svg",
+          "order": 30
         }
       }
     ]
@@ -5539,7 +5876,7 @@
       {
         "name": "mark",
         "summary": "Mark a cached event or every matching topic/mood as read, unread, archived, or unarchived.",
-        "usage": "mark [<event_id>] [--id <id>] [--read] [--unread] [--archived] [--unarchived] [--type <type>] [--tag <tag>] [--event-json <event_json>]",
+        "usage": "mark [<event_id>] [--id <id>] [--read] [--unread] [--archived] [--unarchived] [--type <type>] [--tag <tag>] [--event-json <event_json>] [--event-ids <event_ids>]",
         "aliases": [],
         "arguments": [
           {
@@ -5610,6 +5947,13 @@
             "summary": "Internal raw Nostr event JSON to cache before marking.",
             "kind": "string",
             "required": false
+          },
+          {
+            "name": "event_ids",
+            "flag": "--event-ids",
+            "summary": "Internal comma-separated event IDs to mark together.",
+            "kind": "string",
+            "required": false
           }
         ],
         "examples": [
@@ -5660,7 +6004,7 @@
       {
         "name": "settings",
         "summary": "Show or update AI settings used by nr parse.",
-        "usage": "settings [--backend <backend>] [--model <model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
+        "usage": "settings [--backend <backend>] [--model <model>] [--image-backend <image_backend>] [--image-model <image_model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--evaluate-images <evaluate_images>] [--max-images-per-event <max_images_per_event>] [--max-image-mb <max_image_mb>] [--image-fetch-timeout-sec <image_fetch_timeout_sec>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
         "aliases": [
           "config"
         ],
@@ -5685,6 +6029,24 @@
             "required": false
           },
           {
+            "name": "image_backend",
+            "flag": "--image-backend",
+            "summary": "Backend override for image evaluation.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "cursor",
+              "opencode"
+            ]
+          },
+          {
+            "name": "image_model",
+            "flag": "--image-model",
+            "summary": "Model override for image evaluation.",
+            "kind": "string",
+            "required": false
+          },
+          {
             "name": "agent",
             "flag": "--agent",
             "summary": "Open the backend and model settings dialog.",
@@ -5703,7 +6065,7 @@
           {
             "name": "reset",
             "flag": "--reset",
-            "summary": "Clear backend, model, and instructions overrides.",
+            "summary": "Clear text AI, image AI, and instructions overrides.",
             "kind": "boolean",
             "required": false
           },
@@ -5775,6 +6137,38 @@
             "name": "ai_evaluation_concurrency",
             "flag": "--ai-evaluation-concurrency",
             "summary": "Maximum AI evaluations run concurrently.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "evaluate_images",
+            "flag": "--evaluate-images",
+            "summary": "Evaluate attached images with AI vision.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          {
+            "name": "max_images_per_event",
+            "flag": "--max-images-per-event",
+            "summary": "Maximum images evaluated per event.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "max_image_mb",
+            "flag": "--max-image-mb",
+            "summary": "Maximum image size in MB.",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "image_fetch_timeout_sec",
+            "flag": "--image-fetch-timeout-sec",
+            "summary": "Timeout in seconds for each image fetch.",
             "kind": "integer",
             "required": false
           },
@@ -6023,6 +6417,34 @@
         }
       },
       {
+        "name": "signal-delete",
+        "summary": "Delete Nostr Radar interest signals for one topic or author.",
+        "usage": "signal-delete [--topic <topic>] [--author-pubkey <author_pubkey>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "topic",
+            "flag": "--topic",
+            "summary": "Delete every signal tagged with this topic.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "author_pubkey",
+            "flag": "--author-pubkey",
+            "summary": "Delete every signal attributed to this author pubkey.",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
         "name": "schedule",
         "summary": "Schedule or show the recurring fetch-and-evaluate job.",
         "usage": "schedule [--provider <provider>]",
@@ -6222,6 +6644,28 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "images",
+        "summary": "Show cached image evaluations for a Nostr event.",
+        "usage": "images <event_id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "event_id",
+            "summary": "Nostr event ID.",
+            "kind": "string",
+            "required": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/nr images <event_id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       },
       {
@@ -6426,14 +6870,15 @@
           {
             "name": "mode",
             "flag": "--mode",
-            "summary": "List mode: timeline, for-you, profile, or archive.",
+            "summary": "List mode: timeline, for-you, profile, archive, or signals.",
             "kind": "string",
             "required": false,
             "choices": [
               "timeline",
               "for-you",
               "profile",
-              "archive"
+              "archive",
+              "signals"
             ]
           },
           {
@@ -6477,7 +6922,8 @@
         ],
         "examples": [
           "/nr list",
-          "/nr list --mode archive"
+          "/nr list --mode archive",
+          "/nr list --mode signals"
         ],
         "inferredWeb": {
           "generated": true,

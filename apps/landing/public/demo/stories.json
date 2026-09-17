@@ -69409,7 +69409,7 @@
                                                                   ],
                                                                   [
                                                                     "published_at",
-                                                                    "1788287195"
+                                                                    "1789644113"
                                                                   ],
                                                                   [
                                                                     "title",
@@ -70939,7 +70939,7 @@
                                                               ],
                                                               [
                                                                 "published_at",
-                                                                "1788287195"
+                                                                "1789644113"
                                                               ],
                                                               [
                                                                 "title",
@@ -72064,10 +72064,7 @@
                                             "options": {
                                               "path": "docs",
                                               "draft": true
-                                            },
-                                            "surface": "modal",
-                                            "modalTitle": "Bottom-up summary",
-                                            "recordInTimeline": false
+                                            }
                                           }
                                         }
                                       },
@@ -73627,10 +73624,7 @@
                                             "options": {
                                               "path": "docs",
                                               "draft": true
-                                            },
-                                            "surface": "modal",
-                                            "modalTitle": "Bottom-up summary",
-                                            "recordInTimeline": false
+                                            }
                                           }
                                         }
                                       },
@@ -77966,10 +77960,7 @@
                                             "options": {
                                               "path": "docs",
                                               "draft": true
-                                            },
-                                            "surface": "modal",
-                                            "modalTitle": "Bottom-up summary",
-                                            "recordInTimeline": false
+                                            }
                                           }
                                         }
                                       },
@@ -81112,10 +81103,7 @@
                                             "options": {
                                               "path": "docs",
                                               "draft": true
-                                            },
-                                            "surface": "modal",
-                                            "modalTitle": "Bottom-up summary",
-                                            "recordInTimeline": false
+                                            }
                                           }
                                         }
                                       },
@@ -82675,10 +82663,7 @@
                                             "options": {
                                               "path": "docs",
                                               "draft": true
-                                            },
-                                            "surface": "modal",
-                                            "modalTitle": "Bottom-up summary",
-                                            "recordInTimeline": false
+                                            }
                                           }
                                         }
                                       },
