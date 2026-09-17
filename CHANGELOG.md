@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v12.8.6] - 2026-09-17
+
+- chore: added event enrichment spec to the docs (85a37b80)
+
 ## [v12.8.5] - 2026-09-17
 
-- fix: added NR screenshots to apps/landing (208cadf0)
+- fix: added NR screenshots to apps/landing (b811ce27)
 
 ## [v12.8.4] - 2026-09-15
 
