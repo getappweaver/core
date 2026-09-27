@@ -9,7 +9,6 @@ import type { WebHandlerResult } from '@src/web/ui-schema';
 import type { RouteCommandContext } from '../dispatch';
 import { handleError } from '../dispatch';
 
-import { runProviderAddModel } from './add-model/handler';
 import { runProviderBalance } from './balance/handler';
 import { runProviderBudget } from './budget/handler';
 import { renderProviderCli } from './cli-representation';
@@ -109,18 +108,6 @@ export async function runRoutstrCommandsFromArgs(
       return handleError(
         async () => render(await runProviderSyncModels(input)),
         'Failed to sync models',
-      );
-
-    case 'add-model':
-      return handleError(
-        async () =>
-          render(
-            await runProviderAddModel({
-              ctx: input,
-              modelId: args[1],
-            }),
-          ),
-        'Failed to add model',
       );
 
     default:

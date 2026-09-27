@@ -18,12 +18,7 @@ import type {
   CapabilityClient,
   DefinedCapabilityProvider,
 } from '@src/capabilities/types';
-import type {
-  AgentBackendName,
-  AgentMode,
-  ProviderName,
-  WorkspaceTarget,
-} from '@src/db';
+import type { WorkspaceTarget } from '@src/db';
 import { log } from '@src/logger';
 import type { MessageSource } from '@src/messaging';
 import type { NostrResolutionService } from '@src/nostr/resolution-service';
@@ -39,21 +34,16 @@ import type { Monitoring } from './monitoring';
 // ---------------------------------------------------------------------------
 export type SendReplyFn = (message: string) => Promise<void>;
 export type PluginAgentDefaults = {
-  backend: AgentBackendName;
-  provider: ProviderName;
+  backend: 'opencode';
+  provider: 'local';
   model: string | null;
   effectiveModel: string;
-  mode: AgentMode;
   workspaceTarget: WorkspaceTarget;
 };
 
 export type PluginAgentRunProps = {
   prompt: string;
   sessionId: string | null;
-  backend: AgentBackendName | null;
-  provider: ProviderName | null;
-  model: string | null;
-  mode: AgentMode | null;
   workspaceTarget: WorkspaceTarget | null;
   cwd: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
@@ -69,19 +59,18 @@ export type PluginAgentContextOptions = {
 };
 
 export type PluginAgentRunResult = AgentRunResult & {
-  backend: AgentBackendName;
+  backend: 'opencode';
 };
 
 export type PluginAgentService = {
   getDefaults(): PluginAgentDefaults;
   getEffectiveModel(props: {
-    backend: AgentBackendName | null;
-    model: string | null;
-    mode: AgentMode | null;
+    backend?: 'opencode' | 'cursor' | null;
+    model?: string | null;
     workspaceTarget: WorkspaceTarget | null;
   }): string;
-  getAvailableModels(props: {
-    backend: AgentBackendName | null;
+  getAvailableModels(props?: {
+    backend?: 'opencode' | 'cursor' | null;
   }): Promise<string[]>;
   run(props: PluginAgentRunProps): Promise<PluginAgentRunResult>;
 };
@@ -177,6 +166,15 @@ export type PluginContext = {
     bunkerName?: string,
   ) => Promise<NostrEvent>;
   getRoutstrSkKey: () => string | null;
+  /** Core-owned workspace resolution; no access to the core database is exposed. */
+  workspace: {
+    getActiveTarget: () => WorkspaceTarget;
+    rootFor: (target: WorkspaceTarget) => string;
+  };
+  modelSource: {
+    getActiveProviderId: (target: WorkspaceTarget) => string;
+    withDrainedRuns: <T>(work: () => Promise<T>) => Promise<T>;
+  };
   /** Plugin-scoped client for invoking registered capability operations. */
   capabilities: CapabilityClient;
   /** Best-effort tracing facade. No registered provider means spans are discarded. */

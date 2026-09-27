@@ -82,11 +82,16 @@ export type ParsedCapabilityOperationId = CapabilityOperationRef & {
   id: CapabilityOperationId;
 };
 
-export type CapabilityCaller = {
-  type: 'plugin';
-  pluginName: string;
-  alias: string;
-};
+export type CapabilityCaller =
+  | {
+      type: 'plugin';
+      pluginName: string;
+      alias: string;
+    }
+  | {
+      type: 'core';
+      component: string;
+    };
 
 export type CapabilityOperationHandlerContext<
   TOperation extends AnyCapabilityOperation = AnyCapabilityOperation,
@@ -159,15 +164,25 @@ export type DefinedCapabilityProvider<
   readonly [capabilityProviderDefinitionBrand]: true;
 };
 
-export type CapabilityProviderSource = {
-  type: 'plugin';
-  pluginName: string;
-  alias: string;
-  version: string;
-  title: string;
-  description: string | null;
-  iconUrl: string | null;
-};
+export type CapabilityProviderSource =
+  | {
+      type: 'plugin';
+      pluginName: string;
+      alias: string;
+      version: string;
+      title: string;
+      description: string | null;
+      iconUrl: string | null;
+    }
+  | {
+      type: 'core';
+      id: string;
+      alias: string;
+      version: string;
+      title: string;
+      description: string | null;
+      iconUrl: string | null;
+    };
 
 export type CapabilityProviderSummary = {
   providerId: string;

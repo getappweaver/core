@@ -2,43 +2,34 @@
 // backends/factory.ts
 // ---------------------------------------------------------------------------
 
-import type { AgentBackendName, AgentMode } from '../db';
-import type { ProviderName } from '../providers/types';
-import { assertUnreachable } from '../utils';
+import type { AgentBackendName } from '../db';
 
-import { createCursorSdkBackend } from './cursor-sdk';
+import { opencodeRuntimeController } from './opencode-runtime-controller';
 import { createOpencodeSDKBackend } from './opencode-sdk';
 import type { AgentBackend } from './types';
 
 type CreateBackendProps = {
   backendName: AgentBackendName;
   dmBotRoot: string;
-  cursorMode: AgentMode;
-  opencodeAgentName: string | null;
-  attachUrl: string | null;
-  modelOverride: string | null;
-  providerName: ProviderName | null;
 };
 
 export function createBackend({
-  backendName,
+  backendName: _backendName,
   dmBotRoot,
-  cursorMode,
-  opencodeAgentName,
-  modelOverride,
-  providerName,
 }: CreateBackendProps): AgentBackend {
-  switch (backendName) {
-    case 'cursor':
-      return createCursorSdkBackend(modelOverride);
-    case 'opencode':
-      return createOpencodeSDKBackend({
-        dmBotRoot,
-        agentName: opencodeAgentName ?? cursorMode,
-        modelOverride,
-        providerName,
-      });
-    default:
-      return assertUnreachable(backendName);
-  }
+  const backend = createOpencodeSDKBackend({ dmBotRoot });
+
+  return {
+    ...backend,
+    createSession: (cwd) =>
+      opencodeRuntimeController.withAdmission(() => backend.createSession(cwd)),
+    runMessage: (props) =>
+      opencodeRuntimeController.withAdmission(() => backend.runMessage(props)),
+    runChatCompletion: (props) =>
+      opencodeRuntimeController.withAdmission(() =>
+        backend.runChatCompletion(props),
+      ),
+    availableModels: () =>
+      opencodeRuntimeController.withAdmission(() => backend.availableModels()),
+  };
 }

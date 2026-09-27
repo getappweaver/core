@@ -1,9 +1,9 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import type { Accessor, Setter } from 'solid-js';
 
+import type { AiModelSourceContextUsage } from '@src/capabilities/ai-model-source.v1';
 import type {
   WebAction,
-  WebArgumentFieldChoice,
   WebNodeRoot,
   WebOptimisticMutation,
 } from '@src/web/ui-schema';
@@ -18,25 +18,60 @@ import type {
 } from '../types';
 
 export type ComposerAiState = {
-  backend: string;
+  backend: 'opencode';
   interventionAvailable: boolean;
   interventionEnabled: boolean;
   currentSessionId: string | null;
-  executionProfileLabel: 'Agent' | 'Mode';
-  executionProfileName: string;
-  executionProfileColor: string | null;
-  effectiveModel: string;
-  provider: string;
-  modelOverride: string | null;
-  opencodeModelFormChoices: WebArgumentFieldChoice[];
-  contextStats: {
-    tokensTotal: number;
-    contextLimit: number | null;
-    contextPercent: number | null;
-  } | null;
+  modelSource: {
+    providerId: string;
+    state: {
+      sourceId: string;
+      title: string;
+      active: boolean;
+      transitionState: 'stable' | 'pending' | 'failed';
+      health:
+        | { status: 'healthy' }
+        | { status: 'degraded' | 'unavailable'; message: string };
+      selectedModelId: string | null;
+      effectiveModelId: string;
+      fallbackReason: 'selected' | 'root' | 'backend-default';
+      catalogRevision: string;
+    };
+    models: Array<{
+      id: string;
+      label: string;
+      description: string | null;
+      group: string;
+      contextWindowTokens: number | null;
+      inputModalities: string[];
+      outputModalities: string[];
+      features: string[];
+      privacy: string | null;
+      price: {
+        inputPerMillionTokens: string | null;
+        outputPerMillionTokens: string | null;
+        currency: string;
+      } | null;
+      favorite: boolean;
+      lastUsedAt: string | null;
+      availability:
+        { status: 'available' } | { status: 'unavailable'; reason: string };
+    }>;
+  };
+  modelSources: Array<{
+    providerId: string;
+    alias: string;
+    title: string;
+    active: boolean;
+    health:
+      | { status: 'healthy' }
+      | { status: 'degraded' | 'unavailable'; message: string };
+  }>;
+  contextStats: AiModelSourceContextUsage | null;
 };
 
 export type RunWebActionParams = {
+  onCommandSettled?: (error: string | null) => void;
   onReplaceRoot?: (root: WebNodeRoot) => void;
   getWebRoot?: () => WebNodeRoot;
   applyOptimisticMutations?: (mutations: WebOptimisticMutation[]) => void;

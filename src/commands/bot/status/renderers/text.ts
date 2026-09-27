@@ -1,69 +1,43 @@
-import type {
-  AgentBackendName,
-  AgentMode,
-  Linting,
-  ProviderName,
-  WorkspaceTarget,
-} from '@src/db';
 import { C } from '@src/logger';
 import type { TextRenderContext } from '@src/system/render-context';
-import { formatMsats, msats } from '@src/types';
 
 import type { BotStatusRepresentation } from '../representation';
-
-const STATUS_EMOJI = {
-  backend: (v: AgentBackendName) =>
-    v === 'cursor' ? '🖱️' : v === 'opencode' ? '📦' : '📦',
-  provider: (v: ProviderName) => (v === 'local' ? '💻' : '🌐'),
-  mode: (v: AgentMode) =>
-    ({ free: '🆓', ask: '💬', plan: '📋', agent: '🤖' })[v],
-  linting: (v: Linting) => (v === 'on' ? '✅' : '❌'),
-  workspace: (v: WorkspaceTarget) => (v === 'appweaver' ? '🤖' : '📁'),
-} as const;
 
 export function renderBotStatusText(
   representation: BotStatusRepresentation,
   _context: TextRenderContext,
 ): string {
   const d = representation.data;
-  const col = 14;
 
-  const lbl = (name: string) =>
-    `${C.bold}${(name + ':').padEnd(col)}${C.reset}`;
+  const label = (name: string) =>
+    `${C.bold}${(name + ':').padEnd(18)}${C.reset}`;
 
-  const modelDisplay = d.modelOverride
-    ? `${d.modelOverride} ${C.gray}(override)${C.reset}`
-    : d.resolvedModelName;
+  const update = d.coreUpdate;
 
-  const providerDisplay =
-    d.provider === 'routstr'
-      ? `${STATUS_EMOJI.provider('routstr')} ${C.magenta}routstr${C.reset} (budget: ${formatMsats(msats(d.routstrBudgetMsatsRaw ?? 0))})`
-      : `${STATUS_EMOJI.provider('local')} local`;
-
-  const updateDisplay = d.coreUpdate
-    ? d.coreUpdate.state === 'available'
-      ? ` ${C.green}(${d.coreUpdate.updateLevel} update available: ${d.coreUpdate.remoteVersion ?? d.coreUpdate.remoteRef ?? 'remote'})${C.reset}`
-      : d.coreUpdate.state === 'checking'
-        ? ` ${C.gray}(checking for updates…)${C.reset}`
-        : d.coreUpdate.state === 'unavailable'
-          ? ` ${C.gray}(update check unavailable)${C.reset}`
-          : ` ${C.gray}(up to date)${C.reset}`
-    : '';
+  const version = !update
+    ? d.version
+    : update.state === 'available'
+      ? `${update.localVersion ?? d.version} -> ${update.remoteVersion ?? update.remoteRef ?? 'remote'} - ${update.updateLevel === 'same' || update.updateLevel === 'unknown' ? 'update' : `${update.updateLevel} update`} available`
+      : update.state === 'checking'
+        ? `${d.version} - checking`
+        : update.state === 'unavailable'
+          ? `${d.version} - check unavailable`
+          : `${update.localVersion ?? d.version} - up to date`;
 
   const lines = [
-    `${lbl('Backend')} ${STATUS_EMOJI.backend(d.backend)} ${C.magenta}${d.backend}${C.reset}`,
-    `${lbl('Provider')} ${providerDisplay}`,
-    `${lbl('Version')} ${d.version}${updateDisplay}`,
-    `${lbl('Mode')} ${STATUS_EMOJI.mode(d.mode)} ${d.mode}`,
-    `${lbl('Linting')} ${STATUS_EMOJI.linting(d.linting)} ${d.linting}`,
-    `${lbl('Model')} ${modelDisplay}`,
-    `${lbl('Workspace')} ${STATUS_EMOJI.workspace(d.workspace)} ${d.workspace}`,
-    `${lbl('Relays')} ${d.botRelayUrls.join(', ')}`,
-    `${lbl('Session')} ${d.sessionId ?? `${C.gray}(none)${C.reset}`}`,
+    `${label('Workspace')} ${d.workspace}`,
+    `${label('Session')} ${d.sessionId ?? '(none)'}`,
+    `${label('Linting')} ${d.linting}`,
+    `${label('Version')} ${version}`,
+    `${label('Relays')} ${d.botRelayUrls.length > 0 ? d.botRelayUrls.join(', ') : '(none)'}`,
   ];
 
   if (d.opencodeServeUrl) {
-    lines.push(`${lbl('Serve')} ${d.opencodeServeUrl} (attached)`);
+    lines.push(`${label('Serve')} ${d.opencodeServeUrl} (attached)`);
+  }
+
+  if (d.coreUpdate?.message) {
+    lines.push(`${label('Update')} ${d.coreUpdate.message}`);
   }
 
   return lines.join('\n');

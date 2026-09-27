@@ -3,20 +3,18 @@ import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
 
 import { createBackend } from '@src/backends/factory';
-import { listOpencodeModelCatalog } from '@src/backends/opencode-config';
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import type {
   AgentBackend,
   ChatCompletionMessage,
   ChatCompletionResult,
 } from '@src/backends/types';
+import { createModelSourceCoordinator } from '@src/core/model-source';
 import {
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getModelOverride,
-  getProviderName,
   getState,
   getWorkspaceTarget,
   STATE_INFERENCE_API_KEY_HASH,
+  type WorkspaceTarget,
 } from '@src/db';
 import { verifyInferenceApiKey } from '@src/inference/api-key';
 
@@ -113,22 +111,10 @@ async function parseRequestBody(req: Request): Promise<ChatCompletionRequest> {
   return ChatCompletionRequestSchema.parse(JSON.parse(body) as unknown);
 }
 
-function createInferenceBackend(
-  ctx: WebRouteContext,
-  modelOverride: string | null,
-): AgentBackend {
-  const backendName = getAgentBackend(ctx.seenDb);
-  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
-
+function createInferenceBackend(ctx: WebRouteContext): AgentBackend {
   return createBackend({
-    backendName,
+    backendName: 'opencode',
     dmBotRoot: ctx.dmBotRoot,
-    cursorMode: 'ask',
-    opencodeAgentName:
-      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-    attachUrl: ctx.attachUrl,
-    modelOverride,
-    providerName: getProviderName(ctx.seenDb),
   });
 }
 
@@ -173,21 +159,18 @@ function usageFromResult(result: ChatCompletionResult): {
 }
 
 async function handleModels(ctx: WebRouteContext): Promise<Response> {
-  const backendName = getAgentBackend(ctx.seenDb);
-
-  const backend = createInferenceBackend(
-    ctx,
-    getModelOverride(ctx.seenDb, backendName),
+  const models = await createModelSourceCoordinator(ctx.seenDb).listModels(
+    getWorkspaceTarget(ctx.seenDb),
+    'opencode',
   );
-
-  const models =
-    backend.name === 'opencode'
-      ? listOpencodeModelCatalog(inferenceCwd(ctx)).map((entry) => entry.value)
-      : await backend.availableModels();
 
   return jsonResponse({
     object: 'list',
-    data: models.map((id) => ({ id, object: 'model', owned_by: backend.name })),
+    data: models.map((model) => ({
+      id: model.id,
+      object: 'model',
+      owned_by: model.group,
+    })),
   });
 }
 
@@ -195,8 +178,12 @@ type CompletionContext = {
   id: string;
   created: number;
   request: ChatCompletionRequest;
+  runtimeModelId: string;
+  providerId: string;
   backend: AgentBackend;
   cwd: string;
+  workspace: WorkspaceTarget;
+  db: WebRouteContext['seenDb'];
 };
 
 type RunCompletionProps = {
@@ -210,13 +197,22 @@ async function runCompletion({
   onChunk,
   abortSignal,
 }: RunCompletionProps): Promise<ChatCompletionResult> {
-  return context.backend.runChatCompletion({
+  const result = await context.backend.runChatCompletion({
     messages: normalizeMessages(context.request),
-    model: context.request.model,
+    model: context.runtimeModelId,
     cwd: context.cwd,
     onChunk,
     abortSignal,
   });
+
+  await createModelSourceCoordinator(context.db).recordSuccessfulUse(
+    context.workspace,
+    'opencode',
+    context.request.model,
+    context.providerId,
+  );
+
+  return result;
 }
 
 async function handleNonStreamingCompletion(
@@ -235,7 +231,7 @@ async function handleNonStreamingCompletion(
     id: context.id,
     object: 'chat.completion',
     created: context.created,
-    model: result.model,
+    model: context.request.model,
     choices: [
       {
         index: 0,
@@ -307,24 +303,27 @@ function handleStreamingCompletion(
 
       emitDelta({ role: 'assistant' });
 
-      void runCompletion({
-        context,
-        onChunk: (chunk) => {
-          emitDelta(
-            chunk.type === 'text_delta'
-              ? { content: chunk.content }
-              : { reasoning_content: chunk.content },
-          );
-        },
-        abortSignal,
-      })
+      void opencodeRuntimeController
+        .holdUntil(() =>
+          runCompletion({
+            context,
+            onChunk: (chunk) => {
+              emitDelta(
+                chunk.type === 'text_delta'
+                  ? { content: chunk.content }
+                  : { reasoning_content: chunk.content },
+              );
+            },
+            abortSignal,
+          }),
+        )
         .then((result) => {
           enqueue(
             sseData({
               id: context.id,
               object: 'chat.completion.chunk',
               created: context.created,
-              model: result.model,
+              model: context.request.model,
               choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
               ...(context.request.stream_options?.include_usage
                 ? { usage: usageFromResult(result) }
@@ -383,20 +382,40 @@ async function handleChatCompletion(
     return errorResponse(message, status);
   }
 
-  const context: CompletionContext = {
-    id: `chatcmpl-${randomUUID()}`,
-    created: Math.floor(Date.now() / 1000),
-    request,
-    backend: createInferenceBackend(ctx, request.model),
-    cwd: inferenceCwd(ctx),
-  };
-
-  if (request.stream) {
-    return handleStreamingCompletion(context, req.signal);
-  }
+  const workspace = getWorkspaceTarget(ctx.seenDb);
 
   try {
-    return await handleNonStreamingCompletion(context, req.signal);
+    return await opencodeRuntimeController.withPreparedRun({
+      prepare: () =>
+        createModelSourceCoordinator(ctx.seenDb).prepareRun(
+          workspace,
+          'opencode',
+        ),
+      run: async (prepared) => {
+        if (request.model !== prepared.modelId) {
+          return errorResponse(
+            `Model must match the active model-source selection: ${prepared.modelId}`,
+            400,
+          );
+        }
+
+        const context: CompletionContext = {
+          id: `chatcmpl-${randomUUID()}`,
+          created: Math.floor(Date.now() / 1000),
+          request,
+          runtimeModelId: prepared.runtimeModelId,
+          providerId: prepared.providerId,
+          backend: createInferenceBackend(ctx),
+          cwd: inferenceCwd(ctx),
+          workspace,
+          db: ctx.seenDb,
+        };
+
+        return request.stream
+          ? handleStreamingCompletion(context, req.signal)
+          : handleNonStreamingCompletion(context, req.signal);
+      },
+    });
   } catch (err) {
     return errorResponse(err instanceof Error ? err.message : String(err), 500);
   }

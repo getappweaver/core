@@ -93,12 +93,8 @@ ${JSON.stringify(eventTemplate, null, 2)}
 User instruction:
 ${instruction}
 
-Return only valid JSON for the full edited event template. Do not use markdown fences. Preserve the existing kind unless the user explicitly asked to change it.`,
+    Return only valid JSON for the full edited event template. Do not use markdown fences. Preserve the existing kind unless the user explicitly asked to change it.`,
     sessionId: null,
-    backend: null,
-    provider: null,
-    model: null,
-    mode: null,
     workspaceTarget: null,
     cwd: null,
     onAgentStreamChunk: null,

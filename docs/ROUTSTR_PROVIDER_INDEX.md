@@ -1,5 +1,11 @@
 # Routstr Provider Index
 
+Historical implementation notes for the Routstr index and command surface. The
+`/ai provider` selection and first-class `/routstr` command described below are
+not part of the current public command registry. Routstr is not yet an installable
+model-source plugin; the current AI runtime is OpenCode with a core model source
+and optional model-source apps.
+
 ## Goal
 
 Routstr is not a single provider endpoint. It is a marketplace of providers announced through Nostr. AppWeaver should discover Routstr providers, index their model catalogs and prices, and let the user choose a model and provider based on price and other provider metadata.
@@ -88,7 +94,7 @@ The old model cache was a single JSON blob fetched from `https://api.routstr.com
 - Lists providers for that model.
 - Shows endpoint, provider identifier, input/output/request prices, context length, and model name when available.
 
-`/routstr add-model <model-id>` now reads model metadata from the indexed provider/model rows instead of the old single-provider cache.
+The historical index stored models for inspection. Adding them directly to OpenCode configuration has been retired; model-source apps own their runtime catalogs.
 
 ## Current Limitations
 

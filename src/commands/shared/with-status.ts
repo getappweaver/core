@@ -66,7 +66,7 @@ export async function appendStatusBlock(
     };
   }
 
-  const rep = createBotStatusRepresentation(statusPropsFromContext(ctx));
+  const rep = await createBotStatusRepresentation(statusPropsFromContext(ctx));
   const status = renderBotStatusText(rep, { prefix: ctx.prefix });
 
   return `${body}\n\n${status}`;

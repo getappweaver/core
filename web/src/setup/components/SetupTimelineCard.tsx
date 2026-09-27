@@ -40,9 +40,6 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
   const [savingDefaults, setSavingDefaults] = createSignal(false);
   const [relayText, setRelayText] = createSignal(initialRelays());
   const [prefix, setPrefix] = createSignal(props.status.runtime.prefix);
-  const [backend, setBackend] = createSignal(props.status.defaults.backend);
-  const [provider, setProvider] = createSignal(props.status.defaults.provider);
-  const [mode, setMode] = createSignal(props.status.defaults.mode);
 
   const [workspace, setWorkspace] = createSignal(
     props.status.defaults.workspace,
@@ -64,9 +61,6 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
 
   createEffect(() => {
     setPrefix(props.status.runtime.prefix);
-    setBackend(props.status.defaults.backend);
-    setProvider(props.status.defaults.provider);
-    setMode(props.status.defaults.mode);
     setWorkspace(props.status.defaults.workspace);
     setLinting(props.status.defaults.linting);
     setReadyNotification(props.status.defaults.readyNotification);
@@ -147,9 +141,6 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
   async function saveDefaults(): Promise<void> {
     const defaults: SetupDefaults = {
       prefix: prefix(),
-      backend: backend(),
-      provider: provider(),
-      mode: mode(),
       workspace: workspace(),
       linting: linting(),
       readyNotification: readyNotification(),
@@ -374,49 +365,6 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
                   </small>
                 </label>
                 <label class="field-block">
-                  <span class="field-label">Backend</span>
-                  <select
-                    value={backend()}
-                    onChange={(event) => setBackend(event.currentTarget.value)}
-                  >
-                    <option value="opencode">opencode</option>
-                    <option value="cursor">cursor</option>
-                  </select>
-                  <small>
-                    OpenCode is the recommended default. Cursor is available if
-                    you already use Cursor cloud agents.
-                  </small>
-                </label>
-                <label class="field-block">
-                  <span class="field-label">Provider</span>
-                  <select
-                    value={provider()}
-                    onChange={(event) => setProvider(event.currentTarget.value)}
-                  >
-                    <option value="local">local</option>
-                    <option value="routstr">routstr</option>
-                  </select>
-                  <small>
-                    Local uses your selected backend/provider config. Routstr
-                    routes paid requests through the Cashu-backed provider flow.
-                  </small>
-                </label>
-                <label class="field-block">
-                  <span class="field-label">Mode</span>
-                  <select
-                    value={mode()}
-                    onChange={(event) => setMode(event.currentTarget.value)}
-                  >
-                    <option value="ask">ask</option>
-                    <option value="plan">plan</option>
-                    <option value="agent">agent</option>
-                  </select>
-                  <small>
-                    Ask answers questions, plan proposes changes, and agent can
-                    edit files in the selected workspace.
-                  </small>
-                </label>
-                <label class="field-block">
                   <span class="field-label">Lint auto</span>
                   <select
                     value={linting()}
@@ -427,8 +375,8 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
                   </select>
                   <small>
                     Use this if your selected workspace can run{' '}
-                    <code>bun run lint</code>. In agent mode, AppWeaver will run
-                    lint after edits and do one automatic fix pass if it fails.
+                    <code>bun run lint</code>. AppWeaver runs lint only after a
+                    run changes files and does one automatic fix pass if needed.
                   </small>
                 </label>
                 <label class="field-block setup-checkbox-field">
@@ -459,25 +407,18 @@ export function SetupTimelineCard(props: SetupTimelineCardProps): JSX.Element {
                 >
                   {savingDefaults() ? 'Saving...' : 'Save defaults'}
                 </button>
-                <span class="setup-inline-code">
-                  {backend()} / {provider()} / {mode()}
-                </span>
               </div>
               <Show when={workspace() === 'parent'}>
                 <p class="setup-warning-line">
-                  Saving defaults with OpenCode + parent workspace also installs
-                  missing OpenCode symlinks and agent templates automatically.
+                  Saving defaults for the parent workspace also installs missing
+                  OpenCode workspace assets automatically.
                 </p>
               </Show>
               <Show when={defaultsInstallResult()}>
-                {(installed) => (
-                  <p class="setup-inline-code">
-                    Parent assets checked:{' '}
-                    {installed().symlinks.installed.length} symlink(s)
-                    installed, {installed().symlinks.conflicts.length}{' '}
-                    conflict(s)
-                  </p>
-                )}
+                <p class="setup-inline-code">
+                  Parent workspace assets checked; managed OpenCode
+                  configuration is independent.
+                </p>
               </Show>
               <Show when={defaultsError()}>
                 {(error) => <p class="setup-error-line">{error()}</p>}

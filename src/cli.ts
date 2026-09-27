@@ -10,11 +10,21 @@ import { z } from 'zod';
 
 import { cliRegistry } from '../generated/cli-registry';
 
+import { initializeManagedOpencodeConfigs } from './backends/opencode-managed-config';
+import { configureOpencodeRuntimeController } from './backends/opencode-runtime-controller';
 import { disposeOpencodeSdk } from './backends/opencode-sdk';
+import { capabilityRegistry } from './core/capabilities/registry';
+import { registerCoreModelSource } from './core/model-source';
 import { createPluginAgentService } from './core/plugin-agent';
-import { getDmCommandPrefix, getWotScore, openCoreDb } from './db';
+import {
+  getDmCommandPrefix,
+  getWorkspaceTarget,
+  getWotScore,
+  openCoreDb,
+} from './db';
 import { loadBotConfig } from './env';
 import { dmBotRoot, getParentWorkspaceRoot } from './paths';
+import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
 
 type CliArgs = {
   alias: string | null;
@@ -209,6 +219,26 @@ async function main(): Promise<void> {
 
   const db = aiDefinition.openDb();
   const coreDb = openCoreDb();
+  const parentOfBotRoot = getParentWorkspaceRoot();
+
+  await initializeManagedOpencodeConfigs({
+    appweaverRoot: dmBotRoot,
+    parentRoot: parentOfBotRoot,
+  });
+
+  ensureOpencodeParentWorkspaceAssets({
+    workspace: getWorkspaceTarget(coreDb),
+    dmBotRoot,
+    parentOfBotRoot,
+  });
+
+  configureOpencodeRuntimeController({
+    appweaver: dmBotRoot,
+    parent: parentOfBotRoot,
+  });
+
+  registerCoreModelSource({ db: coreDb, dmBotRoot, parentOfBotRoot });
+  capabilityRegistry.finalize();
   const config = loadBotConfig();
   const pool = new SimplePool();
 
@@ -229,7 +259,7 @@ async function main(): Promise<void> {
     const agent = createPluginAgentService({
       db: coreDb,
       dmBotRoot,
-      parentOfBotRoot: getParentWorkspaceRoot(),
+      parentOfBotRoot,
       attachUrl: process.env.BOT_OPENCODE_SERVE_URL ?? null,
     });
 

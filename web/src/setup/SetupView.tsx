@@ -13,7 +13,6 @@ import { useConnect } from '../connect/useConnect';
 import { useNostrAuth } from '../contexts/NostrAuthContext';
 
 import { CashuSetupCard } from './components/CashuSetupCard';
-import { CursorSetupCard } from './components/CursorSetupCard';
 import { NostrToolingCard } from './components/NostrToolingCard';
 import { OpenCodeAuthCard } from './components/OpenCodeAuthCard';
 import { PiperSetupCard } from './components/PiperSetupCard';
@@ -218,11 +217,6 @@ export function SetupView(): JSX.Element {
                     onSaved={() => void refetch()}
                   />
                   <OpenCodeAuthCard token={setupToken()!} status={loaded()} />
-                  <CursorSetupCard
-                    token={setupToken()!}
-                    status={loaded()}
-                    onSaved={() => void refetch()}
-                  />
                   <WebPushSetupCard
                     token={setupToken()!}
                     status={loaded()}

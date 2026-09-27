@@ -6,6 +6,7 @@ import { createWorkspaceSkillsTable } from '../skills/manager';
 import { createTimelineTables } from '../timeline/db';
 import { createWebPushSubscriptionTables } from '../web/push-subscriptions';
 
+import { createModelSourceTables } from './model-source';
 import { createRoutstrIndexTables } from './routstr-index';
 import type { CoreDb } from './shared';
 import { createToolInvocationRulesTable } from './tool-invocation-rules';
@@ -37,7 +38,17 @@ export function openCoreDb(): CoreDb {
     /* Column already exists */
   }
 
-  db.run("UPDATE sessions SET backend = 'cursor' WHERE backend = 'cursor-sdk'");
+  const sessionColumns = db
+    .query('PRAGMA table_info(sessions)')
+    .all() as Array<{ name: string }>;
+
+  if (sessionColumns.some((column) => column.name === 'execution_policy')) {
+    db.run('ALTER TABLE sessions DROP COLUMN execution_policy');
+  }
+
+  db.run(
+    "UPDATE sessions SET backend = 'opencode' WHERE backend IN ('cursor', 'cursor-sdk')",
+  );
 
   db.run(
     "UPDATE sessions SET backend = 'opencode' WHERE backend = 'opencode-sdk'",
@@ -45,9 +56,7 @@ export function openCoreDb(): CoreDb {
 
   db.run('CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT)');
 
-  db.run(
-    "UPDATE state SET value = 'cursor' WHERE key = 'agent_backend' AND value = 'cursor-sdk'",
-  );
+  db.run("UPDATE state SET value = 'opencode' WHERE key = 'agent_backend'");
 
   db.run(
     "UPDATE state SET value = 'opencode' WHERE key = 'agent_backend' AND value = 'opencode-sdk'",
@@ -89,6 +98,7 @@ export function openCoreDb(): CoreDb {
   createWorkspaceSkillsTable(db as CoreDb);
   createWorkspaceInstructionsTable(db as CoreDb);
   createToolInvocationRulesTable(db as CoreDb);
+  createModelSourceTables(db as CoreDb);
 
   return db as CoreDb;
 }

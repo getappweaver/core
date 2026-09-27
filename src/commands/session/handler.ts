@@ -116,8 +116,13 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
   }
 
   if (sub === 'list') {
+    const limitFlagIndex = args.indexOf('--limit');
+
+    const limit =
+      limitFlagIndex === -1 ? undefined : Number(args[limitFlagIndex + 1]);
+
     return handleError(
-      async () => render(handleSessionList({ db: ctx.seenDb })),
+      async () => render(handleSessionList({ db: ctx.seenDb, limit })),
       'Failed to list sessions',
     );
   }

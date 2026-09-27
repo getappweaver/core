@@ -12,7 +12,6 @@ export const SchedulerTaskV2Schema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('agent-prompt'),
     prompt: z.string().min(1),
-    mode: z.literal('agent'),
     workspaceTarget: z.literal('appweaver'),
   }),
   z.object({

@@ -451,7 +451,7 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
               inputEl = el;
             }}
             class="web-textField__input"
-            type="text"
+            type={props.element.props?.inputType ?? 'text'}
             name={fieldName()}
             value={props.element.props?.value ?? ''}
             placeholder={props.element.props?.inputPlaceholder}

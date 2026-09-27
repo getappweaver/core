@@ -5,16 +5,28 @@ import type { SessionListRepresentation } from './representation';
 
 type HandleSessionListProps = {
   db: CoreDb;
+  limit?: number;
 };
+
+const DEFAULT_SESSION_LIST_LIMIT = 20;
+const MAX_SESSION_LIST_LIMIT = 200;
 
 export function handleSessionList(
   props: HandleSessionListProps,
 ): SessionListRepresentation {
+  const limit = props.limit ?? DEFAULT_SESSION_LIST_LIMIT;
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_SESSION_LIST_LIMIT) {
+    throw new Error(
+      `Session list limit must be an integer from 1 to ${MAX_SESSION_LIST_LIMIT}.`,
+    );
+  }
+
   const rows = props.db
     .prepare(
-      'SELECT id, created_at, backend FROM sessions ORDER BY created_at DESC',
+      'SELECT id, created_at, backend FROM sessions ORDER BY created_at DESC LIMIT ?',
     )
-    .all() as { id: string; created_at: number; backend: string }[];
+    .all(limit) as { id: string; created_at: number; backend: string }[];
 
   if (rows.length === 0) {
     return {

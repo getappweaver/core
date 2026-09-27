@@ -5,20 +5,13 @@
 import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
-import { getAiAgentDeleteSubcommandDefinition } from './agent/delete/definition';
-import { getAiAgentEditSubcommandDefinition } from './agent/edit/definition';
-import { getAiAgentModalSubcommandDefinition } from './agent/modal/definition';
-import { getAiAgentNewSubcommandDefinition } from './agent/new/definition';
-import { getAiAgentRestoreSubcommandDefinition } from './agent/restore/definition';
-import { getAiAgentSaveSubcommandDefinition } from './agent/save/definition';
-import { getAiAgentSetSubcommandDefinition } from './agent/set/definition';
-import { getAiAgentUpsertJsonSubcommandDefinition } from './agent/upsert-json/definition';
-import { getAiBackendSubcommandDefinition } from './backend/definition';
-import { getAiModeSubcommandDefinition } from './mode/definition';
 import { getAiModelSubcommandDefinition } from './model/definition';
+import {
+  getAiFavoriteSubcommandDefinition,
+  getAiRecentLimitSubcommandDefinition,
+  getAiUnfavoriteSubcommandDefinition,
+} from './model-source-definitions';
 import { getAiModelsSubcommandDefinition } from './models/definition';
-import { getAiProviderSubcommandDefinition } from './provider/definition';
-import { getAiRootModelSubcommandDefinition } from './root-model/definition';
 
 type GetAiCommandDefinitionProps = {
   prefix: string;
@@ -31,28 +24,53 @@ export function getAiCommandDefinition({
 
   return {
     name: 'ai',
-    summary: 'Agent mode, backend, models, and payment provider (Routstr).',
+    summary: 'Select and inspect models from the active model source.',
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'ai', {
         topicArgSummary:
-          'Optional: mode, backend, model, models, provider, agents.',
-        exampleTopics: ['mode', 'backend', 'model', 'agents', 'provider'],
+          'Optional: source, model, models, favorite, unfavorite, recent-limit.',
+        exampleTopics: ['source', 'model', 'models'],
       }),
-      getAiModeSubcommandDefinition(p),
-      getAiBackendSubcommandDefinition(p),
+      {
+        name: 'source',
+        summary:
+          'Show installed model sources or activate one for this workspace.',
+        aliases: [],
+        arguments: [
+          {
+            name: 'source',
+            summary: 'Model source alias (core, ppq) or provider ID',
+            kind: 'string',
+            required: false,
+            variadic: false,
+          },
+        ],
+        options: [],
+        examples: [`${p}ai source`, `${p}ai source ppq`, `${p}ai source core`],
+      },
       getAiModelSubcommandDefinition(p),
       getAiModelsSubcommandDefinition(p),
-      getAiAgentModalSubcommandDefinition(p),
-      getAiAgentNewSubcommandDefinition(p),
-      getAiAgentEditSubcommandDefinition(p),
-      getAiAgentDeleteSubcommandDefinition(p),
-      getAiAgentUpsertJsonSubcommandDefinition(p),
-      getAiAgentSaveSubcommandDefinition(p),
-      getAiAgentSetSubcommandDefinition(p),
-      getAiAgentRestoreSubcommandDefinition(p),
-      getAiRootModelSubcommandDefinition(p),
-      getAiProviderSubcommandDefinition(p),
+      getAiFavoriteSubcommandDefinition(),
+      getAiUnfavoriteSubcommandDefinition(),
+      getAiRecentLimitSubcommandDefinition(),
+      {
+        name: 'runtime',
+        summary:
+          'Inspect or recover a managed OpenCode configuration transition.',
+        aliases: [],
+        arguments: [
+          {
+            name: 'action',
+            summary: 'status, cancel, retry, or force-restart',
+            kind: 'string',
+            required: false,
+            variadic: false,
+          },
+        ],
+        options: [],
+        examples: [`${p}ai runtime status`, `${p}ai runtime retry`],
+      },
     ],
   };
 }

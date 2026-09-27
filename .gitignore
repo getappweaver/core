@@ -29,3 +29,6 @@ web/public/plugin-icons/
 web/public/builtin-icons/
 NOTES.md
 Caddyfile
+/opencode.json
+/.appweaver/opencode.json
+/.appweaver/ppq/

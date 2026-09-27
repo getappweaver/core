@@ -5,3 +5,4 @@ export * from './db/routstr-index';
 export * from './db/wot';
 export * from './db/workspace-instructions';
 export * from './db/tool-invocation-rules';
+export * from './db/model-source';

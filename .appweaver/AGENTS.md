@@ -39,6 +39,13 @@ Before changing files, running implementation commands, linting, or applying the
 - If the prompt mixes discussion and possible implementation, prefer discussion first. State what you understand and ask one concise question, or offer the likely next change without applying it.
 - Once the user confirms a concrete direction or asks for edits, switch to implementation mode and carry the change through verification as appropriate.
 
+## Keep implementation plans current
+
+- When a feature has an implementation plan, whether attached to its design document or in a separate file, treat that document as the durable progress record. Locate and read it before working on the feature.
+- Update the plan **as work progresses**, not just in a final progress report: check off completed items after implementation and required verification, leave unimplemented or unverified items unchecked, and split partially completed items so the remaining work is explicit.
+- If the user changes requirements or scope during the conversation, revise the plan at the same time as the implementation. Add new work, remove or mark superseded steps, and keep descriptions and exit criteria consistent with the agreed direction.
+- Before wrapping up, reconcile the plan against the actual files and state what remains. Do not rely on conversation summaries to preserve project status across sessions or context compaction.
+
 ## Web command UI
 
 Rich command output uses `WebNodeRoot` and optional per-render `stylesheets` (Shadow DOM). See `docs/WEB_RENDERER.md` (section “Scoped styles”).
@@ -208,6 +215,7 @@ When the bot runs in `agent` mode after an implementation/change request:
 - Do not add unit, regression, integration, or end-to-end tests unless the user explicitly asks for them.
 - Do not run test commands unless the user explicitly asks for them.
 - A narrowly scoped one-off check, such as `bun -e '...'`, is allowed only when it directly validates the change and is more practical than manual inspection. Do not use it as a default verification step.
+- Do not try to smoke-test AppWeaver in a regular Chrome/browser session. Authenticated AppWeaver flows require the user's Nostr account through a browser extension or connected bunker. Only perform browser testing when the user explicitly confirms that an authenticated browser context is available; otherwise rely on static checks and ask the user to verify authenticated behavior.
 
 ---
 
@@ -229,38 +237,21 @@ When editing or extending AppWeaver, use this as the map. AppWeaver is an open-s
 
 - **SQLite** at `dm-bot.sqlite` (same dir as `index.ts`; filename kept for compatibility):
   - `seen_events(id)` – event ids already processed (avoids duplicate on restart).
-  - `sessions(id, created_at, backend)` – agent session IDs with backend tag (`cursor` or `opencode`).
+  - `sessions(id, created_at, backend)` – agent session IDs with backend tag (legacy records may still have `cursor`).
   - `session_messages(session_id, role, content, created_at)` – conversation history per session.
   - `state(key, value)` – key/value; keys include:
     - `current_session_id` – active session ID
     - `default_mode` – `ask` | `plan` | `agent`
-    - `agent_backend` – `cursor` | `opencode`
+    - `agent_backend` – `opencode` (legacy values normalize to OpenCode)
     - `reply_transport` – `remote` | `local`
     - `workspace_target` – `parent` | `appweaver`
 - **Restart signal**: file `restart.requested` in the project root. Create/touch it to restart the bot when using `watch`; the watcher removes it and restarts the process. There is **no** auto-restart on file edits — that is intentional.
 
 ## Agent backends
 
-Two backends are supported, switchable at runtime via `<prefix>backend cursor|opencode` (default `/backend cursor|opencode`). State persisted in DB.
+OpenCode is the only active agent backend. `createBackend()` uses the OpenCode SDK and the managed runtime controller. Legacy backend names in saved state normalize to OpenCode; there is no backend-switching command. Workspace model selection uses the `ai-model-source` capability: core exposes the normal OpenCode catalog, and installed apps may register their own source. Use `<prefix>ai source` to list sources and `<prefix>ai source core` to select the core catalog. PPQ is an optional model-source app; Routstr has no model-source plugin yet.
 
-### Cursor backend (default)
-- Invokes `agent create-chat` to create sessions (returns a UUID)
-- Runs messages via: `agent -p --model auto --workspace <cwd> --trust --yolo [--mode=ask|--mode=plan|-f] --resume <sessionId> <content>`
-- Session IDs are UUID v4 format
-
-### OpenCode backend
-- Creates sessions by running first message and parsing JSONL output for `sessionID`
-- Runs messages via: `opencode run <content> --format json --session <id> --agent <ask|plan|build>`
-- If `BOT_OPENCODE_SERVE_URL` is set, adds `--attach <url>` to all calls
-- Session IDs are `ses_XXX` format
-- Output is JSONL; parser collects `type:text` events and accumulates tokens/cost from `type:step_finish`
-
-### Mode → agent mapping (OpenCode)
-| AppWeaver mode | OpenCode `--agent` | Model (in opencode.json) |
-|---|---|---|
-| `<prefix>ask` | `ask` | `ppq/google/gemini-2.5-flash-lite` |
-| `<prefix>plan` | `plan` | `ppq/claude-opus-4.5` |
-| `<prefix>agent` | `build` | `ppq/claude-sonnet-4.5` |
+The canonical normal OpenCode config lives at `<workspace>/.appweaver/opencode.json`; AppWeaver materializes the active runtime config at `<workspace>/opencode.json`. See `docs/PPQ_PLUGIN_DESIGN_AND_IMPLEMENTATION_PLAN.md` for the managed config and model-source design.
 
 ## ANSI colors (local terminal only)
 
@@ -279,10 +270,9 @@ Colors are applied for local terminal output and stripped (`stripAnsi()`) before
 ## Where to change what
 
 - **New DM commands**: Add command definitions under `src/commands/`; routing uses the configurable DM prefix from core DB (default `/`).
-- **Agent backends**: `CursorBackend` and `OpenCodeBackend` classes implement `AgentBackend`. Add new backends by implementing the interface and registering in `createBackend()`.
-- **JSONL parsing**: `parseOpenCodeJsonl()` handles OpenCode `--format json` output. Accumulates tokens across multiple steps.
+- **Agent runtime**: `src/backends/factory.ts` creates the OpenCode SDK backend; `src/backends/opencode-runtime-controller.ts` coordinates config transitions and run admission.
+- **Model sources**: `src/core/model-source/` implements the core OpenCode catalog and coordinates installed `ai-model-source` capability providers.
 - **Workspace targeting + auto session reset**: `<prefix>workspace [parent|appweaver]` sets the active workspace target and auto-creates a new session on change.
-- **Backend switching + auto session reset**: `<prefix>backend [cursor|opencode]` sets the active backend and auto-creates a new session on change.
 - **Post-agent lint flow (agent mode)**: After an `agent`-mode run, bot runs `bun run lint` for the active workspace; on lint errors, performs one additional agent round with lint feedback.
 - **Reply formatting / chunking**: `chunkMessage` (max length), `modePrefix()` (colored prefix), `tokenFooter()` (token/cost line).
 - **DM relay discovery**: `getMasterDmRelays` (kind 10050) and `PROFILE_RELAYS`. `sendDm` uses these to decide where to publish.

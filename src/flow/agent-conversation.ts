@@ -1,46 +1,28 @@
 // ---------------------------------------------------------------------------
-// src/flow/agent-conversation.ts — Session, provider, agent run, reply, refund
+// src/flow/agent-conversation.ts — Session, agent run, and reply
 // ---------------------------------------------------------------------------
 
 import type { AgentBackend } from '../backends/types';
 import { getOutputString } from '../backends/types';
-import { parseBudgetAnnotation } from '../budget-annotation';
+import type { PreparedModelRun } from '../core/model-source';
 import type { CoreDb } from '../db';
-import {
-  getCurrentOrDefaultMode,
-  getProviderName,
-  getRoutstrBudget,
-  getWalletDefaultMintUrl,
-  getWorkspaceTarget,
-} from '../db';
-import type { BotConfig } from '../env';
+import { getWorkspaceTarget } from '../db';
 import { C, log } from '../logger';
 import type { MessageSource } from '../messaging';
-import { modePrefix, tokenFooter, sendChunkedReply } from '../messaging';
-import type { ProviderDb } from '../providers/db';
-import { createProvider } from '../providers/factory';
+import { tokenFooter, sendChunkedReply } from '../messaging';
 import { getOrCreateCurrentSession, insertSessionMessage } from '../session';
-import { msatsRaw } from '../types';
-import type { WalletDb } from '../wallet/db';
 
 import { runAgentWithLintFollowUp } from './agent-lint-follow-up';
-import { prepareAutoFlowDeposit } from './auto-flow-deposit';
-import { finalizeAutoFlowRefund } from './auto-flow-refund';
-import { prepareProviderRun } from './prepare-provider-run';
 
 export type RunAgentConversationProps = {
   content: string;
   source: MessageSource;
   sendReplyForSource: (source: MessageSource, message: string) => Promise<void>;
   backend: AgentBackend;
+  prepared: PreparedModelRun;
   seenDb: CoreDb;
   dmBotRoot: string;
   parentOfBotRoot: string;
-  opencodeServeUrl: string | null;
-  config: BotConfig;
-  walletDb: WalletDb | null;
-  providerDb: ProviderDb | null;
-  routstrBaseUrl: string;
 };
 
 export async function runAgentConversation({
@@ -48,17 +30,12 @@ export async function runAgentConversation({
   source,
   sendReplyForSource,
   backend,
+  prepared,
   seenDb,
   dmBotRoot,
   parentOfBotRoot,
-  opencodeServeUrl,
-  config,
-  walletDb,
-  providerDb,
-  routstrBaseUrl,
 }: RunAgentConversationProps): Promise<void> {
   const isLocal = source === 'local';
-  const mode = getCurrentOrDefaultMode(seenDb);
   const currentWorkspace = getWorkspaceTarget(seenDb);
   const cwd = currentWorkspace === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
@@ -70,66 +47,15 @@ export async function runAgentConversation({
 
   insertSessionMessage(seenDb, sessionId, 'user', content);
 
-  const { prompt: effectiveContent, budgetSats: inlineBudget } =
-    parseBudgetAnnotation(content);
-
-  const configuredProviderName = getProviderName(seenDb);
-
-  const isAutoFlow =
-    inlineBudget !== null && configuredProviderName === 'routstr';
-
-  const provider = createProvider({
-    name: configuredProviderName,
-    walletDb,
-    seenDb,
-    providerDb,
-    config,
-    routstrBaseUrl,
-  });
-
-  if (isAutoFlow) {
-    const depositErr = await prepareAutoFlowDeposit({
-      seenDb,
-      cashuDefaultMintUrl: config.cashuDefaultMintUrl,
-      cashuMnemonic: config.cashuMnemonic,
-      walletDb,
-      providerDb,
-      amountSats: inlineBudget,
-    });
-
-    if (depositErr) {
-      await sendReplyForSource(source, depositErr);
-
-      return;
-    }
-  }
-
-  const prepareErr = await prepareProviderRun({
-    provider,
-    budgetSats:
-      inlineBudget != null
-        ? inlineBudget * 1000
-        : msatsRaw(getRoutstrBudget(seenDb)),
-  });
-
-  if (prepareErr) {
-    await sendReplyForSource(source, prepareErr);
-
-    return;
-  }
-
   try {
     const { result: finalResult } = await runAgentWithLintFollowUp({
       dmBotRoot,
-      attachUrl: opencodeServeUrl,
-      mode,
-      configuredProviderName,
       sessionId,
       cwd,
       coreDb: seenDb,
-      effectiveContent,
+      effectiveContent: content,
       currentWorkspace,
-      backendName: backend.name,
+      prepared,
     });
 
     const finalOutput = getOutputString(finalResult);
@@ -151,30 +77,7 @@ export async function runAgentConversation({
       log.error(finalOutput);
     }
 
-    const mintUrl = getWalletDefaultMintUrl(seenDb, config.cashuDefaultMintUrl);
-    let spentMsats = 0;
-
-    if (mintUrl) {
-      const cost =
-        finalResult.type === 'success' ? finalResult.cost : undefined;
-
-      const tokens =
-        finalResult.type === 'success' ? finalResult.tokens : undefined;
-
-      const result = await provider.finalizeRun({
-        success: finalResult.type === 'success',
-        sessionId,
-        promptPrefix: effectiveContent,
-        model: backend.modelName,
-        mintUrl,
-        cost,
-        tokens,
-      });
-
-      spentMsats = result.spentMsats;
-    }
-
-    const prefix = modePrefix(mode, isLocal);
+    const spentMsats = 0;
     const footer = tokenFooter(finalResult, isLocal, spentMsats);
 
     let fullReply: string;
@@ -191,10 +94,9 @@ export async function runAgentConversation({
 
       const reasoningText = reasoningSegs.map((s) => s.value).join('\n');
       const thinkingBlock = `${C.dim}<thinking>\n${reasoningText}\n</thinking>${C.reset}\n\n`;
-      const prefixWithNewline = prefix.trimEnd() + '\n';
-      fullReply = prefixWithNewline + thinkingBlock + finalOutput + footer;
+      fullReply = thinkingBlock + finalOutput + footer;
     } else {
-      fullReply = prefix + finalOutput + footer;
+      fullReply = finalOutput + footer;
     }
 
     await sendChunkedReply({
@@ -205,18 +107,8 @@ export async function runAgentConversation({
   } catch (err) {
     log.error(`${C.red}Agent process error:${C.reset} ${String(err)}`);
 
-    sendReplyForSource(source, `<${mode}> Error: ${String(err)}`).catch((e) =>
+    sendReplyForSource(source, `Error: ${String(err)}`).catch((e) =>
       log.error(`Failed to send error reply: ${String(e)}`),
     );
-  } finally {
-    await finalizeAutoFlowRefund({
-      isAutoFlow,
-      walletDb,
-      seenDb,
-      cashuDefaultMintUrl: config.cashuDefaultMintUrl,
-      cashuMnemonic: config.cashuMnemonic,
-      providerDb,
-      sendReply: (msg) => sendReplyForSource(source, msg),
-    });
   }
 }

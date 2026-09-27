@@ -36,6 +36,11 @@ import { getPublicKey } from 'nostr-tools/pure';
 import { hexToBytes } from 'nostr-tools/utils';
 
 import { createBackend } from './backends/factory';
+import { initializeManagedOpencodeConfigs } from './backends/opencode-managed-config';
+import {
+  configureOpencodeRuntimeController,
+  opencodeRuntimeController,
+} from './backends/opencode-runtime-controller';
 import {
   disposeOpencodeSdk,
   getOpenCodeAuthJsonPath,
@@ -44,6 +49,10 @@ import { startLocalCli } from './cli/local-cli';
 import { renderBotStatusText } from './commands/bot/status/renderers/text';
 import { createBotStatusRepresentation } from './commands/bot/status/representation';
 import { routeCommand } from './commands/dispatch';
+import {
+  createModelSourceCoordinator,
+  registerCoreModelSource,
+} from './core/model-source';
 import {
   getPromptPayloadValue,
   type PluginHostContext,
@@ -57,13 +66,10 @@ import {
 } from './core/registry';
 import { createCoreUpdateChecker } from './core/update-check';
 import {
+  CORE_MODEL_SOURCE_PROVIDER_ID,
+  getActiveModelSourceProviderId,
   openCoreDb,
   initSkKeyEncryption,
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
-  getAgentBackend,
-  getModelOverride,
-  getProviderName,
   getDmCommandPrefix,
   getWorkspaceTarget,
   getRoutstrSkKey,
@@ -104,6 +110,7 @@ import {
   type NostrResolutionRuntime,
 } from './nostr/resolution-service';
 import { createWotServices } from './nostr/wot-service';
+import { migrateNwcConnectionState } from './nwc/state';
 import {
   dmBotRoot,
   getParentWorkspaceRoot,
@@ -195,6 +202,25 @@ async function startSetupOnlyMode(props: {
 }): Promise<never> {
   const seenDb = openCoreDb();
   const parentOfBotRoot = getParentWorkspaceRoot();
+
+  await initializeManagedOpencodeConfigs({
+    appweaverRoot: dmBotRoot,
+    parentRoot: parentOfBotRoot,
+  });
+
+  ensureOpencodeParentWorkspaceAssets({
+    workspace: getWorkspaceTarget(seenDb),
+    dmBotRoot,
+    parentOfBotRoot,
+  });
+
+  configureOpencodeRuntimeController({
+    appweaver: dmBotRoot,
+    parent: parentOfBotRoot,
+  });
+
+  registerCoreModelSource({ db: seenDb, dmBotRoot, parentOfBotRoot });
+  await finalizePluginRegistration();
   const prefix = getDmCommandPrefix(seenDb);
 
   const pool = new SimplePool({ enablePing: false, enableReconnect: false });
@@ -306,7 +332,6 @@ async function main() {
     botRelayUrls,
     opencodeServeUrl,
     cashuMnemonic,
-    routstrBaseUrl,
   } = config;
 
   const botSecretKey = hexToBytes(botKeyHex);
@@ -329,7 +354,21 @@ async function main() {
   pool.allowConnectingToRelay = allowRelayOperation;
   installRelayNoticeTracking(pool);
   const seenDb = openCoreDb();
+  migrateNwcConnectionState(seenDb);
   const providerDb = asProviderDb(seenDb);
+  const parentOfBotRoot = getParentWorkspaceRoot();
+
+  await initializeManagedOpencodeConfigs({
+    appweaverRoot: dmBotRoot,
+    parentRoot: parentOfBotRoot,
+  });
+
+  configureOpencodeRuntimeController({
+    appweaver: dmBotRoot,
+    parent: parentOfBotRoot,
+  });
+
+  registerCoreModelSource({ db: seenDb, dmBotRoot, parentOfBotRoot });
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
   const nostrCacheDb = openNostrCacheDb();
 
@@ -369,8 +408,6 @@ async function main() {
   process.once('SIGINT', () => void shutdown(130));
   process.once('SIGTERM', () => void shutdown(143));
 
-  const parentOfBotRoot = getParentWorkspaceRoot();
-
   initializeWorkspaceSkills({
     db: seenDb,
     dmBotRoot,
@@ -378,7 +415,6 @@ async function main() {
   });
 
   ensureOpencodeParentWorkspaceAssets({
-    backend: getAgentBackend(seenDb),
     workspace: getWorkspaceTarget(seenDb),
     dmBotRoot,
     parentOfBotRoot,
@@ -400,16 +436,6 @@ async function main() {
   log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
   startConfiguredPiperService();
 
-  const statusRep = createBotStatusRepresentation({
-    botRelayUrls,
-    seenDb,
-    version: VERSION,
-    coreUpdate: coreUpdateChecker.getSnapshot(),
-    dmBotRoot,
-    parentOfBotRoot,
-    attachUrl: opencodeServeUrl,
-  });
-
   const prefix = getDmCommandPrefix(seenDb);
 
   const wot = createWotServices({
@@ -417,37 +443,6 @@ async function main() {
     nostrResolution,
     rootPubkey: config.masterPubkey,
     fallbackRelays: botRelayUrls,
-  });
-
-  const statusLines = renderBotStatusText(statusRep, { prefix });
-
-  for (const line of statusLines.split('\n')) {
-    log.info(line);
-  }
-
-  log.sep();
-
-  startLocalWebServer({
-    prefix,
-    version: VERSION,
-    botRelayUrls,
-    parentOfBotRoot,
-    dmBotRoot,
-    attachUrl: opencodeServeUrl,
-    coreUpdateChecker,
-    botPubkey,
-    seenDb,
-    pool,
-    walletDb,
-    providerDb,
-    config,
-    wot,
-    nostrResolution,
-    setupSecret,
-    setupMode: false,
-    setupBillboard,
-    host: resolveHost(),
-    port: resolvePort(),
   });
 
   const pwdOutput = process.cwd();
@@ -536,6 +531,17 @@ async function main() {
     pool,
     masterPubkey,
     agent: pluginAgent,
+    workspace: {
+      getActiveTarget: () => getWorkspaceTarget(seenDb),
+      rootFor: (target) =>
+        target === 'appweaver' ? dmBotRoot : parentOfBotRoot,
+    },
+    modelSource: {
+      getActiveProviderId: (target) =>
+        getActiveModelSourceProviderId(seenDb, target),
+      withDrainedRuns: (work) =>
+        opencodeRuntimeController.withDrainedRuns(work),
+    },
     sendReply: (message: string) => sendReplyForSource(replySource, message),
     sendDm: (message: string) =>
       sendDm({
@@ -598,6 +604,64 @@ async function main() {
     await finalizePluginRegistration();
   }
 
+  for (const workspace of ['parent', 'appweaver'] as const) {
+    const selectedSource = getActiveModelSourceProviderId(seenDb, workspace);
+
+    if (selectedSource !== CORE_MODEL_SOURCE_PROVIDER_ID) {
+      // Restore the selected source in the background. Its provider is
+      // responsible for waiting on any plugin-owned startup work; user runs
+      // still pass through the source preflight and runtime admission gate.
+      void createModelSourceCoordinator(seenDb)
+        .setActiveSource(workspace, selectedSource)
+        .catch(() => {
+          log.warn(
+            `Model source for ${workspace} could not be restored; OpenCode tasks remain blocked.`,
+          );
+        });
+    }
+  }
+
+  const statusRep = await createBotStatusRepresentation({
+    botRelayUrls,
+    seenDb,
+    version: VERSION,
+    coreUpdate: coreUpdateChecker.getSnapshot(),
+    dmBotRoot,
+    parentOfBotRoot,
+    attachUrl: opencodeServeUrl,
+  });
+
+  const statusLines = renderBotStatusText(statusRep, { prefix });
+
+  for (const line of statusLines.split('\n')) {
+    log.info(line);
+  }
+
+  log.sep();
+
+  startLocalWebServer({
+    prefix,
+    version: VERSION,
+    botRelayUrls,
+    parentOfBotRoot,
+    dmBotRoot,
+    attachUrl: opencodeServeUrl,
+    coreUpdateChecker,
+    botPubkey,
+    seenDb,
+    pool,
+    walletDb,
+    providerDb,
+    config,
+    wot,
+    nostrResolution,
+    setupSecret,
+    setupMode: false,
+    setupBillboard,
+    host: resolveHost(),
+    port: resolvePort(),
+  });
+
   publishWidgetIcons(getDmCommandPrefix(seenDb));
 
   // --- Message handler: commands, session, agent run, reply ---
@@ -635,24 +699,13 @@ async function main() {
 
     process.stdout.write(`${C.dim}${C.magenta} > ${content}${C.reset}\n`);
 
-    const mode = getCurrentOrDefaultMode(seenDb);
-    const backendName = getAgentBackend(seenDb);
-    const executionProfile = getBackendExecutionProfile(seenDb, backendName);
-    const modelOverride = getModelOverride(seenDb, backendName);
-
-    const backend = createBackend({
-      backendName,
-      dmBotRoot,
-      cursorMode: mode,
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-      attachUrl: opencodeServeUrl,
-      modelOverride,
-      providerName: getProviderName(seenDb),
-    });
-
     const input = content.trim();
     const dmPrefix = getDmCommandPrefix(seenDb);
+
+    const commandBackend = createBackend({
+      backendName: 'opencode',
+      dmBotRoot,
+    });
 
     // Core built-in commands + plugins (prefix from core DB; default /)
     if (input.startsWith(dmPrefix)) {
@@ -667,7 +720,7 @@ async function main() {
         dmBotRoot,
         attachUrl: opencodeServeUrl,
         coreUpdateChecker,
-        backend,
+        backend: commandBackend,
         botPubkey,
         walletDb,
         providerDb,
@@ -713,19 +766,28 @@ async function main() {
       return;
     }
 
-    await runAgentConversation({
-      content,
-      source,
-      sendReplyForSource,
-      backend,
-      seenDb,
-      dmBotRoot,
-      parentOfBotRoot,
-      opencodeServeUrl,
-      config,
-      walletDb,
-      providerDb,
-      routstrBaseUrl,
+    const workspace = getWorkspaceTarget(seenDb);
+
+    await opencodeRuntimeController.withPreparedRun({
+      prepare: () =>
+        createModelSourceCoordinator(seenDb).prepareRun(workspace, 'opencode'),
+      run: async (prepared) => {
+        const backend = createBackend({
+          backendName: 'opencode',
+          dmBotRoot,
+        });
+
+        await runAgentConversation({
+          content,
+          source,
+          sendReplyForSource,
+          backend,
+          prepared,
+          seenDb,
+          dmBotRoot,
+          parentOfBotRoot,
+        });
+      },
     });
   }
 

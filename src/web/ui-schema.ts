@@ -611,6 +611,8 @@ export const WebBasePropsSchema = z.object({
   formFieldName: z.string().min(1).optional(),
   /** `textField`: placeholder; display-only, not a command option hint. */
   inputPlaceholder: z.string().optional(),
+  /** `textField`: mask credentials without embedding their values in the UI tree. */
+  inputType: z.enum(['text', 'password']).optional(),
   /** `select`: allowed option values. */
   choices: z.array(z.string()).optional(),
   /** `select`: display labels keyed by submitted option value. */

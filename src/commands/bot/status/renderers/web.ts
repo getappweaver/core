@@ -1,27 +1,13 @@
 import type { WebRenderContext } from '@src/system/render-context';
-import { formatMsats, msats } from '@src/types';
 import type {
   WebAction,
   WebNode,
   WebNodeRoot,
   WebTone,
 } from '@src/web/ui-schema';
-import { row, stack } from '@src/web/widgets';
+import { stack, textNode } from '@src/web/widgets';
 
 import type { BotStatusData, BotStatusRepresentation } from '../representation';
-
-type KvRowProps = {
-  label: string;
-  labelClassName?: string;
-  value: string;
-  valueTone: WebTone | null;
-  valueClassName?: string;
-  nowrapValue?: boolean;
-  menuItems?: Array<{
-    label: string;
-    action: WebAction;
-  }>;
-};
 
 const STATUS_REFRESH = {
   command: 'bot',
@@ -30,158 +16,100 @@ const STATUS_REFRESH = {
   options: {},
 } as const;
 
+type StatusMenuItem = {
+  label: string;
+  action: WebAction;
+};
+
 function commandAction(params: {
   command: string;
   subcommand: string;
   arguments?: Record<string, unknown>;
-  options?: Record<string, unknown>;
-  presentation?: 'run' | 'form';
-  surface?: 'timeline' | 'modal';
+  refreshStatus?: boolean;
+  surface?: 'modal';
   modalTitle?: string;
-  argumentChoices?: Record<string, Array<{ value: string; label: string }>>;
 }): WebAction {
   return {
     type: 'command',
     command: params.command,
     subcommand: params.subcommand,
     arguments: params.arguments ?? {},
-    options: params.options ?? {},
-    refresh: STATUS_REFRESH,
-    ...(params.presentation ? { presentation: params.presentation } : {}),
+    options: {},
+    ...(params.refreshStatus ? { refresh: STATUS_REFRESH } : {}),
     ...(params.surface ? { surface: params.surface } : {}),
     ...(params.modalTitle ? { modalTitle: params.modalTitle } : {}),
-    ...(params.argumentChoices
-      ? { argumentChoices: params.argumentChoices }
-      : {}),
   };
 }
 
-function opencodeModelFormChoices(
-  d: BotStatusData,
-): Array<{ value: string; label: string }> | null {
-  if (d.backend !== 'opencode') {
-    return null;
-  }
-
-  return [
-    { value: 'reset', label: 'Clear / reset' },
-    ...d.opencodeModelCatalog,
-  ];
-}
-
-function updateStatusValue(d: BotStatusData): string {
-  const update = d.coreUpdate;
+function versionStatus(data: BotStatusData): string {
+  const update = data.coreUpdate;
 
   if (!update) {
-    return d.version;
+    return data.version;
   }
 
   if (update.state === 'available') {
-    const targetVersion = update.remoteVersion ?? update.remoteRef ?? 'remote';
+    const target = update.remoteVersion ?? update.remoteRef ?? 'remote';
 
     const level =
-      update.updateLevel === 'unknown' || update.updateLevel === 'same'
+      update.updateLevel === 'same' || update.updateLevel === 'unknown'
         ? 'update'
         : `${update.updateLevel} update`;
 
-    return `${update.localVersion ?? d.version} → ${targetVersion} · ${level} available`;
+    return `${update.localVersion ?? data.version} -> ${target} - ${level} available`;
   }
 
   if (update.state === 'checking') {
-    return `${d.version} · checking…`;
+    return `${data.version} - checking`;
   }
 
   if (update.state === 'unavailable') {
-    return `${d.version} · check unavailable`;
+    return `${data.version} - check unavailable`;
   }
 
-  return `${update.localVersion ?? d.version} · up to date`;
+  return `${update.localVersion ?? data.version} - up to date`;
 }
 
-function updateStatusTone(d: BotStatusData): WebTone | null {
-  if (d.coreUpdate?.state === 'available') {
-    return 'success';
-  }
+function statusRow(
+  label: string,
+  value: string,
+  tone?: WebTone,
+  menuItems?: StatusMenuItem[],
+): WebNode {
+  const valueNode: WebNode = menuItems?.length
+    ? {
+        type: 'element',
+        tag: 'overflowMenu',
+        props: {
+          label: value,
+          className: 'web-button web-button--link bot-status-value-trigger',
+          ...(tone ? { tone } : {}),
+        },
+        children: menuItems.map((item) => ({
+          type: 'element',
+          tag: 'menuItem',
+          props: { label: item.label, action: item.action },
+        })),
+      }
+    : {
+        type: 'element',
+        tag: 'text',
+        props: { className: 'bot-status-value', ...(tone ? { tone } : {}) },
+        children: [textNode(value)],
+      };
 
-  if (d.coreUpdate?.state === 'unavailable') {
-    return 'muted';
-  }
-
-  return null;
-}
-
-type OverflowMenuProps = {
-  label: string;
-  items: NonNullable<KvRowProps['menuItems']>;
-  tone: WebTone | null;
-};
-
-function overflowMenu({ label, items, tone }: OverflowMenuProps): WebNode {
-  return {
-    type: 'element',
-    tag: 'overflowMenu',
-    props: {
-      label,
-      className: 'web-button web-button--link status-value-trigger',
-      ...(tone ? { tone } : {}),
-    },
-    children: items.map((item) => ({
-      type: 'element',
-      tag: 'menuItem',
-      props: {
-        label: item.label,
-        action: item.action,
-      },
-    })),
-  };
-}
-
-function kvRow({
-  label,
-  labelClassName,
-  value,
-  valueTone,
-  valueClassName,
-  nowrapValue,
-  menuItems,
-}: KvRowProps): WebNode {
   return {
     type: 'element',
     tag: 'row',
-    props: {
-      className: nowrapValue
-        ? 'status-kv-row status-kv-row--nowrap'
-        : 'status-kv-row',
-      align: 'between',
-      gap: 'md',
-      itemAlign: 'center',
-    },
+    props: { className: 'bot-status-row', gap: 'md' },
     children: [
       {
         type: 'element',
         tag: 'text',
-        props: {
-          tone: 'muted',
-          ...(labelClassName ? { className: labelClassName } : {}),
-        },
-        children: [{ type: 'text', value: label }],
+        props: { className: 'bot-status-label', tone: 'muted' },
+        children: [textNode(label)],
       },
-      row(
-        menuItems?.length
-          ? [overflowMenu({ label: value, items: menuItems, tone: valueTone })]
-          : [
-              {
-                type: 'element',
-                tag: 'text',
-                props: {
-                  ...(valueTone ? { tone: valueTone } : {}),
-                  ...(valueClassName ? { className: valueClassName } : {}),
-                },
-                children: [{ type: 'text', value }],
-              },
-            ],
-        'sm',
-      ),
+      valueNode,
     ],
   };
 }
@@ -190,313 +118,91 @@ export function renderBotStatusWeb(
   representation: BotStatusRepresentation,
   _context: WebRenderContext,
 ): WebNodeRoot {
-  const d = representation.data;
-  const modelFormChoices = opencodeModelFormChoices(d);
+  const data = representation.data;
 
-  const providerValue =
-    d.provider === 'routstr'
-      ? `routstr (budget: ${formatMsats(msats(d.routstrBudgetMsatsRaw ?? 0))})`
-      : 'local';
-
-  const executionProfileLabel =
-    d.executionProfileKind === 'agent' ? 'Agent' : 'Mode';
-
-  const backendItems = [
-    {
-      label: 'cursor',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'backend',
-        arguments: { name: 'cursor' },
-      }),
-    },
-    {
-      label: 'opencode',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'backend',
-        arguments: { name: 'opencode' },
-      }),
-    },
-  ];
-
-  const providerItems = [
-    {
-      label: 'local',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'provider',
-        arguments: { name: 'local' },
-      }),
-    },
-    {
-      label: 'routstr',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'provider',
-        arguments: { name: 'routstr' },
-      }),
-    },
-  ];
-
-  const sessionMenuItems = [
-    {
-      label: 'new',
-      action: commandAction({
-        command: 'session',
-        subcommand: 'new',
-      }),
-    },
-  ];
-
-  const executionProfileItems =
-    d.executionProfileKind === 'agent'
-      ? [
-          ...d.opencodeAgentNames.map((agentName) => ({
-            label: agentName,
-            action: commandAction({
-              command: 'ai',
-              subcommand: 'agents set',
-              arguments: { name: agentName },
-            }),
-          })),
-          {
-            label: 'Manage agents',
-            action: commandAction({
-              command: 'ai',
-              subcommand: 'agents',
-              surface: 'modal',
-              modalTitle: 'OpenCode Agents',
-            }),
-          },
-        ]
-      : [
-          {
-            label: 'ask',
-            action: commandAction({
-              command: 'ai',
-              subcommand: 'mode',
-              arguments: { mode: 'ask' },
-            }),
-          },
-          {
-            label: 'plan',
-            action: commandAction({
-              command: 'ai',
-              subcommand: 'mode',
-              arguments: { mode: 'plan' },
-            }),
-          },
-          {
-            label: 'yolo',
-            action: commandAction({
-              command: 'ai',
-              subcommand: 'mode',
-              arguments: { mode: 'agent' },
-            }),
-          },
-        ];
-
-  const modelMenuItems = [
-    {
-      label: d.modelOverride ? 'Change override' : 'Set override',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'model',
-        arguments: {
-          name_or_reset: d.modelOverride ?? '',
-        },
-        presentation: 'form',
-        ...(modelFormChoices
-          ? { argumentChoices: { name_or_reset: modelFormChoices } }
-          : {}),
-      }),
-    },
-    {
-      label: 'Clear override',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'model',
-        arguments: { name_or_reset: 'reset' },
-      }),
-    },
-  ];
-
-  const versionMenuItems = [
-    {
-      label: 'Check for updates',
+  const workspaceItems: StatusMenuItem[] = ['parent', 'appweaver'].map(
+    (target) => ({
+      label: target,
       action: commandAction({
         command: 'bot',
-        subcommand: 'update-check',
+        subcommand: 'workspace',
+        arguments: { target },
+        refreshStatus: true,
       }),
-    },
-  ];
-
-  if (d.coreUpdate?.state === 'available') {
-    versionMenuItems.push({
-      label: 'Update AppWeaver',
-      action: commandAction({
-        command: 'bot',
-        subcommand: 'update',
-      }),
-    });
-  }
-
-  const rootModelMenuItems = [
-    {
-      label: d.opencodeRootModel ? 'Change root model' : 'Set root model',
-      action: commandAction({
-        command: 'ai',
-        subcommand: 'root-model',
-        arguments: { model_or_reset: d.opencodeRootModel ?? '' },
-        presentation: 'form',
-        surface: 'modal',
-        modalTitle: 'Set Root Model',
-        ...(modelFormChoices
-          ? { argumentChoices: { model_or_reset: modelFormChoices } }
-          : {}),
-      }),
-    },
-  ];
-
-  const rows: WebNode[] = [
-    kvRow({
-      label: 'Backend',
-      value: d.backend,
-      valueTone: 'info',
-      nowrapValue: true,
-      menuItems: backendItems,
-    }),
-    kvRow({
-      label: 'Provider',
-      value: providerValue,
-      valueTone: d.provider === 'routstr' ? 'info' : 'muted',
-      nowrapValue: true,
-      menuItems: providerItems,
-    }),
-    kvRow({
-      label: 'Session',
-      value: d.sessionId ?? '(none)',
-      valueTone: d.sessionId ? 'info' : 'muted',
-      nowrapValue: true,
-      menuItems: sessionMenuItems,
-    }),
-    kvRow({
-      label: executionProfileLabel,
-      value: d.executionProfileDisplayName,
-      valueTone: null,
-      nowrapValue: true,
-      menuItems: executionProfileItems,
-    }),
-    kvRow({
-      label: 'Linting',
-      value: d.linting,
-      valueTone: d.linting === 'on' ? 'success' : 'muted',
-      nowrapValue: true,
-    }),
-  ];
-
-  if (d.executionProfileKind === 'agent') {
-    rows.push(
-      kvRow({
-        label: 'Root model',
-        value: d.opencodeRootModel ?? '(none)',
-        valueTone: d.opencodeRootModel ? null : 'muted',
-        nowrapValue: true,
-        menuItems: rootModelMenuItems,
-      }),
-      kvRow({
-        label: 'Agent model',
-        value: d.opencodeAgentModel ?? '(none)',
-        valueTone: d.opencodeAgentModel ? null : 'muted',
-        nowrapValue: true,
-      }),
-      kvRow({
-        label: 'Override model',
-        value: d.modelOverride ?? '(off)',
-        valueTone: d.modelOverride ? 'info' : 'muted',
-        nowrapValue: true,
-        menuItems: modelMenuItems,
-      }),
-      kvRow({
-        label: 'Effective model',
-        labelClassName: 'status-effective-model',
-        value: d.resolvedModelName,
-        valueTone: null,
-        valueClassName: 'status-effective-model',
-        nowrapValue: true,
-      }),
-      kvRow({
-        label: 'Source',
-        labelClassName: 'status-effective-model',
-        value: d.effectiveModelSource,
-        valueTone: d.effectiveModelSource === 'override' ? 'info' : 'muted',
-        valueClassName: 'status-effective-model',
-        nowrapValue: true,
-      }),
-    );
-  } else {
-    rows.push(
-      kvRow({
-        label: 'Model',
-        labelClassName: 'status-effective-model',
-        value: d.resolvedModelName,
-        valueTone: null,
-        valueClassName: 'status-effective-model',
-        nowrapValue: true,
-        menuItems: modelMenuItems,
-      }),
-      kvRow({
-        label: 'Source',
-        labelClassName: 'status-effective-model',
-        value: d.effectiveModelSource,
-        valueTone: d.effectiveModelSource === 'override' ? 'info' : 'muted',
-        valueClassName: 'status-effective-model',
-        nowrapValue: true,
-      }),
-    );
-  }
-
-  rows.push(
-    kvRow({
-      label: 'Workspace',
-      value: d.workspace,
-      valueTone: null,
-      nowrapValue: true,
-    }),
-    kvRow({
-      label: 'Relays',
-      value: d.botRelayUrls.length > 0 ? d.botRelayUrls.join(', ') : '(none)',
-      valueTone: 'muted',
-    }),
-    kvRow({
-      label: 'Version',
-      value: updateStatusValue(d),
-      valueTone: updateStatusTone(d),
-      nowrapValue: true,
-      menuItems: versionMenuItems,
     }),
   );
 
-  if (d.coreUpdate?.message) {
-    rows.push(
-      kvRow({
-        label: 'Update',
-        value: d.coreUpdate.message,
-        valueTone: d.coreUpdate.state === 'available' ? 'success' : 'muted',
+  const sessionItems: StatusMenuItem[] = [
+    {
+      label: 'New session',
+      action: commandAction({
+        command: 'session',
+        subcommand: 'new',
+        refreshStatus: true,
       }),
+    },
+    {
+      label: 'Resume latest',
+      action: commandAction({
+        command: 'session',
+        subcommand: 'resume-last',
+        refreshStatus: true,
+      }),
+    },
+    {
+      label: 'List sessions',
+      action: commandAction({
+        command: 'session',
+        subcommand: 'list',
+        surface: 'modal',
+        modalTitle: 'Sessions',
+      }),
+    },
+    ...(data.sessionId
+      ? [
+          {
+            label: 'Show recent messages',
+            action: commandAction({
+              command: 'session',
+              subcommand: 'messages',
+              arguments: { session_id: data.sessionId, n: 5 },
+              surface: 'modal',
+              modalTitle: 'Session Messages',
+            }),
+          },
+        ]
+      : []),
+  ];
+
+  const rows = [
+    statusRow('Workspace', data.workspace, 'info', workspaceItems),
+    statusRow(
+      'Session',
+      data.sessionId ?? '(none)',
+      data.sessionId ? 'info' : 'muted',
+      sessionItems,
+    ),
+    statusRow(
+      'Linting',
+      data.linting,
+      data.linting === 'on' ? 'success' : 'muted',
+    ),
+    statusRow('Version', versionStatus(data)),
+    statusRow(
+      'Relays',
+      data.botRelayUrls.length > 0 ? data.botRelayUrls.join(', ') : '(none)',
+      data.botRelayUrls.length > 0 ? undefined : 'muted',
+    ),
+  ];
+
+  if (data.opencodeServeUrl) {
+    rows.push(
+      statusRow('Serve', `${data.opencodeServeUrl} (attached)`, 'info'),
     );
   }
 
-  if (d.opencodeServeUrl) {
-    rows.push(
-      kvRow({
-        label: 'Serve',
-        value: `${d.opencodeServeUrl} (attached)`,
-        valueTone: 'info',
-        nowrapValue: true,
-      }),
-    );
+  if (data.coreUpdate?.message) {
+    rows.push(statusRow('Update', data.coreUpdate.message, 'muted'));
   }
 
   return {
@@ -507,66 +213,42 @@ export function renderBotStatusWeb(
       {
         id: 'bot-status-rows',
         cssText: `
-          .status-kv-row {
-            padding: 0.3rem 0.45rem;
-            border-radius: 2px;
-          }
-
-          .status-kv-row--nowrap {
+          .bot-status-row {
             flex-wrap: nowrap;
+            padding: 0.3rem 0.45rem;
           }
 
-          .status-kv-row:nth-child(even) {
+          .bot-status-row:nth-child(even) {
             background: rgba(255, 255, 255, 0.05);
           }
 
-          .status-kv-row > .web-node:first-child {
+          .bot-status-label {
+            flex: 0 0 5.5rem;
             white-space: nowrap;
           }
 
-          .status-kv-row--nowrap > .web-row:last-child {
-            flex-wrap: nowrap;
-            justify-content: flex-end;
+          .bot-status-value {
             min-width: 0;
+            margin-left: auto;
+            text-align: right;
+            overflow-wrap: anywhere;
           }
 
-          .status-kv-row--nowrap .web-text,
-          .status-kv-row--nowrap .web-overflow-menu,
-          .status-kv-row--nowrap .status-value-trigger {
-            white-space: nowrap;
-          }
-
-          .status-value-trigger {
-            opacity: 1;
+          .bot-status-value-trigger {
             color: var(--color-accent);
-            cursor: pointer;
-            pointer-events: auto;
+            opacity: 1;
+            margin-right: 0;
+            white-space: nowrap;
             text-underline-offset: 2px;
           }
 
-          .status-value-trigger.tone-success {
-            color: var(--color-success);
-          }
-
-          .status-value-trigger.tone-info {
-            color: var(--color-accent);
-          }
-
-          .status-value-trigger.tone-muted {
-            color: var(--color-text-muted);
-          }
-
-          .status-value-trigger:hover,
-          .status-value-trigger:focus-visible {
-            color: #fff;
-          }
-
-          .status-effective-model {
-            font-weight: 700;
+          .bot-status-row > .web-overflow-menu {
+            min-width: 0;
+            margin-left: auto;
           }
         `.trim(),
       },
     ],
-    tree: stack(rows, 'sm'),
+    tree: stack(rows, 'xs'),
   };
 }

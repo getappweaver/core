@@ -18,6 +18,11 @@ import type {
 import { registerStoryDomTarget } from '../../story/dom-targets';
 import { emitStoryTargetClicked } from '../../story/events';
 
+import {
+  cardHeadTreeCollapseAllIcon,
+  cardHeadTreeExpandAllIcon,
+  cardHeadTreeRefreshIcon,
+} from '../timeline/timelineCardHeadIcons';
 import { WebButton } from '../WebButton';
 
 import type { TreeBulkExpandState, TreeExpandRequest } from './contexts';
@@ -47,7 +52,7 @@ import {
 } from './tree-filter';
 import { runLocalWebAction } from './tree-state';
 
-const TREE_FILTER_DEBOUNCE_MS = 1_000;
+const TREE_FILTER_INITIAL_DEBOUNCE_MS = 1_000;
 const TREE_FILTER_MIN_QUERY_LENGTH = 3;
 
 type WebTreeItemProps = {
@@ -395,15 +400,11 @@ export function WebTreeElement(props: WebTreeElementProps) {
     onCleanup(() => clearTimeout(timeoutId));
   });
 
-  function clearFilterDebounceTimer(): void {
+  function setFilterQueryIfQualified(value: string): void {
     if (filterDebounceTimer !== undefined) {
       clearTimeout(filterDebounceTimer);
       filterDebounceTimer = undefined;
     }
-  }
-
-  function setDebouncedFilterQuery(value: string): void {
-    clearFilterDebounceTimer();
 
     if (normalizedFilterQuery(value).length < TREE_FILTER_MIN_QUERY_LENGTH) {
       setFilterQuery('');
@@ -411,15 +412,24 @@ export function WebTreeElement(props: WebTreeElementProps) {
       return;
     }
 
+    if (
+      normalizedFilterQuery(filterQuery()).length >=
+      TREE_FILTER_MIN_QUERY_LENGTH
+    ) {
+      setFilterQuery(value);
+
+      return;
+    }
+
     filterDebounceTimer = setTimeout(() => {
       setFilterQuery(value);
       filterDebounceTimer = undefined;
-    }, TREE_FILTER_DEBOUNCE_MS);
+    }, TREE_FILTER_INITIAL_DEBOUNCE_MS);
   }
 
   function setTreeFilterValue(value: string): void {
     setFilterInput(value);
-    setDebouncedFilterQuery(value);
+    setFilterQueryIfQualified(value);
   }
 
   function requestTreeItemExpansion(ids: string[]): void {
@@ -434,7 +444,9 @@ export function WebTreeElement(props: WebTreeElementProps) {
   }
 
   onCleanup(() => {
-    clearFilterDebounceTimer();
+    if (filterDebounceTimer !== undefined) {
+      clearTimeout(filterDebounceTimer);
+    }
   });
 
   const runRefreshCommand = () => {
@@ -577,19 +589,6 @@ export function WebTreeElement(props: WebTreeElementProps) {
                             'is-open': filterOpen() || hasFilterValue(),
                           }}
                         >
-                          <WebButton
-                            type="button"
-                            class="web-button web-button--link web-tree-filter-toggle"
-                            data-ui="tree-filter-toggle"
-                            aria-label="Filter tree"
-                            title="Filter"
-                            onClick={() => {
-                              setFilterOpen((open) => !open);
-                              queueMicrotask(() => filterInputEl?.focus());
-                            }}
-                          >
-                            Search
-                          </WebButton>
                           <Show when={filterOpen() || hasFilterValue()}>
                             <input
                               ref={(el) => {
@@ -613,12 +612,26 @@ export function WebTreeElement(props: WebTreeElementProps) {
                               }}
                             />
                           </Show>
+                          <WebButton
+                            type="button"
+                            class="web-button web-button--link web-tree-filter-toggle"
+                            data-ui="tree-filter-toggle"
+                            aria-label="Filter tree"
+                            title="Filter"
+                            onClick={() => {
+                              setFilterOpen((open) => !open);
+                              queueMicrotask(() => filterInputEl?.focus());
+                            }}
+                          >
+                            Search
+                          </WebButton>
                         </div>
                       </Show>
                       <WebButton
                         type="button"
-                        class="web-button web-button--link"
+                        class="web-button web-button--link web-tree-toolbar-button"
                         data-ui="tree-collapse-all"
+                        title="Collapse all"
                         aria-label="Collapse all tree branches"
                         onClick={() =>
                           setBulk((prev) => ({
@@ -627,12 +640,13 @@ export function WebTreeElement(props: WebTreeElementProps) {
                           }))
                         }
                       >
-                        Collapse all
+                        {cardHeadTreeCollapseAllIcon({ width: 16, height: 16 })}
                       </WebButton>
                       <WebButton
                         type="button"
-                        class="web-button web-button--link"
+                        class="web-button web-button--link web-tree-toolbar-button"
                         data-ui="tree-expand-all"
+                        title="Expand all"
                         aria-label="Expand all tree branches"
                         onClick={() =>
                           setBulk((prev) => ({
@@ -641,19 +655,20 @@ export function WebTreeElement(props: WebTreeElementProps) {
                           }))
                         }
                       >
-                        Expand all
+                        {cardHeadTreeExpandAllIcon({ width: 16, height: 16 })}
                       </WebButton>
                       <Show when={renderMeta()}>
                         <WebButton
                           type="button"
-                          class="web-button web-button--link"
+                          class="web-button web-button--link web-tree-toolbar-button"
                           data-ui="tree-refresh"
+                          title="Refresh"
                           aria-label="Refresh list"
                           onClick={() => {
                             runRefreshCommand();
                           }}
                         >
-                          Refresh
+                          {cardHeadTreeRefreshIcon({ width: 16, height: 16 })}
                         </WebButton>
                       </Show>
                     </div>

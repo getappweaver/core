@@ -121,6 +121,10 @@ Supporting copy:
 
 > Your data stays local-first, you choose which apps belong in your hub. Use them through web/mobile interfaces and prompts, local terminal input, or your favourite Nostr chat app.
 
+AI architecture copy:
+
+> OpenCode runs AI tasks. Choose models from your workspace's core OpenCode configuration or an installed model-source app; each app supplies its own catalog and runtime configuration. Payment features depend on the app you install.
+
 Local-first app hub feature bullets:
 
 - Install AppWeaver to and run for any project or workspace folder you control.
@@ -162,7 +166,6 @@ Use these for GitHub topics, Nostr repository announcement tags, Nostr profile h
 - `nip34`
 - `opencode`
 - `cashu`
-- `routstr`
 
 ### Technology tags
 

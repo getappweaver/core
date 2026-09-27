@@ -49,7 +49,7 @@
    * --z-dropdown: .topbar.compact + .topbar-menu-panel (below modals; must be
    *   > --z-chrome-sticky so main content cannot paint over sticky timeline chrome —
    *   main follows header in DOM, so equal z-index would put sticky chrome on top)
-   * --z-web-overflow-open: .web-overflow-menu.is-open (lifts menu above web node peers)
+   * --z-web-overflow-open: open web menus and body-level composer popovers
    * --z-modal: .modal-backdrop, .palette-backdrop (full-screen overlays)
    */
   --z-base: 0;
@@ -3339,6 +3339,22 @@ button.composer-chip.composer-chip--model-override {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.composer-model-picker {
+  position: fixed;
+  z-index: var(--z-web-overflow-open);
+  min-width: 0;
+  padding: 0.65rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.composer-model-picker > .web-ui-shadow-host-wrap {
+  min-width: 0;
 }
 
  /* composer working indicator — fixed-width slot, pushes context flush-right */

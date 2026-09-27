@@ -1,6 +1,6 @@
 # AppWeaver Docker Setup
 
-Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Cursor Agent, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support.
+Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support.
 
 Clone AppWeaver on the host if you have not already:
 

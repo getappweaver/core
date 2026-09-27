@@ -2,27 +2,16 @@
 // src/commands/ai/handler.ts — ai mode, backend, model, models, provider
 // ---------------------------------------------------------------------------
 
-import { debug } from '@src/logger';
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
+import { createModelSourceCoordinator } from '@src/core/model-source';
+import { getWorkspaceTarget, setRecentModelLimit } from '@src/db';
 
 import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
-import { appendStatusBlock } from '../shared/with-status';
 
-import { handleAiAgentsDelete } from './agent/delete/handler';
-import { handleAiAgentsEdit } from './agent/edit/handler';
-import { handleAiAgents } from './agent/modal/handler';
-import { handleAiAgentsNew } from './agent/new/handler';
-import { handleAiAgentRestore } from './agent/restore/handler';
-import { handleAiAgentsSave } from './agent/save/handler';
-import { handleAiAgentSet } from './agent/set/handler';
-import { handleAiAgentsUpsertJson } from './agent/upsert-json/handler';
-import { handleAiBackend } from './backend/handler';
 import { renderAiCli } from './cli-representation';
-import { handleAiMode } from './mode/handler';
 import { handleAiModel } from './model/handler';
 import { handleAiModels } from './models/handler';
-import { handleAiProvider } from './provider/handler';
-import { handleAiRootModel } from './root-model/handler';
 
 export const handleAiRoot: BuiltinHandler = async (ctx) => {
   const p = ctx.prefix;
@@ -41,28 +30,31 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
   }
 
   if (!sub) {
-    return `Usage: ${p}ai mode | backend | model | models | provider | agents — or ${p}ai help`;
+    return `Usage: ${p}ai source | model | models | favorite | unfavorite | recent-limit | runtime — or ${p}ai help`;
   }
 
-  if (sub === 'mode') {
-    return handleAiMode(ctx);
-  }
-
-  if (sub === 'backend') {
+  if (sub === 'source') {
     return handleError(async () => {
-      const rep = await handleAiBackend({
-        db: ctx.seenDb,
-        dmBotRoot: ctx.dmBotRoot,
-        parentOfBotRoot: ctx.parentOfBotRoot,
-        attachUrl: ctx.attachUrl,
-        selected: args[1],
-        prefix: p,
-      });
+      const workspace = getWorkspaceTarget(ctx.seenDb);
+      const coordinator = createModelSourceCoordinator(ctx.seenDb);
+      const requested = args[1]?.trim();
 
-      const out = renderAiCli(rep, { prefix: p });
+      if (!requested) {
+        const sources = await coordinator.listSources(workspace);
 
-      return appendStatusBlock(ctx, out);
-    }, 'Failed to switch backend');
+        return sources
+          .map(
+            (source) =>
+              `${source.active ? '✓ ' : '  '}${source.title} (${source.alias})${source.health.status === 'healthy' ? '' : ` — ${source.health.message}`}`,
+          )
+          .join('\n');
+      }
+
+      const providerId = coordinator.resolveSourceId(requested);
+      const snapshot = await coordinator.setActiveSource(workspace, providerId);
+
+      return `Active model source for ${workspace}: ${snapshot.state.title}.`;
+    }, 'Failed to change model source');
   }
 
   if (sub === 'model') {
@@ -81,114 +73,65 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
     }, 'Failed to list models');
   }
 
-  if (sub === 'agents') {
-    const nested = args[1]?.toLowerCase() ?? null;
-
-    if (!nested || nested === 'modal') {
-      return handleError(
-        async () =>
-          handleAiAgents({
-            seenDb: ctx.seenDb,
-            dmBotRoot: ctx.cwd,
-          }),
-        'Failed to open agent manager',
-      );
-    }
-
-    if (nested === 'set') {
-      return handleError(async () => {
-        const out = handleAiAgentSet({
-          seenDb: ctx.seenDb,
-          name: args[2],
-        });
-
-        return appendStatusBlock(ctx, out);
-      }, 'Failed to set agent');
-    }
-
-    if (nested === 'restore') {
-      return handleError(async () => {
-        const out = await handleAiAgentRestore({
-          dmBotRoot: ctx.cwd,
-          seenDb: ctx.seenDb,
-        });
-
-        return appendStatusBlock(ctx, out);
-      }, 'Failed to restore default agents');
-    }
-
-    if (nested === 'delete') {
-      return handleError(async () => {
-        const out = await handleAiAgentsDelete({
-          dmBotRoot: ctx.cwd,
-          seenDb: ctx.seenDb,
-          name: args[2],
-        });
-
-        return appendStatusBlock(ctx, out);
-      }, 'Failed to delete agent');
-    }
-
-    if (nested === 'new') {
-      return handleError(async () => {
-        return handleAiAgentsNew({
-          dmBotRoot: ctx.cwd,
-          args: args.slice(2),
-        });
-      }, 'Failed to save agent');
-    }
-
-    if (nested === 'edit') {
-      return handleError(async () => {
-        return handleAiAgentsEdit({
-          dmBotRoot: ctx.cwd,
-          args: args.slice(2),
-        });
-      }, 'Failed to save agent');
-    }
-
-    if (nested === 'save') {
-      return handleError(async () => {
-        const out = await handleAiAgentsSave({
-          dmBotRoot: ctx.cwd,
-          seenDb: ctx.seenDb,
-          draft: ctx.jsonPayload,
-        });
-
-        return appendStatusBlock(ctx, out);
-      }, 'Failed to save agents config');
-    }
-
-    if (nested === 'upsert-json') {
-      debug('agents upsert-json', ctx.jsonPayload);
-
-      return handleError(async () => {
-        const out = await handleAiAgentsUpsertJson({
-          dmBotRoot: ctx.cwd,
-          payload: ctx.jsonPayload,
-        });
-
-        return appendStatusBlock(ctx, out);
-      }, 'Failed to save agent');
-    }
-
-    return `Usage: ${p}ai agents modal | set | restore | new | edit | delete`;
-  }
-
-  if (sub === 'root-model') {
+  if (sub === 'favorite' || sub === 'unfavorite') {
     return handleError(async () => {
-      const out = await handleAiRootModel({
-        dmBotRoot: ctx.cwd,
-        selected: args[1],
-      });
+      const modelId = args[1]?.trim();
 
-      return appendStatusBlock(ctx, out);
-    }, 'Failed to update root model');
+      if (!modelId) {
+        return `Usage: ${p}ai ${sub} <model-id>`;
+      }
+
+      await createModelSourceCoordinator(ctx.seenDb).setFavorite(
+        getWorkspaceTarget(ctx.seenDb),
+        'opencode',
+        modelId,
+        sub === 'favorite',
+      );
+
+      return `${sub === 'favorite' ? 'Favorited' : 'Unfavorited'} ${modelId}.`;
+    }, 'Failed to update favorite');
   }
 
-  if (sub === 'provider') {
-    return handleAiProvider(ctx);
+  if (sub === 'recent-limit') {
+    return handleError(async () => {
+      const limit = Number(args[1]);
+      setRecentModelLimit(ctx.seenDb, getWorkspaceTarget(ctx.seenDb), limit);
+
+      return `Recent model limit set to ${limit}.`;
+    }, 'Failed to update recent model limit');
   }
 
-  return `Usage: ${p}ai mode | backend | model | models | provider | agents — or ${p}ai help`;
+  if (sub === 'runtime') {
+    return handleError(async () => {
+      const action = args[1]?.toLowerCase() ?? 'status';
+
+      if (action === 'cancel') {
+        return opencodeRuntimeController.cancelPending()
+          ? 'OpenCode configuration transition cancellation requested.'
+          : 'No cancellable OpenCode transition is pending.';
+      }
+
+      if (action === 'retry') {
+        await opencodeRuntimeController.retry();
+
+        return 'OpenCode configuration transition completed.';
+      }
+
+      if (action === 'force-restart') {
+        await opencodeRuntimeController.forceRestart();
+
+        return 'Managed OpenCode process restarted.';
+      }
+
+      if (action !== 'status') {
+        return `Usage: ${p}ai runtime [status | cancel | retry | force-restart]`;
+      }
+
+      const status = opencodeRuntimeController.status();
+
+      return `OpenCode: ${status.state}; active runs: ${status.activeRuns}; queued runs: ${status.queuedRuns}; pending transitions: ${status.pendingTransitions}${status.lastError ? `; ${status.lastError}` : ''}`;
+    }, 'OpenCode runtime action failed');
+  }
+
+  return `Usage: ${p}ai source | model | models | favorite | unfavorite | recent-limit | runtime — or ${p}ai help`;
 };

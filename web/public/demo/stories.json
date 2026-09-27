@@ -67180,7 +67180,7 @@
                                     "children": [
                                       {
                                         "type": "text",
-                                        "value": "Context: opencode - local - default - agent"
+                                        "value": "Context: opencode - default"
                                       }
                                     ]
                                   },
@@ -67237,7 +67237,7 @@
                     "children": [
                       {
                         "type": "text",
-                        "value": "AI drafted this scheduled job:\n\ntype         : cron\nschedule     : 0 9 * * 1-5\nmaxRuns      : -\nname         : Morning priority brief\nprompt       : Review open todos, identify the three highest priority items, and send a concise morning brief.\ndescription  : Every weekday at 09:00\nbackend      : opencode\nprovider     : local\nmodel        : default\nmode         : agent\nbudget_sats  : -\ninstructions : Keep the brief actionable and include only items that can be started today.\n\nDraft ID: demo-job-draft-1\na=accept, r=revise, d=decline, s=skip, q=quit"
+                        "value": "AI drafted this scheduled job:\n\ntype         : cron\nschedule     : 0 9 * * 1-5\nmaxRuns      : -\nname         : Morning priority brief\nprompt       : Review open todos, identify the three highest priority items, and send a concise morning brief.\ndescription  : Every weekday at 09:00\nbackend      : opencode\nmodel        : default\nbudget_sats  : -\ninstructions : Keep the brief actionable and include only items that can be started today.\n\nDraft ID: demo-job-draft-1\na=accept, r=revise, d=decline, s=skip, q=quit"
                       }
                     ]
                   },
@@ -67870,7 +67870,7 @@
                                 "children": [
                                   {
                                     "type": "text",
-                                    "value": "Context: opencode - local - default - agent"
+                                    "value": "Context: opencode - default"
                                   }
                                 ]
                               },
@@ -69409,7 +69409,7 @@
                                                                   ],
                                                                   [
                                                                     "published_at",
-                                                                    "1789644113"
+                                                                    "1790105987"
                                                                   ],
                                                                   [
                                                                     "title",
@@ -70939,7 +70939,7 @@
                                                               ],
                                                               [
                                                                 "published_at",
-                                                                "1789644113"
+                                                                "1790105987"
                                                               ],
                                                               [
                                                                 "title",

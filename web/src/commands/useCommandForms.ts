@@ -1,6 +1,6 @@
 import type { Accessor, Setter } from 'solid-js';
 
-import type { WebAction, WebArgumentFieldChoice } from '@src/web/ui-schema';
+import type { WebAction } from '@src/web/ui-schema';
 
 import type {
   CommandDetail,
@@ -9,12 +9,8 @@ import type {
   TimelineItem,
 } from '../types';
 
-import type { ComposerAiState } from './types';
-
 type CommandFormsAdapters = {
   selectedCommand: Accessor<CommandDetail | null>;
-  /** Used to attach OpenCode model datalists to `/ai model` and `/ai root-model` forms. */
-  composerAiState: Accessor<ComposerAiState | null>;
   setTimeline: Setter<TimelineItem[]>;
   setComposerText: Setter<string>;
   setActiveFormId: Setter<string | null>;
@@ -40,26 +36,6 @@ type CommandFormsAdapters = {
   ) => boolean;
   ensureCommandDetail: (name: string) => Promise<CommandDetail>;
 };
-
-function opencodeModelFieldArgumentChoices(
-  command: string,
-  subcommandName: string,
-  choices: WebArgumentFieldChoice[],
-): Record<string, WebArgumentFieldChoice[]> | null {
-  if (choices.length === 0) {
-    return null;
-  }
-
-  if (command === 'ai' && subcommandName === 'model') {
-    return { name_or_reset: choices };
-  }
-
-  if (command === 'ai' && subcommandName === 'root-model') {
-    return { model_or_reset: choices };
-  }
-
-  return null;
-}
 
 export function useCommandForms(adapters: CommandFormsAdapters) {
   async function openSubcommand(
@@ -145,12 +121,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
 
     const formId = adapters.createId();
 
-    const fromComposer = opencodeModelFieldArgumentChoices(
-      command.name,
-      subcommand.name,
-      adapters.composerAiState()?.opencodeModelFormChoices ?? [],
-    );
-
     const formItem: Extract<TimelineItem, { type: 'command_form' }> = {
       id: formId,
       type: 'command_form',
@@ -158,7 +128,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
       subcommand,
       values: adapters.mergeCommandPayload(subcommand, initialValues),
       autoRun: mode === 'runnable_customizable',
-      ...(fromComposer ? { argumentChoices: fromComposer } : {}),
     };
 
     adapters.setTimeline((prev) => [...prev, formItem]);
@@ -226,17 +195,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
 
     const formId = adapters.createId();
 
-    const fromComposer = opencodeModelFieldArgumentChoices(
-      command.name,
-      subcommand.name,
-      adapters.composerAiState()?.opencodeModelFormChoices ?? [],
-    );
-
-    const mergedArgumentChoices: Record<string, WebArgumentFieldChoice[]> = {
-      ...(fromComposer ?? {}),
-      ...(action.argumentChoices ?? {}),
-    };
-
     const formItem: Extract<TimelineItem, { type: 'command_form' }> = {
       id: formId,
       type: 'command_form',
@@ -245,8 +203,8 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
       values,
       autoRun: mode === 'runnable_customizable',
       ...(action.optionHints ? { optionHints: action.optionHints } : {}),
-      ...(Object.keys(mergedArgumentChoices).length > 0
-        ? { argumentChoices: mergedArgumentChoices }
+      ...(action.argumentChoices
+        ? { argumentChoices: action.argumentChoices }
         : {}),
     };
 

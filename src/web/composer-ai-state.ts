@@ -1,135 +1,81 @@
-import { createBackend } from '@src/backends/factory';
-import { resolveConfiguredModelFromOpencodeConfig } from '@src/backends/opencode-common';
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
+import type { AiModelSourceContextUsage } from '@src/capabilities/ai-model-source.v1';
+import type {
+  ModelSourceOption,
+  ModelSourceSnapshot,
+} from '@src/core/model-source';
+import { createModelSourceCoordinator } from '@src/core/model-source';
 import {
-  getOpencodeAgent,
-  listOpencodeModelCatalog,
-  readOpencodeConfig,
-} from '@src/backends/opencode-config';
-import { getOpencodeSdkContextStats } from '@src/backends/opencode-sdk';
-import {
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
   getInterventionMode,
-  getModelOverride,
-  getProviderName,
   getState,
   getWorkspaceTarget,
   STATE_CURRENT_SESSION,
 } from '@src/db';
-import type { WebArgumentFieldChoice } from '@src/web/ui-schema';
 
 import type { WebRouteContext } from './routes';
 
 export type ComposerAiState = {
-  backend: string;
+  backend: 'opencode';
   interventionAvailable: boolean;
   interventionEnabled: boolean;
   currentSessionId: string | null;
-  executionProfileLabel: 'Agent' | 'Mode';
-  executionProfileName: string;
-  executionProfileColor: string | null;
-  effectiveModel: string;
-  provider: string;
-  /** Current model override in DB; mirrors bot status “Override model”. */
-  modelOverride: string | null;
-  /** For `/ai model` and `/ai root-model` web forms. */
-  opencodeModelFormChoices: WebArgumentFieldChoice[];
-  contextStats: {
-    tokensTotal: number;
-    contextLimit: number | null;
-    contextPercent: number | null;
-  } | null;
+  modelSource: ModelSourceSnapshot;
+  modelSources: ModelSourceOption[];
+  contextStats: AiModelSourceContextUsage | null;
 };
 
 export async function getComposerAiState(
   ctx: WebRouteContext,
 ): Promise<ComposerAiState> {
-  const backendName = getAgentBackend(ctx.seenDb);
-  const cursorMode = getCurrentOrDefaultMode(ctx.seenDb);
-  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
-  const providerName = getProviderName(ctx.seenDb);
+  const workspace = getWorkspaceTarget(ctx.seenDb);
 
-  const cwd =
-    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-      ? ctx.dmBotRoot
-      : ctx.parentOfBotRoot;
+  const coordinator = createModelSourceCoordinator(ctx.seenDb);
 
-  const opencodeConfig =
-    executionProfile.kind === 'opencode' ? readOpencodeConfig(cwd) : null;
+  const [modelSource, modelSources] = await Promise.all([
+    coordinator.getSnapshot(workspace, 'opencode'),
+    coordinator.listSources(workspace),
+  ]);
 
-  const opencodeAgent =
-    executionProfile.kind === 'opencode'
-      ? getOpencodeAgent(opencodeConfig!, executionProfile.agent)
-      : null;
+  const runtime = opencodeRuntimeController.status();
 
-  const opencodeConfigured =
-    executionProfile.kind === 'opencode'
-      ? resolveConfiguredModelFromOpencodeConfig(cwd, executionProfile.agent)
-      : null;
+  if (runtime.state !== 'running') {
+    modelSource.state.transitionState =
+      runtime.state === 'failed' ? 'failed' : 'pending';
 
-  const modelOverride = getModelOverride(ctx.seenDb, backendName);
-
-  const backend = createBackend({
-    backendName,
-    dmBotRoot: ctx.dmBotRoot,
-    cursorMode,
-    opencodeAgentName:
-      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-    attachUrl: ctx.attachUrl,
-    modelOverride,
-    providerName,
-  });
-
-  const effectiveModel =
-    backendName === 'opencode' && opencodeConfigured && !modelOverride
-      ? opencodeConfigured.modelName
-      : backend.modelName;
-
-  const isOpencodeBackend = backendName === 'opencode';
-
-  const opencodeModelFormChoices: WebArgumentFieldChoice[] = [
-    { value: 'reset', label: 'Clear / reset' },
-    ...(isOpencodeBackend
-      ? listOpencodeModelCatalog(cwd)
-      : backendName === 'cursor'
-        ? (await backend.availableModels()).map((model) => ({
-            value: model,
-            label: model,
-          }))
-        : []),
-  ];
+    modelSource.state.health =
+      runtime.state === 'failed'
+        ? {
+            status: 'unavailable',
+            message: runtime.lastError ?? 'OpenCode restart failed.',
+          }
+        : {
+            status: 'degraded',
+            message: 'Waiting for OpenCode configuration restart.',
+          };
+  }
 
   const currentSessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
 
   const contextStats =
-    backendName === 'opencode' && currentSessionId
-      ? await getOpencodeSdkContextStats({
-          sessionId: currentSessionId,
-          cwd,
-          effectiveModel,
-        }).catch(() => null)
+    currentSessionId && runtime.state === 'running'
+      ? await coordinator
+          .getContextUsage({
+            workspaceTarget: workspace,
+            backend: 'opencode',
+            providerId: modelSource.providerId,
+            sessionId: currentSessionId,
+            modelId: modelSource.state.effectiveModelId,
+          })
+          .catch(() => null)
       : null;
 
   return {
-    backend: backendName,
-    interventionAvailable: backendName === 'opencode' && ctx.attachUrl === null,
+    backend: 'opencode',
+    interventionAvailable: ctx.attachUrl === null,
     interventionEnabled: getInterventionMode(ctx.seenDb),
     currentSessionId,
-    executionProfileLabel:
-      executionProfile.kind === 'cursor' ? 'Mode' : ('Agent' as const),
-    executionProfileName:
-      executionProfile.kind === 'cursor' &&
-      (executionProfile.mode === 'agent' || executionProfile.mode === 'free')
-        ? 'yolo'
-        : executionProfile.kind === 'cursor'
-          ? executionProfile.mode
-          : executionProfile.agent,
-    executionProfileColor: opencodeAgent?.color ?? null,
-    effectiveModel,
-    provider: providerName,
-    modelOverride,
-    opencodeModelFormChoices,
+    modelSource,
+    modelSources,
     contextStats,
   };
 }

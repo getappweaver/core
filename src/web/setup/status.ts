@@ -1,11 +1,4 @@
-import {
-  getAgentBackend,
-  getCurrentOrDefaultMode,
-  getDmCommandPrefix,
-  getLinting,
-  getProviderName,
-  getWorkspaceTarget,
-} from '@src/db';
+import { getDmCommandPrefix, getLinting, getWorkspaceTarget } from '@src/db';
 import { parseRelayUrls } from '@src/env';
 import { findExecutablePath } from '@src/executable';
 import { getNativePiperStatus } from '@src/web/native-tts';
@@ -19,7 +12,6 @@ type EnvStatus = {
   relays: boolean;
   cashuMnemonic: boolean;
   webPush: boolean;
-  cursorApiKey: boolean;
   piperBinaryPath: boolean;
   piperModelPath: boolean;
   piperLibraryPath: boolean;
@@ -51,9 +43,6 @@ export type SetupStatus = {
   configured: boolean;
   env: EnvStatus;
   defaults: {
-    backend: string;
-    provider: string;
-    mode: string;
     workspace: string;
     linting: string;
     readyNotification: boolean;
@@ -137,16 +126,8 @@ function setupDependencies(piperConfigured: boolean): SetupDependencyStatus[] {
       name: 'OpenCode',
       command: 'opencode',
       required: false,
-      installHint: 'Install OpenCode, or select Cursor Agent as backend.',
+      installHint: 'Install OpenCode to run AI sessions.',
       installUrl: 'https://opencode.ai/',
-      installCommand: null,
-    }),
-    dependencyStatus({
-      name: 'Cursor Agent',
-      command: 'agent',
-      required: false,
-      installHint: 'Install Cursor Agent, or select OpenCode as backend.',
-      installUrl: 'https://docs.cursor.com/en/cli/installation',
       installCommand: null,
     }),
     dependencyStatus({
@@ -189,7 +170,6 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
       hasEnv('BOT_WEB_PUSH_PUBLIC_KEY') &&
       hasEnv('BOT_WEB_PUSH_PRIVATE_KEY') &&
       hasEnv('BOT_WEB_PUSH_SUBJECT'),
-    cursorApiKey: hasEnv('CURSOR_API_KEY'),
     piperBinaryPath: hasEnv('BOT_PIPER_BINARY_PATH'),
     piperModelPath: hasEnv('BOT_PIPER_MODEL_PATH'),
     piperLibraryPath: hasEnv('BOT_PIPER_LIBRARY_PATH'),
@@ -201,9 +181,6 @@ export function createSetupStatus(ctx: WebRouteContext): SetupStatus {
     configured: env.botKey && env.masterPubkey && env.relays,
     env,
     defaults: {
-      backend: getAgentBackend(ctx.seenDb),
-      provider: getProviderName(ctx.seenDb),
-      mode: getCurrentOrDefaultMode(ctx.seenDb),
       workspace: getWorkspaceTarget(ctx.seenDb),
       linting: getLinting(ctx.seenDb),
       readyNotification: (process.env.READY_ENABLED ?? '1') !== '0',

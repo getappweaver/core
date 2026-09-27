@@ -11,7 +11,6 @@ import { getCashuCommandDefinition } from './cashu/definition';
 import { getNwcCommandDefinition } from './nwc/definition';
 import { getPluginsCommandDefinition } from './plugin-manager/definition';
 import { getRoadmapCommandDefinition } from './roadmap/definition';
-import { getRoutstrCommandDefinition } from './routstr/definition';
 import { getSessionCommandDefinition } from './session/definition';
 import { getSkillsCommandDefinition } from './skills/definition';
 import { getStoryCommandDefinition } from './story/definition';
@@ -27,7 +26,6 @@ export const BUILTIN_ROOT_NAMES = [
   'plugins',
   'roadmap',
   'ai',
-  'routstr',
   'nwc',
   'cashu',
   'wallet',
@@ -65,7 +63,7 @@ are all valid.\n`,
         arguments: [
           {
             name: 'path',
-            summary: 'e.g. session, session new, routstr status',
+            summary: 'e.g. session or session new',
             kind: 'string',
             required: false,
             variadic: true,
@@ -75,7 +73,7 @@ are all valid.\n`,
         examples: [
           `${prefix}help`,
           `${prefix}help bot`,
-          `${prefix}help routstr status`,
+          `${prefix}help session new`,
         ],
       },
     ],
@@ -108,8 +106,6 @@ export function getBuiltinCommandDefinition({
       return getRoadmapCommandDefinition({ prefix });
     case 'ai':
       return getAiCommandDefinition({ prefix });
-    case 'routstr':
-      return getRoutstrCommandDefinition({ prefix });
     case 'nwc':
       return getNwcCommandDefinition({ prefix });
     case 'cashu':
@@ -142,7 +138,6 @@ export function getBuiltinDefinitionsMap({
     plugins: getPluginsCommandDefinition({ prefix }),
     roadmap: getRoadmapCommandDefinition({ prefix }),
     ai: getAiCommandDefinition({ prefix }),
-    routstr: getRoutstrCommandDefinition({ prefix }),
     nwc: getNwcCommandDefinition({ prefix }),
     cashu: getCashuCommandDefinition({ prefix }),
     wallet: getWalletCommandDefinition({ prefix }),

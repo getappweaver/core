@@ -2,7 +2,7 @@
 
 The Alpine image is a reduced runtime for managed hosting. It includes Bun,
 OpenCode, ngit, Piper, Git, and SSH tooling. It intentionally does not include
-Chromium, Playwright browsers, Cursor Agent, a desktop environment, or VNC. Use
+Chromium, Playwright browsers, a desktop environment, or VNC. Use
 the existing [`Dockerfile`](Dockerfile) and [`DOCKER.md`](DOCKER.md) when those
 features are required.
 

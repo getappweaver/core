@@ -9,7 +9,6 @@ type BuildAgentRuntimeContentProps = {
 
 type BuildActiveRuntimeContextProps = {
   backendName: AgentBackendName;
-  agentName: string;
   dmBotRoot: string;
   cwd: string;
 };
@@ -23,7 +22,6 @@ function workspaceTargetLabel(props: {
 
 export function buildActiveRuntimeContext({
   backendName,
-  agentName,
   dmBotRoot,
   cwd,
 }: BuildActiveRuntimeContextProps): string {
@@ -35,11 +33,10 @@ export function buildActiveRuntimeContext({
       : '';
 
   return `Backend: ${backendName}
-Agent profile: ${agentName}
 Workspace target: ${workspaceTarget}
 Workspace root: ${cwd}
 AppWeaver root: ${dmBotRoot}
-Tool permissions: enforced by the active agent profile.${appweaverRuntimeConstraint}
+${appweaverRuntimeConstraint}
 `;
 }
 

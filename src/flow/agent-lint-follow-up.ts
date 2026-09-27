@@ -1,109 +1,70 @@
-// ---------------------------------------------------------------------------
-// src/flow/agent-lint-follow-up.ts — Run agent round(s) with optional lint follow-up
-// ---------------------------------------------------------------------------
+import { spawnSync } from 'node:child_process';
 
 import { buildActiveRuntimeContext } from '../backends/agent-runtime-context';
 import { createBackend } from '../backends/factory';
 import type { AgentRunResult } from '../backends/types';
 import { getOutputString } from '../backends/types';
 import { readAgentsInstructions } from '../core/agent-instructions';
-import type {
-  AgentBackendName,
-  AgentMode,
-  CoreDb,
-  WorkspaceTarget,
-} from '../db';
 import {
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getLinting,
-  getModelOverride,
-  getRoutstrModel,
-  getRoutstrSkKey,
-  getWorkspaceInstructions,
-} from '../db';
-import { runPostAgentLint, formatLintSummary } from '../lint';
+  createModelSourceCoordinator,
+  type PreparedModelRun,
+} from '../core/model-source';
+import type { CoreDb, WorkspaceTarget } from '../db';
+import { getLinting, getWorkspaceInstructions } from '../db';
+import { formatLintSummary, runPostAgentLint } from '../lint';
 import { C, log } from '../logger';
-import type { ProviderName } from '../providers/types';
 import { insertSessionMessage } from '../session';
 
 const POST_AGENT_LINT_PROMPT_PREFIX = '[Post-edit lint feedback]';
 
+function workingTreeFingerprint(cwd: string): string {
+  const result = spawnSync('git', ['diff', '--no-ext-diff', '--binary'], {
+    cwd,
+    encoding: 'utf8',
+  });
+
+  return result.status === 0 ? result.stdout : '';
+}
+
 export type RunAgentWithLintFollowUpProps = {
   dmBotRoot: string;
-  attachUrl: string | null;
-  mode: AgentMode;
-  configuredProviderName: ProviderName | null;
   sessionId: string;
   cwd: string;
   coreDb: CoreDb;
   effectiveContent: string;
   currentWorkspace: WorkspaceTarget;
-  backendName: AgentBackendName;
+  prepared: PreparedModelRun;
 };
 
 export async function runAgentWithLintFollowUp({
   dmBotRoot,
-  attachUrl,
-  mode,
-  configuredProviderName,
   sessionId,
   cwd,
   coreDb,
   effectiveContent,
   currentWorkspace,
-  backendName,
+  prepared,
 }: RunAgentWithLintFollowUpProps): Promise<{
   output: string;
   result: AgentRunResult;
 }> {
-  const runAgentRound = async (
-    roundContent: string,
-    startLog: string,
-  ): Promise<AgentRunResult> => {
-    log.info(startLog);
+  const modelSources = createModelSourceCoordinator(coreDb);
 
-    const backendNameFromDb = getAgentBackend(coreDb);
-    const modelOverride = getModelOverride(coreDb, backendNameFromDb);
-    const routstrModel = getRoutstrModel(coreDb);
+  const runAgentRound = async (content: string, label: string) => {
+    log.info(label);
 
-    const effectiveModelOverride =
-      configuredProviderName === 'routstr' && routstrModel
-        ? routstrModel
-        : (modelOverride ?? null);
-
-    const executionProfile = getBackendExecutionProfile(
-      coreDb,
-      backendNameFromDb,
-    );
-
-    log.info(`effectiveModelOverride: ${effectiveModelOverride}`);
-
-    const roundBackend = createBackend({
-      backendName: backendNameFromDb,
-      dmBotRoot,
-      cursorMode: mode,
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-      attachUrl,
-      modelOverride: effectiveModelOverride,
-      providerName: configuredProviderName,
+    const backend = createBackend({
+      backendName: 'opencode',
+      dmBotRoot: cwd,
     });
 
-    return roundBackend.runMessage({
+    return backend.runMessage({
       sessionId,
-      content: roundContent,
-      cursorMode: mode,
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
+      content,
       cwd,
       context: {
         runtimeContext: buildActiveRuntimeContext({
-          backendName: backendNameFromDb,
-          agentName:
-            executionProfile.kind === 'opencode'
-              ? executionProfile.agent
-              : mode,
+          backendName: 'opencode',
           dmBotRoot,
           cwd,
         }),
@@ -121,28 +82,38 @@ export async function runAgentWithLintFollowUp({
             : null,
         extraInstructions: null,
       },
-      getRoutstrSkKey: () => getRoutstrSkKey(coreDb),
-      modelOverride: effectiveModelOverride,
+      modelOverride: prepared.runtimeModelId,
       onAgentStreamChunk: null,
       streamAbortSignal: null,
     });
   };
 
+  const before = workingTreeFingerprint(cwd);
+
   const initialResult = await runAgentRound(
     effectiveContent,
-    `${C.dim}Starting ${backendName} agent (${mode})…${C.reset}\n`,
+    `${C.dim}Starting OpenCode...${C.reset}\n`,
   );
 
   let finalOutput = getOutputString(initialResult);
   let finalResult = initialResult;
 
-  if (initialResult.type === 'error') {
-    return { output: finalOutput, result: finalResult };
+  if (initialResult.type === 'success') {
+    await modelSources.recordSuccessfulUse(
+      currentWorkspace,
+      'opencode',
+      prepared.modelId,
+      prepared.providerId,
+    );
   }
 
-  const linting = getLinting(coreDb);
+  const filesChanged = before !== workingTreeFingerprint(cwd);
 
-  if (mode !== 'agent' || linting === 'off') {
+  if (
+    initialResult.type === 'error' ||
+    getLinting(coreDb) === 'off' ||
+    !filesChanged
+  ) {
     return { output: finalOutput, result: finalResult };
   }
 
@@ -152,35 +123,34 @@ export async function runAgentWithLintFollowUp({
   const lintResult = runPostAgentLint({ cwd, label: lintLabel });
 
   if (!lintResult.available) {
-    log.error(
-      `Skipping post-agent lint: bun run lint is unavailable in this runtime for ${lintLabel}.`,
-    );
-
     return { output: finalOutput, result: finalResult };
   }
 
   const lintSummary = formatLintSummary(lintResult);
-  finalOutput = `${getOutputString(initialResult)}\n\n${lintSummary}`;
-  const lintFailed = lintResult.exitCode !== 0;
+  finalOutput = `${finalOutput}\n\n${lintSummary}`;
 
-  if (!lintFailed) {
+  if (lintResult.exitCode === 0) {
     return { output: finalOutput, result: finalResult };
   }
 
   const lintPrompt = `${POST_AGENT_LINT_PROMPT_PREFIX}\n${lintSummary}\n\nFix any lint issues and provide your final summary.`;
   insertSessionMessage(coreDb, sessionId, 'user', lintPrompt);
 
-  try {
-    const fixResult = await runAgentRound(
-      lintPrompt,
-      `${C.dim}Starting ${backendName} agent (lint feedback)…${C.reset}\n`,
-    );
+  const fixResult = await runAgentRound(
+    lintPrompt,
+    `${C.dim}Starting OpenCode (lint feedback)...${C.reset}\n`,
+  );
 
-    finalOutput = `${finalOutput}\n\n${getOutputString(fixResult)}`;
-    finalResult = fixResult;
-  } catch (lintFollowupErr) {
-    log.error(`Lint follow-up agent process error: ${String(lintFollowupErr)}`);
-    finalOutput = `${finalOutput}\n\nAutomatic lint-fix round failed: ${String(lintFollowupErr)}`;
+  finalOutput = `${finalOutput}\n\n${getOutputString(fixResult)}`;
+  finalResult = fixResult;
+
+  if (fixResult.type === 'success') {
+    await modelSources.recordSuccessfulUse(
+      currentWorkspace,
+      'opencode',
+      prepared.modelId,
+      prepared.providerId,
+    );
   }
 
   return { output: finalOutput, result: finalResult };

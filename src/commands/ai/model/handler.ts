@@ -1,4 +1,5 @@
-import { getAgentBackend, getModelOverride, setModelOverride } from '@src/db';
+import { createModelSourceCoordinator } from '@src/core/model-source';
+import { getWorkspaceTarget } from '@src/db';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import { handleError, type RouteCommandContext } from '../../dispatch';
@@ -11,8 +12,14 @@ export async function handleAiModel(
   ctx: RouteCommandContext,
 ): Promise<WebHandlerResult> {
   return handleError(async () => {
-    const backendName = getAgentBackend(ctx.seenDb);
-    const currentOverride = getModelOverride(ctx.seenDb, backendName);
+    const backendName = 'opencode' as const;
+    const coordinator = createModelSourceCoordinator(ctx.seenDb);
+    const workspace = getWorkspaceTarget(ctx.seenDb);
+
+    const currentOverride = (
+      await coordinator.getSnapshot(workspace, backendName)
+    ).state.selectedModelId;
+
     const selected = ctx.args[1] ?? null;
 
     const rep = buildAiModelRepresentation({
@@ -22,11 +29,11 @@ export async function handleAiModel(
     });
 
     if (rep.data.view === 'cleared') {
-      setModelOverride(ctx.seenDb, backendName, null);
+      await coordinator.selectModel(workspace, backendName, null);
     }
 
     if (rep.data.view === 'set') {
-      setModelOverride(ctx.seenDb, backendName, rep.data.modelId);
+      await coordinator.selectModel(workspace, backendName, rep.data.modelId);
     }
 
     const out = renderAiModelCli(rep, { prefix: ctx.prefix });

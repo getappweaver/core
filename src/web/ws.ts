@@ -230,17 +230,34 @@ function isDemoAuthorization(value: string): boolean {
 
 function demoComposerAiState(): ComposerAiState {
   return {
-    backend: 'demo',
+    backend: 'opencode',
     interventionAvailable: false,
     interventionEnabled: false,
     currentSessionId: null,
-    executionProfileLabel: 'Agent',
-    executionProfileName: 'Demo Agent',
-    executionProfileColor: 'info',
-    effectiveModel: 'demo/model',
-    provider: 'demo',
-    modelOverride: null,
-    opencodeModelFormChoices: [],
+    modelSource: {
+      providerId: 'demo/ai-model-source/v1',
+      state: {
+        sourceId: 'demo/ai-model-source/v1',
+        title: 'Demo models',
+        active: true,
+        transitionState: 'stable',
+        health: { status: 'healthy' },
+        selectedModelId: 'demo/model',
+        effectiveModelId: 'demo/model',
+        fallbackReason: 'selected',
+        catalogRevision: 'demo-1',
+      },
+      models: [],
+    },
+    modelSources: [
+      {
+        providerId: 'demo/ai-model-source/v1',
+        alias: 'core',
+        title: 'Core models',
+        active: true,
+        health: { status: 'healthy' },
+      },
+    ],
     contextStats: null,
   };
 }
@@ -279,11 +296,13 @@ function formatContextStats(stats: ComposerContextStats | null): string {
     return 'unknown';
   }
 
+  const prefix = stats.estimated ? '≈' : '';
+
   if (stats.contextPercent === null) {
-    return formatTokenCount(stats.tokensTotal);
+    return `${prefix}${formatTokenCount(stats.tokensTotal)}`;
   }
 
-  return `${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
+  return `${prefix}${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
 }
 
 function contextStatsChanged(
@@ -297,7 +316,8 @@ function contextStatsChanged(
   return (
     previous.tokensTotal !== next.tokensTotal ||
     previous.contextLimit !== next.contextLimit ||
-    previous.contextPercent !== next.contextPercent
+    previous.contextPercent !== next.contextPercent ||
+    previous.estimated !== next.estimated
   );
 }
 
@@ -652,7 +672,7 @@ async function handleCompactSession(params: {
     await summarizeOpencodeSdkSession({
       sessionId,
       cwd,
-      effectiveModel: state.effectiveModel,
+      effectiveModel: state.modelSource.state.effectiveModelId,
       auto: false,
       onAgentStreamChunk: (chunk) => {
         sendMessage(
@@ -1245,7 +1265,7 @@ async function handleChat(params: {
   const { ws, ctx, message } = params;
   const backendName = getAgentBackend(ctx.seenDb);
 
-  const useStream = backendName === 'opencode' || backendName === 'cursor';
+  const useStream = true;
 
   debug('websocket chat received', {
     requestId: message.requestId,

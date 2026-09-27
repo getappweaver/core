@@ -3,13 +3,6 @@ import { z } from 'zod';
 import { createBackend } from '@src/backends/factory';
 import { routeCommand } from '@src/commands/dispatch';
 import type { PromptFn, SendReplyFn } from '@src/core/plugin';
-import {
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
-  getModelOverride,
-  getProviderName,
-} from '@src/db';
 import type { InteractivePaymentServiceFactory } from '@src/payments/types';
 import type {
   CommandArgumentDefinition,
@@ -166,18 +159,9 @@ export async function executeBuiltinCommand({
     request,
   });
 
-  const backendName = getAgentBackend(ctx.seenDb);
-  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
-
   const backend = createBackend({
-    backendName,
+    backendName: 'opencode',
     dmBotRoot: ctx.dmBotRoot,
-    cursorMode: getCurrentOrDefaultMode(ctx.seenDb),
-    opencodeAgentName:
-      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-    attachUrl: ctx.attachUrl,
-    modelOverride: getModelOverride(ctx.seenDb, backendName),
-    providerName: getProviderName(ctx.seenDb),
   });
 
   const output = await routeCommand({
@@ -219,9 +203,6 @@ export async function executeBuiltinJsonCommand(params: {
   interactivePaymentServiceFactory?: InteractivePaymentServiceFactory;
 }): Promise<WebHandlerResult> {
   const { ctx, command, subcommand, payload } = params;
-  const backendName = getAgentBackend(ctx.seenDb);
-  const executionProfile = getBackendExecutionProfile(ctx.seenDb, backendName);
-
   const input = `${ctx.prefix}${command.name} ${subcommand.name}`;
 
   const output = await routeCommand({
@@ -234,14 +215,8 @@ export async function executeBuiltinJsonCommand(params: {
     dmBotRoot: ctx.dmBotRoot,
     attachUrl: ctx.attachUrl,
     backend: createBackend({
-      backendName,
+      backendName: 'opencode',
       dmBotRoot: ctx.dmBotRoot,
-      cursorMode: getCurrentOrDefaultMode(ctx.seenDb),
-      opencodeAgentName:
-        executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-      attachUrl: ctx.attachUrl,
-      modelOverride: getModelOverride(ctx.seenDb, backendName),
-      providerName: getProviderName(ctx.seenDb),
     }),
     botPubkey: ctx.botPubkey,
     seenDb: ctx.seenDb,

@@ -8,7 +8,6 @@ export type SetupStatus = {
     relays: boolean;
     cashuMnemonic: boolean;
     webPush: boolean;
-    cursorApiKey: boolean;
     piperBinaryPath: boolean;
     piperModelPath: boolean;
     piperLibraryPath: boolean;
@@ -48,9 +47,6 @@ export type SetupDependencyStatus = {
 
 export type SetupDefaults = {
   prefix: string;
-  backend: string;
-  provider: string;
-  mode: string;
   workspace: string;
   linting: string;
   readyNotification: boolean;
@@ -81,12 +77,6 @@ export type SetDefaultsResponse = {
   status: SetupStatus;
 };
 
-export type SetCursorApiKeyResponse = {
-  ok: true;
-  saved: true;
-  status: SetupStatus;
-};
-
 export type GenerateCashuMnemonicResponse = {
   ok: true;
   mnemonic: string;
@@ -112,10 +102,6 @@ export type ParentWorkspaceInstallResult = {
     kept: string[];
     conflicts: string[];
     missingSources: string[];
-  };
-  agentTemplates: {
-    copied: string[];
-    kept: string[];
   };
   gitignore: {
     added: string[];
@@ -409,26 +395,6 @@ export async function setSetupRelays(
   }
 
   return (await res.json()) as SetRelaysResponse;
-}
-
-export async function setCursorApiKey(
-  token: string,
-  apiKey: string,
-): Promise<SetCursorApiKeyResponse> {
-  const res = await fetch('/api/setup/cursor-api-key', {
-    method: 'POST',
-    headers: {
-      ...setupAuthHeaders(token),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ apiKey }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`setup_cursor_api_key_failed:${res.status}`);
-  }
-
-  return (await res.json()) as SetCursorApiKeyResponse;
 }
 
 export async function generateCashuMnemonic(

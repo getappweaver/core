@@ -1,8 +1,6 @@
 import type { TextRenderContext } from '@src/system/render-context';
 import { assertUnreachable } from '@src/utils';
 
-import { renderProviderAddModelCli } from './add-model/renderers/cli';
-import type { ProviderAddModelRepresentation } from './add-model/representation';
 import { renderProviderBalanceCli } from './balance/renderers/cli';
 import type { ProviderBalanceRepresentation } from './balance/representation';
 import { renderProviderBudgetCli } from './budget/renderers/cli';
@@ -31,8 +29,7 @@ export type ProviderCliRepresentation =
   | ProviderBudgetRepresentation
   | ProviderStatusRepresentation
   | ProviderModelsRepresentation
-  | ProviderSyncModelsRepresentation
-  | ProviderAddModelRepresentation;
+  | ProviderSyncModelsRepresentation;
 
 export function renderProviderCli(
   representation: ProviderCliRepresentation,
@@ -57,8 +54,6 @@ export function renderProviderCli(
       return renderProviderModelsCli(representation, context);
     case 'provider.sync-models':
       return renderProviderSyncModelsCli(representation, context);
-    case 'provider.add-model':
-      return renderProviderAddModelCli(representation, context);
     default:
       return assertUnreachable(representation);
   }

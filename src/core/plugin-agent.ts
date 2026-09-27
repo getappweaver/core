@@ -1,21 +1,21 @@
+import { resolve } from 'node:path';
+
 import { buildActiveRuntimeContext } from '@src/backends/agent-runtime-context';
 import { createBackend } from '@src/backends/factory';
-import { listOpencodeModelCatalog } from '@src/backends/opencode-config';
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
+import { getLastResolvedOpencodeModel } from '@src/backends/opencode-sdk';
 import type { AgentBackend } from '@src/backends/types';
 import {
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
-  getModelOverride,
-  getProviderName,
-  getRoutstrSkKey,
+  CORE_MODEL_SOURCE_PROVIDER_ID,
+  getActiveModelSourceProviderId,
+  getCoreSelectedModel,
   getWorkspaceInstructions,
   getWorkspaceTarget,
-  type AgentBackendName,
   type CoreDb,
 } from '@src/db';
 
 import { readAgentsInstructions } from './agent-instructions';
+import { createModelSourceCoordinator } from './model-source';
 import type {
   PluginAgentDefaults,
   PluginAgentRunProps,
@@ -30,25 +30,11 @@ type CreatePluginAgentServiceProps = {
   attachUrl: string | null;
 };
 
-function sessionBackend(
-  db: CoreDb,
-  sessionId: string,
-): AgentBackendName | null {
-  const row = db
-    .prepare('SELECT backend FROM sessions WHERE id = ?')
-    .get(sessionId) as { backend: AgentBackendName } | undefined;
-
-  return row?.backend ?? null;
-}
-
-function registerSession(props: {
-  db: CoreDb;
-  sessionId: string;
-  backend: AgentBackendName;
-}): void {
+function registerSession(props: { db: CoreDb; sessionId: string }): void {
   props.db.run(
-    'INSERT OR IGNORE INTO sessions (id, created_at, backend) VALUES (?, ?, ?)',
-    [props.sessionId, Math.floor(Date.now() / 1000), props.backend],
+    `INSERT OR REPLACE INTO sessions (id, created_at, backend)
+     VALUES (?, ?, 'opencode')`,
+    [props.sessionId, Math.floor(Date.now() / 1000)],
   );
 }
 
@@ -56,198 +42,143 @@ export function createPluginAgentService({
   db,
   dmBotRoot,
   parentOfBotRoot,
-  attachUrl,
 }: CreatePluginAgentServiceProps): PluginAgentService {
-  function getEffectiveModel(props: {
-    backend: AgentBackendName | null;
-    model: string | null;
-    mode: PluginAgentRunProps['mode'];
-    workspaceTarget: PluginAgentRunProps['workspaceTarget'];
-  }): string {
-    const backend = props.backend ?? getAgentBackend(db);
-    const provider = getProviderName(db);
-    const mode = props.mode ?? getCurrentOrDefaultMode(db);
-    const workspaceTarget = props.workspaceTarget ?? getWorkspaceTarget(db);
+  const modelSources = createModelSourceCoordinator(db);
 
-    const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
-
-    const executionProfile = getBackendExecutionProfile(db, backend);
-
-    return createBackend({
-      backendName: backend,
-      dmBotRoot: cwd,
-      cursorMode: mode,
-      opencodeAgentName:
-        props.mode !== null
-          ? props.mode
-          : executionProfile.kind === 'opencode'
-            ? executionProfile.agent
-            : null,
-      attachUrl,
-      modelOverride: props.model ?? getModelOverride(db, backend),
-      providerName: provider,
-    }).modelName;
-  }
-
-  function getDefaults(): PluginAgentDefaults {
-    const backend = getAgentBackend(db);
-    const provider = getProviderName(db);
-    const model = getModelOverride(db, backend);
-    const mode = getCurrentOrDefaultMode(db);
-    const workspaceTarget = getWorkspaceTarget(db);
-
-    const effectiveModel = getEffectiveModel({
-      backend,
-      model,
-      mode,
-      workspaceTarget,
-    });
-
-    return {
-      backend,
-      provider,
-      model,
-      effectiveModel,
-      mode,
-      workspaceTarget,
-    };
-  }
-
-  function createSelectedBackend(props: {
-    backendName: AgentBackendName;
-    provider: PluginAgentRunProps['provider'];
-    model: PluginAgentRunProps['model'];
-    mode: PluginAgentRunProps['mode'];
-  }): AgentBackend {
-    const defaults = getDefaults();
-    const executionProfile = getBackendExecutionProfile(db, props.backendName);
-    const mode = props.mode ?? defaults.mode;
-
-    return createBackend({
-      backendName: props.backendName,
-      dmBotRoot,
-      cursorMode: mode,
-      opencodeAgentName:
-        props.mode !== null
-          ? props.mode
-          : executionProfile.kind === 'opencode'
-            ? executionProfile.agent
-            : null,
-      attachUrl,
-      modelOverride: props.model ?? getModelOverride(db, props.backendName),
-      providerName: props.provider ?? defaults.provider,
-    });
+  async function prepared(workspaceTarget: 'parent' | 'appweaver') {
+    return modelSources.prepareRun(workspaceTarget, 'opencode');
   }
 
   return {
-    getDefaults,
-    getEffectiveModel,
-
-    async getAvailableModels(props): Promise<string[]> {
-      const backendName = props.backend ?? getAgentBackend(db);
+    getDefaults(): PluginAgentDefaults {
       const workspaceTarget = getWorkspaceTarget(db);
+      const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
+      const model =
+        getActiveModelSourceProviderId(db, workspaceTarget) ===
+        CORE_MODEL_SOURCE_PROVIDER_ID
+          ? getCoreSelectedModel(db, workspaceTarget)
+          : null;
+
+      return {
+        backend: 'opencode',
+        provider: 'local',
+        model,
+        effectiveModel:
+          opencodeRuntimeController.runtimeModelFor(workspaceTarget) ??
+          model ??
+          getLastResolvedOpencodeModel(cwd) ??
+          '(OpenCode default)',
+        workspaceTarget,
+      };
+    },
+
+    getEffectiveModel(props): string {
+      const workspaceTarget = props.workspaceTarget ?? getWorkspaceTarget(db);
+      const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
+      return (
+        props.model ??
+        opencodeRuntimeController.runtimeModelFor(workspaceTarget) ??
+        (getActiveModelSourceProviderId(db, workspaceTarget) ===
+        CORE_MODEL_SOURCE_PROVIDER_ID
+          ? getCoreSelectedModel(db, workspaceTarget)
+          : null) ??
+        getLastResolvedOpencodeModel(cwd) ??
+        '(OpenCode default)'
+      );
+    },
+
+    async getAvailableModels(): Promise<string[]> {
+      return (
+        await modelSources.listModels(getWorkspaceTarget(db), 'opencode')
+      ).map((model) => model.id);
+    },
+
+    async run(props: PluginAgentRunProps): Promise<PluginAgentRunResult> {
+      const requestedCwd = props.cwd ? resolve(props.cwd) : null;
+
+      const workspaceTarget =
+        props.workspaceTarget ??
+        (requestedCwd === resolve(dmBotRoot)
+          ? 'appweaver'
+          : requestedCwd === resolve(parentOfBotRoot)
+            ? 'parent'
+            : getWorkspaceTarget(db));
 
       const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
-      if (backendName === 'opencode') {
-        return listOpencodeModelCatalog(cwd).map((choice) => choice.value);
+      if (requestedCwd && requestedCwd !== resolve(cwd)) {
+        throw new Error('Plugin agent cwd must match its managed workspace.');
       }
 
-      return createSelectedBackend({
-        backendName,
-        provider: null,
-        model: null,
-        mode: null,
-      }).availableModels();
-    },
+      return opencodeRuntimeController.withPreparedRun({
+        prepare: () => prepared(workspaceTarget),
+        run: async (run) => {
+          const backend: AgentBackend = createBackend({
+            backendName: 'opencode',
+            dmBotRoot: cwd,
+          });
 
-    async run(props): Promise<PluginAgentRunResult> {
-      const storedBackend = props.sessionId
-        ? sessionBackend(db, props.sessionId)
-        : null;
+          const reusableSessionId = props.sessionId;
 
-      const backendName = props.backend ?? storedBackend ?? getAgentBackend(db);
+          const sessionId =
+            reusableSessionId ?? (await backend.createSession(cwd));
 
-      if (storedBackend !== null && storedBackend !== backendName) {
-        throw new Error(
-          `Agent session ${props.sessionId} belongs to ${storedBackend}, not ${backendName}`,
-        );
-      }
+          if (reusableSessionId === null) {
+            registerSession({
+              db,
+              sessionId,
+            });
+          }
 
-      const workspaceTarget = props.workspaceTarget ?? getWorkspaceTarget(db);
+          const contextOptions = props.context;
 
-      const cwd =
-        props.cwd ??
-        (workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot);
+          const result = await backend.runMessage({
+            sessionId,
+            content: props.prompt,
+            cwd,
+            context:
+              contextOptions === null
+                ? null
+                : {
+                    runtimeContext: contextOptions.runtimeContext
+                      ? buildActiveRuntimeContext({
+                          backendName: 'opencode',
+                          dmBotRoot,
+                          cwd,
+                        })
+                      : null,
+                    workspaceInstructions: contextOptions.workspaceInstructions
+                      ? getWorkspaceInstructions(db, workspaceTarget)
+                          .instructions
+                      : null,
+                    agentsInstructions: contextOptions.agentsInstructions
+                      ? readAgentsInstructions({
+                          workspaceTarget,
+                          dmBotRoot,
+                          parentOfBotRoot,
+                        })
+                      : null,
+                    extraInstructions: contextOptions.extraInstructions,
+                  },
+            modelOverride: run.runtimeModelId,
+            onAgentStreamChunk: props.onAgentStreamChunk,
+            streamAbortSignal: props.abortSignal,
+          });
 
-      const backend = createSelectedBackend({
-        backendName,
-        provider: props.provider,
-        model: props.model,
-        mode: props.mode,
+          if (result.type === 'success') {
+            await modelSources.recordSuccessfulUse(
+              workspaceTarget,
+              'opencode',
+              run.modelId,
+              run.providerId,
+            );
+          }
+
+          return { ...result, backend: 'opencode' };
+        },
       });
-
-      const sessionId = props.sessionId ?? (await backend.createSession(cwd));
-
-      if (storedBackend === null) {
-        registerSession({ db, sessionId, backend: backendName });
-      }
-
-      const defaults = getDefaults();
-      const executionProfile = getBackendExecutionProfile(db, backendName);
-      const mode = props.mode ?? defaults.mode;
-
-      const agentName =
-        props.mode !== null
-          ? props.mode
-          : executionProfile.kind === 'opencode'
-            ? executionProfile.agent
-            : mode;
-
-      const contextOptions = props.context;
-
-      const result = await backend.runMessage({
-        sessionId,
-        content: props.prompt,
-        cursorMode: mode,
-        opencodeAgentName:
-          props.mode !== null
-            ? props.mode
-            : executionProfile.kind === 'opencode'
-              ? executionProfile.agent
-              : null,
-        cwd,
-        context:
-          contextOptions === null
-            ? null
-            : {
-                runtimeContext: contextOptions.runtimeContext
-                  ? buildActiveRuntimeContext({
-                      backendName,
-                      agentName,
-                      dmBotRoot,
-                      cwd,
-                    })
-                  : null,
-                workspaceInstructions: contextOptions.workspaceInstructions
-                  ? getWorkspaceInstructions(db, workspaceTarget).instructions
-                  : null,
-                agentsInstructions: contextOptions.agentsInstructions
-                  ? readAgentsInstructions({
-                      workspaceTarget,
-                      dmBotRoot,
-                      parentOfBotRoot,
-                    })
-                  : null,
-                extraInstructions: contextOptions.extraInstructions,
-              },
-        getRoutstrSkKey: () => getRoutstrSkKey(db),
-        modelOverride: props.model ?? getModelOverride(db, backendName),
-        onAgentStreamChunk: props.onAgentStreamChunk,
-        streamAbortSignal: props.abortSignal,
-      });
-
-      return { ...result, backend: backendName };
     },
   };
 }

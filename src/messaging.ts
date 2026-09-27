@@ -6,7 +6,6 @@ import type { EventTemplate, SimplePool, VerifiedEvent } from 'nostr-tools';
 
 import type { AgentRunResult } from './backends/types';
 import { redrawPrompt } from './cli/local-cli';
-import type { AgentMode } from './db';
 import { C, log } from './logger';
 import { sendDm } from './nostr/nip17';
 import { assertUnreachable } from './utils';
@@ -81,21 +80,6 @@ export function chunkMessage(text: string): string[] {
   }
 
   return chunks;
-}
-
-export function modePrefix(mode: AgentMode, local: boolean): string {
-  if (!local) {
-    return `<${mode}> `;
-  }
-
-  const colors: Record<AgentMode, string> = {
-    free: C.cyan,
-    ask: C.cyan,
-    plan: C.yellow,
-    agent: C.green,
-  };
-
-  return `${colors[mode]}<${mode}>${C.reset} `;
 }
 
 export function tokenFooter(

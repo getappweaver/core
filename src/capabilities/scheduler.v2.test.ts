@@ -36,7 +36,6 @@ test('scheduler v2 keeps agent-prompt tasks compatible', () => {
     SchedulerTaskV2Schema.parse({
       type: 'agent-prompt',
       prompt: 'Send a summary.',
-      mode: 'agent',
       workspaceTarget: 'appweaver',
     }).type,
   ).toBe('agent-prompt');

@@ -78,7 +78,19 @@ function providerIdFor(
   source: CapabilityProviderSource,
   capability: CapabilityRef,
 ): string {
-  return `${source.pluginName}/${capability.name}/v${capability.version}`;
+  const owner = source.type === 'plugin' ? source.pluginName : source.id;
+
+  return `${owner}/${capability.name}/v${capability.version}`;
+}
+
+function sourceName(source: CapabilityProviderSource): string {
+  return source.type === 'plugin' ? source.pluginName : source.id;
+}
+
+function callerName(caller: CapabilityCaller): string {
+  return caller.type === 'plugin'
+    ? caller.pluginName
+    : `core:${caller.component}`;
 }
 
 function providerSummary(
@@ -109,7 +121,7 @@ function prepareProvider({
     validateCapabilityContract(provider.contract);
   } catch (err) {
     throw new CapabilityRegistrationError(
-      `Invalid capability contract from ${source.pluginName}.`,
+      `Invalid capability contract from ${sourceName(source)}.`,
       err,
     );
   }
@@ -393,7 +405,7 @@ export class CapabilityRegistry {
 
     const fail = (failure: CapabilityError): never => {
       log.error(
-        `Capability ${operation.id} failed via ${resolvedProviderId} for ${caller.pluginName} after ${Date.now() - startedAt}ms: ${failure.code}`,
+        `Capability ${operation.id} failed via ${resolvedProviderId} for ${callerName(caller)} after ${Date.now() - startedAt}ms: ${failure.code}`,
       );
 
       throw failure;
@@ -487,7 +499,7 @@ export class CapabilityRegistry {
       }
 
       debug(
-        `Capability ${operation.id} completed via ${selection.provider.providerId} for ${caller.pluginName} in ${Date.now() - startedAt}ms`,
+        `Capability ${operation.id} completed via ${selection.provider.providerId} for ${callerName(caller)} in ${Date.now() - startedAt}ms`,
       );
 
       return {

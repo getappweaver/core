@@ -11,7 +11,6 @@ import { handleHelpRoot } from './help/handlers';
 import { handleNwcRoot } from './nwc/handler';
 import { handlePluginsRoot } from './plugin-manager/handler';
 import { handleRoadmapRoot } from './roadmap/handler';
-import { handleRoutstrRoot } from './routstr/handler';
 import { handleSessionRoot } from './session/handler';
 import { handleSkillsRoot } from './skills/handler';
 import { handleStoryRoot } from './story/handler';
@@ -33,7 +32,6 @@ export const builtinCommandHandlers: Record<string, BuiltinHandler> = {
   plugin: handlePluginsRoot,
   roadmap: handleRoadmapRoot,
   ai: handleAiRoot,
-  routstr: handleRoutstrRoot,
   nwc: handleNwcRoot,
   cashu: handleCashuRoot,
   wallet: handleWalletRoot,

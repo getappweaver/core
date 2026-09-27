@@ -8,5 +8,5 @@ export function renderSessionUsageText(
 ): string {
   const p = representation.data.prefix;
 
-  return `Usage: ${p}session new | attach <opencode|cursor> <id> | adopt <id> | resume-last | resume <id> | list | list-native --opencode | messages <id> [N] — or ${p}session help`;
+  return `Usage: ${p}session new | attach opencode <id> | adopt <id> | resume-last | resume <id> | list [--limit N] | list-native --opencode | messages <id> [N] — or ${p}session help`;
 }

@@ -8,23 +8,14 @@ import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { generateVAPIDKeys } from 'web-push';
 
 import {
-  AgentBackendNameSchema,
-  AgentModeSchema,
   DmCommandPrefixSchema,
   LintingSchema,
-  ProviderNameSchema,
-  setAgentBackend,
-  setDefaultMode,
   setDmCommandPrefix,
   setLinting,
   markSetupConfigured,
-  setProviderName,
   setWorkspaceTarget,
   type CoreDb,
-  type AgentBackendName,
-  type AgentMode,
   type Linting,
-  type ProviderName,
   type WorkspaceTarget,
   WorkspaceTargetSchema,
 } from '@src/db';
@@ -59,15 +50,6 @@ type SetRelaysProps = {
 
 type SetRelaysResult = {
   relays: string[];
-};
-
-type SetCursorApiKeyProps = {
-  dmBotRoot: string;
-  apiKey: string;
-};
-
-type SetCursorApiKeyResult = {
-  saved: true;
 };
 
 type SetProviderApiKeyProps = {
@@ -135,9 +117,6 @@ const DEFAULT_CASHU_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
 
 export type SetupDefaultsInput = {
   prefix: string;
-  backend: string;
-  provider: string;
-  mode: string;
   workspace: string;
   linting: string;
   readyNotification: boolean;
@@ -153,9 +132,6 @@ type SetSetupDefaultsProps = {
 type SetupDefaultsResult = {
   defaults: {
     prefix: string;
-    backend: AgentBackendName;
-    provider: ProviderName;
-    mode: AgentMode;
     workspace: WorkspaceTarget;
     linting: Linting;
     readyNotification: boolean;
@@ -240,22 +216,6 @@ export function setSetupRelays({
   process.env.BOT_RELAYS = envValue;
 
   return { relays };
-}
-
-export function setSetupCursorApiKey({
-  dmBotRoot,
-  apiKey,
-}: SetCursorApiKeyProps): SetCursorApiKeyResult {
-  const trimmed = apiKey.trim();
-
-  if (trimmed.length === 0) {
-    throw new Error('invalid_cursor_api_key');
-  }
-
-  setEnvInFile(join(dmBotRoot, '.env'), 'CURSOR_API_KEY', trimmed);
-  process.env.CURSOR_API_KEY = trimmed;
-
-  return { saved: true };
 }
 
 export function setSetupProviderApiKey({
@@ -441,17 +401,11 @@ export function setSetupDefaults({
   input,
 }: SetSetupDefaultsProps): SetupDefaultsResult {
   const prefix = DmCommandPrefixSchema.parse(input.prefix.trim());
-  const backend = AgentBackendNameSchema.parse(input.backend);
-  const provider = ProviderNameSchema.parse(input.provider);
-  const mode = AgentModeSchema.parse(input.mode);
   const workspace = WorkspaceTargetSchema.parse(input.workspace);
   const linting = LintingSchema.parse(input.linting);
   const readyNotification = input.readyNotification;
 
   setDmCommandPrefix(db, prefix);
-  setAgentBackend(db, backend);
-  setProviderName(db, provider);
-  setDefaultMode(db, mode);
   setWorkspaceTarget(db, workspace);
   setLinting(db, linting);
   markSetupConfigured(db);
@@ -461,7 +415,6 @@ export function setSetupDefaults({
   process.env.READY_ENABLED = readyValue;
 
   const parentWorkspaceInstall = ensureOpencodeParentWorkspaceAssets({
-    backend,
     workspace,
     dmBotRoot,
     parentOfBotRoot,
@@ -470,9 +423,6 @@ export function setSetupDefaults({
   return {
     defaults: {
       prefix,
-      backend,
-      provider,
-      mode,
       workspace,
       linting,
       readyNotification,

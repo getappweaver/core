@@ -3,6 +3,7 @@ import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 type ComposerContextMenuButtonProps = {
   backend: string;
   label: string;
+  estimated: boolean;
   wsConnected: boolean;
   compacting: boolean;
   sessionDiffAvailable: boolean;
@@ -64,7 +65,9 @@ export function ComposerContextMenuButton(
         aria-haspopup="menu"
         title={
           props.wsConnected
-            ? 'Session context actions'
+            ? props.estimated
+              ? 'Estimated from session text; token usage was not reported. Click for session context actions.'
+              : 'Session context actions'
             : 'Connect WebSocket first'
         }
         onClick={() => setOpen((v) => !v)}

@@ -37,7 +37,6 @@ import { ComposerContextMenuButton } from './composer/components/ComposerContext
 import { ComposerFilePicker } from './composer/components/ComposerFilePicker';
 import { ComposerInterventionButton } from './composer/components/ComposerInterventionButton';
 import { ComposerModelOverrideButton } from './composer/components/ComposerModelOverrideButton';
-import { ComposerProviderMenuButton } from './composer/components/ComposerProviderMenuButton';
 import { ComposerSkillsButton } from './composer/components/ComposerSkillsButton';
 import { ComposerWorkingButton } from './composer/components/ComposerWorkingButton';
 import { useComposer } from './composer/useComposer';
@@ -146,11 +145,13 @@ function formatComposerContextStats(
     return null;
   }
 
+  const prefix = stats.estimated ? '≈' : '';
+
   if (stats.contextPercent === null) {
-    return formatTokenCount(stats.tokensTotal);
+    return `${prefix}${formatTokenCount(stats.tokensTotal)}`;
   }
 
-  return `${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
+  return `${prefix}${formatTokenCount(stats.tokensTotal)} (${Math.round(stats.contextPercent)}%)`;
 }
 
 type DockResizeState = {
@@ -445,6 +446,7 @@ function AppInner(): JSX.Element {
     endWebUiBusy,
     getWebEntityPendingFor,
     isWebUiBusyFor,
+    modelStateUnavailable,
     pendingRequests,
     requestComposerAiState,
     sendSocketMessage,
@@ -2342,7 +2344,6 @@ function AppInner(): JSX.Element {
   const { chooseSubcommand, openCommandFormFromWebCommand, openSubcommand } =
     useCommandForms({
       selectedCommand,
-      composerAiState,
       setTimeline,
       setComposerText,
       setActiveFormId,
@@ -2923,39 +2924,6 @@ function AppInner(): JSX.Element {
                 value={composerText()}
                 footer={
                   <div class="composer-meta">
-                    <button
-                      type="button"
-                      class="composer-chip"
-                      classList={{
-                        'composer-chip--info':
-                          composerAiState()?.executionProfileColor === 'info',
-                        'composer-chip--warning':
-                          composerAiState()?.executionProfileColor ===
-                          'warning',
-                        'composer-chip--danger':
-                          composerAiState()?.executionProfileColor === 'danger',
-                        'composer-chip--success':
-                          composerAiState()?.executionProfileColor ===
-                          'success',
-                      }}
-                      disabled={!wsConnected()}
-                      onClick={() => {
-                        openChromeWidget({
-                          command: 'ai',
-                          subcommand: 'agents',
-                          title: 'OpenCode Agents',
-                        });
-                      }}
-                      title={
-                        wsConnected()
-                          ? 'Open OpenCode agent manager'
-                          : 'Connect WebSocket first'
-                      }
-                    >
-                      {composerAiState()
-                        ? composerAiState()!.executionProfileName
-                        : 'Agent'}
-                    </button>
                     <ComposerSkillsButton
                       iconUrl={SKILLS_MANAGER_ICON_URL}
                       disabled={!wsConnected()}
@@ -2976,17 +2944,14 @@ function AppInner(): JSX.Element {
                       }
                       onToggle={toggleInterventionMode}
                     />
+                    <ComposerModelOverrideButton
+                      state={composerAiState()}
+                      wsConnected={wsConnected()}
+                      modelStateUnavailable={modelStateUnavailable()}
+                      onRequestState={requestComposerAiState}
+                      onRunWebAction={runWebAction}
+                    />
                     <Show when={composerAiState() !== null}>
-                      <ComposerModelOverrideButton
-                        state={composerAiState()!}
-                        wsConnected={wsConnected()}
-                        onRunWebAction={runWebAction}
-                      />
-                      <ComposerProviderMenuButton
-                        provider={composerAiState()!.provider}
-                        wsConnected={wsConnected()}
-                        onRunWebAction={runWebAction}
-                      />
                       <ComposerWorkingButton
                         working={agentWorking()}
                         runStatus={chatRunStatus()}
@@ -3012,6 +2977,9 @@ function AppInner(): JSX.Element {
                         label={
                           formatComposerContextStats(composerAiState()) ??
                           'session'
+                        }
+                        estimated={
+                          composerAiState()?.contextStats?.estimated ?? false
                         }
                         wsConnected={wsConnected()}
                         compacting={compactSessionRequestId() !== null}

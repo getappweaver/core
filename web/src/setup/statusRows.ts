@@ -35,11 +35,6 @@ export function setupRows(status: SetupStatus): StatusRowProps[] {
       ok: status.env.webPush,
       detail: status.env.webPush ? 'configured' : 'optional',
     },
-    {
-      label: 'Cursor API key',
-      ok: status.env.cursorApiKey,
-      detail: status.env.cursorApiKey ? 'configured' : 'optional',
-    },
   ];
 }
 

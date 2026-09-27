@@ -89,11 +89,11 @@ const features: Feature[] = [
     ],
   },
   {
-    title: 'Your AI Backend, Your Models',
+    title: 'Your AI Models, Your Workspace',
     points: [
-      'Choose any model your backend supports, including OpenCode and Cursor backends.',
-      'Use Routstr-supported pay-as-you-go models when you want hosted model access.',
-      'Pay with a local Cashu bitcoin balance where supported.',
+      'Run AI tasks with OpenCode and choose models from the active model source for your workspace.',
+      'Install model-source apps to add their own catalogs and provider configuration.',
+      'Use app-specific payment options; like NWC lightning connections or Cashu eCash where it\'s supported.',
     ],
   },
   {

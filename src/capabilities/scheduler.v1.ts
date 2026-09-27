@@ -11,7 +11,6 @@ import { CapabilityResourceRefSchema, defineCapability } from './types';
 const SchedulerTaskV1Schema = z.object({
   type: z.literal('agent-prompt'),
   prompt: z.string().min(1),
-  mode: z.literal('agent'),
   workspaceTarget: z.literal('appweaver'),
 });
 

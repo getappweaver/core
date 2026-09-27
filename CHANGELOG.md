@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.0.0] - 2026-09-27
+
+- Added model-source capability, Backward incompatible changes: cursor backend dropped, core routstr provider dropped (c8a42d3a)
+
 ## [v12.8.6] - 2026-09-17
 
-- chore: added event enrichment spec to the docs (85a37b80)
+- chore: added event enrichment spec to the docs (8dd873e4)
 
 ## [v12.8.5] - 2026-09-17
 

@@ -331,11 +331,8 @@ export function OpenCodeAuthCard(props: OpenCodeAuthCardProps): JSX.Element {
         <div>
           <h1>OpenCode Backend Configuration</h1>
         </div>
-        <span
-          class="setup-badge"
-          classList={{ 'is-ok': props.status.defaults.backend === 'opencode' }}
-        >
-          {props.status.defaults.backend === 'opencode' ? 'active' : 'optional'}
+        <span class="setup-badge" classList={{ 'is-ok': true }}>
+          active
         </span>
       </div>
       <p class="setup-copy">

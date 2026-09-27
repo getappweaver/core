@@ -1,5 +1,6 @@
 import type { Session } from '@opencode-ai/sdk/v2';
 
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import { getOpencodeSdkClient } from '@src/backends/opencode-sdk';
 import type { CoreDb } from '@src/db';
 import { getState, STATE_CURRENT_SESSION } from '@src/db';
@@ -61,12 +62,10 @@ export async function handleSessionListNative({
     };
   }
 
-  const opencode = await getOpencodeSdkClient();
+  const result = await opencodeRuntimeController.withAdmission(async () => {
+    const opencode = await getOpencodeSdkClient();
 
-  const result = await opencode.session.list({
-    directory: cwd,
-    roots: true,
-    limit: 25,
+    return opencode.session.list({ directory: cwd, roots: true, limit: 25 });
   });
 
   const sessions = result.data ?? [];

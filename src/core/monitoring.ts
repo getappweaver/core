@@ -73,9 +73,8 @@ async function flush(): Promise<void> {
       operationId: MonitoringV1.operations.record.id,
       input: { spans },
       caller: {
-        type: 'plugin',
-        pluginName: 'appweaver-core',
-        alias: 'core',
+        type: 'core',
+        component: 'monitoring',
       },
     });
   } catch (err) {

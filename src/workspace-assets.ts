@@ -1,11 +1,8 @@
 import {
-  copyFileSync,
   existsSync,
   lstatSync,
-  mkdirSync,
   readFileSync,
   readlinkSync,
-  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
@@ -25,100 +22,12 @@ export type InstallParentWorkspaceAssetsResult = {
     missingSources: string[];
     removedLegacyAgentsSymlink: boolean;
   };
-  agentTemplates: {
-    copied: string[];
-    kept: string[];
-  };
   gitignore: {
     added: string[];
     kept: string[];
     removed: string[];
   };
 };
-
-type SymlinkTarget = {
-  label: string;
-  src: string;
-  dest: string;
-};
-
-const DEFAULT_AGENT_TEMPLATE_FILES = [
-  'agent.md',
-  'ask.md',
-  'free.md',
-  'plan.md',
-];
-
-function fileOrDirExists(path: string): boolean {
-  try {
-    lstatSync(path);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isSymlink(path: string): boolean {
-  try {
-    return lstatSync(path).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
-function getParentSymlinkTargets({
-  dmBotRoot,
-  parentOfBotRoot,
-}: InstallParentWorkspaceAssetsProps): SymlinkTarget[] {
-  const staticTargets: SymlinkTarget[] = [
-    {
-      label: 'opencode.json',
-      src: join(dmBotRoot, 'opencode.json'),
-      dest: join(parentOfBotRoot, 'opencode.json'),
-    },
-  ];
-
-  return staticTargets;
-}
-
-function ensureAgentTemplates(
-  targetRoot: string,
-  dmBotRoot: string,
-): {
-  copied: string[];
-  kept: string[];
-} {
-  const templatesDir = join(dmBotRoot, 'templates', 'opencode-agents');
-  const targetDir = join(targetRoot, '.opencode', 'agents');
-  const copied: string[] = [];
-  const kept: string[] = [];
-
-  if (!existsSync(templatesDir)) {
-    return { copied, kept };
-  }
-
-  mkdirSync(targetDir, { recursive: true });
-
-  for (const fileName of DEFAULT_AGENT_TEMPLATE_FILES) {
-    const src = join(templatesDir, fileName);
-    const dest = join(targetDir, fileName);
-
-    if (!existsSync(src)) {
-      continue;
-    }
-
-    if (existsSync(dest)) {
-      kept.push(fileName);
-      continue;
-    }
-
-    copyFileSync(src, dest);
-    copied.push(fileName);
-  }
-
-  return { copied, kept };
-}
 
 function updateParentGitignore({
   dmBotRoot,
@@ -133,6 +42,8 @@ function updateParentGitignore({
   const entries = [
     `${botDirName}/`,
     'opencode.json',
+    '.appweaver/opencode.json',
+    '.appweaver/ppq/',
     '.claude/skills/appweaver-*',
   ];
 
@@ -164,11 +75,13 @@ function updateParentGitignore({
     added.push(entry);
   }
 
-  writeFileSync(
-    gitignorePath,
-    lines.join('\n') + (lines.length > 0 ? '\n' : ''),
-    'utf-8',
-  );
+  if (added.length > 0 || removed.length > 0) {
+    writeFileSync(
+      gitignorePath,
+      lines.join('\n') + (lines.length > 0 ? '\n' : ''),
+      'utf-8',
+    );
+  }
 
   return { added, kept, removed };
 }
@@ -233,31 +146,6 @@ export function installParentWorkspaceAssets({
     parentOfBotRoot,
   });
 
-  for (const target of getParentSymlinkTargets({
-    dmBotRoot,
-    parentOfBotRoot,
-  })) {
-    if (!existsSync(target.src)) {
-      missingSources.push(target.label);
-      continue;
-    }
-
-    if (isSymlink(target.dest)) {
-      kept.push(target.label);
-      continue;
-    }
-
-    if (fileOrDirExists(target.dest)) {
-      conflicts.push(target.label);
-      continue;
-    }
-
-    mkdirSync(dirname(target.dest), { recursive: true });
-    symlinkSync(target.src, target.dest);
-    installed.push(target.label);
-  }
-
-  const agentTemplates = ensureAgentTemplates(parentOfBotRoot, dmBotRoot);
   const gitignore = updateParentGitignore({ dmBotRoot, parentOfBotRoot });
 
   return {
@@ -269,20 +157,19 @@ export function installParentWorkspaceAssets({
       missingSources,
       removedLegacyAgentsSymlink,
     },
-    agentTemplates,
     gitignore,
   };
 }
 
 export function ensureOpencodeParentWorkspaceAssets(props: {
-  backend: string;
   workspace: string;
   dmBotRoot: string;
   parentOfBotRoot: string;
 }): InstallParentWorkspaceAssetsResult | null {
-  if (props.backend !== 'opencode' || props.workspace !== 'parent') {
+  if (props.workspace !== 'parent') {
     removeLegacyParentAgentsSymlink(props);
     removeLegacyParentAgentsGitignoreEntry(props.parentOfBotRoot);
+    updateParentGitignore(props);
 
     return null;
   }

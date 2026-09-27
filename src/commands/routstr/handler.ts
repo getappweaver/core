@@ -11,7 +11,7 @@ export const handleRoutstrRoot: BuiltinHandler = (ctx) => {
     return Promise.resolve(
       renderBuiltinHelpText({
         prefix: ctx.prefix,
-        root: 'routstr',
+        root: 'routstr' as never,
         topic,
       }),
     );

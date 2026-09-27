@@ -1071,6 +1071,97 @@ a.web-button:focus-visible {
   gap: 0.35rem;
 }
 
+.model-picker__row {
+  width: 100%;
+  min-width: 0;
+}
+
+.model-picker__select.web-button {
+  display: block;
+  min-width: 0;
+  padding: 0.28rem 0.4rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-picker__select.web-button:hover,
+.model-picker__select.web-button:focus-visible {
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+
+.model-picker__select.web-button:focus-visible {
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+}
+
+.model-picker__select.web-button.is-selected {
+  color: var(--color-warning);
+}
+
+.model-picker__select.web-button.is-selected::before {
+  content: '\2713';
+  margin-right: 0.35rem;
+}
+
+.model-picker__favourite.web-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-muted);
+  transform: none;
+}
+
+.model-picker__favourite.web-button::before {
+  content: '';
+  width: 1.15rem;
+  height: 1.15rem;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Zm0 4.52-1.76 3.57-3.94.57 2.85 2.78-.67 3.92L12 15.51l3.52 1.85-.67-3.92 2.85-2.78-3.94-.57L12 6.52Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Zm0 4.52-1.76 3.57-3.94.57 2.85 2.78-.67 3.92L12 15.51l3.52 1.85-.67-3.92 2.85-2.78-3.94-.57L12 6.52Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.model-picker__favourite.web-button.is-favourite {
+  color: var(--color-warning);
+}
+
+.model-picker__favourite.web-button.is-favourite::before {
+  mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z'/%3E%3C/svg%3E");
+}
+
+.model-picker__favourite.web-button:hover,
+.model-picker__favourite.web-button:focus-visible {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  box-shadow: none;
+  color: var(--color-warning);
+  transform: none;
+}
+
+.model-picker__favourite.web-button:focus-visible {
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+}
+
+.model-picker__details {
+  padding: 0 0.4rem 0.25rem;
+  font-size: 0.76rem;
+}
+
 .web-tree-header {
   display: flex;
   align-items: center;
@@ -1085,11 +1176,31 @@ a.web-button:focus-visible {
   font-size: 0.82rem;
 }
 
+.web-tree-toolbar-button.web-button.web-button--link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  text-decoration: none;
+}
+
+.web-tree-toolbar-button .card-head-chrome-icon {
+  display: block;
+}
+
 .web-tree-filter {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin-right: auto;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.web-tree-filter.is-open {
+  flex: 1;
 }
 
 .web-tree-filter-toggle.web-button.web-button--link {
@@ -1119,6 +1230,8 @@ a.web-button:focus-visible {
 
 .web-tree-filter-input {
   width: min(12rem, 48vw);
+  min-width: 0;
+  flex: 1;
   border: 1px solid var(--color-border);
   border-radius: 0;
   background: var(--color-panel);
@@ -1129,6 +1242,30 @@ a.web-button:focus-visible {
 
 .web-tree-filter-input:focus {
   border-color: var(--color-warning);
+}
+
+:host-context(.composer-model-picker) {
+  font-size: 0.78rem;
+}
+
+:host-context(.composer-model-picker) .web-tree {
+  gap: 0.25rem;
+}
+
+:host-context(.composer-model-picker) .web-tree-header {
+  gap: 0.35rem;
+}
+
+:host-context(.composer-model-picker) .web-tree-filter {
+  gap: 0.25rem;
+}
+
+:host-context(.composer-model-picker) .web-tree-filter-input {
+  width: 100%;
+  height: 18px;
+  max-height: 18px;
+  font-size: 0.76rem;
+  line-height: 1;
 }
 
 .web-tree-filter-clear {

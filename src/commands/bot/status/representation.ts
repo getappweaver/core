@@ -1,33 +1,16 @@
 import { z } from 'zod';
 
-import { listCachedCursorSdkModelCatalog } from '@src/backends/cursor-sdk';
-import { createBackend } from '@src/backends/factory';
-import { resolveConfiguredModelFromOpencodeConfig } from '@src/backends/opencode-common';
-import {
-  listOpencodeModelCatalog,
-  readOpencodeConfig,
-} from '@src/backends/opencode-config';
 import type { CoreUpdateSnapshot } from '@src/core/update-check';
 import {
-  AgentBackendNameSchema,
-  AgentModeSchema,
   LintingSchema,
-  ProviderNameSchema,
   WorkspaceTargetSchema,
-  getAgentBackend,
-  getBackendExecutionProfile,
-  getCurrentOrDefaultMode,
   getLinting,
-  getModelOverride,
-  getProviderName,
-  getRoutstrBudget,
   getState,
   getWorkspaceTarget,
   STATE_CURRENT_SESSION,
   type CoreDb,
 } from '@src/db';
 import { createRepresentationSchema } from '@src/system/representation';
-import { msatsRaw } from '@src/types';
 
 export type StatusProps = {
   botRelayUrls: string[];
@@ -40,158 +23,36 @@ export type StatusProps = {
 };
 
 export const BotStatusDataSchema = z.object({
-  backend: AgentBackendNameSchema,
-  provider: ProviderNameSchema,
+  backend: z.literal('opencode'),
   version: z.string().min(1),
-  coreUpdate: z
-    .object({
-      state: z.enum(['checking', 'available', 'up_to_date', 'unavailable']),
-      localVersion: z.string().nullable(),
-      remoteVersion: z.string().nullable(),
-      updateLevel: z.enum(['major', 'minor', 'patch', 'same', 'unknown']),
-      changelog: z.array(
-        z.object({
-          ref: z.string(),
-          subject: z.string(),
-        }),
-      ),
-      changelogTruncated: z.boolean(),
-      localRef: z.string().nullable(),
-      remoteRef: z.string().nullable(),
-      upstream: z.string().nullable(),
-      behind: z.number().int().nonnegative().nullable(),
-      ahead: z.number().int().nonnegative().nullable(),
-      checkedAtMs: z.number().int().nonnegative().nullable(),
-      message: z.string().nullable(),
-    })
-    .nullable(),
-  mode: AgentModeSchema,
-  executionProfileKind: z.enum(['mode', 'agent']),
-  executionProfileDisplayName: z.string().min(1),
+  coreUpdate: z.any().nullable(),
   linting: LintingSchema,
-  modelOverride: z.string().nullable(),
-  opencodeRootModel: z.string().nullable(),
-  opencodeAgentModel: z.string().nullable(),
-  opencodeAgentNames: z.array(z.string()),
-  resolvedModelName: z.string().min(1),
-  effectiveModelSource: z.enum(['override', 'agent', 'root', 'default']),
   workspace: WorkspaceTargetSchema,
   botRelayUrls: z.array(z.string()),
   sessionId: z.string().nullable(),
   opencodeServeUrl: z.string().nullable(),
-  routstrBudgetMsatsRaw: z.number().int().nonnegative().nullable(),
-  opencodeModelCatalog: z.array(
-    z.object({
-      value: z.string(),
-      label: z.string(),
-    }),
-  ),
 });
 
 export const BotStatusRepresentationSchema = createRepresentationSchema(
   BotStatusDataSchema,
-).extend({
-  kind: z.literal('bot.status'),
-});
-
+).extend({ kind: z.literal('bot.status') });
 export type BotStatusRepresentation = z.infer<
   typeof BotStatusRepresentationSchema
 >;
-
 export type BotStatusData = z.infer<typeof BotStatusDataSchema>;
 
 export function buildBotStatusData(props: StatusProps): BotStatusData {
-  const {
-    botRelayUrls,
-    seenDb,
-    version,
-    coreUpdate,
-    dmBotRoot,
-    parentOfBotRoot,
-    attachUrl,
-  } = props;
-
-  const mode = getCurrentOrDefaultMode(seenDb);
-  const linting = getLinting(seenDb);
-  const backendName = getAgentBackend(seenDb);
-  const workspace = getWorkspaceTarget(seenDb);
-  const opencodeRoot = workspace === 'appweaver' ? dmBotRoot : parentOfBotRoot;
-  const serveUrl = process.env.BOT_OPENCODE_SERVE_URL;
-  const modelOverride = getModelOverride(seenDb, backendName);
-  const providerName = getProviderName(seenDb);
-  const executionProfile = getBackendExecutionProfile(seenDb, backendName);
-
-  const opencodeConfigured =
-    backendName === 'opencode'
-      ? resolveConfiguredModelFromOpencodeConfig(
-          opencodeRoot,
-          executionProfile.kind === 'opencode' ? executionProfile.agent : mode,
-        )
-      : null;
-
-  const opencodeConfig =
-    backendName === 'opencode' ? readOpencodeConfig(opencodeRoot) : null;
-
-  const opencodeModelCatalog =
-    backendName === 'opencode'
-      ? listOpencodeModelCatalog(opencodeRoot)
-      : backendName === 'cursor'
-        ? listCachedCursorSdkModelCatalog()
-        : [];
-
-  const backend = createBackend({
-    backendName,
-    dmBotRoot,
-    cursorMode: mode,
-    opencodeAgentName:
-      executionProfile.kind === 'opencode' ? executionProfile.agent : null,
-    attachUrl,
-    modelOverride,
-    providerName,
-  });
-
-  const resolvedModelName =
-    backendName === 'opencode' && opencodeConfigured && !modelOverride
-      ? opencodeConfigured.modelName
-      : backend.modelName;
-
-  const cur = getState(seenDb, STATE_CURRENT_SESSION);
-
-  const opencodeServeUrlAttached =
-    backendName === 'opencode' && serveUrl ? serveUrl : null;
-
-  const routstrBudgetMsatsRaw =
-    providerName === 'routstr' ? msatsRaw(getRoutstrBudget(seenDb)) : null;
+  const workspace = getWorkspaceTarget(props.seenDb);
 
   return {
-    backend: backendName,
-    provider: providerName,
-    version,
-    coreUpdate,
-    mode,
-    executionProfileKind:
-      executionProfile.kind === 'cursor' ? 'mode' : ('agent' as const),
-    executionProfileDisplayName:
-      executionProfile.kind === 'opencode'
-        ? executionProfile.agent
-        : mode === 'agent' || mode === 'free'
-          ? 'yolo'
-          : mode,
-    linting,
-    modelOverride,
-    opencodeRootModel: opencodeConfigured?.rootModel ?? null,
-    opencodeAgentModel: opencodeConfigured?.agentModel ?? null,
-    opencodeAgentNames: opencodeConfig?.agents.map((agent) => agent.name) ?? [],
-    resolvedModelName,
-    effectiveModelSource: modelOverride
-      ? 'override'
-      : (opencodeConfigured?.source ?? 'default'),
+    backend: 'opencode',
+    version: props.version,
+    coreUpdate: props.coreUpdate,
+    linting: getLinting(props.seenDb),
     workspace,
-    botRelayUrls,
-    sessionId: cur,
-    opencodeServeUrl: opencodeServeUrlAttached,
-    routstrBudgetMsatsRaw,
-    opencodeModelCatalog,
+    botRelayUrls: props.botRelayUrls,
+    sessionId: getState(props.seenDb, STATE_CURRENT_SESSION),
+    opencodeServeUrl: props.attachUrl,
   };
 }
 

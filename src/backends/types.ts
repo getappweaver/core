@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // backends/types.ts
 // ---------------------------------------------------------------------------
-import type { AgentBackendName, AgentMode } from '../db';
+import type { AgentBackendName } from '../db';
 
 import type { AgentStreamChunk } from './agent-stream-chunk';
 
@@ -66,11 +66,8 @@ export function getOutputString(result: AgentRunResult): string {
 export type RunMessageProps = {
   sessionId: string;
   content: string;
-  cursorMode: AgentMode;
-  opencodeAgentName: string | null;
   cwd: string;
   context: AgentRunContext | null;
-  getRoutstrSkKey: () => string | null;
   modelOverride: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   streamAbortSignal: AbortSignal | null;
@@ -85,7 +82,6 @@ export type AgentRunContext = {
 
 export type AgentBackend = {
   name: AgentBackendName;
-  modelName: string;
   createSession(cwd: string): Promise<string>;
   runMessage(props: RunMessageProps): Promise<AgentRunResult>;
   runChatCompletion(

@@ -70,15 +70,15 @@ function shouldRefreshComposerAiState(
   subcommand: string,
 ): boolean {
   return (
-    command === 'ai' &&
-    [
-      'agents set',
-      'backend',
-      'mode',
-      'model',
-      'provider',
-      'root-model',
-    ].includes(subcommand)
+    (command === 'ai' &&
+      ['favorite', 'model', 'recent-limit', 'source', 'unfavorite'].includes(
+        subcommand,
+      )) ||
+    (command === 'session' &&
+      ['new', 'attach', 'adopt', 'resume', 'resume-last'].includes(
+        subcommand,
+      )) ||
+    (command === 'bot' && subcommand === 'workspace')
   );
 }
 
@@ -2232,6 +2232,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         ]);
       },
       onDone: () => {
+        params?.onCommandSettled?.(null);
+
         emitStoryCommandCompleted({
           command: commandAction.command,
           subcommand: commandAction.subcommand,
@@ -2289,7 +2291,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           adapters.setChromePromptSession(null);
         }
       },
-      onError: () => {
+      onError: (message) => {
+        params?.onCommandSettled?.(message.message);
         finishBrowserTrace('error');
 
         if (statusTargetId) {
@@ -2360,6 +2363,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       endUserPendingOnce();
       adapters.pendingRequests.delete(requestId);
       finishBrowserTrace('error');
+
+      params?.onCommandSettled?.(
+        err instanceof Error ? err.message : String(err),
+      );
 
       adapters.appendSystemMessage(
         err instanceof Error ? err.message : String(err),

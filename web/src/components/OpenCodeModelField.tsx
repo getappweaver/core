@@ -6,7 +6,7 @@ export type OpenCodeModelFieldProps = {
   /** Unique id for the paired `<datalist>`. */
   fieldId: string;
   value: string;
-  /** From `opencode.json`; use `[]` when there is no catalog (plain text field). */
+  /** From the active model source; use `[]` when there is no catalog. */
   choices: WebArgumentFieldChoice[];
   enterKeyHint?:
     'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send';
@@ -14,8 +14,7 @@ export type OpenCodeModelFieldProps = {
 };
 
 /**
- * Text input with optional `<datalist>` of `opencode.json` models (`provider/model`).
- * Shared by the agent editor and timeline command forms (e.g. `/ai root-model`).
+ * Text input with an optional model `<datalist>`.
  */
 export function OpenCodeModelField(props: OpenCodeModelFieldProps) {
   const listId = () => `${props.fieldId}-opencode-models`;

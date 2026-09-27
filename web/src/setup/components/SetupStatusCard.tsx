@@ -39,18 +39,6 @@ export function SetupStatusCard(props: {
           <dd>{status().runtime.prefix}</dd>
         </div>
         <div>
-          <dt>Backend</dt>
-          <dd>{status().defaults.backend}</dd>
-        </div>
-        <div>
-          <dt>Provider</dt>
-          <dd>{status().defaults.provider}</dd>
-        </div>
-        <div>
-          <dt>Mode</dt>
-          <dd>{status().defaults.mode}</dd>
-        </div>
-        <div>
           <dt>Bot pubkey</dt>
           <dd>{status().runtime.botPubkey ?? 'not available'}</dd>
         </div>

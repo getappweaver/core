@@ -1,3 +1,4 @@
+import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import { getOpencodeSdkClient } from '@src/backends/opencode-sdk';
 import type { AgentBackendName, CoreDb } from '@src/db';
 import { setState, STATE_CURRENT_SESSION } from '@src/db';
@@ -37,12 +38,11 @@ export async function handleSessionAdopt({
     };
   }
 
-  const opencode = await getOpencodeSdkClient();
-
   try {
-    const result = await opencode.session.get({
-      sessionID: sessionId,
-      directory: cwd,
+    const result = await opencodeRuntimeController.withAdmission(async () => {
+      const opencode = await getOpencodeSdkClient();
+
+      return opencode.session.get({ sessionID: sessionId, directory: cwd });
     });
 
     const session = result.data;

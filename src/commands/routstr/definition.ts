@@ -125,22 +125,6 @@ export function getRoutstrCommandDefinition({
         summary: 'Refresh the Routstr model catalog cache.',
         example: `${p}routstr sync-models`,
       }),
-      {
-        name: 'add-model',
-        summary: 'Add a cached Routstr model to opencode.json.',
-        aliases: [],
-        arguments: [
-          {
-            name: 'model-id',
-            summary: 'Routstr model id from the cached catalog.',
-            kind: 'string',
-            required: true,
-            variadic: false,
-          },
-        ],
-        options: [],
-        examples: [`${p}routstr add-model openai/gpt-4.1-mini`],
-      },
     ],
   };
 }

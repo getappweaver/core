@@ -8,12 +8,17 @@ import {
   STATE_NWC_CONNECTIONS,
   type CoreDb,
 } from '@src/db';
+import {
+  decryptSecret,
+  EncryptedSecretEnvelopeSchema,
+  encryptSecret,
+} from '@src/security/encrypted-secret';
 
 import { parseNwcConnectionUri, safeNwcConnection } from './connection';
 import { NwcStateError } from './errors';
 import type { NwcConnection, SafeNwcConnection } from './types';
 
-const StoredNwcConnectionSchema = z.object({
+const StoredNwcConnectionSchema = z.strictObject({
   id: z.string().uuid(),
   label: z.string().min(1).max(80),
   connectionUri: z.string().min(1),
@@ -24,10 +29,22 @@ const StoredNwcConnectionSchema = z.object({
   methods: z.array(z.string()),
 });
 
-const NwcConnectionStateSchema = z.object({
+const NwcConnectionStateV1Schema = z.strictObject({
   version: z.literal(1),
   revision: z.number().int().nonnegative(),
   connections: z.array(StoredNwcConnectionSchema),
+});
+
+const EncryptedStoredNwcConnectionSchema = StoredNwcConnectionSchema.omit({
+  connectionUri: true,
+}).extend({
+  connectionUriCiphertext: EncryptedSecretEnvelopeSchema,
+});
+
+const NwcConnectionStateV2Schema = z.strictObject({
+  version: z.literal(2),
+  revision: z.number().int().nonnegative(),
+  connections: z.array(EncryptedStoredNwcConnectionSchema),
 });
 
 export type StoredNwcConnection = z.infer<typeof StoredNwcConnectionSchema>;
@@ -42,7 +59,11 @@ export type NwcConnectionSummary = SafeNwcConnection & {
   methods: string[];
 };
 
-type NwcConnectionState = z.infer<typeof NwcConnectionStateSchema>;
+type NwcConnectionState = {
+  version: 2;
+  revision: number;
+  connections: StoredNwcConnection[];
+};
 
 type AddNwcConnectionProps = {
   db: CoreDb;
@@ -59,10 +80,20 @@ type UpdateNwcVerificationProps = {
 };
 
 const EMPTY_STATE: NwcConnectionState = {
-  version: 1,
+  version: 2,
   revision: 0,
   connections: [],
 };
+
+function serializeState(state: NwcConnectionState): string {
+  return JSON.stringify({
+    ...state,
+    connections: state.connections.map(({ connectionUri, ...connection }) => ({
+      ...connection,
+      connectionUriCiphertext: encryptSecret(connectionUri),
+    })),
+  });
+}
 
 function loadState(db: CoreDb): NwcConnectionState {
   const raw = getState(db, STATE_NWC_CONNECTIONS);
@@ -79,17 +110,54 @@ function loadState(db: CoreDb): NwcConnectionState {
     throw new NwcStateError();
   }
 
-  const parsed = NwcConnectionStateSchema.safeParse(value);
+  const current = NwcConnectionStateV2Schema.safeParse(value);
 
-  if (!parsed.success) {
+  if (current.success) {
+    return {
+      version: 2,
+      revision: current.data.revision,
+      connections: current.data.connections.map(
+        ({ connectionUriCiphertext, ...connection }) => ({
+          ...connection,
+          connectionUri: decryptSecret(connectionUriCiphertext),
+        }),
+      ),
+    };
+  }
+
+  const legacy = NwcConnectionStateV1Schema.safeParse(value);
+
+  if (!legacy.success) {
     throw new NwcStateError();
   }
 
-  return parsed.data;
+  for (const connection of legacy.data.connections) {
+    try {
+      parseNwcConnectionUri(connection.connectionUri);
+    } catch {
+      throw new NwcStateError();
+    }
+  }
+
+  const migrated: NwcConnectionState = {
+    version: 2,
+    revision: legacy.data.revision + 1,
+    connections: legacy.data.connections,
+  };
+
+  db.transaction(() => {
+    setState(db, STATE_NWC_CONNECTIONS, serializeState(migrated));
+  })();
+
+  return migrated;
 }
 
 function writeState(db: CoreDb, state: NwcConnectionState): void {
-  setState(db, STATE_NWC_CONNECTIONS, JSON.stringify(state));
+  setState(db, STATE_NWC_CONNECTIONS, serializeState(state));
+}
+
+export function migrateNwcConnectionState(db: CoreDb): void {
+  loadState(db);
 }
 
 function normalizeLabel(label: string): string {

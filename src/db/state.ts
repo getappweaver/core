@@ -1,22 +1,22 @@
 import { existsSync } from 'fs';
 
 import { Database } from 'bun:sqlite';
-import { decrypt, encrypt, getConversationKey } from 'nostr-tools/nip44';
-import { hexToBytes } from 'nostr-tools/utils';
 import { z } from 'zod';
 
-import { log } from '../logger';
 import { CORE_DB_PATH } from '../paths';
+import {
+  decryptLegacySecretCiphertext,
+  decryptSecret,
+  encryptSecret,
+  initSecretEncryption,
+} from '../security/encrypted-secret';
 import { msats, msatsRaw } from '../types';
-import { assertUnreachable } from '../utils';
 
 import {
   AgentBackendNameSchema,
-  AgentModeSchema,
   DEFAULT_BACKEND,
   DEFAULT_DM_COMMAND_PREFIX,
   DEFAULT_LINTING,
-  DEFAULT_MODE,
   DmCommandPrefixSchema,
   DEFAULT_PROVIDER,
   DEFAULT_WORKSPACE_TARGET,
@@ -24,12 +24,10 @@ import {
   ProviderNameSchema,
   STATE_AGENT_BACKEND,
   STATE_CASHU_DEFAULT_MINT_URL,
-  STATE_DEFAULT_MODE,
   STATE_DM_COMMAND_PREFIX,
   STATE_LINTING,
   STATE_INTERVENTION_MODE,
   STATE_MODEL_OVERRIDE,
-  STATE_OPENCODE_AGENT,
   STATE_PROVIDER_NAME,
   STATE_ROUTSTR_BUDGET_MSATS,
   STATE_ROUTSTR_MODEL,
@@ -39,7 +37,6 @@ import {
   STATE_SETUP_CONFIGURED_AT,
   STATE_WORKSPACE_TARGET,
   type AgentBackendName,
-  type AgentMode,
   type CoreDb,
   type DmCommandPrefix,
   type Linting,
@@ -49,8 +46,6 @@ import {
   type WorkspaceTarget,
   WorkspaceTargetSchema,
 } from './shared';
-
-let skKeyConversationKey: Uint8Array | null = null;
 
 export type SetupConfigurationSnapshot = {
   dbExists: boolean;
@@ -114,7 +109,7 @@ export function initSkKeyEncryption(
   botKeyHex: string,
   botPubkey: string,
 ): void {
-  skKeyConversationKey = getConversationKey(hexToBytes(botKeyHex), botPubkey);
+  initSecretEncryption(botKeyHex, botPubkey);
 }
 
 export function getState(db: CoreDb, key: string): string | null {
@@ -143,86 +138,12 @@ export function markSetupConfigured(db: CoreDb): void {
   setState(db, STATE_SETUP_CONFIGURED_AT, new Date().toISOString());
 }
 
-export function getCurrentOrDefaultMode(db: CoreDb): AgentMode {
-  const v = getState(db, STATE_DEFAULT_MODE);
-  const parsed = AgentModeSchema.safeParse(v);
-
-  if (!parsed.success) {
-    return DEFAULT_MODE;
-  }
-
-  const mode = parsed.data;
-  switch (mode) {
-    case 'free':
-      return mode;
-    case 'ask':
-      return mode;
-    case 'plan':
-      return mode;
-    case 'agent':
-      return mode;
-    default:
-      return assertUnreachable(mode);
-  }
-}
-
-export function setDefaultMode(db: CoreDb, mode: AgentMode): void {
-  setState(db, STATE_DEFAULT_MODE, mode);
-}
-
-export function getSelectedOpencodeAgent(db: CoreDb): string {
-  const selected = getState(db, STATE_OPENCODE_AGENT)?.trim();
-
-  if (selected) {
-    return selected;
-  }
-
-  return getCurrentOrDefaultMode(db);
-}
-
-export function setSelectedOpencodeAgent(db: CoreDb, agentName: string): void {
-  const trimmed = agentName.trim();
-
-  if (trimmed.length === 0) {
-    throw new Error('agent name cannot be empty');
-  }
-
-  setState(db, STATE_OPENCODE_AGENT, trimmed);
-}
-
-export type BackendExecutionProfile =
-  | {
-      kind: 'cursor';
-      mode: AgentMode;
-    }
-  | {
-      kind: 'opencode';
-      agent: string;
-    };
-
-export function getBackendExecutionProfile(
-  db: CoreDb,
-  backendName: AgentBackendName,
-): BackendExecutionProfile {
-  if (backendName === 'cursor') {
-    return {
-      kind: 'cursor',
-      mode: getCurrentOrDefaultMode(db),
-    };
-  }
-
-  return {
-    kind: 'opencode',
-    agent: getSelectedOpencodeAgent(db),
-  };
-}
-
 function normalizeBackendName(value: string | null): AgentBackendName | null {
-  if (value === 'cursor-sdk') {
-    return 'cursor';
-  }
-
-  if (value === 'opencode-sdk') {
+  if (
+    value === 'cursor' ||
+    value === 'cursor-sdk' ||
+    value === 'opencode-sdk'
+  ) {
     return 'opencode';
   }
 
@@ -267,10 +188,7 @@ export function getModelOverride(
     return value;
   }
 
-  const legacyBackendName =
-    backendName === 'cursor' ? 'cursor-sdk' : 'opencode-sdk';
-
-  return getState(db, `${STATE_MODEL_OVERRIDE}:${legacyBackendName}`);
+  return getState(db, `${STATE_MODEL_OVERRIDE}:opencode-sdk`);
 }
 
 export function setModelOverride(
@@ -324,28 +242,31 @@ export function getRoutstrSkKey(db: CoreDb): string | null {
     return null;
   }
 
-  if (!skKeyConversationKey) {
-    log.warn('SK key encryption not initialized — returning raw value');
-
-    return stored;
-  }
+  let value: unknown;
 
   try {
-    return decrypt(stored, skKeyConversationKey);
+    value = JSON.parse(stored) as unknown;
   } catch {
-    return stored;
+    value = null;
   }
+
+  if (value !== null) {
+    return decryptSecret(value);
+  }
+
+  // Legacy plaintext Routstr keys are fixed-width hex. Every other legacy value
+  // must decrypt successfully; a failed decrypt is never interpreted as plain.
+  const legacyValue = /^[0-9a-f]{64}$/i.test(stored)
+    ? stored
+    : decryptLegacySecretCiphertext(stored);
+
+  setRoutstrSkKey(db, legacyValue);
+
+  return legacyValue;
 }
 
 export function setRoutstrSkKey(db: CoreDb, key: string): void {
-  if (!skKeyConversationKey) {
-    log.warn('SK key encryption not initialized — storing raw value');
-    setState(db, STATE_ROUTSTR_SK_KEY, key);
-
-    return;
-  }
-
-  setState(db, STATE_ROUTSTR_SK_KEY, encrypt(key, skKeyConversationKey));
+  setState(db, STATE_ROUTSTR_SK_KEY, JSON.stringify(encryptSecret(key)));
 }
 
 export function getWalletDefaultMintUrl(

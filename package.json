@@ -1,7 +1,7 @@
 {
   "name": "appweaver",
-  "version": "12.8.6",
-  "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control. Test 2",
+  "version": "13.0.0",
+  "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
   "type": "module",
   "workspaces": [
     "apps/*"
@@ -12,6 +12,7 @@
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
     "demo:generate": "DEMO_BUILD=1 bun run scripts/generate-demo.ts",
+    "demo:sync-builtins": "bun run scripts/generate-demo.ts --sync-builtins",
     "web:demo:build": "bun run demo:generate && APPWEAVER_DEMO=1 APPWEAVER_DEMO_EMBEDDED=1 bun run web:build",
     "demo:build": "bun run web:demo:build && bun run --cwd apps/landing demo:build",
     "web:pwa-icons": "bun run scripts/write-pwa-placeholder-icons.ts",
@@ -30,7 +31,6 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^3.7.1",
-    "@cursor/sdk": "^1.0.27",
     "@noble/ciphers": "^2.3.0",
     "@noble/hashes": "^2.3.0",
     "@opencode-ai/sdk": "^1.18.16",

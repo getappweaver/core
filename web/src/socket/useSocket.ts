@@ -28,6 +28,8 @@ import {
 import type { PendingRequest, SocketAppAdapters, SocketState } from './types';
 
 const WS_RECONNECT_DELAY_MS = 1500;
+const COMPOSER_STATE_RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+const COMPOSER_STATE_PENDING_POLL_MS = 1500;
 
 type DemoStoryEntry = {
   pluginAlias: string;
@@ -81,17 +83,34 @@ type ClientMessageRecord = Record<string, unknown> & {
 };
 
 const demoComposerAiState: ComposerAiState = {
-  backend: 'demo',
+  backend: 'opencode',
   interventionAvailable: false,
   interventionEnabled: false,
   currentSessionId: null,
-  executionProfileLabel: 'Mode',
-  executionProfileName: 'Demo',
-  executionProfileColor: '#facc15',
-  effectiveModel: 'demo-fixture-model',
-  provider: 'AppWeaver Demo',
-  modelOverride: null,
-  opencodeModelFormChoices: [],
+  modelSource: {
+    providerId: 'demo/ai-model-source/v1',
+    state: {
+      sourceId: 'demo/ai-model-source/v1',
+      title: 'Demo models',
+      active: true,
+      transitionState: 'stable',
+      health: { status: 'healthy' },
+      selectedModelId: 'demo/model',
+      effectiveModelId: 'demo/model',
+      fallbackReason: 'selected',
+      catalogRevision: 'demo-1',
+    },
+    models: [],
+  },
+  modelSources: [
+    {
+      providerId: 'demo/ai-model-source/v1',
+      alias: 'core',
+      title: 'Core models',
+      active: true,
+      health: { status: 'healthy' },
+    },
+  ],
   contextStats: null,
 };
 
@@ -264,6 +283,7 @@ function demoWidgetOutput(params: {
 
 export function useSocket(adapters: SocketAppAdapters) {
   const [wsConnected, setWsConnected] = createSignal(false);
+  const [modelStateUnavailable, setModelStateUnavailable] = createSignal(false);
 
   const [webUiBusyCounts, setWebUiBusyCounts] = createSignal<
     Record<string, number>
@@ -277,7 +297,16 @@ export function useSocket(adapters: SocketAppAdapters) {
 
   let socket: WebSocket | null = null;
   let wsReconnectTimer: number | null = null;
+  let composerStateRetryTimer: number | null = null;
+  let composerStateRequestSequence = 0;
   const pendingRequests = new Map<string, PendingRequest>();
+
+  function clearComposerStateRetry(): void {
+    if (composerStateRetryTimer !== null) {
+      window.clearTimeout(composerStateRetryTimer);
+      composerStateRetryTimer = null;
+    }
+  }
 
   function setSocket(next: WebSocket | null): void {
     socket = next;
@@ -601,7 +630,6 @@ export function useSocket(adapters: SocketAppAdapters) {
   function loadBootstrapData(): void {
     const commandsRequestId = createRequestId();
     const timelineRequestId = createRequestId();
-    const composerAiStateRequestId = createRequestId();
 
     pendingRequests.set(commandsRequestId, {
       onCommandsResult: (message) => {
@@ -673,12 +701,6 @@ export function useSocket(adapters: SocketAppAdapters) {
       },
     });
 
-    pendingRequests.set(composerAiStateRequestId, {
-      onComposerAiStateResult: (message) => {
-        adapters.setComposerAiState(message.state);
-      },
-    });
-
     send({
       type: 'request_commands',
       requestId: commandsRequestId,
@@ -691,13 +713,13 @@ export function useSocket(adapters: SocketAppAdapters) {
       limit: 100,
     });
 
-    send({
-      type: 'request_composer_ai_state',
-      requestId: composerAiStateRequestId,
-    });
+    requestComposerAiState();
   }
 
-  function requestComposerAiState(): void {
+  function requestComposerAiStateAttempt(
+    attempt: number,
+    sequence: number,
+  ): void {
     if (!wsConnected()) {
       return;
     }
@@ -706,14 +728,55 @@ export function useSocket(adapters: SocketAppAdapters) {
 
     pendingRequests.set(requestId, {
       onComposerAiStateResult: (message) => {
+        if (sequence !== composerStateRequestSequence) {
+          return;
+        }
+
+        clearComposerStateRetry();
+        setModelStateUnavailable(false);
         adapters.setComposerAiState(message.state);
+
+        if (message.state.modelSource.state.transitionState === 'pending') {
+          composerStateRetryTimer = window.setTimeout(() => {
+            composerStateRetryTimer = null;
+            requestComposerAiStateAttempt(0, sequence);
+          }, COMPOSER_STATE_PENDING_POLL_MS);
+        }
       },
+      onError: () => {
+        if (sequence !== composerStateRequestSequence) {
+          return;
+        }
+
+        const delay = COMPOSER_STATE_RETRY_DELAYS_MS[attempt];
+
+        if (delay === undefined) {
+          setModelStateUnavailable(true);
+
+          return;
+        }
+
+        composerStateRetryTimer = window.setTimeout(() => {
+          composerStateRetryTimer = null;
+          requestComposerAiStateAttempt(attempt + 1, sequence);
+        }, delay);
+      },
+      suppressErrorUi: true,
     });
 
-    send({
-      type: 'request_composer_ai_state',
-      requestId,
-    });
+    try {
+      send({ type: 'request_composer_ai_state', requestId });
+    } catch {
+      pendingRequests.delete(requestId);
+      setModelStateUnavailable(true);
+    }
+  }
+
+  function requestComposerAiState(): void {
+    clearComposerStateRetry();
+    setModelStateUnavailable(false);
+    composerStateRequestSequence += 1;
+    requestComposerAiStateAttempt(0, composerStateRequestSequence);
   }
 
   function connectSocket(): void {
@@ -731,6 +794,8 @@ export function useSocket(adapters: SocketAppAdapters) {
       handlers: {
         setWsConnected,
         clearWebPendingState: () => {
+          clearComposerStateRetry();
+          composerStateRequestSequence += 1;
           setWebUiBusyCounts({});
           setWebEntityPending({});
           adapters.setPaymentRequest(null);
@@ -879,6 +944,8 @@ export function useSocket(adapters: SocketAppAdapters) {
 
   function disconnectSocket(): void {
     clearReconnectTimer();
+    clearComposerStateRetry();
+    composerStateRequestSequence += 1;
 
     if (socket && socket.readyState !== WebSocket.CLOSED) {
       socket.close();
@@ -912,6 +979,7 @@ export function useSocket(adapters: SocketAppAdapters) {
     endWebUiBusy,
     getWebEntityPendingFor,
     isWebUiBusyFor,
+    modelStateUnavailable,
     pendingRequests,
     requestComposerAiState,
     sendSocketMessage: send,

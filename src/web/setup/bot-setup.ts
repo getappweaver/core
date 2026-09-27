@@ -4,18 +4,15 @@
 // Usage: bun run bot:setup
 //
 // Reads current state from DB, shows current values as defaults,
-// lets user reconfigure workspace, backend, provider, mode, lint, ready.
-// If workspace is "parent", symlinks opencode.json into the parent project.
+// lets user reconfigure workspace, command prefix, lint, and notifications.
+// Initializes independent managed OpenCode configuration for both workspaces.
 // Managed skills are enabled separately per workspace.
 // Optionally configures Web Push VAPID keys (BOT_WEB_PUSH_*) in .env via web-push.
 // ---------------------------------------------------------------------------
 
 import {
-  copyFileSync,
   existsSync,
-  mkdirSync,
   readlinkSync,
-  symlinkSync,
   unlinkSync,
   lstatSync,
   readFileSync,
@@ -26,20 +23,15 @@ import * as readline from 'readline';
 
 import { generateVAPIDKeys } from 'web-push';
 
+import { initializeManagedOpencodeConfigs } from '@src/backends/opencode-managed-config';
 import type { Linting } from '@src/db';
 import { openCoreDb } from '@src/db';
 import {
   getDmCommandPrefix,
   getWorkspaceTarget,
   setWorkspaceTarget,
-  getAgentBackend,
-  setAgentBackend,
-  getCurrentOrDefaultMode,
-  setDefaultMode,
   getLinting,
   setLinting,
-  getProviderName,
-  setProviderName,
   setDmCommandPrefix,
 } from '@src/db';
 import { normalizeVapidSubject } from '@src/env';
@@ -48,34 +40,12 @@ import { dmBotRoot, getParentWorkspaceRoot } from '@src/paths';
 
 const PARENT_ROOT = getParentWorkspaceRoot();
 const BOT_DIR_NAME = basename(dmBotRoot);
-const AGENT_TEMPLATES_DIR = join(dmBotRoot, 'templates', 'opencode-agents');
-
-const DEFAULT_AGENT_TEMPLATE_FILES = [
-  'agent.md',
-  'ask.md',
-  'free.md',
-  'plan.md',
-];
-
-type SymlinkTarget = {
-  label: string;
-  src: string;
-  dest: string;
-};
-
-function getSymlinkTargets(): SymlinkTarget[] {
-  return [
-    {
-      label: 'opencode.json',
-      src: join(dmBotRoot, 'opencode.json'),
-      dest: join(PARENT_ROOT, 'opencode.json'),
-    },
-  ];
-}
 
 const PARENT_GITIGNORE_ENTRIES = [
   `${BOT_DIR_NAME}/`,
   'opencode.json',
+  '.appweaver/opencode.json',
+  '.appweaver/ppq/',
   '.claude/skills/appweaver-*',
 ];
 
@@ -163,24 +133,6 @@ function askYesNo(question: string, current: boolean): Promise<boolean> {
   });
 }
 
-function isSymlink(path: string): boolean {
-  try {
-    return lstatSync(path).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
-function fileOrDirExists(path: string): boolean {
-  try {
-    lstatSync(path);
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function updateParentGitignore(): void {
   const gitignorePath = join(PARENT_ROOT, '.gitignore');
   let existing = '';
@@ -209,11 +161,13 @@ function updateParentGitignore(): void {
     }
   }
 
-  writeFileSync(
-    gitignorePath,
-    lines.join('\n') + (lines.length > 0 ? '\n' : ''),
-    'utf-8',
-  );
+  if (added.length > 0 || removedLegacyAgentsEntry) {
+    writeFileSync(
+      gitignorePath,
+      lines.join('\n') + (lines.length > 0 ? '\n' : ''),
+      'utf-8',
+    );
+  }
 
   if (added.length > 0) {
     console.log('  Updated parent .gitignore with:');
@@ -229,138 +183,19 @@ function updateParentGitignore(): void {
   }
 }
 
-function removeParentGitignoreEntries(): void {
-  const gitignorePath = join(PARENT_ROOT, '.gitignore');
-
-  if (!existsSync(gitignorePath)) {
-    return;
-  }
-
-  const existing = readFileSync(gitignorePath, 'utf-8').replace(/\r\n/g, '\n');
-  const lines = existing.split('\n');
-  const entries = new Set(PARENT_GITIGNORE_ENTRIES);
-
-  const kept: string[] = [];
-  const removed: string[] = [];
-
-  for (const line of lines) {
-    if (entries.has(line)) {
-      if (line !== '') {
-        removed.push(line);
-      }
-    } else {
-      kept.push(line);
-    }
-  }
-
-  writeFileSync(
-    gitignorePath,
-    kept.join('\n') + (kept.length > 0 ? '\n' : ''),
-    'utf-8',
-  );
-
-  if (removed.length > 0) {
-    console.log('  Removed entries from parent .gitignore:');
-    for (const entry of removed) {
-      console.log(`    - ${entry}`);
-    }
-  }
-}
-
-function ensureAgentTemplatesInstalled(targetRoot: string): void {
-  if (!existsSync(AGENT_TEMPLATES_DIR)) {
-    console.log(
-      `  ⚠ Agent templates missing, skipping .opencode/agents install for ${targetRoot}`,
-    );
-
-    return;
-  }
-
-  const targetDir = join(targetRoot, '.opencode', 'agents');
-  mkdirSync(targetDir, { recursive: true });
-
-  let copied = 0;
-  let kept = 0;
-
-  for (const fileName of DEFAULT_AGENT_TEMPLATE_FILES) {
-    const src = join(AGENT_TEMPLATES_DIR, fileName);
-    const dest = join(targetDir, fileName);
-
-    if (!existsSync(src)) {
-      continue;
-    }
-
-    if (existsSync(dest)) {
-      kept += 1;
-      continue;
-    }
-
-    copyFileSync(src, dest);
-    copied += 1;
-  }
-
-  if (copied > 0 || kept > 0) {
-    console.log(
-      `  .opencode/agents in ${targetRoot}: copied ${copied}, kept existing ${kept}`,
-    );
-  }
-}
-
-async function removeSymlinks(): Promise<void> {
-  if (removeLegacyParentAgentsSymlink()) {
-    console.log('  ✓ Removed legacy AppWeaver AGENTS.md symlink');
-  }
-
-  for (const target of getSymlinkTargets()) {
-    if (isSymlink(target.dest)) {
-      unlinkSync(target.dest);
-      console.log(`  ✓ Removed symlink: ${target.label}`);
-    }
-  }
-}
-
-async function createSymlinks(): Promise<void> {
+async function initializeWorkspaceConfig(): Promise<void> {
   console.log(`\nParent project root: ${PARENT_ROOT}\n`);
 
   if (removeLegacyParentAgentsSymlink()) {
     console.log('  ✓ Removed legacy AppWeaver AGENTS.md symlink');
   }
 
-  for (const target of getSymlinkTargets()) {
-    if (!existsSync(target.src)) {
-      console.log(`  ⚠ Source not found, skipping: ${target.label}`);
-      continue;
-    }
+  await initializeManagedOpencodeConfigs({
+    appweaverRoot: dmBotRoot,
+    parentRoot: PARENT_ROOT,
+  });
 
-    if (isSymlink(target.dest)) {
-      console.log(`  ✓ Already symlinked: ${target.label}`);
-      continue;
-    }
-
-    if (fileOrDirExists(target.dest)) {
-      const overwrite = await ask(
-        `  "${target.label}" already exists in parent. Replace with symlink? (y/N): `,
-      );
-
-      if (overwrite.toLowerCase() !== 'y') {
-        console.log(`  Skipped: ${target.label}`);
-        continue;
-      }
-
-      unlinkSync(target.dest);
-    }
-
-    const destParent = dirname(target.dest);
-
-    if (!existsSync(destParent)) {
-      mkdirSync(destParent, { recursive: true });
-    }
-
-    symlinkSync(target.src, target.dest);
-    console.log(`  ✓ Symlinked: ${target.label}`);
-    console.log(`    ${target.dest} → ${target.src}`);
-  }
-
+  console.log('  ✓ Initialized managed OpenCode configuration');
   updateParentGitignore();
 }
 
@@ -377,9 +212,6 @@ async function main(): Promise<void> {
 
   // Read current state
   const currentWorkspace = getWorkspaceTarget(db) ?? 'parent';
-  const currentBackend = getAgentBackend(db) ?? 'opencode';
-  const currentProvider = getProviderName(db) ?? 'local';
-  const currentMode = getCurrentOrDefaultMode(db) ?? 'ask';
   const currentLintAuto = getLinting(db) ?? 'off';
   const currentReady = (process.env.READY_ENABLED ?? '1') !== '0';
 
@@ -402,32 +234,9 @@ async function main(): Promise<void> {
 
   setWorkspaceTarget(db, workspace);
 
-  const wasParent = currentWorkspace === 'parent';
   const isParent = workspace === 'parent';
 
-  if (isParent) {
-    console.log('\nSetting up symlinks for parent workspace...');
-    await createSymlinks();
-    ensureAgentTemplatesInstalled(PARENT_ROOT);
-  } else if (wasParent && !isParent) {
-    const remove = await ask(
-      '\nWorkspace changed from parent to appweaver. Remove symlinks from parent project? (y/N): ',
-    );
-
-    if (remove.toLowerCase() === 'y') {
-      await removeSymlinks();
-
-      const removeGitignore = await ask(
-        'Also remove AppWeaver core entries from parent .gitignore? (y/N): ',
-      );
-
-      if (removeGitignore.toLowerCase() === 'y') {
-        removeParentGitignoreEntries();
-      }
-    }
-  }
-
-  ensureAgentTemplatesInstalled(dmBotRoot);
+  await initializeWorkspaceConfig();
 
   // ---------------------------------------------------------------------------
   // 2. DM command prefix
@@ -460,92 +269,12 @@ async function main(): Promise<void> {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Backend
+  // 3. Lint auto
   // ---------------------------------------------------------------------------
 
-  console.log('\n── Backend ──');
-  console.log('  opencode — OpenCode SDK backend (recommended)');
-  console.log('  cursor   — Cursor TypeScript SDK backend');
-  console.log('');
-
-  const backend = await askWithDefault(
-    'Backend',
-    currentBackend as 'opencode' | 'cursor',
-    ['opencode', 'cursor'],
-  );
-
-  setAgentBackend(db, backend);
-
-  if (backend === 'cursor') {
-    const currentCursorKey = getEnvFromFile(envPath, 'CURSOR_API_KEY');
-
-    const cursorKeyUrl =
-      'https://cursor.com/dashboard/integrations#user-api-keys';
-
-    console.log('\n  Cursor backend requires CURSOR_API_KEY in .env.');
-    console.log('  Open this URL to create or copy your API key:\n');
-    console.log(`  ${cursorKeyUrl}\n`);
-
-    const keyPrompt = currentCursorKey
-      ? `Paste your Cursor API key (Enter to keep current): `
-      : 'Paste your Cursor API key: ';
-
-    const pasted = await ask(keyPrompt);
-    const cursorKey = (pasted.trim() || currentCursorKey) ?? '';
-
-    if (cursorKey) {
-      setEnvInFile(envPath, 'CURSOR_API_KEY', cursorKey);
-      console.log('  ✓ CURSOR_API_KEY saved to .env');
-    } else {
-      console.log(
-        '  ⚠ No key provided. Set CURSOR_API_KEY in .env before using the Cursor backend.',
-      );
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. Provider
-  // ---------------------------------------------------------------------------
-
-  console.log('\n── Provider ──');
-  console.log('  local   — use models local to the backend selected');
-
-  console.log(
-    '  routstr — (opencode only) routstr models, pay per request with sats via Cashu\n',
-  );
-
-  const provider = await askWithDefault(
-    'Provider',
-    currentProvider as 'local' | 'routstr',
-    ['local', 'routstr'],
-  );
-
-  setProviderName(db, provider);
-
-  // ---------------------------------------------------------------------------
-  // 5. Mode
-  // ---------------------------------------------------------------------------
-
-  console.log('\n── Mode ──');
-  console.log('  ask   — read-only, agent answers questions');
-  console.log('  plan  — proposes changes without applying them');
-  console.log('  agent — applies changes, commits, pushes\n');
-
-  const mode = await askWithDefault(
-    'Mode',
-    currentMode as 'ask' | 'plan' | 'agent',
-    ['ask', 'plan', 'agent'],
-  );
-
-  setDefaultMode(db, mode);
-
-  // ---------------------------------------------------------------------------
-  // 6. Lint auto
-  // ---------------------------------------------------------------------------
-
-  console.log('\n── Lint Auto (agent mode only) ──');
+  console.log('\n── Lint Auto ──');
   console.log('  off    — never run lint automatically');
-  console.log('  on     — run lint after agent responses in agent mode\n');
+  console.log('  on     — run lint after responses that change files\n');
 
   const lintAuto = await askWithDefault(
     'Lint auto',
@@ -661,9 +390,7 @@ async function main(): Promise<void> {
   console.log('\n── Configuration saved ──\n');
   console.log(`  Workspace:         ${workspace}`);
   console.log(`  DM command prefix: ${getDmCommandPrefix(db)}`);
-  console.log(`  Backend:           ${backend}`);
-  console.log(`  Provider:          ${provider}`);
-  console.log(`  Mode:              ${mode}`);
+  console.log('  Backend:           opencode');
   console.log(`  Lint auto:         ${lintAuto}`);
   console.log(`  Ready notification: ${ready ? 'on' : 'off'}`);
 
@@ -678,7 +405,7 @@ async function main(): Promise<void> {
   if (isParent) {
     console.log(`\n  Parent root:       ${PARENT_ROOT}`);
 
-    console.log('  Symlinks: opencode.json');
+    console.log('  OpenCode config:   independently managed');
   }
 
   console.log('\n✓ Setup complete. Run `bun run start` to start the bot.\n');

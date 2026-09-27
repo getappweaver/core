@@ -4,7 +4,6 @@ import {
   type CoreDb,
   type WorkspaceTarget,
   WorkspaceTargetSchema,
-  getAgentBackend,
   getWorkspaceTarget,
   setWorkspaceTarget,
 } from '@src/db';
@@ -101,7 +100,6 @@ export async function handleBotWorkspace(
   setWorkspaceTarget(db, nextTarget);
 
   ensureOpencodeParentWorkspaceAssets({
-    backend: getAgentBackend(db),
     workspace: nextTarget,
     dmBotRoot,
     parentOfBotRoot,

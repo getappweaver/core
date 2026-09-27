@@ -13,7 +13,7 @@ export function getSessionAttachSubcommandDefinition(
     arguments: [
       {
         name: 'backend',
-        summary: 'External backend: opencode or cursor.',
+        summary: 'External backend (opencode).',
         kind: 'string',
         required: true,
         variadic: false,

@@ -6,7 +6,7 @@ Open-source app hub for running AI-powered tools from a project or workspace fol
 
 - Install AppWeaver into a project or workspace folder and add the apps you want.
 - Use focused tools through the web interface, web chat, local terminal input, or your favourite Nostr chat app.
-- Use OpenCode by default for the richest model/provider options, or Cursor Agent if that fits your workflow better.
+- Run AI tasks with OpenCode and choose models from the active model source for your workspace.
 - Keep data local: configuration, sessions, app data, wallet data, and browser profiles live on your machine or server.
 
 ## Key Features
@@ -14,13 +14,13 @@ Open-source app hub for running AI-powered tools from a project or workspace fol
 - **Easy UI setup** — Clone the repo, run `bun install` and `bun run start`, then follow the web setup interface.
 - **AI-powered apps** — Install apps for todos, bookmarks, jobs, files, browser actions, publishing, journaling, and more.
 - **Multiple control surfaces** — Use the web UI, Nostr DMs, terminal chat, or AI-agent tool calls.
-- **OpenCode-first backend** — OpenCode supports richer model/provider selection and local provider configuration; Cursor Agent is also supported.
-- **Bitcoin-native paid AI** — Optional Cashu/Routstr flow for pay-as-you-go model usage.
+- **OpenCode AI runtime** — Configure OpenCode providers locally; switch between the core model source and installed model-source apps for workspace-specific catalogs.
+- **Bitcoin-native wallet** — Keep Cashu eCash locally; apps can offer payment flows where supported.
 - **Local-first data** — AppWeaver stores state in folders you control.
 
-Built with Bun, TypeScript, nostr-tools, OpenCode, Cursor Agent support, Solid, and SQLite.
+Built with Bun, TypeScript, nostr-tools, OpenCode, Solid, and SQLite.
 
-**Links:** [Nostr](https://nostr.com/) · [NIP-17 encrypted DMs](https://github.com/nostr-protocol/nips/blob/master/17.md) · [OpenCode](https://opencode.ai) · [Cursor](https://cursor.com) · [Cashu](https://cashu.space) · [Routstr](https://routstr.com) · [ngit](https://gitworkshop.dev/ngit)
+**Links:** [Nostr](https://nostr.com/) · [NIP-17 encrypted DMs](https://github.com/nostr-protocol/nips/blob/master/17.md) · [OpenCode](https://opencode.ai) · [Cashu](https://cashu.space) · [ngit](https://gitworkshop.dev/ngit)
 
 ## Install And Setup
 
@@ -55,22 +55,20 @@ Setup checks the tools AppWeaver expects to find on the server `PATH`.
 
 Required:
 
-| Tool    | Why it matters                                |
-| ------- | --------------------------------------------- |
-| Bun     | Runtime, scripts, package install, web build  |
-| Node.js | Required by parts of the AI/backend toolchain |
-| Git     | Core and app updates                          |
-| ngit    | Nostr Git remotes, app installs, app updates  |
-
+| Tool     | Why it matters                                |
+| -------- | --------------------------------------------- |
+| Bun      | Runtime, scripts, package install, web build  |
+| Node.js  | Required by parts of the AI/backend toolchain |
+| OpenCode | AI runtime and model/provider support         |
+| Git      | Core and app updates                          |
+| ngit     | Nostr Git remotes, app installs, app updates  |
 
 Optional:
 
-| Tool                   | Why it matters                                            |
-| ---------------------- | --------------------------------------------------------- |
-| OpenCode               | Recommended AI backend with richer model/provider support |
-| Cursor Agent (`agent`) | Alternative AI backend                                    |
-| Python (`python3`)     | Useful if installing Piper via `pip`                      |
-| Piper                  | Local text-to-speech support                              |
+| Tool               | Why it matters                        |
+| ------------------ | ------------------------------------- |
+| Python (`python3`) | Useful if installing Piper via `pip`  |
+| Piper              | Local text-to-speech support          |
 
 
 Common install links:
@@ -80,7 +78,6 @@ Common install links:
 - Git: [https://git-scm.com/downloads](https://git-scm.com/downloads)
 - ngit: [https://gitworkshop.dev/ngit](https://gitworkshop.dev/ngit)
 - OpenCode: [https://opencode.ai/](https://opencode.ai/)
-- Cursor Agent: [https://docs.cursor.com/en/cli/installation](https://docs.cursor.com/en/cli/installation)
 - Python: [https://www.python.org/downloads/](https://www.python.org/downloads/)
 - Piper: [https://github.com/OHF-Voice/piper1-gpl](https://github.com/OHF-Voice/piper1-gpl)
 
@@ -122,34 +119,29 @@ Install and update apps from the web UI. The app installer shows available apps,
 | **Browser actions** | Drive browser sessions for web automation and research tasks. |
 | **Captain's Log** | Adds private journaling, searchable notes, drafts, and optional publishing to Nostr. |
 
-## Cashu And Routstr
+## AI Models And Cashu
 
-Routstr is optional. Use it when you want pay-as-you-go AI model usage with sats instead of a separate subscription.
+OpenCode is the AI runtime. Configure providers in your workspace's managed OpenCode configuration, or install a model-source app to supply its own catalog and runtime configuration. Use `/ai source` to see available sources and `/ai source core` to return to the core OpenCode catalog. For example, the optional PPQ app provides its own model source and funding flow.
 
 AppWeaver's built-in wallet stores Cashu eCash tokens. It does not mint via Lightning directly; use an external Cashu wallet such as [cashu.me](https://cashu.me) or Minibits to receive sats, then paste the Cashu token into AppWeaver.
 
-Basic flow:
+To use the local Cashu wallet:
 
 1. Configure or generate a Cashu wallet in setup.
 2. Set a mint with `/cashu mint <mintURL>` if needed.
 3. Receive tokens with `/cashu receive <token>`.
-4. Switch to Routstr with `/ai provider set routstr`.
-5. Deposit with `/ai provider deposit <sats>` or append a budget suffix to a prompt, such as `fix this bug !!1000sats`.
 
 Useful commands:
 
-| Command                       | Description                                     |
-| ----------------------------- | ----------------------------------------------- |
-| `/cashu mint [url]`           | Show or set your Cashu mint URL                 |
-| `/cashu balance`              | Show local Cashu wallet balance                 |
-| `/cashu receive <token>`      | Receive a Cashu token                           |
-| `/cashu history`              | Show recent Cashu spend history                 |
-| `/wallet list`                | Show the aggregate wallet overview              |
-| `/ai provider deposit <sats>` | Move sats to a Routstr session                  |
-| `/ai provider refund`         | Recover unspent Routstr balance                 |
-| `/ai provider balance`        | Check Routstr session balance                   |
-| `/ai provider budget <sats>`  | Set default budget                              |
-| `/ai provider status`         | Show provider, session, mint, model, and budget |
+| Command                  | Description                        |
+| ------------------------ | ---------------------------------- |
+| `/cashu mint [url]`      | Show or set your Cashu mint URL    |
+| `/cashu balance`         | Show local Cashu wallet balance    |
+| `/cashu receive <token>` | Receive a Cashu token              |
+| `/cashu history`         | Show recent Cashu spend history    |
+| `/wallet list`           | Show the aggregate wallet overview |
+| `/ai source`             | List installed model sources       |
+| `/ai models`             | List models from the active source |
 
 
 ## Docker
@@ -184,5 +176,5 @@ For app/plugin development, see [PLUGINS.md](PLUGINS.md).
 - **A dependency is missing**: Install it, restart AppWeaver, then reload setup. Setup checks the server process `PATH`.
 - **Nostr DMs do not arrive**: Confirm `BOT_RELAYS` matches the relay URLs your Nostr client uses for encrypted DMs. Some relays require NIP-42 AUTH.
 - **No ready DM**: Check relay connectivity and your master pubkey. You can disable ready DMs with `READY_ENABLED=0`.
-- **Wallet not available**: Configure a Cashu mnemonic in setup before using wallet or Routstr commands.
+- **Wallet not available**: Configure a Cashu mnemonic in setup before using wallet commands.
 - **More visibility**: Run with `DEBUG=1` to see subscription filters, incoming events, publish targets, and AUTH challenges.

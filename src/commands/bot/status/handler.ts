@@ -11,7 +11,9 @@ export async function handleBotStatus(
   ctx: RouteCommandContext,
 ): Promise<WebHandlerResult> {
   return handleError(async () => {
-    const rep = createBotStatusRepresentation(statusPropsFromContext(ctx));
+    const rep = await createBotStatusRepresentation(
+      statusPropsFromContext(ctx),
+    );
 
     if (ctx.source === 'web') {
       return renderBotStatusWeb(rep, { prefix: ctx.prefix });

@@ -4,7 +4,6 @@ import { join } from 'path';
 import { buildActiveRuntimeContext } from '@src/backends/agent-runtime-context';
 import {
   deleteToolInvocationRule,
-  getSelectedOpencodeAgent,
   getWorkspaceInstructions,
   getWorkspaceTarget,
   listToolInvocationRules,
@@ -628,7 +627,6 @@ export const handleSkillsRoot: BuiltinHandler = async (ctx) => {
         }),
         runtimeContext: buildActiveRuntimeContext({
           backendName: 'opencode',
-          agentName: getSelectedOpencodeAgent(ctx.seenDb),
           dmBotRoot: ctx.dmBotRoot,
           cwd: ctx.cwd,
         }),

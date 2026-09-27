@@ -390,6 +390,53 @@ function writeJson(filePath: string, value: unknown): void {
   );
 }
 
+// Refresh the public command catalogs without regenerating stories, bootstrap
+// metadata, plugin commands, or icon assets from unrelated in-progress work.
+function syncBuiltinCommands(): void {
+  const definitions = getBuiltinDefinitionsMap({ prefix: DEMO_PREFIX });
+
+  const builtins = BUILTIN_ROOT_NAMES.map((root) =>
+    serializeCommand({ definition: definitions[root], source: 'builtin' }),
+  );
+
+  const targets = [
+    DEMO_COMMANDS_JSON,
+    join(ROOT, 'apps', 'landing', 'public', 'demo', 'commands.json'),
+    join(
+      ROOT,
+      'apps',
+      'landing',
+      'public',
+      'demo',
+      'app',
+      'demo',
+      'commands.json',
+    ),
+  ].map((filePath) => {
+    const commands = JSON.parse(
+      readFileSync(filePath, 'utf8'),
+    ) as DemoCommandDetail[];
+
+    if (
+      !Array.isArray(commands) ||
+      !commands.some((command) => command.source === 'builtin')
+    ) {
+      throw new Error(`Invalid demo command catalog: ${filePath}`);
+    }
+
+    return { filePath, commands };
+  });
+
+  for (const { filePath, commands } of targets) {
+    writeJson(filePath, [
+      ...builtins,
+      ...commands.filter((command) => command.source !== 'builtin'),
+    ]);
+
+    console.log(`[generate-demo] Synced built-in commands in ${filePath}`);
+  }
+}
+
 async function main(): Promise<void> {
   const pluginsJson = readPluginsJson();
   const commandEntries: DemoCommandStoryEntry[] = [];
@@ -482,4 +529,8 @@ async function main(): Promise<void> {
   console.log(`[generate-demo] Wrote ${DEMO_STORIES_JSON}`);
 }
 
-await main();
+if (process.argv.includes('--sync-builtins')) {
+  syncBuiltinCommands();
+} else {
+  await main();
+}

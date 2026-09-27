@@ -4,7 +4,7 @@ import { formatMsats, msats } from '@src/types';
 import type { ProviderUsageRepresentation } from '../representation';
 
 function formatProviderUsageBlock(usageBase: string): string {
-  return `Usage: ${usageBase} deposit <sats> [--new] | ${usageBase} refund | ${usageBase} balance | ${usageBase} budget <msats> | ${usageBase} status | ${usageBase} models [filter] | ${usageBase} sync-models | ${usageBase} add-model <id>`;
+  return `Usage: ${usageBase} deposit <sats> [--new] | ${usageBase} refund | ${usageBase} balance | ${usageBase} budget <msats> | ${usageBase} status | ${usageBase} models [filter] | ${usageBase} sync-models`;
 }
 
 export function renderProviderUsageCli(

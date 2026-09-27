@@ -71,7 +71,6 @@ import {
   downloadSetupPiperModel,
   generateSetupBotKey,
   setSetupCashuWallet,
-  setSetupCursorApiKey,
   setSetupDefaults,
   setSetupMasterPubkey,
   setSetupPiperConfig,
@@ -973,41 +972,6 @@ export function createWebFetchHandler(
           });
       }
 
-      if (req.method === 'POST' && path === '/api/setup/cursor-api-key') {
-        return parseJsonBody(req)
-          .then((payload) => {
-            const apiKey =
-              payload && typeof payload === 'object' && 'apiKey' in payload
-                ? (payload as { apiKey?: unknown }).apiKey
-                : null;
-
-            if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
-              throw new Error('invalid_cursor_api_key');
-            }
-
-            const result = setSetupCursorApiKey({
-              dmBotRoot: ctx.dmBotRoot,
-              apiKey,
-            });
-
-            return jsonResponse({
-              ok: true,
-              ...result,
-              status: createSetupStatus(ctx),
-            });
-          })
-          .catch((err) => {
-            const message = err instanceof Error ? err.message : String(err);
-
-            const status =
-              message === 'invalid_json' || message === 'invalid_cursor_api_key'
-                ? 400
-                : 500;
-
-            return jsonResponse({ error: message }, { status });
-          });
-      }
-
       if (req.method === 'POST' && path === '/api/setup/provider-api-key') {
         return parseJsonBody(req)
           .then((payload) => {
@@ -1172,9 +1136,6 @@ export function createWebFetchHandler(
 
             if (
               typeof input.prefix !== 'string' ||
-              typeof input.backend !== 'string' ||
-              typeof input.provider !== 'string' ||
-              typeof input.mode !== 'string' ||
               typeof input.workspace !== 'string' ||
               typeof input.linting !== 'string' ||
               typeof input.readyNotification !== 'boolean'
@@ -1188,9 +1149,6 @@ export function createWebFetchHandler(
               parentOfBotRoot: ctx.parentOfBotRoot,
               input: {
                 prefix: input.prefix,
-                backend: input.backend,
-                provider: input.provider,
-                mode: input.mode,
                 workspace: input.workspace,
                 linting: input.linting,
                 readyNotification: input.readyNotification,

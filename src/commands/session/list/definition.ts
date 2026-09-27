@@ -7,10 +7,21 @@ export function getSessionListSubcommandDefinition(
 
   return {
     name: 'list',
-    summary: 'List all sessions (all backends).',
+    summary: 'List recent sessions (default 20).',
     aliases: [],
     arguments: [],
-    options: [],
-    examples: [`${p}session list`],
+    options: [
+      {
+        name: 'limit',
+        summary: 'Maximum number of sessions to list.',
+        flag: '--limit',
+        shortFlag: null,
+        kind: 'integer',
+        required: false,
+        multiple: false,
+        choices: null,
+      },
+    ],
+    examples: [`${p}session list`, `${p}session list --limit 50`],
   };
 }
