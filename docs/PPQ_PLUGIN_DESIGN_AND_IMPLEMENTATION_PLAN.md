@@ -846,7 +846,15 @@ Exit criteria:
       nodes and toolbar filtering.
 - [x] Implement active-source state in WebSocket composer updates.
 - [x] Ensure model selection updates the source first, then transitions runtime
-      config when required.
+      config when the source's structural runtime contribution changes. Model
+      changes within the active source use the run-scoped model override without
+      a config transition.
+- [x] Reuse the active source snapshot and a short-lived in-memory Core catalog
+      lookup across composer state, selection validation, and run preparation.
+- [x] Coalesce concurrent composer-state refresh requests into one follow-up
+      request instead of issuing overlapping capability and OpenCode calls.
+- [x] Show model selection as pending immediately and prevent duplicate picker
+      actions until the command settles.
 - [x] Route composer session context usage through the active model-source
       capability so Core and PPQ supply their own context limits.
 - [x] Estimate PPQ session text tokens when OpenCode reports zero usage and mark

@@ -57,6 +57,7 @@ export class ModelSourceCoordinator {
 
   async listSources(
     workspaceTarget: WorkspaceTarget,
+    activeSnapshot: ModelSourceSnapshot | null,
   ): Promise<ModelSourceOption[]> {
     const activeId = this.provider(workspaceTarget);
     const providers = this.client.listProviders(AiModelSourceV1.capability);
@@ -66,11 +67,14 @@ export class ModelSourceCoordinator {
         const alias = provider.source.alias;
 
         try {
-          const output = (await this.invoke(
-            AiModelSourceV1.operations['get-state'],
-            provider.providerId,
-            { workspaceTarget, backend: 'opencode' },
-          )) as { state: AiModelSourceState };
+          const output =
+            activeSnapshot?.providerId === provider.providerId
+              ? { state: activeSnapshot.state }
+              : ((await this.invoke(
+                  AiModelSourceV1.operations['get-state'],
+                  provider.providerId,
+                  { workspaceTarget, backend: 'opencode' },
+                )) as { state: AiModelSourceState });
 
           return {
             providerId: provider.providerId,
@@ -175,10 +179,11 @@ export class ModelSourceCoordinator {
         },
       )) as { config: AiModelRuntimeConfig };
 
-      await opencodeRuntimeController.ensureRuntimeConfig(
-        workspaceTarget,
-        runtime.config,
-      );
+      await opencodeRuntimeController.ensureRuntimeConfig({
+        providerId,
+        workspace: workspaceTarget,
+        config: runtime.config,
+      });
 
       setActiveModelSourceProviderId(this.db, workspaceTarget, providerId);
 
@@ -268,8 +273,6 @@ export class ModelSourceCoordinator {
       { workspaceTarget, backend, modelId },
     )) as { state: AiModelSourceState };
 
-    await this.prepareRun(workspaceTarget, backend);
-
     return output.state;
   }
 
@@ -322,10 +325,11 @@ export class ModelSourceCoordinator {
       { workspaceTarget, backend, modelId },
     )) as { config: AiModelRuntimeConfig };
 
-    const runtimeModelId = await opencodeRuntimeController.ensureRuntimeConfig(
-      workspaceTarget,
-      runtime.config,
-    );
+    const runtimeModelId = await opencodeRuntimeController.ensureRuntimeConfig({
+      workspace: workspaceTarget,
+      providerId,
+      config: runtime.config,
+    });
 
     return {
       providerId,

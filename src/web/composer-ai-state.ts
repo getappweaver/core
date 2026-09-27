@@ -31,10 +31,8 @@ export async function getComposerAiState(
 
   const coordinator = createModelSourceCoordinator(ctx.seenDb);
 
-  const [modelSource, modelSources] = await Promise.all([
-    coordinator.getSnapshot(workspace, 'opencode'),
-    coordinator.listSources(workspace),
-  ]);
+  const modelSource = await coordinator.getSnapshot(workspace, 'opencode');
+  const modelSources = await coordinator.listSources(workspace, modelSource);
 
   const runtime = opencodeRuntimeController.status();
 

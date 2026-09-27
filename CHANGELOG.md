@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.0.2] - 2026-09-27
+
+- fix: faster model switching (80d0b96b)
+
 ## [v13.0.1] - 2026-09-27
 
-- fix: demo assets path (4ae499ba)
+- fix: demo assets path (dc498a7c)
 
 ## [v13.0.0] - 2026-09-27
 

@@ -20,6 +20,8 @@ import type {
   DoneServerMessage,
   ErrorServerMessage,
   InterventionRequestServerMessage,
+  PaymentRequestServerMessage,
+  PaymentStatusServerMessage,
   PromptPayload,
   PromptServerMessage,
   TimelineEventsResultServerMessage,
@@ -55,6 +57,8 @@ export type IncomingServerMessage =
   | PromptServerMessage
   | ChatStreamChunkServerMessage
   | InterventionRequestServerMessage
+  | PaymentRequestServerMessage
+  | PaymentStatusServerMessage
   | ChatResultServerMessage
   | DoneServerMessage
   | ErrorServerMessage;

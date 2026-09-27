@@ -40,7 +40,7 @@ export const handleAiRoot: BuiltinHandler = async (ctx) => {
       const requested = args[1]?.trim();
 
       if (!requested) {
-        const sources = await coordinator.listSources(workspace);
+        const sources = await coordinator.listSources(workspace, null);
 
         return sources
           .map(

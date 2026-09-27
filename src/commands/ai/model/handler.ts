@@ -16,11 +16,12 @@ export async function handleAiModel(
     const coordinator = createModelSourceCoordinator(ctx.seenDb);
     const workspace = getWorkspaceTarget(ctx.seenDb);
 
-    const currentOverride = (
-      await coordinator.getSnapshot(workspace, backendName)
-    ).state.selectedModelId;
-
     const selected = ctx.args[1] ?? null;
+
+    const currentOverride = selected
+      ? null
+      : (await coordinator.getSnapshot(workspace, backendName)).state
+          .selectedModelId;
 
     const rep = buildAiModelRepresentation({
       backendName,

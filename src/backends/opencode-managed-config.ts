@@ -380,6 +380,14 @@ export function runtimeModelId(config: AiModelRuntimeConfig): string {
     : `${config.provider.id}/${config.model}`;
 }
 
+export function runtimeConfigSignature(config: AiModelRuntimeConfig): string {
+  return JSON.stringify(
+    config.kind === 'canonical-model'
+      ? { kind: config.kind }
+      : { kind: config.kind, provider: config.provider },
+  );
+}
+
 export async function materializeOpencodeRuntimeConfig(
   workspaceRoot: string,
   contribution: AiModelRuntimeConfig,

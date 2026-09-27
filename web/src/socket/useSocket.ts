@@ -299,6 +299,8 @@ export function useSocket(adapters: SocketAppAdapters) {
   let wsReconnectTimer: number | null = null;
   let composerStateRetryTimer: number | null = null;
   let composerStateRequestSequence = 0;
+  let composerStateRequestInFlight = false;
+  let composerStateRefreshQueued = false;
   const pendingRequests = new Map<string, PendingRequest>();
 
   function clearComposerStateRetry(): void {
@@ -470,6 +472,8 @@ export function useSocket(adapters: SocketAppAdapters) {
         setAgentWorking: adapters.setAgentWorking,
         setTimeline: adapters.setTimeline,
         setToolInterventions: adapters.setToolInterventions,
+        setPaymentRequest: adapters.setPaymentRequest,
+        setPaymentStatus: adapters.setPaymentStatus,
       },
     });
   }
@@ -732,9 +736,17 @@ export function useSocket(adapters: SocketAppAdapters) {
           return;
         }
 
+        composerStateRequestInFlight = false;
         clearComposerStateRetry();
         setModelStateUnavailable(false);
         adapters.setComposerAiState(message.state);
+
+        if (composerStateRefreshQueued) {
+          composerStateRefreshQueued = false;
+          requestComposerAiState();
+
+          return;
+        }
 
         if (message.state.modelSource.state.transitionState === 'pending') {
           composerStateRetryTimer = window.setTimeout(() => {
@@ -745,6 +757,15 @@ export function useSocket(adapters: SocketAppAdapters) {
       },
       onError: () => {
         if (sequence !== composerStateRequestSequence) {
+          return;
+        }
+
+        composerStateRequestInFlight = false;
+
+        if (composerStateRefreshQueued) {
+          composerStateRefreshQueued = false;
+          requestComposerAiState();
+
           return;
         }
 
@@ -765,8 +786,10 @@ export function useSocket(adapters: SocketAppAdapters) {
     });
 
     try {
+      composerStateRequestInFlight = true;
       send({ type: 'request_composer_ai_state', requestId });
     } catch {
+      composerStateRequestInFlight = false;
       pendingRequests.delete(requestId);
       setModelStateUnavailable(true);
     }
@@ -775,6 +798,13 @@ export function useSocket(adapters: SocketAppAdapters) {
   function requestComposerAiState(): void {
     clearComposerStateRetry();
     setModelStateUnavailable(false);
+
+    if (composerStateRequestInFlight) {
+      composerStateRefreshQueued = true;
+
+      return;
+    }
+
     composerStateRequestSequence += 1;
     requestComposerAiStateAttempt(0, composerStateRequestSequence);
   }
@@ -796,6 +826,8 @@ export function useSocket(adapters: SocketAppAdapters) {
         clearWebPendingState: () => {
           clearComposerStateRetry();
           composerStateRequestSequence += 1;
+          composerStateRequestInFlight = false;
+          composerStateRefreshQueued = false;
           setWebUiBusyCounts({});
           setWebEntityPending({});
           adapters.setPaymentRequest(null);
@@ -946,6 +978,8 @@ export function useSocket(adapters: SocketAppAdapters) {
     clearReconnectTimer();
     clearComposerStateRetry();
     composerStateRequestSequence += 1;
+    composerStateRequestInFlight = false;
+    composerStateRefreshQueued = false;
 
     if (socket && socket.readyState !== WebSocket.CLOSED) {
       socket.close();

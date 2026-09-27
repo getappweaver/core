@@ -22,11 +22,9 @@ export function createCoreModelSourceProvider(props: {
       'capability:v1:ai-model-source.get-context-usage': async ({ input }) => ({
         usage: await adapter.getContextUsage(input),
       }),
-      'capability:v1:ai-model-source.select-model': async ({ input }) => {
-        await adapter.selectModel(input, input.modelId);
-
-        return { state: await adapter.getState(input) };
-      },
+      'capability:v1:ai-model-source.select-model': async ({ input }) => ({
+        state: await adapter.selectModel(input, input.modelId),
+      }),
       'capability:v1:ai-model-source.set-favorite': async ({ input }) => {
         await adapter.setFavorite(input, input.modelId, input.favorite);
 

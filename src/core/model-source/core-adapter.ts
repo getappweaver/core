@@ -37,6 +37,15 @@ type ContextUsageRequest = SourceContext & {
   modelId: string;
 };
 
+type CoreCatalog = Awaited<ReturnType<typeof getOpencodeWorkspaceModels>>;
+
+type CatalogCacheEntry = {
+  expiresAt: number;
+  value: Promise<CoreCatalog>;
+};
+
+const CATALOG_CACHE_MS = 5_000;
+
 function hashRevision(values: string[]): string {
   let hash = 2_166_136_261;
 
@@ -49,6 +58,8 @@ function hashRevision(values: string[]): string {
 }
 
 export class CoreModelSourceAdapter {
+  private readonly catalogs = new Map<WorkspaceTarget, CatalogCacheEntry>();
+
   constructor(private readonly props: CoreModelSourceAdapterProps) {}
 
   private cwd(workspaceTarget: WorkspaceTarget): string {
@@ -58,9 +69,27 @@ export class CoreModelSourceAdapter {
   }
 
   private async catalog(context: SourceContext) {
-    return opencodeRuntimeController.withAdmission(() =>
-      getOpencodeWorkspaceModels(this.cwd(context.workspaceTarget)),
-    );
+    const cached = this.catalogs.get(context.workspaceTarget);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+
+    const value = opencodeRuntimeController
+      .withAdmission(() =>
+        getOpencodeWorkspaceModels(this.cwd(context.workspaceTarget)),
+      )
+      .catch((error) => {
+        this.catalogs.delete(context.workspaceTarget);
+        throw error;
+      });
+
+    this.catalogs.set(context.workspaceTarget, {
+      expiresAt: Date.now() + CATALOG_CACHE_MS,
+      value,
+    });
+
+    return value;
   }
 
   private effective(
@@ -186,9 +215,11 @@ export class CoreModelSourceAdapter {
   async selectModel(
     context: SourceContext,
     modelId: string | null,
-  ): Promise<void> {
+  ): Promise<AiModelSourceState> {
+    const catalog = await this.catalog(context);
+
     if (modelId !== null) {
-      const model = (await this.listModels(context)).find(
+      const model = this.models(context, catalog.models).find(
         (entry) => entry.id === modelId,
       );
 
@@ -200,6 +231,8 @@ export class CoreModelSourceAdapter {
     }
 
     setCoreSelectedModel(this.props.db, context.workspaceTarget, modelId);
+
+    return (await this.getSnapshot(context)).state;
   }
 
   async setFavorite(

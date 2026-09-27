@@ -239,12 +239,29 @@ export function ComposerModelOverrideButton(props: Props) {
                   action.command === 'ai' &&
                   action.subcommand === 'source';
 
+                const switchingModel =
+                  action.type === 'command' &&
+                  action.command === 'ai' &&
+                  action.subcommand === 'model';
+
                 if (switchingSource) {
                   const source = props.state?.modelSources.find(
                     (option) => option.providerId === action.arguments?.source,
                   );
 
                   setChangingTo(source?.alias ?? 'model source');
+                }
+
+                if (switchingModel) {
+                  const modelId = action.arguments?.model;
+
+                  setChangingTo(
+                    typeof modelId === 'string' ? modelId : 'model',
+                  );
+                }
+
+                if (switchingSource || switchingModel) {
+                  setOpen(false);
                 }
 
                 const suppressResult =
@@ -256,7 +273,7 @@ export function ComposerModelOverrideButton(props: Props) {
 
                 props.onRunWebAction(action, {
                   ...params,
-                  ...(switchingSource
+                  ...(switchingSource || switchingModel
                     ? { onCommandSettled: () => setChangingTo(null) }
                     : {}),
                   uiExecutionPolicy: {

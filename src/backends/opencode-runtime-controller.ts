@@ -8,6 +8,7 @@ import { log } from '@src/logger';
 
 import {
   materializeOpencodeRuntimeConfig,
+  runtimeConfigSignature,
   runtimeModelId,
 } from './opencode-managed-config';
 import {
@@ -30,8 +31,25 @@ export type OpencodeRuntimeStatus = {
 type Roots = Record<WorkspaceTarget, string>;
 type PendingTransition = {
   workspaceRoot: string;
+  providerId: string;
   config: AiModelRuntimeConfig;
 };
+
+type EnsureRuntimeConfigProps = {
+  workspace: WorkspaceTarget;
+  providerId: string;
+  config: AiModelRuntimeConfig;
+};
+
+function sourceRuntimeSignature(
+  providerId: string,
+  config: AiModelRuntimeConfig,
+): string {
+  return JSON.stringify({
+    providerId,
+    config: runtimeConfigSignature(config),
+  });
+}
 
 export class StaleRuntimeTransitionError extends Error {
   constructor() {
@@ -241,18 +259,19 @@ class OpencodeRuntimeController {
     }
   }
 
-  async ensureRuntimeConfig(
-    workspace: WorkspaceTarget,
-    config: AiModelRuntimeConfig,
-  ): Promise<string> {
+  async ensureRuntimeConfig({
+    workspace,
+    providerId,
+    config,
+  }: EnsureRuntimeConfigProps): Promise<string> {
     if (this.manualRestart) {
       await this.waitForAdmission();
 
-      return this.ensureRuntimeConfig(workspace, config);
+      return this.ensureRuntimeConfig({ workspace, providerId, config });
     }
 
     const workspaceRoot = this.workspaceRoot(workspace);
-    const signature = JSON.stringify(config);
+    const signature = sourceRuntimeSignature(providerId, config);
 
     if (
       this.leaseContext.getStore() &&
@@ -267,10 +286,12 @@ class OpencodeRuntimeController {
       this.state === 'running' &&
       this.appliedSignatures.get(workspaceRoot) === signature
     ) {
+      this.appliedConfigs.set(workspaceRoot, config);
+
       return runtimeModelId(config);
     }
 
-    this.pending.set(workspaceRoot, { workspaceRoot, config });
+    this.pending.set(workspaceRoot, { workspaceRoot, providerId, config });
 
     if (!this.transitionPromise) {
       this.transitionPromise = this.runTransitions().finally(() => {
@@ -411,7 +432,7 @@ class OpencodeRuntimeController {
       for (const transition of applied.values()) {
         this.appliedSignatures.set(
           transition.workspaceRoot,
-          JSON.stringify(transition.config),
+          sourceRuntimeSignature(transition.providerId, transition.config),
         );
 
         this.appliedConfigs.set(transition.workspaceRoot, transition.config);
