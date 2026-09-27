@@ -2,6 +2,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -46,6 +47,16 @@ function mirrorStaticDemoAssets(targetRoot: string): void {
   copyDir(join(WEB_PUBLIC, 'demo'), join(targetRoot, 'demo'));
   copyDir(join(WEB_PUBLIC, 'plugin-icons'), join(targetRoot, 'plugin-icons'));
   copyDir(join(WEB_PUBLIC, 'builtin-icons'), join(targetRoot, 'builtin-icons'));
+}
+
+if (existsSync(WEB_DIST)) {
+  const index = readFileSync(join(WEB_DIST, 'index.html'), 'utf8');
+
+  if (!index.includes('/demo/app/assets/')) {
+    throw new Error(
+      'web/dist is not an embedded demo build. Run `bun run web:demo:build` before copying it to landing.',
+    );
+  }
 }
 
 mirrorStaticDemoAssets(LANDING_PUBLIC);
