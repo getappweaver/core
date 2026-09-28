@@ -1,6 +1,50 @@
 # PPQ Plugin Design and Implementation Plan
 
-Status: draft for review
+Status: local v0.1.0 release candidate; remote publication verification pending
+
+## Concurrent-runtime revision (Core 13.1 / Job 4.7)
+
+The exclusive-mode and source-switch restart decisions below describe the initial
+PPQ implementation. The current direction supersedes them for inference routing:
+
+- The workspace's selected source/model is the **main prompt default**, not a
+  restriction on other callers. Job tasks can optionally pin a workspace, source,
+  and model; omitted values inherit the current defaults at execution time.
+- Managed OpenCode servers are reused per workspace/source/configuration. Models
+  within a source use separate sessions and per-prompt model overrides on the
+  same server. Core and PPQ runs can execute concurrently; switching the main
+  default does not rewrite `opencode.json` or drain/restart a server.
+- Source-specific configuration is supplied through `OPENCODE_CONFIG_CONTENT`
+  in the server process. The normal canonical config remains on disk as the
+  shared base. OpenCode merges inline config with project/global config, so
+  provider isolation must be verified on each source instance.
+- Servers remain open until AppWeaver exits. Each source instance tracks active
+  runs for future idle retirement; zero runs alone does not trigger shutdown.
+  Credential rotation and structural configuration updates still require safe
+  handling of affected in-flight requests.
+- Job `sticky-session` is opt-in (default false). When enabled, a recurring job
+  resumes only if the workspace and model source still match its saved session.
+  Scheduler v3 exposes the execution options; earlier scheduler contracts keep
+  their existing task shapes. Existing Job rows need only additive nullable/default
+  columns, with no data rewrite. Historical `model` strings remain inert until a
+  model override is explicitly configured.
+
+The remaining sections retain the original implementation history and PPQ funding,
+proxy, and security requirements; their exclusive-source and global-drain language
+is superseded by this revision.
+
+Concurrent-runtime implementation checks:
+
+- [x] Add per-run source/model routing and reuse source servers without a
+      source-switch restart; track active users per source instance.
+- [x] Add optional Job source/workspace/model settings, fresh sessions by default,
+      and opt-in sticky session binding to workspace and source.
+- [x] Add scheduler v3 with execution options and retain V1/V2 contracts.
+- [x] Set the Core 13.1.0 and Job 4.7.0 compatibility versions.
+- [ ] Verify simultaneous funded PPQ and Core prompts from Job and the main
+      composer, including account/key rotation and process restart.
+- [ ] Verify multiple source instances against distinct parent/AppWeaver
+      workspace configurations and session histories under sustained load.
 
 ## Goal
 
@@ -742,7 +786,9 @@ automatic vendored-proxy build, activation, and key-authenticated balance
 preflight. Composer session context usage is supplied by the active model
 source, with PPQ's limit from its validated catalog. Selected PPQ workspaces
 restore the proxy and model source in the background after bot startup;
-PPQ runs wait for readiness. Still outstanding: remote account/key management,
+PPQ runs wait for readiness. The independent plugin repository is prepared for
+a local v0.1.0 release so clean-install and funded-flow verification can use an
+immutable revision. Still outstanding: remote account/key management,
 live PPQ top-up response verification and cross-transport funding approval,
 402 incident reporting and resume, live standard/private inference validation,
 and release hardening. A web-initiated Lightning top-up uses the core
@@ -983,9 +1029,11 @@ Exit criteria:
 - [ ] Test account/key deletion and stale notification actions.
 - [ ] Test parent/AppWeaver workspace isolation.
 - [ ] Test mobile and desktop Settings/model/payment/incident UI.
-- [ ] Document PPQ privacy paths accurately, including what metadata PPQ sees
+- [x] Document PPQ privacy paths accurately, including what metadata PPQ sees
       and that ordinary upstream providers see plaintext.
-- [ ] Document account recovery limitations tied to the AppWeaver identity key.
+- [x] Document account recovery limitations tied to the AppWeaver identity key.
+- [x] Create a local v0.1.0 release for clean-install and funded-flow
+      verification without registering or publishing a remote repository.
 - [ ] Publish the PPQ plugin only after a small-value real Lightning end-to-end
       verification.
 

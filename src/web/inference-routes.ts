@@ -4,11 +4,13 @@ import { z, ZodError } from 'zod';
 
 import { createBackend } from '@src/backends/factory';
 import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
+import { withOpencodeSource } from '@src/backends/opencode-sdk';
 import type {
   AgentBackend,
   ChatCompletionMessage,
   ChatCompletionResult,
 } from '@src/backends/types';
+import type { AiModelRuntimeConfig } from '@src/capabilities/ai-model-source.v1';
 import { createModelSourceCoordinator } from '@src/core/model-source';
 import {
   getState,
@@ -180,6 +182,7 @@ type CompletionContext = {
   request: ChatCompletionRequest;
   runtimeModelId: string;
   providerId: string;
+  runtimeConfig: AiModelRuntimeConfig;
   backend: AgentBackend;
   cwd: string;
   workspace: WorkspaceTarget;
@@ -305,16 +308,22 @@ function handleStreamingCompletion(
 
       void opencodeRuntimeController
         .holdUntil(() =>
-          runCompletion({
-            context,
-            onChunk: (chunk) => {
-              emitDelta(
-                chunk.type === 'text_delta'
-                  ? { content: chunk.content }
-                  : { reasoning_content: chunk.content },
-              );
-            },
-            abortSignal,
+          withOpencodeSource({
+            workspaceRoot: context.cwd,
+            providerId: context.providerId,
+            config: context.runtimeConfig,
+            run: () =>
+              runCompletion({
+                context,
+                onChunk: (chunk) => {
+                  emitDelta(
+                    chunk.type === 'text_delta'
+                      ? { content: chunk.content }
+                      : { reasoning_content: chunk.content },
+                  );
+                },
+                abortSignal,
+              }),
           }),
         )
         .then((result) => {
@@ -386,6 +395,7 @@ async function handleChatCompletion(
 
   try {
     return await opencodeRuntimeController.withPreparedRun({
+      workspace,
       prepare: () =>
         createModelSourceCoordinator(ctx.seenDb).prepareRun(
           workspace,
@@ -405,6 +415,7 @@ async function handleChatCompletion(
           request,
           runtimeModelId: prepared.runtimeModelId,
           providerId: prepared.providerId,
+          runtimeConfig: prepared.runtimeConfig,
           backend: createInferenceBackend(ctx),
           cwd: inferenceCwd(ctx),
           workspace,

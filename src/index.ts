@@ -42,7 +42,7 @@ import {
   opencodeRuntimeController,
 } from './backends/opencode-runtime-controller';
 import {
-  disposeOpencodeSdk,
+  disposeAllOpencodeSdks,
   getOpenCodeAuthJsonPath,
 } from './backends/opencode-sdk';
 import { startLocalCli } from './cli/local-cli';
@@ -399,7 +399,7 @@ async function main() {
     }
 
     shuttingDown = true;
-    disposeOpencodeSdk();
+    disposeAllOpencodeSdks();
     disposeNativePiperService();
     await closeActiveNostrResources();
     process.exit(exitCode);
@@ -769,6 +769,7 @@ async function main() {
     const workspace = getWorkspaceTarget(seenDb);
 
     await opencodeRuntimeController.withPreparedRun({
+      workspace,
       prepare: () =>
         createModelSourceCoordinator(seenDb).prepareRun(workspace, 'opencode'),
       run: async (prepared) => {
@@ -821,7 +822,7 @@ async function main() {
 
 main().catch(async (err) => {
   console.error(err);
-  disposeOpencodeSdk();
+  disposeAllOpencodeSdks();
   disposeNativePiperService();
   await closeActiveNostrResources();
   process.exit(1);

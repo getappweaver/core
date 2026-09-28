@@ -12,7 +12,7 @@ import { cliRegistry } from '../generated/cli-registry';
 
 import { initializeManagedOpencodeConfigs } from './backends/opencode-managed-config';
 import { configureOpencodeRuntimeController } from './backends/opencode-runtime-controller';
-import { disposeOpencodeSdk } from './backends/opencode-sdk';
+import { disposeAllOpencodeSdks } from './backends/opencode-sdk';
 import { capabilityRegistry } from './core/capabilities/registry';
 import { registerCoreModelSource } from './core/model-source';
 import { createPluginAgentService } from './core/plugin-agent';
@@ -316,7 +316,7 @@ async function main(): Promise<void> {
     throw error;
   } finally {
     try {
-      disposeOpencodeSdk();
+      disposeAllOpencodeSdks();
     } finally {
       coreDb.close();
       pool.destroy();
@@ -325,7 +325,7 @@ async function main(): Promise<void> {
 }
 
 function exitOnSignal(exitCode: number): void {
-  disposeOpencodeSdk();
+  disposeAllOpencodeSdks();
   process.exit(exitCode);
 }
 

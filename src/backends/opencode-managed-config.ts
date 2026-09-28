@@ -388,6 +388,62 @@ export function runtimeConfigSignature(config: AiModelRuntimeConfig): string {
   );
 }
 
+/** Build a source-specific inline override without changing the workspace config. */
+export function composeOpencodeRuntimeConfig(
+  canonical: RawOpencodeConfig,
+  contribution: AiModelRuntimeConfig,
+): RawOpencodeConfig {
+  if (contribution.kind === 'canonical-model') {
+    return { ...canonical, model: contribution.model };
+  }
+
+  if (
+    !contribution.provider.models.some(
+      (model) => model.id === contribution.model,
+    )
+  ) {
+    throw new Error(
+      'Active model is absent from the runtime provider catalog.',
+    );
+  }
+
+  const provider = { ...(canonical.provider ?? {}) };
+
+  provider[contribution.provider.id] = {
+    npm: '@ai-sdk/openai-compatible',
+    name: contribution.provider.label,
+    options: { baseURL: contribution.provider.baseUrl },
+    models: Object.fromEntries(
+      contribution.provider.models.map((model) => [
+        model.id,
+        { name: model.label },
+      ]),
+    ),
+  };
+
+  const runtime: RawOpencodeConfig = {
+    ...canonical,
+    provider,
+    enabled_providers: [contribution.provider.id],
+    model: runtimeModelId(contribution),
+    small_model: runtimeModelId(contribution),
+  };
+
+  const disabled = Array.isArray(canonical.disabled_providers)
+    ? canonical.disabled_providers.filter(
+        (id) => id !== contribution.provider.id,
+      )
+    : undefined;
+
+  if (disabled?.length) {
+    runtime.disabled_providers = disabled;
+  } else {
+    delete runtime.disabled_providers;
+  }
+
+  return runtime;
+}
+
 export async function materializeOpencodeRuntimeConfig(
   workspaceRoot: string,
   contribution: AiModelRuntimeConfig,
@@ -395,56 +451,11 @@ export async function materializeOpencodeRuntimeConfig(
   return withWorkspaceLock(workspaceRoot, async () => {
     const canonical = await readCanonicalOpencodeConfig(workspaceRoot);
 
-    if (contribution.kind === 'canonical-model') {
-      return materializeConfig(workspaceRoot, canonical);
-    }
-
-    if (
-      !contribution.provider.models.some(
-        (model) => model.id === contribution.model,
-      )
-    ) {
-      throw new Error(
-        'Active model is absent from the runtime provider catalog.',
-      );
-    }
-
-    const provider = { ...(canonical.provider ?? {}) };
-
-    provider[contribution.provider.id] = {
-      npm: '@ai-sdk/openai-compatible',
-      name: contribution.provider.label,
-      options: { baseURL: contribution.provider.baseUrl },
-      models: Object.fromEntries(
-        contribution.provider.models.map((model) => [
-          model.id,
-          { name: model.label },
-        ]),
-      ),
-    };
-
-    const disabledProviders = Array.isArray(canonical.disabled_providers)
-      ? canonical.disabled_providers.filter(
-          (id) => id !== contribution.provider.id,
-        )
-      : undefined;
-
-    const model = runtimeModelId(contribution);
-
-    const runtime: RawOpencodeConfig = {
-      ...canonical,
-      provider,
-      enabled_providers: [contribution.provider.id],
-      model,
-      small_model: model,
-    };
-
-    if (disabledProviders?.length) {
-      runtime.disabled_providers = disabledProviders;
-    } else {
-      delete runtime.disabled_providers;
-    }
-
-    return materializeConfig(workspaceRoot, runtime);
+    return materializeConfig(
+      workspaceRoot,
+      contribution.kind === 'canonical-model'
+        ? canonical
+        : composeOpencodeRuntimeConfig(canonical, contribution),
+    );
   });
 }

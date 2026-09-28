@@ -45,6 +45,10 @@ export type PluginAgentRunProps = {
   prompt: string;
   sessionId: string | null;
   workspaceTarget: WorkspaceTarget | null;
+  /** Optional model-source provider ID or unique alias; null inherits workspace selection. */
+  modelSourceId?: string | null;
+  /** Optional model ID within the resolved source; null inherits its selection. */
+  modelId?: string | null;
   cwd: string | null;
   onAgentStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   abortSignal: AbortSignal | null;
@@ -60,6 +64,7 @@ export type PluginAgentContextOptions = {
 
 export type PluginAgentRunResult = AgentRunResult & {
   backend: 'opencode';
+  modelSourceId: string;
 };
 
 export type PluginAgentService = {
@@ -71,6 +76,8 @@ export type PluginAgentService = {
   }): string;
   getAvailableModels(props?: {
     backend?: 'opencode' | 'cursor' | null;
+    modelSourceId?: string | null;
+    workspaceTarget?: WorkspaceTarget | null;
   }): Promise<string[]>;
   run(props: PluginAgentRunProps): Promise<PluginAgentRunResult>;
 };

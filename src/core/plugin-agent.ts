@@ -45,10 +45,6 @@ export function createPluginAgentService({
 }: CreatePluginAgentServiceProps): PluginAgentService {
   const modelSources = createModelSourceCoordinator(db);
 
-  async function prepared(workspaceTarget: 'parent' | 'appweaver') {
-    return modelSources.prepareRun(workspaceTarget, 'opencode');
-  }
-
   return {
     getDefaults(): PluginAgentDefaults {
       const workspaceTarget = getWorkspaceTarget(db);
@@ -89,10 +85,14 @@ export function createPluginAgentService({
       );
     },
 
-    async getAvailableModels(): Promise<string[]> {
+    async getAvailableModels(props): Promise<string[]> {
       return (
-        await modelSources.listModels(getWorkspaceTarget(db), 'opencode')
-      ).map((model) => model.id);
+        await modelSources.getSnapshot(
+          props?.workspaceTarget ?? getWorkspaceTarget(db),
+          'opencode',
+          props?.modelSourceId ?? undefined,
+        )
+      ).models.map((model) => model.id);
     },
 
     async run(props: PluginAgentRunProps): Promise<PluginAgentRunResult> {
@@ -113,7 +113,14 @@ export function createPluginAgentService({
       }
 
       return opencodeRuntimeController.withPreparedRun({
-        prepare: () => prepared(workspaceTarget),
+        workspace: workspaceTarget,
+        prepare: () =>
+          modelSources.prepareRun(workspaceTarget, 'opencode', {
+            providerId: props.modelSourceId
+              ? modelSources.resolveSourceId(props.modelSourceId)
+              : null,
+            modelId: props.modelId,
+          }),
         run: async (run) => {
           const backend: AgentBackend = createBackend({
             backendName: 'opencode',
@@ -176,7 +183,11 @@ export function createPluginAgentService({
             );
           }
 
-          return { ...result, backend: 'opencode' };
+          return {
+            ...result,
+            backend: 'opencode',
+            modelSourceId: run.providerId,
+          };
         },
       });
     },

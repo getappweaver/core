@@ -15,6 +15,7 @@ import {
   areOpencodeSessionsIdle,
   restartOpencodeSdk,
   verifyOpencodeRuntimeProvider,
+  withOpencodeSource,
 } from './opencode-sdk';
 
 export type OpencodeRuntimeState =
@@ -216,11 +217,28 @@ class OpencodeRuntimeController {
   }
 
   async withPreparedRun<TPrepared, TResult>(props: {
+    workspace?: WorkspaceTarget;
     prepare: () => Promise<TPrepared>;
     run: (prepared: TPrepared) => Promise<TResult>;
   }): Promise<TResult> {
+    const execute = async (prepared: TPrepared): Promise<TResult> => {
+      const candidate = prepared as {
+        providerId?: string;
+        runtimeConfig?: AiModelRuntimeConfig;
+      };
+
+      return props.workspace && candidate.providerId && candidate.runtimeConfig
+        ? withOpencodeSource({
+            workspaceRoot: this.workspaceRoot(props.workspace),
+            providerId: candidate.providerId,
+            config: candidate.runtimeConfig,
+            run: () => props.run(prepared),
+          })
+        : props.run(prepared);
+    };
+
     if (this.leaseContext.getStore()) {
-      return props.run(await props.prepare());
+      return execute(await props.prepare());
     }
 
     while (true) {
@@ -252,7 +270,7 @@ class OpencodeRuntimeController {
       const { token, release } = this.acquire();
 
       try {
-        return await this.leaseContext.run(token, () => props.run(prepared));
+        return await this.leaseContext.run(token, () => execute(prepared));
       } finally {
         release();
       }

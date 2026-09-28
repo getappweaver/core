@@ -29,6 +29,7 @@ export async function runWebChat(
   const workspace = getWorkspaceTarget(ctx.seenDb);
 
   return opencodeRuntimeController.withPreparedRun({
+    workspace,
     prepare: () =>
       createModelSourceCoordinator(ctx.seenDb).prepareRun(
         workspace,

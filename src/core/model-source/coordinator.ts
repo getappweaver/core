@@ -1,4 +1,5 @@
 import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
+import { withOpencodeSource } from '@src/backends/opencode-sdk';
 import type {
   AiModelSourceContextUsage,
   AiModelRuntimeConfig,
@@ -14,7 +15,6 @@ import {
   type CoreDb,
   type WorkspaceTarget,
 } from '@src/db';
-import { log } from '@src/logger';
 
 export type ModelSourceSnapshot = {
   providerId: string;
@@ -152,8 +152,6 @@ export class ModelSourceCoordinator {
       { workspaceTarget, backend: 'opencode' },
     )) as { state: AiModelSourceState };
 
-    let newlyActivated = false;
-
     if (!state.state.active) {
       state = (await this.invoke(
         AiModelSourceV1.operations.activate,
@@ -161,15 +159,13 @@ export class ModelSourceCoordinator {
         { workspaceTarget, backend: 'opencode' },
       )) as { state: AiModelSourceState };
 
-      newlyActivated = true;
-
       if (!state.state.active) {
         throw new Error('The model source could not be activated.');
       }
     }
 
     try {
-      const runtime = (await this.invoke(
+      await this.invoke(
         AiModelSourceV1.operations['get-runtime-config'],
         providerId,
         {
@@ -177,45 +173,15 @@ export class ModelSourceCoordinator {
           backend: 'opencode',
           modelId: state.state.effectiveModelId,
         },
-      )) as { config: AiModelRuntimeConfig };
-
-      await opencodeRuntimeController.ensureRuntimeConfig({
-        providerId,
-        workspace: workspaceTarget,
-        config: runtime.config,
-      });
+      );
 
       setActiveModelSourceProviderId(this.db, workspaceTarget, providerId);
 
       const snapshot = await this.getSnapshot(workspaceTarget, 'opencode');
 
-      if (previousId !== providerId) {
-        await this.client
-          .invoke({
-            operation: AiModelSourceV1.operations.deactivate,
-            provider: previousId,
-            input: { workspaceTarget, backend: 'opencode' },
-          })
-          .catch(() => {
-            log.warn(
-              'Previous model source could not shut down after OpenCode switched.',
-            );
-          });
-      }
-
       return snapshot;
     } catch (error) {
       setActiveModelSourceProviderId(this.db, workspaceTarget, previousId);
-
-      if (newlyActivated && previousId !== providerId) {
-        await this.client
-          .invoke({
-            operation: AiModelSourceV1.operations.deactivate,
-            provider: providerId,
-            input: { workspaceTarget, backend: 'opencode' },
-          })
-          .catch(() => {});
-      }
 
       throw error;
     }
@@ -224,8 +190,11 @@ export class ModelSourceCoordinator {
   async getSnapshot(
     workspaceTarget: WorkspaceTarget,
     backend: AgentBackendName,
+    sourceId?: string,
   ): Promise<ModelSourceSnapshot> {
-    const providerId = this.provider(workspaceTarget);
+    const providerId = sourceId
+      ? this.resolveSourceId(sourceId)
+      : this.provider(workspaceTarget);
 
     const output = (await this.invoke(
       AiModelSourceV1.operations['list-models'],
@@ -246,16 +215,34 @@ export class ModelSourceCoordinator {
   async getContextUsage(
     props: GetContextUsageProps,
   ): Promise<AiModelSourceContextUsage | null> {
-    const output = (await this.invoke(
-      AiModelSourceV1.operations['get-context-usage'],
+    const runtime = (await this.invoke(
+      AiModelSourceV1.operations['get-runtime-config'],
       props.providerId,
       {
         workspaceTarget: props.workspaceTarget,
         backend: props.backend,
-        sessionId: props.sessionId,
         modelId: props.modelId,
       },
-    )) as { usage: AiModelSourceContextUsage | null };
+    )) as { config: AiModelRuntimeConfig };
+
+    const output = (await withOpencodeSource({
+      workspaceRoot: opencodeRuntimeController.workspaceRoot(
+        props.workspaceTarget,
+      ),
+      providerId: props.providerId,
+      config: runtime.config,
+      run: () =>
+        this.invoke(
+          AiModelSourceV1.operations['get-context-usage'],
+          props.providerId,
+          {
+            workspaceTarget: props.workspaceTarget,
+            backend: props.backend,
+            sessionId: props.sessionId,
+            modelId: props.modelId,
+          },
+        ),
+    })) as { usage: AiModelSourceContextUsage | null };
 
     return output.usage;
   }
@@ -296,16 +283,36 @@ export class ModelSourceCoordinator {
   async prepareRun(
     workspaceTarget: WorkspaceTarget,
     backend: AgentBackendName,
+    selection?: { providerId?: string | null; modelId?: string | null },
   ): Promise<PreparedModelRun> {
-    const providerId = this.provider(workspaceTarget);
+    const providerId = selection?.providerId ?? this.provider(workspaceTarget);
 
-    const stateOutput = (await this.invoke(
+    if (
+      !this.client
+        .listProviders(AiModelSourceV1.capability)
+        .some((p) => p.providerId === providerId)
+    ) {
+      throw new Error(`Unknown model source provider: ${providerId}`);
+    }
+
+    let stateOutput = (await this.invoke(
       AiModelSourceV1.operations['get-state'],
       providerId,
       { workspaceTarget, backend },
     )) as { state: AiModelSourceState };
 
-    const modelId = stateOutput.state.effectiveModelId;
+    if (!stateOutput.state.active) {
+      stateOutput = (await this.invoke(
+        AiModelSourceV1.operations.activate,
+        providerId,
+        {
+          workspaceTarget,
+          backend,
+        },
+      )) as { state: AiModelSourceState };
+    }
+
+    const modelId = selection?.modelId ?? stateOutput.state.effectiveModelId;
 
     const preflight = (await this.invoke(
       AiModelSourceV1.operations.preflight,
@@ -325,11 +332,10 @@ export class ModelSourceCoordinator {
       { workspaceTarget, backend, modelId },
     )) as { config: AiModelRuntimeConfig };
 
-    const runtimeModelId = await opencodeRuntimeController.ensureRuntimeConfig({
-      workspace: workspaceTarget,
-      providerId,
-      config: runtime.config,
-    });
+    const runtimeModelId =
+      runtime.config.kind === 'canonical-model'
+        ? modelId
+        : `${runtime.config.provider.id}/${modelId}`;
 
     return {
       providerId,

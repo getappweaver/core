@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -6,9 +7,12 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // ---------------------------------------------------------------------------
-// backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (in-process server)
+// backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (managed servers)
 // ---------------------------------------------------------------------------
 import { createOpencodeClient } from '@opencode-ai/sdk/v2';
+
+import type { AiModelRuntimeConfig } from '@src/capabilities/ai-model-source.v1';
+import { CORE_MODEL_SOURCE_PROVIDER_ID } from '@src/db/model-source';
 
 import { debug, log, stripAnsi } from '../logger';
 import { dmBotRoot } from '../paths';
@@ -24,6 +28,11 @@ import {
 } from './agent-stream-chunk';
 import { serializeChatCompletionMessages } from './chat-completion';
 import { getOpencodeInterventionEnvironment } from './opencode-intervention';
+import {
+  composeOpencodeRuntimeConfig,
+  readCanonicalOpencodeConfigSync,
+  runtimeConfigSignature,
+} from './opencode-managed-config';
 import {
   isOpenCodeSessionCompletionEvent,
   parseOpenCodeMessage,
@@ -54,6 +63,11 @@ type SdkInstance = {
 
 let sdk: SdkInstance | null = null;
 let sdkInitPromise: Promise<SdkInstance> | null = null;
+const sourceSdkContext = new AsyncLocalStorage<SdkInstance>();
+const sourceInstances = new Map<string, Promise<SdkInstance>>();
+const readySourceServers = new Set<SdkInstance>();
+const sourceRunCounts = new Map<string, number>();
+const coreCanonicalRevisions = new Map<string, string>();
 let lastStartedPort: number | null = null;
 const lastResolvedModels = new Map<string, string>();
 
@@ -612,7 +626,10 @@ function getPortsToTry(): number[] {
   return DEFAULT_PORTS;
 }
 
-async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
+async function createLocalOpencodeSdk(
+  port: number,
+  inlineConfig: Record<string, unknown> = {},
+): Promise<SdkInstance> {
   const cwd = getOpencodeServerCwd();
   const pluginDir = join(cwd, '.opencode', 'plugins');
 
@@ -653,7 +670,9 @@ async function createLocalOpencodeSdk(port: number): Promise<SdkInstance> {
       env: {
         ...process.env,
         OPENCODE_CONFIG_CONTENT: JSON.stringify({
+          ...inlineConfig,
           plugin: [
+            ...(Array.isArray(inlineConfig.plugin) ? inlineConfig.plugin : []),
             pathToFileURL(interventionPluginPath).href,
             ...(systemLogEnabled
               ? [pathToFileURL(systemLogPluginPath).href]
@@ -849,7 +868,7 @@ async function initSdk(): Promise<SdkInstance> {
   );
 }
 
-async function getOrInitSdk(): Promise<SdkInstance> {
+async function getSharedSdk(): Promise<SdkInstance> {
   if (sdk) {
     return sdk;
   }
@@ -865,6 +884,131 @@ async function getOrInitSdk(): Promise<SdkInstance> {
   } finally {
     sdkInitPromise = null;
   }
+}
+
+async function getOrInitSdk(): Promise<SdkInstance> {
+  return sourceSdkContext.getStore() ?? getSharedSdk();
+}
+
+/** Source processes are reused across sessions and retained until AppWeaver exits. */
+export async function withOpencodeSource<T>(props: {
+  workspaceRoot: string;
+  providerId: string;
+  config: AiModelRuntimeConfig;
+  run: () => Promise<T>;
+}): Promise<T> {
+  const canonical = readCanonicalOpencodeConfigSync(props.workspaceRoot);
+  const canonicalRevision = JSON.stringify(canonical);
+
+  const key = JSON.stringify([
+    props.workspaceRoot,
+    props.providerId,
+    runtimeConfigSignature(props.config),
+    canonicalRevision,
+  ]);
+
+  // The existing shared server already serves Core sessions in both workspaces.
+  if (
+    props.providerId === CORE_MODEL_SOURCE_PROVIDER_ID &&
+    props.config.kind === 'canonical-model' &&
+    (coreCanonicalRevisions.get(props.workspaceRoot) ?? canonicalRevision) ===
+      canonicalRevision
+  ) {
+    coreCanonicalRevisions.set(props.workspaceRoot, canonicalRevision);
+    const core = await getSharedSdk();
+    sourceRunCounts.set(key, (sourceRunCounts.get(key) ?? 0) + 1);
+
+    try {
+      return await sourceSdkContext.run(core, props.run);
+    } finally {
+      const remaining = (sourceRunCounts.get(key) ?? 1) - 1;
+
+      if (remaining) {
+        sourceRunCounts.set(key, remaining);
+      } else {
+        sourceRunCounts.delete(key);
+      }
+    }
+  }
+
+  let pending = sourceInstances.get(key);
+
+  if (!pending) {
+    pending = (async () => {
+      const config = composeOpencodeRuntimeConfig(canonical, props.config);
+      const instance = await createLocalOpencodeSdk(0, config);
+      try {
+        const health = await instance.client.global.health();
+
+        if (!health.data?.healthy) {
+          throw new Error('OpenCode source server failed its health check.');
+        }
+
+        if (props.config.kind === 'openai-compatible') {
+          const providerConfig = props.config;
+
+          const providers = await instance.client.config.providers({
+            directory: props.workspaceRoot,
+          });
+
+          const available = (
+            providers.data as
+              | {
+                  providers?: Array<{
+                    id: string;
+                    models?: Record<string, unknown>;
+                  }>;
+                }
+              | undefined
+          )?.providers?.some(
+            (provider) =>
+              provider.id === providerConfig.provider.id &&
+              Object.hasOwn(provider.models ?? {}, providerConfig.model),
+          );
+
+          if (providers.error || !available) {
+            throw new Error(
+              'OpenCode source server did not load the selected provider.',
+            );
+          }
+        }
+
+        readySourceServers.add(instance);
+
+        return instance;
+      } catch (error) {
+        await instance.server.closeAndWait();
+        throw error;
+      }
+    })();
+
+    sourceInstances.set(key, pending);
+
+    void pending.catch(() => {
+      if (sourceInstances.get(key) === pending) {
+        sourceInstances.delete(key);
+      }
+    });
+  }
+
+  const instance = await pending;
+  sourceRunCounts.set(key, (sourceRunCounts.get(key) ?? 0) + 1);
+
+  try {
+    return await sourceSdkContext.run(instance, props.run);
+  } finally {
+    const remaining = (sourceRunCounts.get(key) ?? 1) - 1;
+
+    if (remaining) {
+      sourceRunCounts.set(key, remaining);
+    } else {
+      sourceRunCounts.delete(key);
+    }
+  }
+}
+
+export function getOpencodeSourceRunCounts(): ReadonlyMap<string, number> {
+  return new Map(sourceRunCounts);
 }
 
 export async function getOpencodeSdkClient(): Promise<SdkInstance['client']> {
@@ -1292,6 +1436,24 @@ export async function authorizeOpencodeSetupProvider(props: {
     method: method.type,
     instructions: nativeResult.instructions,
   };
+}
+
+export function disposeAllOpencodeSdks(): void {
+  for (const instance of readySourceServers) {
+    instance.server.close();
+  }
+
+  readySourceServers.clear();
+
+  for (const instance of sourceInstances.values()) {
+    void instance.then((value) => value.server.close()).catch(() => {});
+  }
+
+  sourceInstances.clear();
+  sourceRunCounts.clear();
+  coreCanonicalRevisions.clear();
+
+  disposeOpencodeSdk();
 }
 
 export function disposeOpencodeSdk(): void {
