@@ -818,13 +818,43 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         const requestId = adapters.createId();
         const command = optimisticPayload.command;
 
+        const reconcile = () => {
+          const refresh = action.refresh;
+
+          if (!refresh || !params?.onReplaceRoot) {
+            return;
+          }
+
+          runWebAction(
+            {
+              type: 'command',
+              command: refresh.command,
+              subcommand: refresh.subcommand,
+              arguments: refresh.arguments ?? {},
+              options: refresh.options ?? {},
+              recordInTimeline: false,
+              pendingUi: { presentation: 'none' },
+            },
+            {
+              ...params,
+              uiExecutionPolicy: {
+                ...params.uiExecutionPolicy,
+                recordInTimeline: false,
+                suppressSystemMessage: true,
+              },
+            },
+          );
+        };
+
         adapters.pendingRequests.set(requestId, {
           recordInTimeline: false,
-          onCommandResult: () => {},
+          onCommandResult: reconcile,
           onError: (message) => {
             adapters.appendSystemMessage(
               `Optimistic command failed: ${message.message}`,
             );
+
+            reconcile();
           },
         });
 
@@ -847,6 +877,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           adapters.appendSystemMessage(
             err instanceof Error ? err.message : String(err),
           );
+
+          reconcile();
         }
       } else if (clientActionName === 'web.closeModal') {
         closeChromeModal();

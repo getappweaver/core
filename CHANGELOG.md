@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.1.1] - 2026-09-29
+
+- fix: optimistic commands reconcile on fails (88d217a4)
+
 ## [v13.1.0] - 2026-09-28
 
-- feat: created scheduler.v3 - fix: new opencode server for each model-source (1a85a81a)
+- feat: created scheduler.v3 - fix: new opencode server for each model-source (d4e345d1)
 
 ## [v13.0.2] - 2026-09-27
 
