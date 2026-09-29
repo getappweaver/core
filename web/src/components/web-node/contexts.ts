@@ -15,6 +15,11 @@ import type {
   WebEntityPendingState,
 } from '../../commands/types';
 
+/** Registers an opted-in textarea with a host-level file suggestion picker. */
+export const WebFileSuggestionInputContext = createContext<
+  ((input: HTMLTextAreaElement | null) => void) | null
+>(null);
+
 // ---------------------------------------------------------------------------
 // Reveal context
 // ---------------------------------------------------------------------------

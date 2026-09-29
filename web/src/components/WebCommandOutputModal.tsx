@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { JSX } from 'solid-js';
-import { Show } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 
 import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
 
@@ -11,6 +11,10 @@ import type {
   RunWebActionParams,
   WebEntityPendingState,
 } from '../commands/types';
+import {
+  ComposerFilePicker,
+  type FilePickerTransport,
+} from '../composer/components/ComposerFilePicker';
 
 import { WebButton } from './WebButton';
 import { WebNodeShadowRoot } from './WebNodeShadowRoot';
@@ -20,6 +24,7 @@ type WebCommandOutputModalProps = {
   iconUrl?: string | null;
   ariaLabel: string;
   onClose: () => void;
+  filePickerTransport: FilePickerTransport;
   loading: boolean;
   error: string | null;
   text: string | null;
@@ -40,6 +45,27 @@ type WebCommandOutputModalProps = {
 export function WebCommandOutputModal(
   props: WebCommandOutputModalProps,
 ): JSX.Element {
+  const [fileSuggestionInput, setFileSuggestionInput] =
+    createSignal<HTMLTextAreaElement | null>(null);
+
+  function insertFilePath(value: string): void {
+    const input = fileSuggestionInput();
+
+    if (!input) {
+      return;
+    }
+
+    input.value = value;
+
+    // The picker restores the selection in a microtask after insertion.
+    // Notify the textarea after that so its query sees the new cursor position.
+    requestAnimationFrame(() => {
+      if (input.isConnected) {
+        input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+    });
+  }
+
   function handleBackdropClick(e: MouseEvent): void {
     if (e.target === e.currentTarget) {
       props.onClose();
@@ -120,9 +146,20 @@ export function WebCommandOutputModal(
                     })
                   }
                   onReplaceRoot={props.onReplaceWeb}
+                  onFileSuggestionInput={setFileSuggestionInput}
                 />
               </div>
             )}
+          </Show>
+
+          <Show when={fileSuggestionInput()}>
+            <ComposerFilePicker
+              {...props.filePickerTransport}
+              textareaRef={() => fileSuggestionInput() ?? undefined}
+              composerText={() => fileSuggestionInput()?.value ?? ''}
+              setComposerText={insertFilePath}
+              floating
+            />
           </Show>
 
           <Show

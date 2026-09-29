@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.2.0] - 2026-09-29
+
+- feat: new workspace-file-view capability added (e2093f2e)
+
 ## [v13.1.1] - 2026-09-29
 
-- fix: optimistic commands reconcile on fails (88d217a4)
+- fix: optimistic commands reconcile on fails (3b7c2bae)
 
 ## [v13.1.0] - 2026-09-28
 

@@ -27,6 +27,7 @@ import { WebButton } from '../WebButton';
 import {
   TreeExpandRequestSetterContext,
   TreeItemExpandedStateContext,
+  WebFileSuggestionInputContext,
   WebRevealContext,
 } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
@@ -504,11 +505,18 @@ export function resizeAutoGrowTextArea(
 
 export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   const getBusy = useContext(WebShadowUiBusyContext);
+  const registerFileInput = useContext(WebFileSuggestionInputContext);
   const name = () => props.element.props?.formFieldName;
   const maxRows = () => props.element.props?.maxRows ?? 4;
   let textareaEl: HTMLTextAreaElement | undefined;
   let manuallyResized = false;
   let stopResizeGesture: (() => void) | null = null;
+
+  onCleanup(() => {
+    if (props.element.props?.fileSuggestions && textareaEl) {
+      registerFileInput?.(null);
+    }
+  });
 
   const resize = () => {
     if (!textareaEl || manuallyResized) {
@@ -623,6 +631,11 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
         <textarea
           ref={(el) => {
             textareaEl = el;
+
+            if (props.element.props?.fileSuggestions) {
+              registerFileInput?.(el);
+            }
+
             queueMicrotask(resize);
           }}
           class="web-textArea__input"

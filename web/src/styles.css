@@ -2839,6 +2839,13 @@ pre {
   box-shadow: 8px 8px 0 var(--color-panel-shadow);
 }
 
+.composer-file-picker--floating {
+  position: fixed;
+  bottom: auto;
+  right: auto;
+  z-index: calc(var(--z-modal) + 1);
+}
+
 .composer-file-picker__header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

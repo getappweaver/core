@@ -7,6 +7,7 @@ import type {
 } from '../commands/types';
 import { WebCommandOutputModal } from '../components/WebCommandOutputModal';
 import { WebNodeShadowRoot } from '../components/WebNodeShadowRoot';
+import type { FilePickerTransport } from '../composer/components/ComposerFilePicker';
 import { splitPromptPayload } from '../socket/dispatch';
 
 import type { ChromeHook } from './types';
@@ -24,6 +25,7 @@ type ChromeOverlayProps = {
     entityKey: string,
   ) => WebEntityPendingState;
   onClose: () => void;
+  filePickerTransport: FilePickerTransport;
   onRunWebAction: (
     action: import('@src/web/ui-schema').WebAction,
     params?: RunWebActionParams,
@@ -38,6 +40,7 @@ export function ChromeOverlay(props: ChromeOverlayProps): JSX.Element {
         iconUrl={props.chrome.chromeModal()!.iconUrl}
         ariaLabel={props.chrome.chromeModal()!.title}
         onClose={props.onClose}
+        filePickerTransport={props.filePickerTransport}
         loading={props.chrome.chromeLoading()}
         error={props.chrome.chromeError()}
         text={props.chrome.chromeText()}

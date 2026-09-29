@@ -3036,6 +3036,13 @@ function AppInner(): JSX.Element {
       <ConnectOverlays auth={auth} connect={connect} />
       <ChromeOverlay
         chrome={chrome}
+        filePickerTransport={{
+          wsConnected,
+          pendingRequests,
+          sendSocketMessage,
+          createId,
+          timelineId,
+        }}
         currentUserPubkey={(() => {
           const state = auth.authState();
 

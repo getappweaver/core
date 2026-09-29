@@ -1,9 +1,10 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js';
+import { Portal } from 'solid-js/web';
 
 import { globToRegex } from '../../components/web-node/tree-filter';
 import type { PendingRequest } from '../../socket/types';
 
-type ComposerFilePickerProps = {
+export type ComposerFilePickerProps = {
   textareaRef: () => HTMLTextAreaElement | undefined;
   composerText: () => string;
   setComposerText: (value: string) => void;
@@ -12,7 +13,18 @@ type ComposerFilePickerProps = {
   sendSocketMessage: (message: unknown) => void;
   createId: () => string;
   timelineId: () => string;
+  /** Render above a textarea in a modal instead of above the composer. */
+  floating?: boolean;
 };
+
+export type FilePickerTransport = Pick<
+  ComposerFilePickerProps,
+  | 'wsConnected'
+  | 'pendingRequests'
+  | 'sendSocketMessage'
+  | 'createId'
+  | 'timelineId'
+>;
 
 type AtQuery = {
   atPos: number;
@@ -109,6 +121,13 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
   const [pathHidden, setPathHidden] = createSignal(false);
   const [atInfo, setAtInfo] = createSignal<AtQuery | null>(null);
   const [scrollThumb, setScrollThumb] = createSignal({ top: 0, height: 100 });
+
+  const [floatingPosition, setFloatingPosition] = createSignal({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  });
 
   let debounceTimer: number | null = null;
   let capabilityRequestId: string | null = null;
@@ -613,6 +632,46 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
   });
 
   createEffect(() => {
+    if (!props.floating || !open()) {
+      return;
+    }
+
+    const updatePosition = () => {
+      const textarea = props.textareaRef();
+
+      if (!textarea) {
+        return;
+      }
+
+      const rect = textarea.getBoundingClientRect();
+      const above = rect.top >= window.innerHeight - rect.bottom;
+
+      const available = above
+        ? rect.top - 16
+        : window.innerHeight - rect.bottom - 16;
+
+      const height = Math.min(384, Math.max(80, available));
+      const width = Math.min(rect.width, window.innerWidth - 16);
+
+      setFloatingPosition({
+        left: Math.min(Math.max(8, rect.left), window.innerWidth - width - 8),
+        top: above ? Math.max(8, rect.top - height - 8) : rect.bottom + 8,
+        width,
+        height,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    onCleanup(() => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    });
+  });
+
+  createEffect(() => {
     void loading();
     void files().length;
 
@@ -689,12 +748,25 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
     }
   });
 
-  return (
+  const picker = (
     <Show when={open()}>
       <div
-        id="composer-file-picker"
+        id={props.floating ? 'modal-file-picker' : 'composer-file-picker'}
         ref={pickerEl}
         class="composer-file-picker panel"
+        classList={{
+          'composer-file-picker--floating': props.floating === true,
+        }}
+        style={
+          props.floating
+            ? {
+                left: `${floatingPosition().left}px`,
+                top: `${floatingPosition().top}px`,
+                width: `${floatingPosition().width}px`,
+                'max-height': `${floatingPosition().height}px`,
+              }
+            : undefined
+        }
         role="listbox"
         aria-label="File suggestions"
       >
@@ -799,5 +871,11 @@ export function ComposerFilePicker(props: ComposerFilePickerProps) {
         </Show>
       </div>
     </Show>
+  );
+
+  return props.floating ? (
+    <Portal mount={document.body}>{picker}</Portal>
+  ) : (
+    picker
   );
 }

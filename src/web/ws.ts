@@ -1232,10 +1232,15 @@ async function handleRunCapability(params: {
         source: 'web',
         kind: 'command_result',
         role: null,
-        command: message.consumerAlias,
-        subcommand: message.operation,
-        subcommandTag: message.operation,
-        values: null,
+        command: output.meta.command,
+        subcommand: output.meta.subcommand,
+        subcommandTag: output.meta.subcommand,
+        values: output.meta.arguments
+          ? {
+              arguments: output.meta.arguments,
+              options: output.meta.options ?? {},
+            }
+          : null,
         form: null,
         text: null,
         web: output,

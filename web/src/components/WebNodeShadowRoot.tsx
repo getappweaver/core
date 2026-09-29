@@ -24,6 +24,7 @@ import baseWebUiCss from '../webview/base-web-ui.css?raw';
 import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
 
 import diffPatchCss from './diff-patch.css?raw';
+import { WebFileSuggestionInputContext } from './web-node/contexts';
 import { applyOptimisticMutationsToRoot } from './web-node/optimistic';
 import { reconcileWebNodeRoot } from './web-node/reconcile';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
@@ -67,6 +68,7 @@ type WebNodeShadowRootProps = {
   onError?: (message: string) => void;
   promptRequestId?: string;
   onRunAction?: (action: WebAction, params?: RunWebActionParams) => void;
+  onFileSuggestionInput?: (input: HTMLTextAreaElement | null) => void;
 };
 
 const BASE_STYLE_TEXT = `${baseWebUiCss}\n${webOverflowPanelCss}\n${diffPatchCss}\n${hljsGithubDarkCss}`;
@@ -518,26 +520,30 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                                 }
                               }
                             >
-                              <WebNodeRenderer
-                                root={currentRoot}
-                                onReplaceRoot={props.onReplaceRoot}
-                                onError={props.onError}
-                                promptRequestId={props.promptRequestId}
-                                speechSentences={speechSentences}
-                                activeSpeechSentenceIndex={
-                                  activeSpeechSentenceIndex
-                                }
-                                onSpeechSentenceClick={onSpeechSentenceClick}
-                                onRunAction={(action, params) =>
-                                  props.onRunAction?.(action, {
-                                    ...params,
-                                    getWebRoot: () => currentRoot,
-                                    applyOptimisticMutations:
-                                      applyLocalOptimisticMutations,
-                                    webTargetRoot: c.shadow,
-                                  })
-                                }
-                              />
+                              <WebFileSuggestionInputContext.Provider
+                                value={props.onFileSuggestionInput ?? null}
+                              >
+                                <WebNodeRenderer
+                                  root={currentRoot}
+                                  onReplaceRoot={props.onReplaceRoot}
+                                  onError={props.onError}
+                                  promptRequestId={props.promptRequestId}
+                                  speechSentences={speechSentences}
+                                  activeSpeechSentenceIndex={
+                                    activeSpeechSentenceIndex
+                                  }
+                                  onSpeechSentenceClick={onSpeechSentenceClick}
+                                  onRunAction={(action, params) =>
+                                    props.onRunAction?.(action, {
+                                      ...params,
+                                      getWebRoot: () => currentRoot,
+                                      applyOptimisticMutations:
+                                        applyLocalOptimisticMutations,
+                                      webTargetRoot: c.shadow,
+                                    })
+                                  }
+                                />
+                              </WebFileSuggestionInputContext.Provider>
                             </WebPendingEntityContext.Provider>
                           </TreeTimeFilterStateContext.Provider>
                         </WebToggleContext.Provider>

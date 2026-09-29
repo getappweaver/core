@@ -1606,10 +1606,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             {
               id: adapters.createId(),
               type: 'command_result',
-              command: action.consumerAlias,
-              subcommand: action.operation,
-              subcommandTag: action.operation,
-              values: null,
+              command: output.web.meta.command,
+              subcommand: output.web.meta.subcommand,
+              subcommandTag: output.web.meta.subcommand,
+              values: output.web.meta.arguments
+                ? {
+                    arguments: output.web.meta.arguments,
+                    options: output.web.meta.options ?? {},
+                  }
+                : null,
               text: null,
               web: output.web,
               clientView: null,
@@ -1658,6 +1663,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     const commandAction = action;
+
+    const originRefreshParams =
+      commandAction.refresh?.target === 'origin'
+        ? chromeModalOriginParams
+        : null;
 
     if (commandAction.presentation === 'form') {
       closeChromeModal();
@@ -1946,7 +1956,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         refresh.target === 'taskbar' ||
         adapters.isTaskbarSubcommand(refresh.command, refresh.subcommand);
 
-      const currentMeta = params?.getWebRoot?.().meta;
+      const refreshParams = originRefreshParams ?? params;
+      const currentMeta = refreshParams?.getWebRoot?.().meta;
 
       const taskbarOptions = refreshesTaskbar
         ? adapters.getTaskbarDockValues(refresh.command, refresh.subcommand)
@@ -1967,7 +1978,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
       const refreshRecordTl = refresh.recordInTimeline ?? recordTl;
 
-      if (!refreshesTaskbar && !params?.onReplaceRoot) {
+      if (!refreshesTaskbar && !refreshParams?.onReplaceRoot) {
         return;
       }
 
@@ -2037,7 +2048,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 renderSpan?.spanId ?? browserTrace?.rootSpanId ?? null,
             });
 
-            params?.onReplaceRoot?.(highlightedWeb);
+            refreshParams?.onReplaceRoot?.(highlightedWeb);
             updateSpan?.end();
 
             afterNextPaint(() => {

@@ -37,10 +37,15 @@ function text(value: string): WebNode {
 }
 
 function root({ consumerAlias, operation, children }: RootProps): WebNodeRoot {
+  const capability = parseCapabilityOperationId(operation);
+
   return {
     kind: 'ui',
     version: 1,
-    meta: { command: consumerAlias, subcommand: operation },
+    meta: {
+      command: capability?.capability.name ?? consumerAlias,
+      subcommand: capability?.operation ?? operation,
+    },
     tree: {
       type: 'element',
       tag: 'stack',

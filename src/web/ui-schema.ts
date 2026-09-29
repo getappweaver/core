@@ -42,8 +42,8 @@ export const WebRefreshSchema = z.object({
       template: z.string().min(1),
     })
     .optional(),
-  /** Force an authoritative widget refresh instead of replacing the invoking modal/root. */
-  target: z.enum(['taskbar']).optional(),
+  /** Refresh a docked widget or the widget that opened the invoking modal. */
+  target: z.enum(['taskbar', 'origin']).optional(),
 });
 
 export const WebCommandStatusSchema = z.object({
@@ -609,6 +609,8 @@ export const WebBasePropsSchema = z.object({
   stopPropagation: z.boolean().optional(),
   /** `textField`: name submitted with parent `form` (FormData / merge into command `arguments`). */
   formFieldName: z.string().min(1).optional(),
+  /** Enable @workspace-file suggestions when this textarea is shown in a modal. */
+  fileSuggestions: z.boolean().optional(),
   /** `textField`: placeholder; display-only, not a command option hint. */
   inputPlaceholder: z.string().optional(),
   /** `textField`: mask credentials without embedding their values in the UI tree. */
