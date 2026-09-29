@@ -413,6 +413,7 @@ async function resolveReplyContext({
     fallbackRelays: uniqueRelays(payload.fallbackRelays),
     includeDirectReplies,
     replyLimit: 20,
+    resolutionMode: 'persistent',
   });
 }
 

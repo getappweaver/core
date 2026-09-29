@@ -74,7 +74,7 @@ const features: Feature[] = [
         <a href="/apps/job-scheduler">jobs</a>,{' '}
         <a href="/apps/nostr-radar">social media</a>,{' '}
         <a href="/apps/file-manager">files</a>, browser actions,{' '}
-        <a href="/apps/captains-log">journals</a>, and publishing.
+        <a href="/apps/captains-log">journals</a>.
       </>,
       'Anyone can publish an app into the ecosystem.',
       'Apps expose commands, widgets, AI skills, and promptable tools.',

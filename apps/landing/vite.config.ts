@@ -23,6 +23,7 @@ function landingRoutesPlugin(): Plugin {
     '/apps/file-manager',
     '/apps/job-scheduler',
     '/apps/nostr-radar',
+    '/apps/ppq',
     '/apps/todo',
     '/one-page',
   ]);

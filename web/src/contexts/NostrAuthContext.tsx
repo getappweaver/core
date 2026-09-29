@@ -250,6 +250,10 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
     BunkerConnection[]
   >([]);
 
+  const [bunkerConnectionsError, setBunkerConnectionsError] = createSignal<
+    string | null
+  >(null);
+
   const [signEventRequest, setSignEventRequest] =
     createSignal<SignEventRequest | null>(null);
 
@@ -404,11 +408,13 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
   async function refreshBunkerConnections(): Promise<void> {
     if (mode() === 'landing') {
       setBunkerConnections([]);
+      setBunkerConnectionsError(null);
 
       return;
     }
 
     setBunkerConnections(await listBunkerConnections());
+    setBunkerConnectionsError(null);
   }
 
   async function addBunkerConnection(args: {
@@ -582,8 +588,12 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
 
     try {
       await refreshBunkerConnections();
-    } catch {
+    } catch (error) {
       setBunkerConnections([]);
+
+      setBunkerConnectionsError(
+        error instanceof Error ? error.message : String(error),
+      );
     }
 
     const allowedPubkeys = options?.allowedPubkeys
@@ -749,6 +759,7 @@ export function NostrAuthProvider(props: NostrAuthProviderProps): JSX.Element {
             activeSignEventRequest()?.request.allowedPubkeys ?? null
           }
           bunkerConnections={bunkerConnections()}
+          bunkerConnectionsError={bunkerConnectionsError()}
           onAddBunker={addBunkerConnection}
           onChoose={resolveSignEventChoice}
           onCancel={() => resolveSignEventChoice(null)}

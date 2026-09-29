@@ -9,6 +9,8 @@ import {
 } from 'fs';
 import { join } from 'path';
 
+import { copyPluginIconsToLanding } from './copy-plugin-icons-to-landing';
+
 const ROOT = join(import.meta.dir, '..');
 const WEB_DIST = join(ROOT, 'web', 'dist');
 const WEB_PUBLIC = join(ROOT, 'web', 'public');
@@ -47,6 +49,7 @@ function mirrorStaticDemoAssets(targetRoot: string): void {
   copyDir(join(WEB_PUBLIC, 'demo'), join(targetRoot, 'demo'));
   copyDir(join(WEB_PUBLIC, 'plugin-icons'), join(targetRoot, 'plugin-icons'));
   copyDir(join(WEB_PUBLIC, 'builtin-icons'), join(targetRoot, 'builtin-icons'));
+  copyPluginIconsToLanding(targetRoot);
 }
 
 if (existsSync(WEB_DIST)) {

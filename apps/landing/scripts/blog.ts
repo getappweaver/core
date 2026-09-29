@@ -35,6 +35,7 @@ const STATIC_SITEMAP_PATHS = [
   { path: '/apps/job-scheduler', priority: '0.8', changefreq: 'monthly' },
   { path: '/apps/nostr-radar', priority: '0.8', changefreq: 'monthly' },
   { path: '/apps/file-manager', priority: '0.8', changefreq: 'monthly' },
+  { path: '/apps/ppq', priority: '0.8', changefreq: 'monthly' },
   { path: '/blog/', priority: '0.7', changefreq: 'weekly' },
 ] as const;
 

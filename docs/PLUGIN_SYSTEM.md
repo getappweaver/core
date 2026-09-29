@@ -321,3 +321,49 @@ Each command family becomes a plugin:
 3. **Plugin dependencies**: How to handle circular deps?
 4. **Migration**: How to handle user data when plugin updates schema?
 5. **Discovery**: How do users find available plugins?
+
+## Add a plugin landing page
+
+Landing pages are built from `apps/landing/src/landing-data.ts` and rendered by
+`apps/landing/src/plugin-pages.tsx`. For example, PayPerQ lives at `/apps/ppq`.
+
+1. Give the plugin a local SVG icon and set `appweaver.icon` in
+   `plugins/<alias>/package.json` (for example, `"./ppq.svg"`). Register the
+   plugin in `plugins.json` if it is not already listed. From `apps/landing`, run
+   `bun run apps:icons`. This reads each registered plugin's manifest and copies
+   its icon to `apps/landing/public/plugin-icons/<alias>/<filename>`.
+   `bun run demo:copy` also copies the icons along with the web demo assets, but
+   requires an embedded `web/dist` when that directory exists.
+2. Add an `OfficialApp` entry in `apps/landing/src/landing-data.ts`: set the
+   route (`href: '/apps/<slug>'`), package name, repo, display names, description,
+   feature bullets, and `hasInteractiveDemo`. Add its icon path in
+   `apps/landing/src/official-app-grid.tsx`. If the route slug differs from the
+   command alias, add a mapping in `pluginRouteAliases` in
+   `apps/landing/src/plugin-pages.tsx`.
+3. Add the route to `appRoutes` in `apps/landing/vite.config.ts` so both dev and
+   preview serve it. Optionally add a custom title and description in
+   `pluginPagePresentations` in `plugin-pages.tsx`. A plugin with a header/right
+   web widget can set `hasInteractiveDemo: true` and show the embedded demo.
+   A model-source plugin without such a widget (like PPQ) should set it to
+   `false`; the page then shows its features without an empty demo panel.
+   For an install screenshot, place `<slug>.png` in
+   `apps/landing/public/plugin-install/` (for example, `ppq.png`) and set
+   `installScreenshotSlug: '<slug>'` in its `OfficialApp` entry. The page's
+   `pluginInstallScreenshotSlugs` map can also supply the slug, but an explicit
+   `installScreenshotSlug: null` **hides the screenshot** even if the file and
+   map entry exist. Use `null` only if there is no screenshot; this uses the
+   plugin icon for social previews instead.
+4. If the plugin has interactive demo commands, refresh the demo assets with
+   `bun run demo:generate` from the repository root, build the embedded web
+   demo with `bun run web:demo:build`, then run `bun run demo:copy` from
+   `apps/landing`. The landing page reads command metadata from
+   `apps/landing/public/demo/commands.json` to select the widget.
+5. From `apps/landing`, run `bun run build` after adding or replacing screenshots.
+   Vite copies `public/plugin-install/<slug>.png` into `dist/plugin-install/`;
+   a preview or deployed site serving an older `dist` will not show the new
+   image until rebuilt. The build also syncs manifest icons, builds the site,
+   and runs `bun run apps:build` (the script at
+   `apps/landing/scripts/generate-plugin-pages.ts`). It creates
+   `dist/apps/<slug>/index.html` with page-specific metadata and a static
+   fallback. Open the route in preview to confirm the icon, feature copy,
+   installation section, and any interactive demo.

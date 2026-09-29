@@ -28,7 +28,7 @@ type PluginPageSectionId =
 
 type PluginPage = {
   routeSlug: string;
-  installScreenshotSlug: string;
+  installScreenshotSlug: string | null;
   command: string;
   subcommand: string;
   label: string;
@@ -37,7 +37,7 @@ type PluginPage = {
   title: string;
   eyebrow: string;
   description: string;
-  demoQuery: string;
+  demoQuery: string | null;
   demoStories: PluginDemoStory[];
   features: string[];
   featureGallery: PluginFeatureGallery | null;
@@ -61,7 +61,7 @@ type PluginFeatureGallery = {
 type PluginPagePresentation = {
   title: string;
   description: string;
-  featureGallery: PluginFeatureGallery;
+  featureGallery: PluginFeatureGallery | null;
 };
 
 type PluginDemoViewMode = 'desktop' | 'mobile';
@@ -126,6 +126,7 @@ const pluginRouteAliases: Record<string, string> = {
   'apps/job-scheduler': 'job',
   'apps/nostr-radar': 'nr',
   'apps/todo': 'todo',
+  'apps/ppq': 'ppq',
 };
 
 const pluginInstallScreenshotSlugs: Record<string, string> = {
@@ -135,6 +136,7 @@ const pluginInstallScreenshotSlugs: Record<string, string> = {
   journal: 'captains-log',
   nr: 'nostr-radar',
   todo: 'todo-app',
+  ppq: 'ppq',
 };
 
 const pluginRoadmapRepoIds: Record<string, string> = {
@@ -144,6 +146,7 @@ const pluginRoadmapRepoIds: Record<string, string> = {
   journal: 'journal',
   nr: 'Nostr-Radar',
   todo: 'todo',
+  ppq: 'ppq',
 };
 
 const pluginDemoStories: Record<string, PluginDemoStory[]> = {
@@ -302,10 +305,16 @@ const pluginDemoStories: Record<string, PluginDemoStory[]> = {
 };
 
 const pluginPagePresentations: Record<string, PluginPagePresentation> = {
+  ppq: {
+    title: 'Private-model options. Lightning-funded AI in your workspace.',
+    description:
+      'PayPerQ adds a model source to AppWeaver: choose from its catalog, route private/* models through an attested Tinfoil enclave, and top up your account with an approved Lightning payment.',
+    featureGallery: null,
+  },
   nr: {
     title: 'Explore Nostr by topic. Rank what matters. Filter out what does not.',
     description:
-      'Nostr Radar is an intentional Nostr reader that discovers posts through your network, evaluates them in finite time slots, and scores relevance with private local signals.',
+      'Nostr Radar discovers posts through your network and evaluates them in finite time slots. Choose Jev Mode for fast, low-cost topic and mood classification, or LLM Mode for post and image summaries and more reliable classification. Private local signals shape relevance.',
     featureGallery: {
       title: 'A reader designed for deliberate discovery.',
       description:
@@ -458,14 +467,17 @@ function officialAppForSlug(slug: string) {
 export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
   const slug = routeSlugForPath(pathname);
   const commandToken = pluginRouteAliases[slug] ?? slug;
-  const usesFeatureGallery = pluginPagePresentations[commandToken] !== undefined;
+  const app = officialAppForSlug(slug);
+  const usesFeatureGallery = !!pluginPagePresentations[commandToken]?.featureGallery;
 
   return [
     { sectionId: null, label: 'Back', href: '/' },
     { sectionId: 'features', label: 'Features', href: '#features' },
-    usesFeatureGallery
-      ? { sectionId: 'gallery', label: 'Gallery', href: '#gallery' }
-      : { sectionId: 'demo', label: 'Demo', href: '#demo' },
+    ...(usesFeatureGallery
+      ? [{ sectionId: 'gallery' as const, label: 'Gallery', href: '#gallery' }]
+      : app?.hasInteractiveDemo === false
+        ? []
+        : [{ sectionId: 'demo' as const, label: 'Demo', href: '#demo' }]),
     { sectionId: 'install', label: 'Install', href: '#install' },
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
     { sectionId: 'more', label: 'More', href: '#more' },
@@ -507,27 +519,35 @@ function pluginPageForPath(
       entry.webWidget?.label,
   );
 
-  if (!command || !subcommand?.webWidget) {
+  if (!command && officialApp?.hasInteractiveDemo !== false) {
+    return null;
+  }
+
+  if (!subcommand?.webWidget && officialApp?.hasInteractiveDemo !== false) {
     return null;
   }
 
   const displayName =
-    officialApp?.displayName ?? subcommand.webWidget.modalTitle ?? titleCaseSlug(slug);
-  const description = officialApp?.description ?? command.summary;
+    officialApp?.displayName ?? subcommand?.webWidget?.modalTitle ?? titleCaseSlug(slug);
+  const description = officialApp?.description ?? command?.summary ?? '';
 
   return {
     routeSlug: slug,
-    installScreenshotSlug: pluginInstallScreenshotSlugs[command.name] ?? slug,
-    command: command.name,
-    subcommand: subcommand.name,
-    label: officialApp?.label ?? `/${command.name}`,
+    installScreenshotSlug: officialApp?.installScreenshotSlug === null
+      ? null
+      : pluginInstallScreenshotSlugs[commandToken] ?? slug,
+    command: command?.name ?? commandToken,
+    subcommand: subcommand?.name ?? 'status',
+    label: officialApp?.label ?? `/${commandToken}`,
     shortName: officialApp?.shortName ?? displayName,
     iconSrc: pluginIconSrcForSlug(slug),
     title: presentation?.title ?? `${displayName} for your AppWeaver workspace.`,
     eyebrow: displayName,
     description: presentation?.description ?? description,
-    demoQuery: `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`,
-    demoStories: pluginDemoStories[command.name] ?? [],
+    demoQuery: subcommand?.webWidget && command
+      ? `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`
+      : null,
+    demoStories: pluginDemoStories[commandToken] ?? [],
     features: officialApp?.features ?? [
       description,
       'Install it from the AppWeaver plugin manager when it belongs in your workspace.',
@@ -700,7 +720,9 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
 }
 
 function PluginInstallPreview(props: { page: PluginPage }) {
-  const screenshotSrc = () => installScreenshotSrc(props.page.installScreenshotSlug);
+  const screenshotSrc = () => props.page.installScreenshotSlug
+    ? installScreenshotSrc(props.page.installScreenshotSlug)
+    : null;
   const [fullscreenScreenshot, setFullscreenScreenshot] = createSignal<{
     src: string;
     alt: string;
@@ -736,18 +758,22 @@ function PluginInstallPreview(props: { page: PluginPage }) {
             })
           }
         />
-        <ScreenshotCard
-          src={screenshotSrc()}
-          alt={`AppWeaver Plugin Manager showing ${props.page.eyebrow}`}
-          label={`Install ${props.page.eyebrow}`}
-          onOpenFullscreen={() =>
-            setFullscreenScreenshot({
-              src: screenshotSrc(),
-              alt: `AppWeaver Plugin Manager showing ${props.page.eyebrow}`,
-              label: `Install ${props.page.shortName}`,
-            })
-          }
-        />
+        <Show when={screenshotSrc()}>
+          {(src) => (
+            <ScreenshotCard
+              src={src()}
+              alt={`AppWeaver Plugin Manager showing ${props.page.eyebrow}`}
+              label={`Install ${props.page.eyebrow}`}
+              onOpenFullscreen={() =>
+                setFullscreenScreenshot({
+                  src: src(),
+                  alt: `AppWeaver Plugin Manager showing ${props.page.eyebrow}`,
+                  label: `Install ${props.page.shortName}`,
+                })
+              }
+            />
+          )}
+        </Show>
       </div>
       <Show when={fullscreenScreenshot()}>
         {(screenshot) => (
@@ -973,7 +999,7 @@ function PluginDemoSection(props: { page: PluginPage }) {
         </div>
         <iframe
           title={`See ${props.page.shortName} stories for yourself`}
-          src={demoAppSrc(props.page.demoQuery)}
+          src={demoAppSrc(props.page.demoQuery ?? '')}
           class="plugin-page-demo-frame"
           classList={{ 'plugin-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
           loading="lazy"
@@ -1118,13 +1144,15 @@ function PluginLandingPage(props: {
       <Show
         when={props.page.featureGallery}
         fallback={
-          <section
-            id="demo"
-            class="plugin-page-section plugin-page-section--demo"
-            aria-label={`${props.page.eyebrow} demo`}
-          >
-            <PluginDemoSection page={props.page} />
-          </section>
+          <Show when={props.page.demoQuery !== null}>
+            <section
+              id="demo"
+              class="plugin-page-section plugin-page-section--demo"
+              aria-label={`${props.page.eyebrow} demo`}
+            >
+              <PluginDemoSection page={props.page} />
+            </section>
+          </Show>
         }
       >
         {(gallery) => (

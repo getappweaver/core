@@ -981,3 +981,58 @@ The initial implementation can proceed without settling these details:
 - A local-only index mode remains optional and deferred; indexes are tracked by default.
 
 Source discovery and coverage use the existing `respect_gitignore` behavior rather than introducing a new ignore configuration model for the initial implementation.
+
+## Field Notes From The PPQ Release Refresh
+
+The PPQ release refresh exposed an inefficient but valid usage pattern. The
+plugin had six indexed directories. Running recursive generation, recursive
+summarization, and forced recursive enrichment produced 18 sequential model
+calls: one call per directory for each stage. That explains most of the wall
+time.
+
+The token counters also looked larger than the amount of new information being
+processed. Typical summarize calls reported roughly 10.6k total input tokens,
+but about 10.2k were cache reads; enrichment showed a similar fixed cached
+baseline. The root generation call reported about 21.8k total tokens, including
+roughly 10.2k cached tokens. Therefore nominal token totals can substantially
+overstate newly processed or billed input, but the number of sequential model
+round trips remains real and was too high for this update.
+
+The refresh could have been more efficient:
+
+- Run `--plan` first and treat its estimated AI-call count as a cost warning.
+- Use one-level generation only for directories with semantic source changes.
+  In this case those were the plugin root, `vendor`, and
+  `vendor/ppq-private-mode/lib`; unchanged `bin` and `lib/nitro` records did not
+  need source regeneration.
+- Supply `agent_context` for files and directories the coding agent just read or
+  changed. Re-analyzing known package, command, README, and vendor-patch changes
+  discarded one of the design's main token-saving mechanisms.
+- Keep `prompt` null for routine freshness updates. A new operation-specific
+  prompt can alter validity inputs and cause otherwise reusable summaries to be
+  regenerated.
+- Do not use `force=true` for routine enrichment. Use `force=false` so current
+  enrichment is skipped, and omit enrichment entirely when architectural roles
+  did not change.
+- Run one root summarization after targeted generation and rely on hashes to
+  rebuild only stale ancestors.
+- Perform the final refresh after release hooks or formatters have produced
+  `package.json`, `CHANGELOG.md`, and other generated release files. Otherwise a
+  pre-commit refresh can become stale immediately.
+
+A preferable maintenance sequence is:
+
+```text
+1. bottomup.summary on the relevant root (no AI call)
+2. bottomup.generate --plan for each changed directory (no AI call)
+3. one-level bottomup.generate with agent_context for changed directories
+4. one root bottomup.summarize with no custom prompt
+5. bottomup.enrich only when context changed, with force=false
+6. bottomup.summary to verify current coverage (no AI call)
+```
+
+Recursive generation remains appropriate for first-time bootstrap or broad
+vendor replacement. Forced recursive enrichment should be exceptional. Future
+implementation work should also consider bounded parallel execution for
+independent sibling directories, because fresh sessions make that safe and it
+would reduce wall time even when the total number of calls is unchanged.

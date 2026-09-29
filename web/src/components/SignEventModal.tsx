@@ -25,6 +25,7 @@ type SignEventModalProps = {
   currentPubkey: string;
   allowedPubkeys: Set<string> | null;
   bunkerConnections: BunkerConnection[];
+  bunkerConnectionsError: string | null;
   onAddBunker: (props: {
     name: string;
     data: BunkerSignerData;
@@ -449,7 +450,11 @@ export function SignEventModal(props: SignEventModalProps): JSX.Element {
                     class="muted"
                     style={{ margin: 0, 'font-size': '0.85rem' }}
                   >
-                    No applicable saved bunker connections.
+                    {props.bunkerConnectionsError
+                      ? `Could not load saved bunker connections: ${props.bunkerConnectionsError}. Check that the web account is authenticated as the AppWeaver master identity, then try again.`
+                      : props.bunkerConnections.length > 0
+                        ? `No saved bunker connections match the required signer ${[...(props.allowedPubkeys ?? [])].map(formatNpub).join(', ')}.`
+                        : 'No saved bunker connections.'}
                   </p>
                 }
               >

@@ -188,6 +188,7 @@ export async function handleNostrLikeEventAction({
       fallbackRelays,
       includeDirectReplies: false,
       replyLimit: 1,
+      resolutionMode: 'persistent',
     });
 
     const target = context.targetEvent;

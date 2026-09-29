@@ -25,9 +25,13 @@ function escapeAttribute(value: string): string {
 }
 
 function appImageUrl(app: OfficialApp): string {
+  if (app.installScreenshotSlug === null) {
+    return `${SITE_ORIGIN}/plugin-icons/${app.label.slice(1)}/${app.label.slice(1)}.svg`;
+  }
+
   const slug = app.href.split('/').at(-1);
 
-  return `${SITE_ORIGIN}/plugin-install/${slug === 'todo' ? 'todo-app' : slug}.png`;
+  return `${SITE_ORIGIN}/plugin-install/${app.installScreenshotSlug ?? (slug === 'todo' ? 'todo-app' : slug)}.png`;
 }
 
 function renderStructuredData(app: OfficialApp): string {

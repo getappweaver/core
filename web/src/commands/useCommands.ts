@@ -1569,14 +1569,15 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         recordInTimeline: action.surface === 'timeline',
         onCommandResult: (message) => {
           const output = splitCommandOutput(message.output);
+          const web = output.web;
 
-          if (!output.web) {
+          if (!web) {
             return;
           }
 
           receivedOutput = true;
 
-          if (params?.onCapabilityResult?.(output.web)) {
+          if (params?.onCapabilityResult?.(web)) {
             return;
           }
 
@@ -1590,13 +1591,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             adapters.setChromeLoading(false);
             adapters.setChromeError(null);
             adapters.setChromeText(null);
-            adapters.setChromeWeb(output.web);
+            adapters.setChromeWeb(web);
 
             return;
           }
 
           if (action.surface !== 'timeline' && params?.onReplaceRoot) {
-            params.onReplaceRoot(output.web);
+            params.onReplaceRoot(web);
 
             return;
           }
@@ -1606,17 +1607,17 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             {
               id: adapters.createId(),
               type: 'command_result',
-              command: output.web.meta.command,
-              subcommand: output.web.meta.subcommand,
-              subcommandTag: output.web.meta.subcommand,
-              values: output.web.meta.arguments
+              command: web.meta.command,
+              subcommand: web.meta.subcommand,
+              subcommandTag: web.meta.subcommand,
+              values: web.meta.arguments
                 ? {
-                    arguments: output.web.meta.arguments,
-                    options: output.web.meta.options ?? {},
+                    arguments: web.meta.arguments,
+                    options: web.meta.options ?? {},
                   }
                 : null,
               text: null,
-              web: output.web,
+              web,
               clientView: null,
             },
           ]);

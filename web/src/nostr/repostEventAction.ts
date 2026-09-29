@@ -333,6 +333,7 @@ async function resolveRepostContext(
     fallbackRelays: uniqueRelays(payload.fallbackRelays),
     includeDirectReplies: false,
     replyLimit: 1,
+    resolutionMode: 'persistent',
   });
 }
 

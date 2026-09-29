@@ -3523,7 +3523,7 @@
       {
         "name": "bottomup.generate",
         "summary": "Generate source-grounded .BOTTOMUP.json knowledge.",
-        "usage": "bottomup.generate --path <path> [--root <root>] [--recursive] [--enrich] [--context <context>] [--prompt <prompt>] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
+        "usage": "bottomup.generate --path <path> [--root <root>] [--recursive] [--enrich] [--context <context>] [--prompt <prompt>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
         "aliases": [],
         "arguments": [],
         "options": [
@@ -3582,15 +3582,6 @@
             "required": false,
             "choices": null,
             "webInput": "textarea"
-          },
-          {
-            "name": "model",
-            "summary": "Override the model used for generation.",
-            "flag": "--model",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
           },
           {
             "name": "ignore",
@@ -3708,7 +3699,7 @@
       {
         "name": "bottomup.summarize",
         "summary": "Build compact hierarchical summaries in .BOTTOMUP.json files.",
-        "usage": "bottomup.summarize --path <path> [--root <root>] [--prompt <prompt>] [--no-partial] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
+        "usage": "bottomup.summarize --path <path> [--root <root>] [--prompt <prompt>] [--no-partial] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
         "aliases": [],
         "arguments": [],
         "options": [
@@ -3746,15 +3737,6 @@
             "flag": "--no-partial",
             "shortFlag": null,
             "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "model",
-            "summary": "Override the model used for summarization.",
-            "flag": "--model",
-            "shortFlag": null,
-            "kind": "string",
             "required": false,
             "choices": null
           },
@@ -3990,7 +3972,7 @@
       {
         "name": "bottomup.enrich",
         "summary": "Enrich .BOTTOMUP.json knowledge from stored summaries and context.",
-        "usage": "bottomup.enrich --path <path> [--root <root>] [--context <context>] [--prompt <prompt>] [--allow-partial] [--force] [--model <model>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
+        "usage": "bottomup.enrich --path <path> [--root <root>] [--context <context>] [--prompt <prompt>] [--allow-partial] [--force] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
         "aliases": [],
         "arguments": [],
         "options": [
@@ -4047,15 +4029,6 @@
             "flag": "--force",
             "shortFlag": null,
             "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "model",
-            "summary": "Override the model used for enrichment.",
-            "flag": "--model",
-            "shortFlag": null,
-            "kind": "string",
             "required": false,
             "choices": null
           },
@@ -4367,7 +4340,7 @@
       {
         "name": "update",
         "summary": "Update a job name, model, prompt, or execution instructions.",
-        "usage": "update <id> [--name <name>] [--model <model>] [--prompt <prompt>] [--instructions <instructions>]",
+        "usage": "update <id> [--name <name>] [--model <model>] [--model-source <modelSource>] [--workspace <workspace>] [--sticky-session <stickySession>] [--prompt <prompt>] [--instructions <instructions>]",
         "aliases": [
           "edit"
         ],
@@ -4391,6 +4364,27 @@
             "name": "model",
             "flag": "--model",
             "summary": "Model override; reset uses the backend default.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "modelSource",
+            "flag": "--model-source",
+            "summary": "Model source provider or alias; inherit follows the workspace default.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "flag": "--workspace",
+            "summary": "Workspace: parent, appweaver, or inherit.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "stickySession",
+            "flag": "--sticky-session",
+            "summary": "Reuse the previous session on later runs: true or false.",
             "kind": "string",
             "required": false
           },
@@ -5102,13 +5096,106 @@
       },
       {
         "name": "settings",
-        "summary": "Show or update AI settings used by nr parse.",
-        "usage": "settings [--backend <backend>] [--model <model>] [--image-backend <image_backend>] [--image-model <image_model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--evaluate-images <evaluate_images>] [--max-images-per-event <max_images_per_event>] [--max-image-mb <max_image_mb>] [--image-fetch-timeout-sec <image_fetch_timeout_sec>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
+        "summary": "Show or update NR evaluation mode and classifier settings.",
+        "usage": "settings [--mode <mode>] [--jev-api-key <jev_api_key>] [--jev-api-base <jev_api_base>] [--jev-topics <jev_topics>] [--jev-topic-batch-size <jev_topic_batch_size>] [--jev-moods <jev_moods>] [--jev-languages <jev_languages>] [--jev-state-instructions <jev_state_instructions>] [--jev-topic-question <jev_topic_question>] [--jev-mood-question <jev_mood_question>] [--jev-language-question <jev_language_question>] [--jev-relevance-question <jev_relevance_question>] [--backend <backend>] [--model <model>] [--image-backend <image_backend>] [--image-model <image_model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--evaluate-images <evaluate_images>] [--max-images-per-event <max_images_per_event>] [--max-image-mb <max_image_mb>] [--image-fetch-timeout-sec <image_fetch_timeout_sec>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
         "aliases": [
           "config"
         ],
         "arguments": [],
         "options": [
+          {
+            "name": "mode",
+            "flag": "--mode",
+            "summary": "Evaluation mode (LLM or Jev classifier).",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "llm",
+              "classifier"
+            ]
+          },
+          {
+            "name": "jev_api_key",
+            "flag": "--jev-api-key",
+            "summary": "Jev API key (reset clears it).",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "jev_api_base",
+            "flag": "--jev-api-base",
+            "summary": "Jev API base URL.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "jev_topics",
+            "flag": "--jev-topics",
+            "summary": "Comma-separated candidate topics.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "jev_topic_batch_size",
+            "flag": "--jev-topic-batch-size",
+            "summary": "Choices per topic or mood question (1-50, default 10).",
+            "kind": "integer",
+            "required": false
+          },
+          {
+            "name": "jev_moods",
+            "flag": "--jev-moods",
+            "summary": "Comma-separated candidate moods.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "jev_languages",
+            "flag": "--jev-languages",
+            "summary": "Comma-separated ISO 639-1 language codes.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "jev_state_instructions",
+            "flag": "--jev-state-instructions",
+            "summary": "State guidance for Jev.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "jev_topic_question",
+            "flag": "--jev-topic-question",
+            "summary": "Jev topic question.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "jev_mood_question",
+            "flag": "--jev-mood-question",
+            "summary": "Jev mood question.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "jev_language_question",
+            "flag": "--jev-language-question",
+            "summary": "Jev language question.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "jev_relevance_question",
+            "flag": "--jev-relevance-question",
+            "summary": "Jev relevance question.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
           {
             "name": "backend",
             "flag": "--backend",
@@ -6038,6 +6125,294 @@
     ]
   },
   {
+    "name": "ppq",
+    "summary": "Manage workspace-local PPQ accounts and explore the model catalog.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "ppq",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for ppq or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional: status, accounts, keys, models, settings",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/ppq help",
+          "/ppq help status",
+          "/ppq help accounts",
+          "/ppq help models"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "status",
+        "summary": "Show the current PPQ workspace and prerequisites.",
+        "usage": "status",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "accounts",
+        "summary": "List accounts without exposing credentials.",
+        "usage": "accounts",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "create",
+        "summary": "Create a PPQ account in the authenticated web UI.",
+        "usage": "create",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "import",
+        "summary": "Open the secure account import form in the web UI.",
+        "usage": "import",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "select-account",
+        "summary": "Select a stored account in this workspace.",
+        "usage": "select-account <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Stored account ID.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "keys",
+        "summary": "List stored key names for the selected account.",
+        "usage": "keys",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "import-key",
+        "summary": "Open the API-key import form in the web UI.",
+        "usage": "import-key",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "select-key",
+        "summary": "Select a stored runtime API key.",
+        "usage": "select-key <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Stored key ID.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "models",
+        "summary": "Show the PPQ chat model catalog.",
+        "usage": "models",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "refresh",
+        "summary": "Refresh the validated PPQ catalog.",
+        "usage": "refresh",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "select-model",
+        "summary": "Choose a PPQ model.",
+        "usage": "select-model <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "PPQ model ID.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "favorite",
+        "summary": "Favorite a PPQ model.",
+        "usage": "favorite <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "PPQ model ID.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "unfavorite",
+        "summary": "Remove a PPQ model from favorites.",
+        "usage": "unfavorite <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "PPQ model ID.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "settings",
+        "summary": "View or update recent models and notifications.",
+        "usage": "settings",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "funding",
+        "summary": "Request a Lightning top-up invoice.",
+        "usage": "funding",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "topup",
+        "summary": "Request a Lightning top-up in the authenticated web UI.",
+        "usage": "topup",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
     "name": "todo",
     "summary": "Todo management with nested tasks, AI drafts, and ranking.",
     "aliases": [],
@@ -6573,7 +6948,7 @@
       {
         "name": "show",
         "summary": "Show detail for a single todo.",
-        "usage": "show <id>",
+        "usage": "show <id> [--list-context <listContext>]",
         "aliases": [],
         "arguments": [
           {
@@ -6583,7 +6958,16 @@
             "required": true
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "listContext",
+            "summary": "List invocation to refresh after editing from the web widget.",
+            "flag": "--list-context",
+            "kind": "string",
+            "required": false,
+            "shortFlag": null
+          }
+        ],
         "examples": [
           "/todo show 42"
         ],

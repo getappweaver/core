@@ -7,6 +7,7 @@ export type OfficialApp = {
   repo: string;
   displayName: string;
   shortName: string;
+  installScreenshotSlug?: string | null;
   features: string[];
   hasInteractiveDemo: boolean;
 };
@@ -109,7 +110,7 @@ export const officialApps: OfficialApp[] = [
     name: 'Nostr Radar',
     label: '/nr',
     description:
-      'Explore Nostr by topic, discover posts through overlooked social signals, and privately rank what matters to you.',
+      'Explore Nostr by topic and mood. Choose Jev Mode for fast, low-cost classification, or LLM Mode for summaries, image descriptions, and more reliable classification.',
     href: '/apps/nostr-radar',
     packageName: 'appweaver-nr-plugin',
     repo: 'nostr://_@getappweaver.com/relay.ngit.dev/Nostr-Radar',
@@ -118,10 +119,31 @@ export const officialApps: OfficialApp[] = [
     hasInteractiveDemo: false,
     features: [
       'Fetch and evaluate posts in finite time slots instead of browsing an infinite feed.',
+      'Choose Jev Mode to classify posts by topic and mood quickly at low cost, or LLM Mode for post and image summaries and more reliable classification.',
       'See the 25 most relevant evaluated posts in For You using private local scoring signals.',
       'Filter Timeline and For You by time slot, preferred topics, and unpreferred topics.',
       'Surface reactions, not just reposts or quotes.',
       'Archive important posts to collect or revisit later.',
+    ],
+  },
+  {
+    name: 'PayPerQ',
+    label: '/ppq',
+    description:
+      'Use PayPerQ models in AppWeaver with attested proxy routing, private-model options, balance checks, and Lightning funding.',
+    href: '/apps/ppq',
+    packageName: 'appweaver-ppq-plugin',
+    repo: 'nostr://npub1wg0xnsln7nsff2g2cqxr5jgqcd38rmnr4m47vla7ahq39sclk2vqs0vy52/relay.ngit.dev/ppq',
+    displayName: 'PayPerQ',
+    shortName: 'PPQ',
+    installScreenshotSlug: 'ppq',
+    hasInteractiveDemo: false,
+    features: [
+      'Choose private/* models for inference in a verified Tinfoil enclave; ordinary models use the attested Nitro path and their upstream providers receive plaintext.',
+      'Select PayPerQ as the model source in AppWeaver, then browse its validated model catalog and save favorites.',
+      'Check your PPQ balance before each inference task so missing credit or an invalid key blocks paid requests.',
+      'Request a Lightning top-up from the Funding view and approve payment through your connected AppWeaver NWC wallet.',
+      'Keep account credentials encrypted per workspace with your AppWeaver identity key.',
     ],
   },
 ];

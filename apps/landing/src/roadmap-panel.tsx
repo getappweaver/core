@@ -61,6 +61,12 @@ type WorkflowZapSigner = {
   lnurlpUrl: string;
 };
 
+type RoadmapZapInvoice = {
+  invoice: string;
+  amount: string;
+  recipient: string;
+};
+
 export type RoadmapPanelProps = {
   title: string;
   boardKey: string;
@@ -140,6 +146,8 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
   const [paymentText, setPaymentText] = createSignal<string | null>(null);
   const [paymentError, setPaymentError] = createSignal<string | null>(null);
   const [paymentLoading, setPaymentLoading] = createSignal(false);
+  const [paymentInvoice, setPaymentInvoice] = createSignal<RoadmapZapInvoice | null>(null);
+  const [invoiceCopyError, setInvoiceCopyError] = createSignal(false);
   const [connectModalOpen, setConnectModalOpen] = createSignal(false);
   const [unlockModalOpen, setUnlockModalOpen] = createSignal(false);
   const [authorIdentities, setAuthorIdentities] = createSignal<
@@ -534,14 +542,21 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
   function runAction(action: WebAction): void {
     if (action.type === 'clientAction' && action.action === 'roadmap.lightningZap') {
+      setPaymentInvoice(null);
+      setInvoiceCopyError(false);
+      setModalTitle('Pay roadmap zap');
+
       void handleRoadmapLightningZap({
         action,
         signEvent: (event: EventTemplate) =>
           signEventForLanding(event, { title: 'Sign zap request' }),
-        setChromeWeb: setPaymentRoot,
         setChromeText: setPaymentText,
         setChromeError: setPaymentError,
         setChromeLoading: setPaymentLoading,
+        requestPayment: ({ invoice, amount, recipient }) => {
+          setPaymentRoot(null);
+          setPaymentInvoice({ invoice, amount, recipient });
+        },
       });
 
       return;
@@ -556,6 +571,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
       setPaymentError(null);
       setPaymentText(null);
+      setPaymentInvoice(null);
       setModalTitle('Roadmap payment');
       setPaymentRoot(
         renderRoadmapFundWeb({
@@ -628,6 +644,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
       setPaymentText(null);
       setPaymentError(null);
       setPaymentLoading(false);
+      setPaymentInvoice(null);
 
       return;
     }
@@ -739,6 +756,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
 
         setPaymentError(null);
         setPaymentText(null);
+        setPaymentInvoice(null);
         setModalTitle('Roadmap payment');
         setPaymentRoot(
           renderRoadmapFundWeb({
@@ -789,7 +807,7 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
           </Show>
         </Show>
       </div>
-      <Show when={paymentRoot() || paymentText() || paymentError()}>
+      <Show when={paymentRoot() || paymentText() || paymentError() || paymentInvoice()}>
         <div class="roadmap-payment-modal-backdrop">
           <div
             class="roadmap-payment-modal"
@@ -808,6 +826,8 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
                   setPaymentText(null);
                   setPaymentError(null);
                   setPaymentLoading(false);
+                  setPaymentInvoice(null);
+                  setInvoiceCopyError(false);
                 }}
               >
                 ✕
@@ -819,6 +839,32 @@ export function RoadmapPanel(props: RoadmapPanelProps): JSX.Element {
               </Show>
               <Show when={!paymentError() && paymentText()}>
                 {(message) => <div class="roadmap-panel-status">{message()}</div>}
+              </Show>
+              <Show when={!paymentError() && !paymentText() && paymentInvoice()}>
+                {(payment) => (
+                  <div class="roadmap-panel-status">
+                    <p>Pay {payment().amount} sats to {payment().recipient} with your Lightning wallet:</p>
+                    <p><a href={`lightning:${payment().invoice}`}>Open wallet</a></p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            await navigator.clipboard.writeText(payment().invoice);
+                          } catch {
+                            setInvoiceCopyError(true);
+                          }
+                        })();
+                      }}
+                    >
+                      Copy invoice
+                    </button>
+                    <Show when={invoiceCopyError()}>
+                      <p>Could not copy automatically. Select and copy the invoice below.</p>
+                    </Show>
+                    <textarea readOnly rows={4} value={payment().invoice} aria-label="Lightning invoice" />
+                  </div>
+                )}
               </Show>
               <Show when={!paymentError() && !paymentText() && paymentRoot()}>
                 {(modalRoot) => (
