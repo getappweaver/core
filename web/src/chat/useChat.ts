@@ -11,6 +11,12 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   const CHAT_PROMPT_PREVIEW_LENGTH = 200;
 
   const chatStreamAssistantByRequestId = new Map<string, string>();
+  const sessionByRequestId = new Map<string, string>();
+
+  const isVisibleRequest = (requestId: string): boolean =>
+    !sessionByRequestId.has(requestId) ||
+    sessionByRequestId.get(requestId) === adapters.timelineId();
+
   const streamedAssistantRequestIds = new Set<string>();
 
   const reasoningStreamByRequestId = new Map<
@@ -27,6 +33,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
     const deltaText = pendingStreamTextByRequestId.get(requestId);
     pendingStreamTextByRequestId.delete(requestId);
+
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
 
     if (!deltaText) {
       logChatDebug('stream.flush.empty', { requestId });
@@ -78,6 +88,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleStreamTextDelta(requestId: string, deltaText: string): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('stream.text_delta', {
       requestId,
       length: deltaText.length,
@@ -138,6 +152,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     requestId: string,
     deltaText: string,
   ): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('stream.reasoning_delta', {
       requestId,
       length: deltaText.length,
@@ -186,6 +204,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     id: string,
     text: string,
   ): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('stream.summary', { requestId, id, length: text.length });
 
     closeTextSegmentBeforeStructuralChunk(requestId);
@@ -213,6 +235,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     requestId: string,
     files: TimelineFileDiff[],
   ): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('stream.diff', {
       requestId,
       fileCount: files.length,
@@ -225,6 +251,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleStreamTool(requestId: string, tool: TimelineToolCall): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('stream.tool', {
       requestId,
       callId: tool.callId,
@@ -267,6 +297,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function handleChatResult(requestId: string, output: string): void {
+    if (!isVisibleRequest(requestId)) {
+      return;
+    }
+
     logChatDebug('chat.result', {
       requestId,
       length: output.length,
@@ -321,6 +355,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
   }
 
   function clearRequest(requestId: string): void {
+    sessionByRequestId.delete(requestId);
     const timer = streamFlushTimerByRequestId.get(requestId);
 
     if (timer !== undefined) {
@@ -364,6 +399,15 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
   function sendChat(text: string): void {
     const requestId = adapters.createId();
+    const sessionId = adapters.timelineId();
+
+    if (!sessionId) {
+      adapters.appendSystemMessage('Waiting for a session to be ready.');
+
+      return;
+    }
+
+    sessionByRequestId.set(requestId, sessionId);
 
     logChatDebug('chat.send.start', {
       requestId,
@@ -378,10 +422,15 @@ export function useChat(adapters: ChatAdapters): ChatHook {
 
     adapters.pendingRequests.set(requestId, {
       onPrompt: (message) => {
+        adapters.setPromptForSession(sessionId, message.requestId);
+
+        if (!isVisibleRequest(requestId)) {
+          return;
+        }
+
         const prompt = splitPromptPayload(message.prompt);
 
         adapters.setAgentWorking(false);
-        adapters.setPendingPromptRequestId(message.requestId);
 
         adapters.setTimeline((prev) => [
           ...prev,
@@ -395,6 +444,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         ]);
       },
       onChatResult: (message) => {
+        if (!isVisibleRequest(requestId)) {
+          return;
+        }
+
         logChatDebug('chat.pending.on_result', {
           requestId,
           outputLength: message.output.length,
@@ -410,6 +463,10 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         adapters.onChatResult();
       },
       onError: (message) => {
+        if (!isVisibleRequest(requestId)) {
+          return;
+        }
+
         logChatDebug('chat.pending.on_error', {
           requestId,
           message: message.message,
@@ -432,7 +489,8 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       adapters.sendSocketMessage({
         type: 'chat',
         requestId,
-        timelineId: adapters.timelineId(),
+        timelineId: sessionId,
+        sessionId,
         content: text,
       });
 
@@ -464,6 +522,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
       adapters.sendSocketMessage({
         type: 'cancel_chat',
         requestId: adapters.createId(),
+        sessionId: adapters.timelineId(),
       });
 
       logChatDebug('chat.cancel.sent');

@@ -26,7 +26,9 @@ export function openCoreDb(): CoreDb {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       created_at INTEGER NOT NULL,
-      backend TEXT NOT NULL DEFAULT 'opencode'
+      backend TEXT NOT NULL DEFAULT 'opencode',
+      workspace TEXT,
+      updated_at INTEGER
     )
   `);
 
@@ -36,6 +38,14 @@ export function openCoreDb(): CoreDb {
     );
   } catch {
     /* Column already exists */
+  }
+
+  for (const column of ['workspace TEXT', 'updated_at INTEGER']) {
+    try {
+      db.run(`ALTER TABLE sessions ADD COLUMN ${column}`);
+    } catch {
+      /* Column already exists */
+    }
   }
 
   const sessionColumns = db

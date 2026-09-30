@@ -43,6 +43,8 @@ export async function runAgentConversation({
     db: seenDb,
     backend,
     cwd,
+    workspace: currentWorkspace,
+    selection: 'dm',
   });
 
   insertSessionMessage(seenDb, sessionId, 'user', content);

@@ -1,4 +1,4 @@
-import type { AgentBackendName, CoreDb } from '@src/db';
+import type { AgentBackendName, CoreDb, WorkspaceTarget } from '@src/db';
 import { setCurrentSession } from '@src/session';
 
 import type { SessionAttachRepresentation } from './representation';
@@ -9,6 +9,8 @@ type HandleSessionAttachProps = {
   sessionId: string;
   prefix: string;
   activeBackend: AgentBackendName;
+  workspace: WorkspaceTarget;
+  selection: 'web' | 'dm';
 };
 
 export function handleSessionAttach(
@@ -47,11 +49,11 @@ export function handleSessionAttach(
   const now = Math.floor(Date.now() / 1000);
 
   db.run(
-    'INSERT OR IGNORE INTO sessions (id, created_at, backend) VALUES (?, ?, ?)',
-    [sessionId, now, activeBackend],
+    'INSERT OR IGNORE INTO sessions (id, created_at, backend, workspace, updated_at) VALUES (?, ?, ?, ?, ?)',
+    [sessionId, now, activeBackend, props.workspace, now],
   );
 
-  if (!setCurrentSession(db, sessionId)) {
+  if (!setCurrentSession(db, sessionId, props.workspace, props.selection)) {
     throw new Error(`Failed to attach session ${sessionId}`);
   }
 

@@ -1,11 +1,13 @@
-import type { CoreDb } from '@src/db';
-import { getState, STATE_CURRENT_SESSION } from '@src/db';
+import type { CoreDb, WorkspaceTarget } from '@src/db';
+import { getState, STATE_CURRENT_SESSION, webSessionStateKey } from '@src/db';
 
 import type { SessionListRepresentation } from './representation';
 
 type HandleSessionListProps = {
   db: CoreDb;
   limit?: number;
+  workspace: WorkspaceTarget;
+  selection: 'web' | 'dm';
 };
 
 const DEFAULT_SESSION_LIST_LIMIT = 20;
@@ -24,9 +26,13 @@ export function handleSessionList(
 
   const rows = props.db
     .prepare(
-      'SELECT id, created_at, backend FROM sessions ORDER BY created_at DESC LIMIT ?',
+      'SELECT id, created_at, backend FROM sessions WHERE workspace = ? ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?',
     )
-    .all(limit) as { id: string; created_at: number; backend: string }[];
+    .all(props.workspace, limit) as {
+    id: string;
+    created_at: number;
+    backend: string;
+  }[];
 
   if (rows.length === 0) {
     return {
@@ -37,7 +43,12 @@ export function handleSessionList(
     };
   }
 
-  const cur = getState(props.db, STATE_CURRENT_SESSION);
+  const cur = getState(
+    props.db,
+    props.selection === 'web'
+      ? webSessionStateKey(props.workspace)
+      : STATE_CURRENT_SESSION,
+  );
 
   return {
     kind: 'session.list',

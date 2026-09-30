@@ -87,6 +87,8 @@ const demoComposerAiState: ComposerAiState = {
   interventionAvailable: false,
   interventionEnabled: false,
   currentSessionId: null,
+  workspace: 'appweaver',
+  sessionRunning: false,
   modelSource: {
     providerId: 'demo/ai-model-source/v1',
     state: {
@@ -301,6 +303,8 @@ export function useSocket(adapters: SocketAppAdapters) {
   let composerStateRequestSequence = 0;
   let composerStateRequestInFlight = false;
   let composerStateRefreshQueued = false;
+  let queuedComposerSelection: 'current' | 'latest' = 'current';
+  const lastRunningBySession = new Map<string, boolean>();
   const pendingRequests = new Map<string, PendingRequest>();
 
   function clearComposerStateRetry(): void {
@@ -435,6 +439,7 @@ export function useSocket(adapters: SocketAppAdapters) {
           adapters: {
             appendSystemMessage: adapters.appendSystemMessage,
             chat: adapters.chat,
+            timelineId: adapters.timelineId,
             setAgentWorking: adapters.setAgentWorking,
             setTimeline: adapters.setTimeline,
             setToolInterventions: adapters.setToolInterventions,
@@ -469,6 +474,7 @@ export function useSocket(adapters: SocketAppAdapters) {
       adapters: {
         appendSystemMessage: adapters.appendSystemMessage,
         chat: adapters.chat,
+        timelineId: adapters.timelineId,
         setAgentWorking: adapters.setAgentWorking,
         setTimeline: adapters.setTimeline,
         setToolInterventions: adapters.setToolInterventions,
@@ -631,26 +637,15 @@ export function useSocket(adapters: SocketAppAdapters) {
     });
   }
 
-  function loadBootstrapData(): void {
-    const commandsRequestId = createRequestId();
+  function loadSessionTimeline(sessionId: string): void {
     const timelineRequestId = createRequestId();
-
-    pendingRequests.set(commandsRequestId, {
-      onCommandsResult: (message) => {
-        adapters.setCommands(message.commands);
-      },
-      onDone: () => {
-        adapters.setLoadingCommands(false);
-      },
-      onError: (message) => {
-        adapters.appendSystemMessage(message.message);
-        adapters.setLoadingCommands(false);
-      },
-    });
 
     pendingRequests.set(timelineRequestId, {
       onTimelineEventsResult: (message) => {
-        if (message.timelineId !== adapters.timelineId()) {
+        if (
+          message.timelineId !== sessionId ||
+          sessionId !== adapters.timelineId()
+        ) {
           return;
         }
 
@@ -697,11 +692,33 @@ export function useSocket(adapters: SocketAppAdapters) {
           });
         }
 
-        if (restoredItems.length > 0) {
-          adapters.setTimeline((current) =>
-            preserveCurrentSingletonRoots(restoredItems, current),
-          );
-        }
+        adapters.setTimeline((current) =>
+          preserveCurrentSingletonRoots(restoredItems, current),
+        );
+      },
+    });
+
+    send({
+      type: 'load_timeline',
+      requestId: timelineRequestId,
+      timelineId: sessionId,
+      limit: 100,
+    });
+  }
+
+  function loadBootstrapData(): void {
+    const commandsRequestId = createRequestId();
+
+    pendingRequests.set(commandsRequestId, {
+      onCommandsResult: (message) => {
+        adapters.setCommands(message.commands);
+      },
+      onDone: () => {
+        adapters.setLoadingCommands(false);
+      },
+      onError: (message) => {
+        adapters.appendSystemMessage(message.message);
+        adapters.setLoadingCommands(false);
       },
     });
 
@@ -710,12 +727,9 @@ export function useSocket(adapters: SocketAppAdapters) {
       requestId: commandsRequestId,
     });
 
-    send({
-      type: 'load_timeline',
-      requestId: timelineRequestId,
-      timelineId: adapters.timelineId(),
-      limit: 100,
-    });
+    if (adapters.timelineId()) {
+      loadSessionTimeline(adapters.timelineId());
+    }
 
     requestComposerAiState();
   }
@@ -723,6 +737,7 @@ export function useSocket(adapters: SocketAppAdapters) {
   function requestComposerAiStateAttempt(
     attempt: number,
     sequence: number,
+    selection: 'current' | 'latest',
   ): void {
     if (!wsConnected()) {
       return;
@@ -740,19 +755,51 @@ export function useSocket(adapters: SocketAppAdapters) {
         clearComposerStateRetry();
         setModelStateUnavailable(false);
         adapters.setComposerAiState(message.state);
+        adapters.setAgentWorking(message.state.sessionRunning);
+
+        const sessionId =
+          message.state.currentSessionId ?? (isWebDemoMode() ? 'demo' : null);
+
+        const wasRunning = sessionId
+          ? lastRunningBySession.get(sessionId)
+          : undefined;
+
+        if (sessionId) {
+          lastRunningBySession.set(sessionId, message.state.sessionRunning);
+        }
+
+        if (
+          sessionId &&
+          (sessionId !== adapters.timelineId() || !adapters.timelineId())
+        ) {
+          adapters.setTimelineId(sessionId);
+          loadSessionTimeline(sessionId);
+        } else if (sessionId && wasRunning && !message.state.sessionRunning) {
+          loadSessionTimeline(sessionId);
+        }
 
         if (composerStateRefreshQueued) {
           composerStateRefreshQueued = false;
-          requestComposerAiState();
+          const nextSelection = queuedComposerSelection;
+          queuedComposerSelection = 'current';
+          requestComposerAiState(nextSelection);
 
           return;
         }
 
-        if (message.state.modelSource.state.transitionState === 'pending') {
-          composerStateRetryTimer = window.setTimeout(() => {
-            composerStateRetryTimer = null;
-            requestComposerAiStateAttempt(0, sequence);
-          }, COMPOSER_STATE_PENDING_POLL_MS);
+        if (
+          message.state.sessionRunning ||
+          message.state.modelSource.state.transitionState === 'pending'
+        ) {
+          composerStateRetryTimer = window.setTimeout(
+            () => {
+              composerStateRetryTimer = null;
+              requestComposerAiStateAttempt(0, sequence, 'current');
+            },
+            message.state.sessionRunning
+              ? 2500
+              : COMPOSER_STATE_PENDING_POLL_MS,
+          );
         }
       },
       onError: () => {
@@ -764,7 +811,9 @@ export function useSocket(adapters: SocketAppAdapters) {
 
         if (composerStateRefreshQueued) {
           composerStateRefreshQueued = false;
-          requestComposerAiState();
+          const nextSelection = queuedComposerSelection;
+          queuedComposerSelection = 'current';
+          requestComposerAiState(nextSelection);
 
           return;
         }
@@ -779,7 +828,7 @@ export function useSocket(adapters: SocketAppAdapters) {
 
         composerStateRetryTimer = window.setTimeout(() => {
           composerStateRetryTimer = null;
-          requestComposerAiStateAttempt(attempt + 1, sequence);
+          requestComposerAiStateAttempt(attempt + 1, sequence, selection);
         }, delay);
       },
       suppressErrorUi: true,
@@ -787,7 +836,13 @@ export function useSocket(adapters: SocketAppAdapters) {
 
     try {
       composerStateRequestInFlight = true;
-      send({ type: 'request_composer_ai_state', requestId });
+
+      send({
+        type: 'request_composer_ai_state',
+        requestId,
+        sessionId:
+          selection === 'latest' ? null : adapters.timelineId() || null,
+      });
     } catch {
       composerStateRequestInFlight = false;
       pendingRequests.delete(requestId);
@@ -795,18 +850,24 @@ export function useSocket(adapters: SocketAppAdapters) {
     }
   }
 
-  function requestComposerAiState(): void {
+  function requestComposerAiState(
+    selection: 'current' | 'latest' = 'current',
+  ): void {
     clearComposerStateRetry();
     setModelStateUnavailable(false);
 
     if (composerStateRequestInFlight) {
       composerStateRefreshQueued = true;
 
+      if (selection === 'latest') {
+        queuedComposerSelection = 'latest';
+      }
+
       return;
     }
 
     composerStateRequestSequence += 1;
-    requestComposerAiStateAttempt(0, composerStateRequestSequence);
+    requestComposerAiStateAttempt(0, composerStateRequestSequence, selection);
   }
 
   function connectSocket(): void {
@@ -824,10 +885,15 @@ export function useSocket(adapters: SocketAppAdapters) {
       handlers: {
         setWsConnected,
         clearWebPendingState: () => {
+          for (const requestId of pendingRequests.keys()) {
+            adapters.chat.clearRequest(requestId);
+          }
+
           clearComposerStateRetry();
           composerStateRequestSequence += 1;
           composerStateRequestInFlight = false;
           composerStateRefreshQueued = false;
+          queuedComposerSelection = 'current';
           setWebUiBusyCounts({});
           setWebEntityPending({});
           adapters.setPaymentRequest(null);
@@ -933,6 +999,7 @@ export function useSocket(adapters: SocketAppAdapters) {
           adapters: {
             appendSystemMessage: adapters.appendSystemMessage,
             chat: adapters.chat,
+            timelineId: adapters.timelineId,
             setAgentWorking: adapters.setAgentWorking,
             setTimeline: adapters.setTimeline,
             setToolInterventions: adapters.setToolInterventions,

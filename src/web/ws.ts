@@ -3,6 +3,7 @@ import { join } from 'path';
 
 import {
   clearOpencodeInterventionsForBridge,
+  clearOpencodeInterventionsForSession,
   registerOpencodeInterventionBridge,
   resolveOpencodeIntervention,
   unregisterOpencodeInterventionBridge,
@@ -20,9 +21,7 @@ import {
 import { createWebPrompt } from '@src/core/plugin';
 import {
   getAgentBackend,
-  getState,
   getWorkspaceTarget,
-  STATE_CURRENT_SESSION,
   setInterventionMode,
 } from '@src/db';
 import { isDemoMode } from '@src/demo-mode';
@@ -30,6 +29,7 @@ import { debug, log } from '@src/logger';
 import type { InteractivePaymentBroker } from '@src/payments/service';
 import { createBrokerPaymentServiceFactory } from '@src/payments/service';
 import type { WebSocketPaymentSession } from '@src/payments/web-prompt';
+import { assertWebSession } from '@src/session';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
@@ -56,6 +56,11 @@ import { getComposerAiState, type ComposerAiState } from './composer-ai-state';
 import { executeBuiltinCommand, executeBuiltinJsonCommand } from './execute';
 import { verifyNip98Authorization } from './nip98-verify';
 import type { WebRouteContext } from './routes';
+import {
+  finishSessionRun,
+  startSessionRun,
+  stopSessionRun,
+} from './session-runs';
 import type { WebSocketPromptSession } from './ws-prompt-session';
 import {
   AuthenticateClientMessageSchema,
@@ -87,8 +92,7 @@ import {
 
 export type WebSocketData = {
   promptSession: WebSocketPromptSession;
-  currentChatAbort: AbortController | null;
-  currentChatRequestId: string | null;
+  questionSessions: Set<string>;
   interventionEnabled: boolean;
   interventionBridge: InterventionBridge | null;
   /** Set from NIP-98 on HTTP upgrade and/or first `authenticate` message. */
@@ -118,6 +122,7 @@ function insertCommandOutputTimelineEvent(props: {
     case 'diff':
       insertTimelineEvent(ctx.seenDb, {
         timelineId,
+        sessionId: timelineId,
         source: 'web',
         kind: 'diff',
         role: null,
@@ -152,7 +157,9 @@ function sendMessage(
   ws: Bun.ServerWebSocket<WebSocketData>,
   message: WebSocketServerMessage,
 ): void {
-  ws.send(JSON.stringify(message));
+  if (ws.readyState === 1) {
+    ws.send(JSON.stringify(message));
+  }
 }
 
 function ensureInterventionBridge(
@@ -165,7 +172,7 @@ function ensureInterventionBridge(
 
   const bridge: InterventionBridge = {
     db,
-    enabled: () => ws.data.interventionEnabled,
+    enabled: () => ws.readyState === 1 && ws.data.interventionEnabled,
     send: (intervention) => {
       sendMessage(
         ws,
@@ -175,7 +182,7 @@ function ensureInterventionBridge(
         }),
       );
     },
-    abort: () => ws.data.currentChatAbort?.abort(),
+    abort: (sessionId) => stopSessionRun(sessionId),
   };
 
   ws.data.interventionBridge = bridge;
@@ -234,6 +241,8 @@ function demoComposerAiState(): ComposerAiState {
     interventionAvailable: false,
     interventionEnabled: false,
     currentSessionId: null,
+    workspace: 'appweaver',
+    sessionRunning: false,
     modelSource: {
       providerId: 'demo/ai-model-source/v1',
       state: {
@@ -266,6 +275,7 @@ type ComposerContextStats = NonNullable<ComposerAiState['contextStats']>;
 
 type WaitForUpdatedComposerAiStateProps = {
   ctx: WebRouteContext;
+  sessionId: string;
   previous: ComposerContextStats | null;
   attempts: number;
   delayMs: number;
@@ -323,11 +333,12 @@ function contextStatsChanged(
 
 async function waitForUpdatedComposerAiState({
   ctx,
+  sessionId,
   previous,
   attempts,
   delayMs,
 }: WaitForUpdatedComposerAiStateProps): Promise<ComposerAiState> {
-  let latest = await getComposerAiState(ctx);
+  let latest = await getComposerAiState(ctx, sessionId);
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (contextStatsChanged(previous, latest.contextStats)) {
@@ -335,7 +346,7 @@ async function waitForUpdatedComposerAiState({
     }
 
     await sleep(delayMs);
-    latest = await getComposerAiState(ctx);
+    latest = await getComposerAiState(ctx, sessionId);
   }
 
   return latest;
@@ -423,6 +434,7 @@ function sendDemoWidgetOutput(params: {
   if (message.recordInTimeline !== false) {
     insertTimelineEvent(ctx.seenDb, {
       timelineId: message.timelineId,
+      sessionId: message.timelineId,
       source: 'web',
       kind: 'command_result',
       role: null,
@@ -561,6 +573,7 @@ async function handleDemoWebSocketMessage(params: {
         ws,
         createChatResultMessage({
           requestId: message.requestId,
+          sessionId: message.sessionId,
           output:
             'Demo mode only runs generated stories. Open /story list to start.',
         }),
@@ -618,11 +631,28 @@ async function handleCompactSession(params: {
   ws: Bun.ServerWebSocket<WebSocketData>;
   ctx: WebRouteContext;
   requestId: string;
+  sessionId: string;
 }): Promise<void> {
-  const { ws, ctx, requestId } = params;
-  ws.data.currentChatAbort?.abort();
-  const compactAbort = new AbortController();
-  ws.data.currentChatAbort = compactAbort;
+  const { requestId, sessionId } = params;
+  const compactAbort = startSessionRun(sessionId, requestId, 'compact');
+
+  try {
+    await compactSessionInRun(params, compactAbort);
+  } finally {
+    finishSessionRun(sessionId, requestId);
+  }
+}
+
+async function compactSessionInRun(
+  params: {
+    ws: Bun.ServerWebSocket<WebSocketData>;
+    ctx: WebRouteContext;
+    requestId: string;
+    sessionId: string;
+  },
+  compactAbort: AbortController,
+): Promise<void> {
+  const { ws, ctx, requestId, sessionId } = params;
   let shouldSendDone = true;
   const backendName = getAgentBackend(ctx.seenDb);
 
@@ -639,21 +669,7 @@ async function handleCompactSession(params: {
       return;
     }
 
-    const sessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
-
-    if (!sessionId) {
-      sendMessage(
-        ws,
-        createErrorMessage({
-          requestId,
-          message: 'No active session to compact.',
-        }),
-      );
-
-      return;
-    }
-
-    const state = await getComposerAiState(ctx);
+    const state = await getComposerAiState(ctx, sessionId);
     const beforeStats = state.contextStats;
 
     const cwd =
@@ -679,6 +695,7 @@ async function handleCompactSession(params: {
           ws,
           createChatStreamChunkMessage({
             requestId,
+            sessionId,
             chunk,
           }),
         );
@@ -688,6 +705,7 @@ async function handleCompactSession(params: {
 
     const afterState = await waitForUpdatedComposerAiState({
       ctx,
+      sessionId,
       previous: beforeStats,
       attempts: 6,
       delayMs: 500,
@@ -723,10 +741,6 @@ async function handleCompactSession(params: {
     shouldSendDone = false;
     throw err;
   } finally {
-    if (ws.data.currentChatAbort === compactAbort) {
-      ws.data.currentChatAbort = null;
-    }
-
     if (shouldSendDone) {
       sendMessage(ws, createDoneMessage(requestId));
     }
@@ -867,6 +881,7 @@ async function handleSaveTimelineForm(params: {
   upsertTimelineCommandForm(params.ctx.seenDb, {
     eventId: params.message.eventId,
     timelineId: params.message.timelineId,
+    sessionId: params.message.timelineId,
     source: 'web',
     command: params.message.command,
     form: params.message.form,
@@ -920,6 +935,7 @@ async function handleRunCommand(params: {
       if (serverMessage.type === 'prompt' && recordTl) {
         insertTimelineEvent(ctx.seenDb, {
           timelineId: message.timelineId,
+          sessionId: message.timelineId,
           source: 'web',
           kind: 'prompt',
           role: null,
@@ -943,6 +959,7 @@ async function handleRunCommand(params: {
   if (recordTl) {
     insertTimelineEvent(ctx.seenDb, {
       timelineId: message.timelineId,
+      sessionId: message.timelineId,
       source: 'web',
       kind: 'chat',
       role: 'user',
@@ -972,6 +989,7 @@ async function handleRunCommand(params: {
       if (recordTl) {
         insertTimelineEvent(ctx.seenDb, {
           timelineId: message.timelineId,
+          sessionId: message.timelineId,
           source: 'web',
           kind: 'command_result',
           role: null,
@@ -1018,6 +1036,7 @@ async function handleRunCommand(params: {
   } else if (recordTl) {
     insertTimelineEvent(ctx.seenDb, {
       timelineId: message.timelineId,
+      sessionId: message.timelineId,
       source: 'web',
       kind: 'command_result',
       role: null,
@@ -1229,6 +1248,7 @@ async function handleRunCapability(params: {
     if (message.surface === 'timeline') {
       insertTimelineEvent(ctx.seenDb, {
         timelineId: message.timelineId,
+        sessionId: message.timelineId,
         source: 'web',
         kind: 'command_result',
         role: null,
@@ -1267,8 +1287,31 @@ async function handleChat(params: {
   ctx: WebRouteContext;
   message: ChatClientMessage;
 }): Promise<void> {
+  const { sessionId, requestId } = params.message;
+  const abort = startSessionRun(sessionId, requestId, 'chat');
+
+  try {
+    await runChatInSession(params, abort);
+  } finally {
+    finishSessionRun(sessionId, requestId);
+  }
+}
+
+async function runChatInSession(
+  params: {
+    ws: Bun.ServerWebSocket<WebSocketData>;
+    ctx: WebRouteContext;
+    message: ChatClientMessage;
+  },
+  chatAbort: AbortController,
+): Promise<void> {
   const { ws, ctx, message } = params;
   const backendName = getAgentBackend(ctx.seenDb);
+
+  const cwd =
+    getWorkspaceTarget(ctx.seenDb) === 'appweaver'
+      ? ctx.dmBotRoot
+      : ctx.parentOfBotRoot;
 
   const useStream = true;
 
@@ -1278,25 +1321,12 @@ async function handleChat(params: {
     backend: backendName,
     contentLength: message.content.length,
     contentPreview: message.content.slice(0, 120),
-    activeRequestId: ws.data.currentChatRequestId,
-    activeAborted: ws.data.currentChatAbort?.signal.aborted ?? false,
+    sessionId: message.sessionId,
   });
-
-  if (ws.data.currentChatAbort) {
-    debug('websocket aborting previous chat for replacement prompt', {
-      previousRequestId: ws.data.currentChatRequestId,
-      replacementRequestId: message.requestId,
-      previousAlreadyAborted: ws.data.currentChatAbort.signal.aborted,
-    });
-  }
-
-  ws.data.currentChatAbort?.abort();
-  const chatAbort = new AbortController();
-  ws.data.currentChatAbort = chatAbort;
-  ws.data.currentChatRequestId = message.requestId;
 
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
+    sessionId: message.sessionId,
     source: 'web',
     kind: 'chat',
     role: 'user',
@@ -1330,6 +1360,7 @@ async function handleChat(params: {
     result = await runWebChat({
       ctx,
       content: message.content,
+      sessionId: message.sessionId,
       onSessionReady: (sessionId) => {
         registeredSessionId = sessionId;
 
@@ -1347,6 +1378,14 @@ async function handleChat(params: {
       onStreamChunk: useStream
         ? (chunk) => {
             if (chunk.kind === 'question') {
+              ws.data.questionSessions.add(message.sessionId);
+
+              if (ws.readyState !== 1) {
+                stopSessionRun(message.sessionId);
+
+                return;
+              }
+
               log.info(
                 `[websocket] presenting OpenCode question ${chunk.requestId}`,
               );
@@ -1359,6 +1398,7 @@ async function handleChat(params: {
                   if (serverMessage.type === 'prompt') {
                     insertTimelineEvent(ctx.seenDb, {
                       timelineId: message.timelineId,
+                      sessionId: message.sessionId,
                       source: 'web',
                       kind: 'prompt',
                       role: null,
@@ -1384,10 +1424,7 @@ async function handleChat(params: {
                   replyOpencodeSdkQuestion({
                     requestId: chunk.requestId,
                     sessionId: chunk.sessionId,
-                    cwd:
-                      getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-                        ? ctx.dmBotRoot
-                        : ctx.parentOfBotRoot,
+                    cwd,
                     answer,
                   }),
                 )
@@ -1395,7 +1432,10 @@ async function handleChat(params: {
                   log.warn(
                     `OpenCode question reply failed: ${err instanceof Error ? err.message : String(err)}`,
                   );
-                });
+                })
+                .finally(() =>
+                  ws.data.questionSessions.delete(message.sessionId),
+                );
 
               return;
             }
@@ -1404,6 +1444,7 @@ async function handleChat(params: {
               ws,
               createChatStreamChunkMessage({
                 requestId: message.requestId,
+                sessionId: message.sessionId,
                 chunk,
               }),
             );
@@ -1422,6 +1463,7 @@ async function handleChat(params: {
               insertTimelineEvent(ctx.seenDb, {
                 id: `${message.requestId}-tool-${chunk.tool.callId}`,
                 timelineId: message.timelineId,
+                sessionId: message.sessionId,
                 source: 'web',
                 kind: 'tool',
                 role: null,
@@ -1450,6 +1492,7 @@ async function handleChat(params: {
               insertTimelineEvent(ctx.seenDb, {
                 id: currentReasoningSegmentId,
                 timelineId: message.timelineId,
+                sessionId: message.sessionId,
                 source: 'web',
                 kind: 'reasoning',
                 role: null,
@@ -1472,6 +1515,7 @@ async function handleChat(params: {
               insertTimelineEvent(ctx.seenDb, {
                 id: `${message.requestId}-summary-${chunk.id}`,
                 timelineId: message.timelineId,
+                sessionId: message.sessionId,
                 source: 'web',
                 kind: 'agent_summary',
                 role: null,
@@ -1505,20 +1549,16 @@ async function handleChat(params: {
       requestId: message.requestId,
       error: err instanceof Error ? err.message : String(err),
       aborted: chatAbort.signal.aborted,
-      stillCurrent: ws.data.currentChatAbort === chatAbort,
     });
 
     log.warn(
       `[websocket] chat run failed ${message.requestId}: ${err instanceof Error ? err.message : String(err)}`,
     );
 
-    if (ws.data.currentChatAbort === chatAbort) {
-      ws.data.currentChatAbort = null;
-      ws.data.currentChatRequestId = null;
-    }
-
     throw err;
   } finally {
+    ws.data.questionSessions.delete(message.sessionId);
+
     if (registeredSessionId) {
       unregisterOpencodeInterventionBridge({
         sessionId: registeredSessionId,
@@ -1526,15 +1566,9 @@ async function handleChat(params: {
       });
     }
 
-    if (ws.data.currentChatAbort === chatAbort) {
-      ws.data.currentChatAbort = null;
-      ws.data.currentChatRequestId = null;
-    }
-
     debug('websocket chat run finalized', {
       requestId: message.requestId,
       aborted: chatAbort.signal.aborted,
-      stillCurrent: ws.data.currentChatAbort === chatAbort,
     });
   }
 
@@ -1546,6 +1580,7 @@ async function handleChat(params: {
 
   insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
+    sessionId: message.sessionId,
     source: 'web',
     kind: 'chat',
     role: 'assistant',
@@ -1565,6 +1600,7 @@ async function handleChat(params: {
     ws,
     createChatResultMessage({
       requestId: message.requestId,
+      sessionId: message.sessionId,
       output,
     }),
   );
@@ -1582,20 +1618,17 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
       ws.data.paymentSession.setSender((message) => sendMessage(ws, message));
     },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
-      debug('websocket closed while chat was active', {
-        requestId: ws.data.currentChatRequestId,
-        aborted: ws.data.currentChatAbort?.signal.aborted ?? false,
-      });
+      for (const sessionId of ws.data.questionSessions) {
+        stopSessionRun(sessionId);
+      }
 
-      ws.data.currentChatAbort?.abort();
-      ws.data.currentChatAbort = null;
-      ws.data.currentChatRequestId = null;
+      ws.data.questionSessions.clear();
       ws.data.promptSession.clearAll();
       ws.data.paymentSession.close();
       ws.data.interventionEnabled = false;
 
       if (ws.data.interventionBridge) {
-        clearOpencodeInterventionsForBridge(ws.data.interventionBridge);
+        clearOpencodeInterventionsForBridge(ws.data.interventionBridge, false);
       }
     },
     message(
@@ -1708,6 +1741,32 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             return;
           }
 
+          if ('timelineId' in message) {
+            assertWebSession(
+              ctx.seenDb,
+              message.timelineId,
+              getWorkspaceTarget(ctx.seenDb),
+            );
+          }
+
+          if (
+            message.type === 'compact_session' ||
+            message.type === 'cancel_chat'
+          ) {
+            assertWebSession(
+              ctx.seenDb,
+              message.sessionId,
+              getWorkspaceTarget(ctx.seenDb),
+            );
+          }
+
+          if (
+            message.type === 'chat' &&
+            message.sessionId !== message.timelineId
+          ) {
+            throw new Error('Chat session does not match its timeline.');
+          }
+
           switch (message.type) {
             case 'authenticate': {
               sendMessage(ws, createDoneMessage(message.requestId));
@@ -1734,7 +1793,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ws,
                 createComposerAiStateResultMessage({
                   requestId: message.requestId,
-                  state: await getComposerAiState(ctx),
+                  state: await getComposerAiState(ctx, message.sessionId),
                 }),
               );
 
@@ -1748,6 +1807,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 ws,
                 ctx,
                 requestId: message.requestId,
+                sessionId: message.sessionId,
               });
 
               return;
@@ -1850,6 +1910,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
               ) {
                 insertTimelineEvent(ctx.seenDb, {
                   timelineId: resolved.timelineId,
+                  sessionId: resolved.timelineId,
                   source: 'web',
                   kind: 'chat',
                   role: 'user',
@@ -1882,16 +1943,12 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             case 'cancel_chat': {
               debug('websocket cancel_chat received', {
                 cancelRequestId: message.requestId,
-                activeRequestId: ws.data.currentChatRequestId,
-                activeAborted:
-                  ws.data.currentChatAbort?.signal.aborted ?? false,
+                sessionId: message.sessionId,
               });
 
-              ws.data.currentChatAbort?.abort();
+              stopSessionRun(message.sessionId);
 
-              if (ws.data.interventionBridge) {
-                clearOpencodeInterventionsForBridge(ws.data.interventionBridge);
-              }
+              clearOpencodeInterventionsForSession(message.sessionId);
 
               sendMessage(ws, createDoneMessage(message.requestId));
 

@@ -74,12 +74,14 @@ export type PromptServerMessage = {
 export type ChatResultServerMessage = {
   type: 'chat_result';
   requestId: string;
+  sessionId: string;
   output: string;
 };
 
 export type ChatStreamChunkServerMessage = {
   type: 'chat_stream_chunk';
   requestId: string;
+  sessionId: string;
   chunk: AgentStreamChunk;
 };
 

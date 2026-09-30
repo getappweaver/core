@@ -1,7 +1,7 @@
 import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import { getOpencodeSdkClient } from '@src/backends/opencode-sdk';
-import type { AgentBackendName, CoreDb } from '@src/db';
-import { setState, STATE_CURRENT_SESSION } from '@src/db';
+import type { AgentBackendName, CoreDb, WorkspaceTarget } from '@src/db';
+import { setCurrentSession } from '@src/session';
 
 import type { SessionAdoptRepresentation } from './representation';
 
@@ -11,6 +11,8 @@ type HandleSessionAdoptProps = {
   prefix: string;
   activeBackend: AgentBackendName;
   cwd: string;
+  workspace: WorkspaceTarget;
+  selection: 'web' | 'dm';
 };
 
 export async function handleSessionAdopt({
@@ -19,6 +21,8 @@ export async function handleSessionAdopt({
   prefix,
   activeBackend,
   cwd,
+  workspace,
+  selection,
 }: HandleSessionAdoptProps): Promise<SessionAdoptRepresentation> {
   if (!sessionId) {
     return {
@@ -57,11 +61,24 @@ export async function handleSessionAdopt({
     }
 
     db.run(
-      'INSERT OR IGNORE INTO sessions (id, created_at, backend) VALUES (?, ?, ?)',
-      [session.id, Math.floor(session.time.created / 1000), 'opencode'],
+      'INSERT OR IGNORE INTO sessions (id, created_at, backend, workspace, updated_at) VALUES (?, ?, ?, ?, ?)',
+      [
+        session.id,
+        Math.floor(session.time.created / 1000),
+        'opencode',
+        workspace,
+        Math.floor(session.time.updated / 1000),
+      ],
     );
 
-    setState(db, STATE_CURRENT_SESSION, session.id);
+    db.run(
+      'UPDATE sessions SET workspace = ? WHERE id = ? AND workspace IS NULL',
+      [workspace, session.id],
+    );
+
+    if (!setCurrentSession(db, session.id, workspace, selection)) {
+      throw new Error('Session belongs to a different workspace.');
+    }
 
     return {
       kind: 'session.adopt',

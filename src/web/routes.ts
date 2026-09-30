@@ -6,6 +6,7 @@
 // (transport: http, renderTarget: json | html) and reuse CLI dispatch.
 
 import { existsSync } from 'fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'path';
 
 import type { SimplePool } from 'nostr-tools/pool';
@@ -66,6 +67,7 @@ import {
   listWebPushSubscriptions,
   upsertWebPushSubscription,
 } from './push-subscriptions';
+import { finishSessionRun, startSessionRun } from './session-runs';
 import {
   generateSetupCashuMnemonic,
   downloadSetupPiperModel,
@@ -1362,17 +1364,32 @@ export function createWebFetchHandler(
               ? (payload as { content?: unknown }).content
               : null;
 
-          if (typeof content !== 'string' || content.trim().length === 0) {
+          const sessionId =
+            payload && typeof payload === 'object' && 'sessionId' in payload
+              ? (payload as { sessionId?: unknown }).sessionId
+              : null;
+
+          if (
+            typeof content !== 'string' ||
+            content.trim().length === 0 ||
+            typeof sessionId !== 'string' ||
+            !sessionId
+          ) {
             throw new Error('invalid_chat_content');
           }
+
+          const requestId = randomUUID();
+
+          const abort = startSessionRun(sessionId, requestId, 'chat');
 
           return runWebChat({
             ctx,
             content,
+            sessionId,
             onSessionReady: null,
-            onStreamChunk: null,
-            streamAbortSignal: null,
-          });
+            onStreamChunk: () => undefined,
+            streamAbortSignal: abort.signal,
+          }).finally(() => finishSessionRun(sessionId, requestId));
         })
         .then((result) => jsonResponse({ ok: true, ...result }))
         .catch((err) => {

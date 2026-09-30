@@ -17,6 +17,8 @@ export const LintingSchema = z.enum(['on', 'off']);
 export type Linting = z.infer<typeof LintingSchema>;
 
 export const STATE_CURRENT_SESSION = 'current_session_id';
+export const webSessionStateKey = (workspace: WorkspaceTarget): string =>
+  `web_current_session_id:${workspace}`;
 export const STATE_AGENT_BACKEND = 'agent_backend';
 export const STATE_WORKSPACE_TARGET = 'workspace_target';
 export const STATE_MODEL_OVERRIDE = 'model_override';

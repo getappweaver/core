@@ -40,7 +40,7 @@ export type InterventionBridge = {
   db: CoreDb;
   enabled: () => boolean;
   send: (request: ToolInterventionRequest) => void;
-  abort: () => void;
+  abort: (sessionId: string) => void;
 };
 
 const RequestSchema = z.object({
@@ -58,6 +58,7 @@ const pending = new Map<
   string,
   {
     bridge: InterventionBridge;
+    request: ToolInterventionRequest;
     resolve: (decision: ToolInterventionDecision) => void;
   }
 >();
@@ -117,9 +118,32 @@ export function unregisterOpencodeInterventionBridge(props: {
 
 export function clearOpencodeInterventionsForBridge(
   bridge: InterventionBridge,
+  stop = true,
 ): void {
   for (const [requestId, current] of pending) {
     if (current.bridge !== bridge) {
+      continue;
+    }
+
+    pending.delete(requestId);
+
+    current.resolve(
+      stop
+        ? {
+            action: 'stop',
+            output: null,
+            remember: false,
+            ruleArgumentKey: null,
+            rulePattern: null,
+          }
+        : defaultDecision(current.request),
+    );
+  }
+}
+
+export function clearOpencodeInterventionsForSession(sessionId: string): void {
+  for (const [requestId, current] of pending) {
+    if (current.request.sessionId !== sessionId) {
       continue;
     }
 
@@ -193,7 +217,7 @@ export async function handleOpencodeInterventionRequest(
     );
 
     if (remembered.action === 'stop') {
-      queueMicrotask(bridge.abort);
+      queueMicrotask(() => bridge.abort(request.sessionId));
     }
 
     bridge.send({
@@ -228,6 +252,7 @@ export async function handleOpencodeInterventionRequest(
   const decision = await new Promise<ToolInterventionDecision>((resolve) => {
     pending.set(request.id, {
       bridge,
+      request,
       resolve: (value) => {
         if (value.remember) {
           saveToolInvocationRule({
@@ -253,7 +278,7 @@ export async function handleOpencodeInterventionRequest(
   );
 
   if (decision.action === 'stop') {
-    queueMicrotask(bridge.abort);
+    queueMicrotask(() => bridge.abort(request.sessionId));
   }
 
   return Response.json(decision);

@@ -62,8 +62,8 @@ export function connectSocketTransport(params: {
   socket.addEventListener('close', () => {
     setSocket(null);
     handlers.setWsConnected(false);
-    state.pendingRequests.clear();
     handlers.clearWebPendingState();
+    state.pendingRequests.clear();
     handlers.scheduleSocketReconnect();
   });
 

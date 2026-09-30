@@ -185,6 +185,7 @@ export type TimelineHistoryItem =
 export type TimelineEventRecord = {
   id: string;
   timelineId: string;
+  sessionId: string;
   source: MessageSource;
   kind: TimelineEventKind;
   role: 'user' | 'assistant' | null;

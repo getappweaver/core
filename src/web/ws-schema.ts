@@ -60,11 +60,13 @@ export const RequestCommandsClientMessageSchema = z.object({
 export const RequestComposerAiStateClientMessageSchema = z.object({
   type: z.literal('request_composer_ai_state'),
   requestId: RequestIdSchema,
+  sessionId: z.string().min(1).nullable(),
 });
 
 export const CompactSessionClientMessageSchema = z.object({
   type: z.literal('compact_session'),
   requestId: RequestIdSchema,
+  sessionId: z.string().min(1),
 });
 
 export const LoadTimelineClientMessageSchema = z.object({
@@ -156,12 +158,14 @@ export const ChatClientMessageSchema = z.object({
   type: z.literal('chat'),
   requestId: RequestIdSchema,
   timelineId: z.string().min(1),
+  sessionId: z.string().min(1),
   content: z.string().min(1),
 });
 
 export const CancelChatClientMessageSchema = z.object({
   type: z.literal('cancel_chat'),
   requestId: RequestIdSchema,
+  sessionId: z.string().min(1),
 });
 
 export const SetInterventionModeClientMessageSchema = z.object({
@@ -442,12 +446,14 @@ export type PromptServerMessage = {
 export type ChatResultServerMessage = {
   type: 'chat_result';
   requestId: string;
+  sessionId: string;
   output: string;
 };
 
 export type ChatStreamChunkServerMessage = {
   type: 'chat_stream_chunk';
   requestId: string;
+  sessionId: string;
   chunk: AgentStreamChunk;
 };
 
@@ -610,22 +616,26 @@ export function createPromptMessage(params: {
 
 export function createChatResultMessage(params: {
   requestId: string;
+  sessionId: string;
   output: string;
 }): ChatResultServerMessage {
   return {
     type: 'chat_result',
     requestId: params.requestId,
+    sessionId: params.sessionId,
     output: params.output,
   };
 }
 
 export function createChatStreamChunkMessage(params: {
   requestId: string;
+  sessionId: string;
   chunk: AgentStreamChunk;
 }): ChatStreamChunkServerMessage {
   return {
     type: 'chat_stream_chunk',
     requestId: params.requestId,
+    sessionId: params.sessionId,
     chunk: params.chunk,
   };
 }

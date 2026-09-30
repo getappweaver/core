@@ -1,4 +1,4 @@
-import type { CoreDb } from '@src/db';
+import type { CoreDb, WorkspaceTarget } from '@src/db';
 import { setCurrentSession } from '@src/session';
 
 import type { SessionResumeRepresentation } from './representation';
@@ -7,6 +7,8 @@ type HandleSessionResumeProps = {
   db: CoreDb;
   sessionId: string;
   prefix: string;
+  workspace: WorkspaceTarget;
+  selection: 'web' | 'dm';
 };
 
 export function handleSessionResume(
@@ -23,7 +25,7 @@ export function handleSessionResume(
     };
   }
 
-  if (!setCurrentSession(db, sessionId)) {
+  if (!setCurrentSession(db, sessionId, props.workspace, props.selection)) {
     return {
       kind: 'session.resume',
       version: 1,

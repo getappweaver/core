@@ -71,6 +71,7 @@ export type SplitPromptPayloadResult = {
 export type SocketAppAdapters = {
   auth: Pick<NostrAuthContextValue, 'authState' | 'getNip98Token'>;
   timelineId: Accessor<string>;
+  setTimelineId: (sessionId: string) => void;
   setCommands: Setter<CommandDetail[]>;
   setComposerAiState: Setter<
     import('../commands/types').ComposerAiState | null

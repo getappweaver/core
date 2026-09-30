@@ -2,6 +2,8 @@
 // src/commands/session/handler.ts — session <subcommand> DM builtin root
 // ---------------------------------------------------------------------------
 
+import { getWorkspaceTarget } from '@src/db';
+
 import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 import { appendStatusBlock } from '../shared/with-status';
@@ -43,6 +45,8 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
         seenDb: ctx.seenDb,
         backend: ctx.backend,
         cwd: ctx.cwd,
+        workspace: getWorkspaceTarget(ctx.seenDb),
+        selection: ctx.source === 'web' ? 'web' : 'dm',
       });
 
       return appendStatusBlock(ctx, render(rep));
@@ -62,6 +66,8 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
             sessionId: sessionId ?? '',
             prefix: p,
             activeBackend: ctx.backend.name,
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            selection: ctx.source === 'web' ? 'web' : 'dm',
           }),
         ),
       'Failed to attach session',
@@ -80,6 +86,8 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
             prefix: p,
             activeBackend: ctx.backend.name,
             cwd: ctx.cwd,
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            selection: ctx.source === 'web' ? 'web' : 'dm',
           }),
         ),
       'Failed to adopt session',
@@ -93,6 +101,8 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
           handleSessionResumeLast({
             db: ctx.seenDb,
             backendName: ctx.backend.name,
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            selection: ctx.source === 'web' ? 'web' : 'dm',
           }),
         ),
       'Failed to resume last session',
@@ -109,6 +119,8 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
             db: ctx.seenDb,
             sessionId: sessionId ?? '',
             prefix: p,
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            selection: ctx.source === 'web' ? 'web' : 'dm',
           }),
         ),
       'Failed to resume session',
@@ -122,7 +134,15 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
       limitFlagIndex === -1 ? undefined : Number(args[limitFlagIndex + 1]);
 
     return handleError(
-      async () => render(handleSessionList({ db: ctx.seenDb, limit })),
+      async () =>
+        render(
+          handleSessionList({
+            db: ctx.seenDb,
+            limit,
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            selection: ctx.source === 'web' ? 'web' : 'dm',
+          }),
+        ),
       'Failed to list sessions',
     );
   }

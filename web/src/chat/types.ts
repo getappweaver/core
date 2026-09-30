@@ -13,7 +13,7 @@ export type ChatAdapters = {
   sendSocketMessage: (message: unknown) => void;
   appendSystemMessage: (text: string) => void;
   setAgentWorking: Setter<boolean>;
-  setPendingPromptRequestId: Setter<string | null>;
+  setPromptForSession: (sessionId: string, requestId: string) => void;
   setSessionDiffFiles: Setter<TimelineFileDiff[]>;
   chatRunStatus: Accessor<ChatRunStatus>;
   setChatRunStatus: (status: ChatRunStatus) => void;

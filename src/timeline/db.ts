@@ -17,6 +17,7 @@ import type {
 type TimelineEventRow = {
   id: string;
   timeline_id: string;
+  session_id: string | null;
   source: MessageSource;
   kind: TimelineEventKind;
   role: 'user' | 'assistant' | null;
@@ -42,6 +43,7 @@ export function createTimelineTables(db: CoreDb): void {
     CREATE TABLE IF NOT EXISTS timeline_events (
       id TEXT PRIMARY KEY,
       timeline_id TEXT NOT NULL,
+      session_id TEXT,
       source TEXT NOT NULL,
       kind TEXT NOT NULL,
       role TEXT,
@@ -62,6 +64,16 @@ export function createTimelineTables(db: CoreDb): void {
       created_at INTEGER NOT NULL
     )
   `);
+
+  try {
+    db.run('ALTER TABLE timeline_events ADD COLUMN session_id TEXT');
+  } catch {
+    /* Column already exists; historical rows remain NULL and are not shown. */
+  }
+
+  db.run(
+    'CREATE INDEX IF NOT EXISTS timeline_events_session_created_idx ON timeline_events (session_id, created_at DESC)',
+  );
 
   try {
     db.run('ALTER TABLE timeline_events ADD COLUMN form_json TEXT');
@@ -136,10 +148,15 @@ export function insertTimelineEvent(
     createdAt: event.createdAt ?? Date.now(),
   };
 
+  if (record.timelineId !== event.sessionId) {
+    throw new Error('Timeline must match its session.');
+  }
+
   db.run(
     `INSERT OR REPLACE INTO timeline_events (
       id,
       timeline_id,
+      session_id,
       source,
       kind,
       role,
@@ -158,10 +175,11 @@ export function insertTimelineEvent(
       prompt_json,
       request_id,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       record.id,
       record.timelineId,
+      event.sessionId,
       record.source,
       record.kind,
       record.role,
@@ -183,13 +201,23 @@ export function insertTimelineEvent(
     ],
   );
 
+  db.run('UPDATE sessions SET updated_at = ? WHERE id = ?', [
+    Math.floor(record.createdAt / 1000),
+    event.sessionId,
+  ]);
+
   return record;
 }
 
 function rowToTimelineEventRecord(row: TimelineEventRow): TimelineEventRecord {
+  if (!row.session_id) {
+    throw new Error('Historical timeline events do not have a session.');
+  }
+
   return {
     id: row.id,
     timelineId: row.timeline_id,
+    sessionId: row.session_id,
     source: row.source,
     kind: row.kind,
     role: row.role,
@@ -364,10 +392,10 @@ export function deleteTimelineEvent(
   timelineId: string,
   eventId: string,
 ): void {
-  db.run('DELETE FROM timeline_events WHERE timeline_id = ? AND id = ?', [
-    timelineId,
-    eventId,
-  ]);
+  db.run(
+    'DELETE FROM timeline_events WHERE session_id = ? AND timeline_id = ? AND id = ?',
+    [timelineId, timelineId, eventId],
+  );
 }
 
 export function upsertTimelineCommandForm(
@@ -375,6 +403,7 @@ export function upsertTimelineCommandForm(
   params: {
     eventId: string;
     timelineId: string;
+    sessionId: string;
     source: MessageSource;
     command: string;
     form: TimelineCommandFormState;
@@ -384,6 +413,7 @@ export function upsertTimelineCommandForm(
   return insertTimelineEvent(db, {
     id: params.eventId,
     timelineId: params.timelineId,
+    sessionId: params.sessionId,
     source: params.source,
     kind: 'command_form',
     role: null,
@@ -412,19 +442,19 @@ function listTimelineEventRows(
       ? db
           .prepare(
             `SELECT * FROM timeline_events
-           WHERE timeline_id = ?
+          WHERE session_id = ? AND timeline_id = ?
            ORDER BY created_at DESC
            LIMIT ?`,
           )
-          .all(timelineId, limit)
+          .all(timelineId, timelineId, limit)
       : db
           .prepare(
             `SELECT * FROM timeline_events
-           WHERE timeline_id = ? AND created_at < ?
+          WHERE session_id = ? AND timeline_id = ? AND created_at < ?
            ORDER BY created_at DESC
            LIMIT ?`,
           )
-          .all(timelineId, beforeCreatedAt, limit)
+          .all(timelineId, timelineId, beforeCreatedAt, limit)
   ) as TimelineEventRow[];
 
   return rows;

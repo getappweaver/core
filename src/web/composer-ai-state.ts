@@ -1,3 +1,4 @@
+import { createBackend } from '@src/backends/factory';
 import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import type { AiModelSourceContextUsage } from '@src/capabilities/ai-model-source.v1';
 import type {
@@ -7,18 +8,22 @@ import type {
 import { createModelSourceCoordinator } from '@src/core/model-source';
 import {
   getInterventionMode,
-  getState,
   getWorkspaceTarget,
-  STATE_CURRENT_SESSION,
+  type WorkspaceTarget,
 } from '@src/db';
+import { getOrCreateCurrentSession } from '@src/session';
 
 import type { WebRouteContext } from './routes';
+import { isSessionRunning } from './session-runs';
+import { getSelectedWebSessionId } from './session-selection';
 
 export type ComposerAiState = {
   backend: 'opencode';
   interventionAvailable: boolean;
   interventionEnabled: boolean;
   currentSessionId: string | null;
+  workspace: WorkspaceTarget;
+  sessionRunning: boolean;
   modelSource: ModelSourceSnapshot;
   modelSources: ModelSourceOption[];
   contextStats: AiModelSourceContextUsage | null;
@@ -26,6 +31,7 @@ export type ComposerAiState = {
 
 export async function getComposerAiState(
   ctx: WebRouteContext,
+  selectedSessionId: string | null,
 ): Promise<ComposerAiState> {
   const workspace = getWorkspaceTarget(ctx.seenDb);
 
@@ -52,7 +58,26 @@ export async function getComposerAiState(
           };
   }
 
-  const currentSessionId = getState(ctx.seenDb, STATE_CURRENT_SESSION);
+  const cwd = workspace === 'appweaver' ? ctx.dmBotRoot : ctx.parentOfBotRoot;
+
+  const selected = getSelectedWebSessionId(
+    ctx.seenDb,
+    selectedSessionId,
+    workspace,
+  );
+
+  const currentSessionId = selected
+    ? selected
+    : await getOrCreateCurrentSession({
+        db: ctx.seenDb,
+        backend: createBackend({
+          backendName: 'opencode',
+          dmBotRoot: ctx.dmBotRoot,
+        }),
+        cwd,
+        workspace,
+        selection: 'web',
+      });
 
   const contextStats =
     currentSessionId && runtime.state === 'running'
@@ -72,6 +97,8 @@ export async function getComposerAiState(
     interventionAvailable: ctx.attachUrl === null,
     interventionEnabled: getInterventionMode(ctx.seenDb),
     currentSessionId,
+    workspace,
+    sessionRunning: isSessionRunning(currentSessionId),
     modelSource,
     modelSources,
     contextStats,

@@ -238,22 +238,10 @@ function parseWidgetQuery(search: string): WidgetQuery | null {
 }
 
 function AppInner(): JSX.Element {
-  const TIMELINE_STORAGE_KEY = 'appweaver.timeline-id';
   const CHAT_RUN_STATUS_STORAGE_PREFIX = 'appweaver.chat-run-status';
   const PIPER_TTS_AUTO_ATTEMPTED_KEY = 'appweaver.tts.piper-auto-attempted';
 
-  const initialTimelineId = (() => {
-    const existing = window.localStorage.getItem(TIMELINE_STORAGE_KEY);
-
-    if (existing && existing.trim().length > 0) {
-      return existing;
-    }
-
-    const created = createId();
-    window.localStorage.setItem(TIMELINE_STORAGE_KEY, created);
-
-    return created;
-  })();
+  const initialTimelineId = isWebDemoMode() ? 'demo' : '';
 
   function chatRunStatusStorageKey(scope: string): string {
     return `${CHAT_RUN_STATUS_STORAGE_PREFIX}:${scope}`;
@@ -363,6 +351,10 @@ function AppInner(): JSX.Element {
     string | null
   >(null);
 
+  const [compactSessionId, setCompactSessionId] = createSignal<string | null>(
+    null,
+  );
+
   let passiveActionQueue = Promise.resolve();
   let passiveHoveredElement: HTMLElement | null = null;
 
@@ -390,7 +382,24 @@ function AppInner(): JSX.Element {
     string[]
   >([]);
 
-  const [timelineId] = createSignal<string>(initialTimelineId);
+  const [timelineId, setTimelineId] = createSignal<string>(initialTimelineId);
+  const promptRequestBySession = new Map<string, string | null>();
+
+  function setPromptForSession(sessionId: string, requestId: string): void {
+    promptRequestBySession.set(sessionId, requestId);
+
+    if (timelineId() === sessionId) {
+      setPendingPromptRequestId(requestId);
+    }
+  }
+
+  createEffect(() => {
+    const sessionId = timelineId();
+
+    if (sessionId) {
+      promptRequestBySession.set(sessionId, pendingPromptRequestId());
+    }
+  });
 
   let dockResizeState: DockResizeState | null = null;
   const dockCardElements = new Map<string, HTMLElement>();
@@ -457,6 +466,13 @@ function AppInner(): JSX.Element {
     auth,
     setTimeline,
     timelineId,
+    setTimelineId: (sessionId) => {
+      setTimelineId(sessionId);
+      setTimeline([]);
+      setPendingPromptRequestId(promptRequestBySession.get(sessionId) ?? null);
+      setChatRunStatus(readChatRunStatus(`session:${sessionId}`));
+      setSessionDiffFiles([]);
+    },
     setCommands,
     setComposerAiState,
     setLoadingCommands,
@@ -490,7 +506,7 @@ function AppInner(): JSX.Element {
     sendSocketMessage,
     appendSystemMessage,
     setAgentWorking,
-    setPendingPromptRequestId,
+    setPromptForSession,
     setSessionDiffFiles,
     chatRunStatus,
     setChatRunStatus: setPersistedChatRunStatus,
@@ -2162,29 +2178,41 @@ function AppInner(): JSX.Element {
     }
 
     const requestId = createId();
+    const sessionId = timelineId();
+
+    if (!sessionId) {
+      return;
+    }
 
     setCompactSessionRequestId(requestId);
+    setCompactSessionId(sessionId);
     appendSystemMessage('------ Compacting -------');
 
     pendingRequests.set(requestId, {
       onCommandResult: (message) => {
-        if (typeof message.output === 'string') {
+        if (timelineId() === sessionId && typeof message.output === 'string') {
           appendSystemMessage(message.output);
         }
       },
       onDone: () => {
         setCompactSessionRequestId(null);
+        setCompactSessionId(null);
         requestComposerAiState();
       },
       onError: (message) => {
         setCompactSessionRequestId(null);
-        appendSystemMessage(`Compaction failed: ${message.message}`);
+        setCompactSessionId(null);
+
+        if (timelineId() === sessionId) {
+          appendSystemMessage(`Compaction failed: ${message.message}`);
+        }
       },
     });
 
     sendSocketMessage({
       type: 'compact_session',
       requestId,
+      sessionId,
     });
   }
 
@@ -2230,6 +2258,7 @@ function AppInner(): JSX.Element {
     timelineId,
     pendingPromptRequestId,
     setPendingPromptRequestId,
+    setPromptForSession,
     setComposerText,
     chromePromptSession: chrome.chromePromptSession,
     setChromePromptSession: chrome.setChromePromptSession,
@@ -2982,7 +3011,10 @@ function AppInner(): JSX.Element {
                           composerAiState()?.contextStats?.estimated ?? false
                         }
                         wsConnected={wsConnected()}
-                        compacting={compactSessionRequestId() !== null}
+                        compacting={
+                          compactSessionRequestId() !== null &&
+                          compactSessionId() === timelineId()
+                        }
                         sessionDiffAvailable={sessionDiffFiles().length > 0}
                         onShowSessionDiff={showSessionDiff}
                         onCompact={compactCurrentSession}

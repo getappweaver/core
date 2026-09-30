@@ -116,6 +116,8 @@ export async function handleBotWorkspace(
       db,
       backend,
       cwd,
+      workspace: nextTarget,
+      selection: 'dm',
     });
 
     return toRepresentation({

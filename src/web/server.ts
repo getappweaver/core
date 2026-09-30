@@ -294,8 +294,7 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
           const upgraded = server.upgrade(req, {
             data: {
               promptSession: new WebSocketPromptSession(),
-              currentChatAbort: null,
-              currentChatRequestId: null,
+              questionSessions: new Set<string>(),
               interventionEnabled: getInterventionMode(options.seenDb),
               interventionBridge: null,
               nip98Authenticated: nip98.ok,

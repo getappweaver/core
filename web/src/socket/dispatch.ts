@@ -106,6 +106,7 @@ export function handleServerMessage(params: {
     SocketAppAdapters,
     | 'appendSystemMessage'
     | 'chat'
+    | 'timelineId'
     | 'setAgentWorking'
     | 'setTimeline'
     | 'setToolInterventions'
@@ -155,6 +156,10 @@ export function handleServerMessage(params: {
       return;
     case 'chat_stream_chunk': {
       const chunk = message.chunk;
+
+      if (message.sessionId !== adapters.timelineId()) {
+        return;
+      }
 
       logChatDebug('socket.chat_stream_chunk', {
         requestId: message.requestId,
@@ -219,6 +224,10 @@ export function handleServerMessage(params: {
         [intervention.callId]: intervention,
       }));
 
+      if (intervention.sessionId !== adapters.timelineId()) {
+        return;
+      }
+
       adapters.setTimeline((current) => {
         if (
           current.some(
@@ -253,6 +262,10 @@ export function handleServerMessage(params: {
     }
 
     case 'chat_result':
+      if (message.sessionId !== adapters.timelineId()) {
+        return;
+      }
+
       logChatDebug('socket.chat_result', {
         requestId: message.requestId,
         hasPending: pending !== undefined,
@@ -268,7 +281,6 @@ export function handleServerMessage(params: {
         hasPending: pending !== undefined,
       });
 
-      adapters.setAgentWorking(false);
       pending?.onDone?.(message);
       pendingRequests.delete(message.requestId);
       adapters.chat.clearRequest(message.requestId);
@@ -281,7 +293,6 @@ export function handleServerMessage(params: {
         message: message.message,
       });
 
-      adapters.setAgentWorking(false);
       pending?.onError?.(message);
       pendingRequests.delete(message.requestId);
       adapters.chat.clearRequest(message.requestId);

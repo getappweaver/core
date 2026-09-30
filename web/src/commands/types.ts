@@ -2,6 +2,7 @@ import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import type { Accessor, Setter } from 'solid-js';
 
 import type { AiModelSourceContextUsage } from '@src/capabilities/ai-model-source.v1';
+import type { WorkspaceTarget } from '@src/db';
 import type {
   WebAction,
   WebNodeRoot,
@@ -22,6 +23,8 @@ export type ComposerAiState = {
   interventionAvailable: boolean;
   interventionEnabled: boolean;
   currentSessionId: string | null;
+  workspace: WorkspaceTarget;
+  sessionRunning: boolean;
   modelSource: {
     providerId: string;
     state: {
@@ -122,6 +125,7 @@ export type CommandsAdapters = {
   timelineId: Accessor<string>;
   pendingPromptRequestId: Accessor<string | null>;
   setPendingPromptRequestId: Setter<string | null>;
+  setPromptForSession: (sessionId: string, requestId: string) => void;
   setComposerText: Setter<string>;
   chromePromptSession: Accessor<ChromePromptSession | null>;
   setChromePromptSession: Setter<ChromePromptSession | null>;
@@ -139,7 +143,7 @@ export type CommandsAdapters = {
   ) => Promise<NostrEvent | null>;
   nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   createId: () => string;
-  requestComposerAiState: () => void;
+  requestComposerAiState: (selection?: 'current' | 'latest') => void;
   refreshCoreUpdateState: () => Promise<void>;
   beginWebUiBusy: (sourceId: string) => void;
   endWebUiBusy: (sourceId: string) => void;

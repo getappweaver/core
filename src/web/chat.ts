@@ -8,13 +8,14 @@ import { createModelSourceCoordinator } from '@src/core/model-source';
 import { getWorkspaceInstructions } from '@src/db';
 import { getWorkspaceTarget } from '@src/db';
 import { debug } from '@src/logger';
-import { getOrCreateCurrentSession } from '@src/session';
+import { assertWebSession } from '@src/session';
 
 import type { WebRouteContext } from './routes';
 
 export type RunWebChatProps = {
   ctx: WebRouteContext;
   content: string;
+  sessionId: string;
   onSessionReady: ((sessionId: string) => void) | null;
   onStreamChunk: ((chunk: AgentStreamChunk) => void) | null;
   streamAbortSignal: AbortSignal | null;
@@ -23,8 +24,14 @@ export type RunWebChatProps = {
 export async function runWebChat(
   props: RunWebChatProps,
 ): Promise<{ output: string; sessionId: string }> {
-  const { ctx, content, onSessionReady, onStreamChunk, streamAbortSignal } =
-    props;
+  const {
+    ctx,
+    content,
+    sessionId,
+    onSessionReady,
+    onStreamChunk,
+    streamAbortSignal,
+  } = props;
 
   const workspace = getWorkspaceTarget(ctx.seenDb);
 
@@ -36,6 +43,8 @@ export async function runWebChat(
         'opencode',
       ),
     run: async (prepared) => {
+      assertWebSession(ctx.seenDb, sessionId, workspace);
+
       const backend = createBackend({
         backendName: 'opencode',
         dmBotRoot: ctx.dmBotRoot,
@@ -43,12 +52,6 @@ export async function runWebChat(
 
       const cwd =
         workspace === 'appweaver' ? ctx.dmBotRoot : ctx.parentOfBotRoot;
-
-      const sessionId = await getOrCreateCurrentSession({
-        db: ctx.seenDb,
-        backend,
-        cwd,
-      });
 
       onSessionReady?.(sessionId);
 

@@ -1494,6 +1494,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           type: 'chat',
           requestId,
           timelineId: adapters.timelineId(),
+          sessionId: adapters.timelineId(),
           content: action.prompt,
         });
       } catch (err) {
@@ -1519,6 +1520,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       }
 
       const requestId = adapters.createId();
+      const sessionId = adapters.timelineId();
 
       const sourceId = params?.onCapabilityResult
         ? undefined
@@ -1568,6 +1570,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       adapters.pendingRequests.set(requestId, {
         recordInTimeline: action.surface === 'timeline',
         onCommandResult: (message) => {
+          if (sessionId !== adapters.timelineId()) {
+            return;
+          }
+
           const output = splitCommandOutput(message.output);
           const web = output.web;
 
@@ -1638,7 +1644,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         adapters.sendSocketMessage({
           type: 'run_capability',
           requestId,
-          timelineId: adapters.timelineId(),
+          timelineId: sessionId,
           operation: action.operation,
           input: action.input,
           consumerAlias: action.consumerAlias,
@@ -1760,6 +1766,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     }
 
     const requestId = adapters.createId();
+    const sessionId = adapters.timelineId();
     const uiExecutionPolicy = params?.uiExecutionPolicy;
 
     const browserTrace = commandAction.monitoring
@@ -2089,7 +2096,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         adapters.sendSocketMessage({
           type: 'run_command',
           requestId: refreshRequestId,
-          timelineId: adapters.timelineId(),
+          timelineId: sessionId,
           command: refresh.command,
           subcommand: refresh.subcommand,
           payload: {
@@ -2126,6 +2133,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.pendingRequests.set(requestId, {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
+        if (sessionId !== adapters.timelineId()) {
+          endUserPendingOnce();
+          finishBrowserTrace('ok');
+
+          return;
+        }
+
         if (!commandRoundTripEnded) {
           commandRoundTripEnded = true;
           commandRoundTrip?.end();
@@ -2242,6 +2256,14 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onPrompt: (message) => {
+        adapters.setPromptForSession(sessionId, message.requestId);
+
+        if (sessionId !== adapters.timelineId()) {
+          endUserPendingOnce();
+
+          return;
+        }
+
         const prompt = splitPromptPayload(message.prompt);
 
         dispatchRefreshOnce({ refreshStage: 'prompt' });
@@ -2284,7 +2306,13 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         });
 
         if (shouldRefreshComposerAiStateAfterDone) {
-          void refreshComposerAiState();
+          adapters.requestComposerAiState(
+            commandAction.command === 'session' ||
+              (commandAction.command === 'bot' &&
+                commandAction.subcommand === 'workspace')
+              ? 'latest'
+              : 'current',
+          );
         }
 
         if (
@@ -2387,7 +2415,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       adapters.sendSocketMessage({
         type: 'run_command',
         requestId,
-        timelineId: adapters.timelineId(),
+        timelineId: sessionId,
         command: action.command,
         subcommand: commandAction.subcommand,
         payload: {
@@ -2424,6 +2452,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     values: import('../types').CommandPayload,
   ): Promise<void> {
     const requestId = adapters.createId();
+    const sessionId = adapters.timelineId();
     const isTaskbar = adapters.isTaskbarSubcommand(command, subcommand.name);
 
     const loadingTimelineItemId =
@@ -2517,6 +2546,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         resultReceived = true;
         roundTrip?.end();
 
+        if (sessionId !== adapters.timelineId()) {
+          finishTrace('ok');
+
+          return;
+        }
+
         const output = splitCommandOutput(message.output);
 
         const renderSpan = browserTrace?.startSpan({
@@ -2573,6 +2608,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         });
       },
       onPrompt: (message) => {
+        adapters.setPromptForSession(sessionId, message.requestId);
+
+        if (sessionId !== adapters.timelineId()) {
+          return;
+        }
+
         const prompt = splitPromptPayload(message.prompt);
 
         adapters.setPendingPromptRequestId(message.requestId);
@@ -2596,7 +2637,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
 
         if (shouldRefreshComposerAiState(command, subcommand.name)) {
-          void refreshComposerAiState();
+          adapters.requestComposerAiState(
+            command === 'session' ||
+              (command === 'bot' && subcommand.name === 'workspace')
+              ? 'latest'
+              : 'current',
+          );
         }
 
         if (shouldRefreshCoreUpdateState(command, subcommand.name)) {
@@ -2609,6 +2655,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       },
       onError: () => {
         finishTrace('error');
+
+        if (sessionId !== adapters.timelineId()) {
+          return;
+        }
 
         if (loadingTimelineItemId) {
           adapters.setTimeline((prev) =>
@@ -2626,7 +2676,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       adapters.sendSocketMessage({
         type: 'run_command',
         requestId,
-        timelineId: adapters.timelineId(),
+        timelineId: sessionId,
         command,
         subcommand: subcommand.name,
         payload: values,

@@ -1,4 +1,4 @@
-import type { AgentBackendName, CoreDb } from '@src/db';
+import type { AgentBackendName, CoreDb, WorkspaceTarget } from '@src/db';
 import { getLatestSession, setCurrentSession } from '@src/session';
 
 import type { SessionResumeLastRepresentation } from './representation';
@@ -6,12 +6,14 @@ import type { SessionResumeLastRepresentation } from './representation';
 type HandleSessionResumeLastProps = {
   db: CoreDb;
   backendName: AgentBackendName;
+  workspace: WorkspaceTarget;
+  selection: 'web' | 'dm';
 };
 
 export function handleSessionResumeLast(
   props: HandleSessionResumeLastProps,
 ): SessionResumeLastRepresentation {
-  const id = getLatestSession(props.db, props.backendName);
+  const id = getLatestSession(props.db, props.backendName, props.workspace);
 
   if (!id) {
     return {
@@ -22,7 +24,7 @@ export function handleSessionResumeLast(
     };
   }
 
-  setCurrentSession(props.db, id);
+  setCurrentSession(props.db, id, props.workspace, props.selection);
 
   return {
     kind: 'session.resume-last',
