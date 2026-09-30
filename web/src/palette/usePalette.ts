@@ -296,7 +296,6 @@ export function usePalette(adapters: PaletteAdapters): PaletteHook {
 
       if (!preserveQuery) {
         setPaletteQuery('');
-        adapters.setComposerText('');
       }
     } catch (err) {
       setPaletteError(err instanceof Error ? err.message : String(err));

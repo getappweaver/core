@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.4.1] - 2026-09-30
+
+- fix: keep composer text when a command runs (9bff401)
+
 ## [v13.4.0] - 2026-09-30
 
-- feat: parallelize sessions (0cd101f)
+- feat: parallelize sessions (3b377ef)
 
 ## [v13.3.0] - 2026-09-29
 

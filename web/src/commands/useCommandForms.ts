@@ -63,7 +63,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
 
     if (command.name === 'help' && subcommand.name === 'topic') {
       adapters.closePalette();
-      adapters.setComposerText('');
 
       await adapters.runCommand(
         command.name,
@@ -76,7 +75,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
 
     if (subcommand.name === 'help') {
       adapters.closePalette();
-      adapters.setComposerText('');
 
       await adapters.runCommand(
         command.name,
@@ -88,7 +86,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
     }
 
     adapters.closePalette();
-    adapters.setComposerText('');
 
     const mode = subcommand.inferredWeb?.executionMode ?? 'requires_input';
 
@@ -191,7 +188,6 @@ export function useCommandForms(adapters: CommandFormsAdapters) {
     }
 
     adapters.closePalette();
-    adapters.setComposerText('');
 
     const formId = adapters.createId();
 
