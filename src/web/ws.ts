@@ -29,13 +29,16 @@ import { debug, log } from '@src/logger';
 import type { InteractivePaymentBroker } from '@src/payments/service';
 import { createBrokerPaymentServiceFactory } from '@src/payments/service';
 import type { WebSocketPaymentSession } from '@src/payments/web-prompt';
-import { assertWebSession } from '@src/session';
+import { assertWebSession, renameAppWeaverSession } from '@src/session';
+import { watchSessionTitles } from '@src/session-title-notifications';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
+  getSessionUnreadWindow,
   insertTimelineEvent,
   listTimelineHistoryBefore,
   listTimelineHistoryLatest,
+  markSessionRead,
   upsertTimelineCommandForm,
 } from '@src/timeline/db';
 import type { TimelinePayload } from '@src/timeline/types';
@@ -243,6 +246,8 @@ function demoComposerAiState(): ComposerAiState {
     currentSessionId: null,
     workspace: 'appweaver',
     sessionRunning: false,
+    currentSessionTitle: null,
+    recentSessions: [],
     modelSource: {
       providerId: 'demo/ai-model-source/v1',
       state: {
@@ -525,6 +530,7 @@ async function handleDemoWebSocketMessage(params: {
           timelineId: message.timelineId,
           items: [],
           hasMore: false,
+          firstUnreadId: null,
         }),
       );
 
@@ -574,6 +580,7 @@ async function handleDemoWebSocketMessage(params: {
         createChatResultMessage({
           requestId: message.requestId,
           sessionId: message.sessionId,
+          eventId: null,
           output:
             'Demo mode only runs generated stories. Open /story list to start.',
         }),
@@ -815,11 +822,23 @@ async function handleLoadTimeline(params: {
   ctx: WebRouteContext;
   message: LoadTimelineClientMessage;
 }): Promise<void> {
-  const result = listTimelineHistoryLatest(
+  const unread = getSessionUnreadWindow(
     params.ctx.seenDb,
     params.message.timelineId,
     params.message.limit,
   );
+
+  const result = listTimelineHistoryLatest(
+    params.ctx.seenDb,
+    params.message.timelineId,
+    unread.limit,
+  );
+
+  const firstUnreadId = result.items.some(
+    (item) => item.id === unread.firstUnreadId,
+  )
+    ? unread.firstUnreadId
+    : null;
 
   sendMessage(
     params.ws,
@@ -828,6 +847,7 @@ async function handleLoadTimeline(params: {
       timelineId: params.message.timelineId,
       items: result.items,
       hasMore: result.hasMore,
+      firstUnreadId,
     }),
   );
 
@@ -853,6 +873,7 @@ async function handleLoadTimelineBefore(params: {
       timelineId: params.message.timelineId,
       items: result.items,
       hasMore: result.hasMore,
+      firstUnreadId: null,
     }),
   );
 
@@ -1578,7 +1599,7 @@ async function runChatInSession(
     `[websocket] inserting assistant chat ${message.requestId} (${output.length} chars)`,
   );
 
-  insertTimelineEvent(ctx.seenDb, {
+  const assistantEvent = insertTimelineEvent(ctx.seenDb, {
     timelineId: message.timelineId,
     sessionId: message.sessionId,
     source: 'web',
@@ -1601,6 +1622,7 @@ async function runChatInSession(
     createChatResultMessage({
       requestId: message.requestId,
       sessionId: message.sessionId,
+      eventId: assistantEvent.id,
       output,
     }),
   );
@@ -1612,12 +1634,41 @@ async function runChatInSession(
 }
 
 export function createWebSocketHandler(ctx: WebRouteContext) {
+  const connections = new Set<Bun.ServerWebSocket<WebSocketData>>();
+  let stopWatchingTitles: (() => void) | null = null;
+
   return {
     open(ws: Bun.ServerWebSocket<WebSocketData>): void {
+      connections.add(ws);
+
+      if (!stopWatchingTitles && !isDemoMode()) {
+        stopWatchingTitles = watchSessionTitles(ctx.seenDb, (update) => {
+          for (const connection of connections) {
+            if (
+              connection.data.nip98Authenticated &&
+              !connection.data.demoAuthenticated
+            ) {
+              sendMessage(connection, {
+                type: 'session_title_updated',
+                requestId: 'session-title-update',
+                ...update,
+              });
+            }
+          }
+        });
+      }
+
       ensureInterventionBridge(ws, ctx.seenDb);
       ws.data.paymentSession.setSender((message) => sendMessage(ws, message));
     },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
+      connections.delete(ws);
+
+      if (connections.size === 0) {
+        stopWatchingTitles?.();
+        stopWatchingTitles = null;
+      }
+
       for (const sessionId of ws.data.questionSessions) {
         stopSessionRun(sessionId);
       }
@@ -1809,6 +1860,33 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 requestId: message.requestId,
                 sessionId: message.sessionId,
               });
+
+              return;
+            }
+
+            case 'rename_session': {
+              renameAppWeaverSession({
+                db: ctx.seenDb,
+                sessionId: message.sessionId,
+                workspace: getWorkspaceTarget(ctx.seenDb),
+                title: message.title,
+                mode: 'manual',
+              });
+
+              sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
+            case 'mark_session_read': {
+              assertWebSession(
+                ctx.seenDb,
+                message.sessionId,
+                getWorkspaceTarget(ctx.seenDb),
+              );
+
+              markSessionRead(ctx.seenDb, message.sessionId, message.messageId);
+              sendMessage(ws, createDoneMessage(message.requestId));
 
               return;
             }

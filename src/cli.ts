@@ -24,6 +24,10 @@ import {
 } from './db';
 import { loadBotConfig } from './env';
 import { dmBotRoot, getParentWorkspaceRoot } from './paths';
+import {
+  getAppWeaverSessionWorkspace,
+  renameAppWeaverSession,
+} from './session';
 import { ensureOpencodeParentWorkspaceAssets } from './workspace-assets';
 
 type CliArgs = {
@@ -31,6 +35,12 @@ type CliArgs = {
   toolName: string | null;
   rawArgsJson: string | null;
 };
+
+const SessionRenameCliArgsSchema = z.strictObject({
+  sessionId: z.string().min(1),
+  title: z.string().trim().min(1).max(120),
+  mode: z.enum(['auto', 'manual']),
+});
 
 type CliLogEntry = {
   ts: string;
@@ -78,6 +88,11 @@ function parseArgs(argv: string[]): CliArgs {
 
 function printHelp(): void {
   console.log('Usage: bun src/cli.ts <alias> <toolName> <rawArgsJson>');
+
+  console.log(
+    'Session title: bun src/cli.ts session rename \'{"sessionId":"...","title":"...","mode":"auto"}\'',
+  );
+
   console.log('');
   console.log('Aliases:');
 
@@ -145,6 +160,44 @@ async function main(): Promise<void> {
 
   if (!alias) {
     printHelp();
+
+    return;
+  }
+
+  if (alias === 'session') {
+    if (toolName !== 'rename') {
+      console.log(
+        JSON.stringify(z.toJSONSchema(SessionRenameCliArgsSchema), null, 2),
+      );
+
+      return;
+    }
+
+    const raw = safeJsonParse(rawArgsJson ?? '{}');
+
+    if (!raw.ok) {
+      throw new Error(`Failed to parse JSON args: ${raw.error}`);
+    }
+
+    const parsed = SessionRenameCliArgsSchema.parse(raw.value);
+
+    const db = openCoreDb();
+
+    try {
+      const workspace = getAppWeaverSessionWorkspace(db, parsed.sessionId);
+
+      const result = renameAppWeaverSession({
+        db,
+        sessionId: parsed.sessionId,
+        workspace,
+        title: parsed.title,
+        mode: parsed.mode,
+      });
+
+      console.log(JSON.stringify({ sessionId: parsed.sessionId, ...result }));
+    } finally {
+      db.close();
+    }
 
     return;
   }

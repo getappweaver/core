@@ -1559,6 +1559,25 @@ pre {
   display: none;
 }
 
+.timeline-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-accent, #c05a49);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  scroll-margin-top: 0.75rem;
+}
+
+.timeline-unread-divider::before,
+.timeline-unread-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid currentColor;
+  opacity: 0.55;
+}
+
 .timeline--bottom-fade::after {
   content: '';
   display: block;
@@ -3327,8 +3346,52 @@ button.composer-meta-text--context.is-compacting {
   margin-left: 0;
 }
 
+.composer:has(.composer-meta-dropdown--context .web-overflow-panel) {
+  z-index: var(--z-web-overflow-open);
+}
+
+.composer-meta-dropdown--context .web-overflow-panel {
+  z-index: var(--z-web-overflow-open);
+}
+
 .composer-meta-dropdown--context .composer-meta-text--context {
   margin-left: 0;
+}
+
+.composer-session-menu-heading {
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.composer-session-menu-item {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-session-menu-item[aria-current='true'] {
+  outline: 2px solid var(--color-border);
+}
+
+.composer-session-rename {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.composer-session-rename input {
+  min-width: 0;
+  width: 14rem;
+  padding: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.35rem;
+  background: var(--color-panel);
+  color: var(--color-text);
+}
+
+.composer-meta-dropdown--context .composer-session-rename .web-button {
+  width: auto;
 }
 
 .composer-meta-dropdown {

@@ -26,6 +26,10 @@ function createAdapters() {
     import('@src/payments/web-types').WebPaymentStatus | null
   >(null);
 
+  const [, setComposerAiState] = createSignal<
+    import('../commands/types').ComposerAiState | null
+  >(null);
+
   const deltas: string[] = [];
 
   const adapters: MessageAdapters = {
@@ -35,6 +39,7 @@ function createAdapters() {
     setToolInterventions: setInterventions,
     setPaymentRequest,
     setPaymentStatus,
+    setComposerAiState,
     appendSystemMessage: () => undefined,
     chat: {
       clearRequest: () => undefined,

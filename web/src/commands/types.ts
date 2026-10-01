@@ -3,6 +3,7 @@ import type { Accessor, Setter } from 'solid-js';
 
 import type { AiModelSourceContextUsage } from '@src/capabilities/ai-model-source.v1';
 import type { WorkspaceTarget } from '@src/db';
+import type { AppWeaverSession } from '@src/session';
 import type {
   WebAction,
   WebNodeRoot,
@@ -25,6 +26,8 @@ export type ComposerAiState = {
   currentSessionId: string | null;
   workspace: WorkspaceTarget;
   sessionRunning: boolean;
+  currentSessionTitle: string | null;
+  recentSessions: AppWeaverSession[];
   modelSource: {
     providerId: string;
     state: {
@@ -143,7 +146,9 @@ export type CommandsAdapters = {
   ) => Promise<NostrEvent | null>;
   nip44DecryptSelf: (ciphertext: string) => Promise<string | null>;
   createId: () => string;
-  requestComposerAiState: (selection?: 'current' | 'latest') => void;
+  requestComposerAiState: (
+    selection?: 'current' | 'latest' | { sessionId: string },
+  ) => void;
   refreshCoreUpdateState: () => Promise<void>;
   beginWebUiBusy: (sourceId: string) => void;
   endWebUiBusy: (sourceId: string) => void;

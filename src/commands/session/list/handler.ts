@@ -26,10 +26,11 @@ export function handleSessionList(
 
   const rows = props.db
     .prepare(
-      'SELECT id, created_at, backend FROM sessions WHERE workspace = ? ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?',
+      'SELECT id, title, created_at, backend FROM sessions WHERE workspace = ? ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?',
     )
     .all(props.workspace, limit) as {
     id: string;
+    title: string | null;
     created_at: number;
     backend: string;
   }[];
@@ -58,6 +59,7 @@ export function handleSessionList(
       view: 'rows',
       rows: rows.map((r) => ({
         id: r.id,
+        title: r.title,
         backend: r.backend ?? 'opencode',
         createdAtIso: new Date(r.created_at * 1000).toISOString(),
         isCurrent: r.id === cur,

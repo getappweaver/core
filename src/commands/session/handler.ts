@@ -14,6 +14,7 @@ import { handleSessionList } from './list/handler';
 import { handleSessionListNative } from './list-native/handler';
 import { handleSessionMessages } from './messages/handler';
 import { handleSessionNew } from './new/handler';
+import { handleSessionRename } from './rename/handler';
 import { handleSessionResume } from './resume/handler';
 import { handleSessionResumeLast } from './resume-last/handler';
 import { renderSessionText } from './text-representation';
@@ -51,6 +52,22 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
 
       return appendStatusBlock(ctx, render(rep));
     }, 'Failed to create new session');
+  }
+
+  if (sub === 'rename') {
+    return handleError(
+      async () =>
+        render(
+          handleSessionRename({
+            db: ctx.seenDb,
+            sessionId: args[1] ?? '',
+            title: args.slice(2).join(' '),
+            workspace: getWorkspaceTarget(ctx.seenDb),
+            prefix: p,
+          }),
+        ),
+      'Failed to rename session',
+    );
   }
 
   if (sub === 'attach') {

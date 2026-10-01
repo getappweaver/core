@@ -47,10 +47,22 @@ export function TimelineView(props: TimelineViewProps) {
     >
       <For each={itemIds()}>
         {(itemId) => (
-          <TimelineItemSlot
-            item={() => itemsById().get(itemId) ?? null}
-            viewProps={props}
-          />
+          <>
+            <Show when={itemId === props.firstUnreadId}>
+              <div
+                class="timeline-unread-divider"
+                role="separator"
+                aria-label="New messages"
+                tabIndex={-1}
+              >
+                <span>New messages</span>
+              </div>
+            </Show>
+            <TimelineItemSlot
+              item={() => itemsById().get(itemId) ?? null}
+              viewProps={props}
+            />
+          </>
         )}
       </For>
     </div>

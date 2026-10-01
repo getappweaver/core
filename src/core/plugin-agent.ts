@@ -154,6 +154,8 @@ export function createPluginAgentService({
                           backendName: 'opencode',
                           dmBotRoot,
                           cwd,
+                          sessionId: null,
+                          sessionTitle: null,
                         })
                       : null,
                     workspaceInstructions: contextOptions.workspaceInstructions

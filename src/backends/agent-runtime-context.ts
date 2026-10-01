@@ -11,6 +11,8 @@ type BuildActiveRuntimeContextProps = {
   backendName: AgentBackendName;
   dmBotRoot: string;
   cwd: string;
+  sessionId: string | null;
+  sessionTitle: string | null;
 };
 
 function workspaceTargetLabel(props: {
@@ -24,6 +26,8 @@ export function buildActiveRuntimeContext({
   backendName,
   dmBotRoot,
   cwd,
+  sessionId,
+  sessionTitle,
 }: BuildActiveRuntimeContextProps): string {
   const workspaceTarget = workspaceTargetLabel({ cwd, dmBotRoot });
 
@@ -32,11 +36,18 @@ export function buildActiveRuntimeContext({
       ? '\nAppWeaver chat runtime constraint: do not create, touch, or modify restart.requested. That would restart the host process and can interrupt the active chat. If code changes need a restart, say so in your final response instead.'
       : '';
 
+  const titleGuidance = sessionId
+    ? `\nAppWeaver session ID: ${sessionId}
+AppWeaver session title: ${sessionTitle ? JSON.stringify(sessionTitle) : '(untitled)'}
+After the first meaningful user request, give an untitled session a specific title of at most 30 characters. If an automatically assigned title no longer describes the current conversation, update it. Use the session-title skill and run bun "${dmBotRoot}/src/cli.ts" session rename with JSON {"sessionId":"${sessionId}","title":"<short title>","mode":"auto"}. Use this exact session ID, not a global current-session ID. Auto renames never override manual titles; avoid renaming when the existing title still fits. Do not interrupt the user's task to discuss title maintenance.`
+    : '';
+
   return `Backend: ${backendName}
 Workspace target: ${workspaceTarget}
 Workspace root: ${cwd}
 AppWeaver root: ${dmBotRoot}
 ${appweaverRuntimeConstraint}
+${titleGuidance}
 `;
 }
 

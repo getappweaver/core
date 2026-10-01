@@ -4,6 +4,7 @@ import { createRepresentationSchema } from '@src/system/representation';
 
 export const SessionListRowSchema = z.object({
   id: z.string().min(1),
+  title: z.string().nullable(),
   backend: z.string().min(1),
   createdAtIso: z.string().min(1),
   isCurrent: z.boolean(),

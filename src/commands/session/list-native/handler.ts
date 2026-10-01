@@ -25,6 +25,7 @@ type RuntimeSessionExtras = {
 
 type TrackedSessionRow = {
   id: string;
+  title: string | null;
 };
 
 function isOpencodeFlag(flag: string): boolean {
@@ -80,10 +81,11 @@ export async function handleSessionListNative({
   }
 
   const trackedRows = db
-    .prepare('SELECT id FROM sessions WHERE backend = ?')
+    .prepare('SELECT id, title FROM sessions WHERE backend = ?')
     .all('opencode') as TrackedSessionRow[];
 
   const trackedIds = new Set(trackedRows.map((row) => row.id));
+  const trackedTitles = new Map(trackedRows.map((row) => [row.id, row.title]));
   const currentSessionId = getState(db, STATE_CURRENT_SESSION);
 
   return {
@@ -95,7 +97,7 @@ export async function handleSessionListNative({
       directory: cwd,
       rows: sessions.map((session) => ({
         id: session.id,
-        title: session.title,
+        title: trackedTitles.get(session.id) ?? session.title,
         directory: session.directory,
         agent: (session as Session & RuntimeSessionExtras).agent ?? null,
         model: formatModel(session),

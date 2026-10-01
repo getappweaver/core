@@ -629,6 +629,8 @@ export const handleSkillsRoot: BuiltinHandler = async (ctx) => {
           backendName: 'opencode',
           dmBotRoot: ctx.dmBotRoot,
           cwd: ctx.cwd,
+          sessionId: null,
+          sessionTitle: null,
         }),
         workspace,
         workspaceInstructions: configuredInstructions.instructions,

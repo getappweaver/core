@@ -11,6 +11,7 @@ import { getSessionListSubcommandDefinition } from './list/definition';
 import { getSessionListNativeSubcommandDefinition } from './list-native/definition';
 import { getSessionMessagesSubcommandDefinition } from './messages/definition';
 import { getSessionNewSubcommandDefinition } from './new/definition';
+import { getSessionRenameSubcommandDefinition } from './rename/definition';
 import { getSessionResumeSubcommandDefinition } from './resume/definition';
 import { getSessionResumeLastSubcommandDefinition } from './resume-last/definition';
 
@@ -26,14 +27,15 @@ export function getSessionCommandDefinition({
   return {
     name: 'session',
     summary:
-      'Agent sessions: new, attach, adopt, resume, list, and inspect messages.',
+      'Agent sessions: new, rename, attach, adopt, resume, list, and inspect messages.',
     aliases: [],
     subcommands: [
       createHelpSubcommandDefinition(prefix, 'session', {
         topicArgSummary:
-          'Optional subcommand name such as new, attach, adopt, list, list-native, resume, or messages.',
+          'Optional subcommand name such as new, rename, attach, adopt, list, list-native, resume, or messages.',
         exampleTopics: [
           'new',
+          'rename',
           'attach',
           'adopt',
           'list',
@@ -43,6 +45,7 @@ export function getSessionCommandDefinition({
         ],
       }),
       getSessionNewSubcommandDefinition(p),
+      getSessionRenameSubcommandDefinition(p),
       getSessionAttachSubcommandDefinition(p),
       getSessionAdoptSubcommandDefinition(p),
       getSessionResumeLastSubcommandDefinition(p),

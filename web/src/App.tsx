@@ -22,6 +22,7 @@ import type { ChatRunStatus } from './chat/types';
 import { useChat } from './chat/useChat';
 import { ChromeOverlay } from './chrome/ChromeOverlay';
 import { HeaderChrome } from './chrome/HeaderChrome';
+import type { ChromeModalState } from './chrome/types';
 import { useChrome } from './chrome/useChrome';
 import {
   ensureCommandDetail as ensureCommandDetailFromCatalog,
@@ -51,6 +52,11 @@ import {
   type LayoutPrefs,
   readLayoutPrefs,
 } from './layout/desktopLayoutPrefs';
+import {
+  readSessionWidgetLayout,
+  writeSessionWidgetLayout,
+  type SessionWidgetItem,
+} from './layout/sessionWidgetLayout';
 import {
   SingletonDock,
   type DockedWidgetCard,
@@ -273,6 +279,10 @@ function AppInner(): JSX.Element {
     },
   ]);
 
+  const [firstUnreadId, setFirstUnreadId] = createSignal<string | null>(null);
+
+  let pendingUnreadFocusSessionId: string | null = null;
+
   const [composerText, setComposerText] = createSignal('');
   const [loadingCommands, setLoadingCommands] = createSignal(true);
   const [agentWorking, setAgentWorking] = createSignal(false);
@@ -382,6 +392,14 @@ function AppInner(): JSX.Element {
     string[]
   >([]);
 
+  const [widgetOpenOrder, setWidgetOpenOrder] = createSignal<string[]>([]);
+  let widgetLayoutSaveTimer: number | null = null;
+  let restoringWidgetLayout = false;
+  let pendingModalRestore: {
+    sessionId: string;
+    modal: ChromeModalState;
+  } | null = null;
+
   const [timelineId, setTimelineId] = createSignal<string>(initialTimelineId);
   const promptRequestBySession = new Map<string, string | null>();
 
@@ -436,6 +454,117 @@ function AppInner(): JSX.Element {
 
   const chrome = useChrome();
 
+  function persistSessionWidgetLayout(sessionId: string): void {
+    if (isWebDemoMode()) {
+      return;
+    }
+
+    const entries = taskbarSingletonByKey();
+    const dockItems = dockWidgetItemsByKey();
+
+    const timelineItems = timeline().filter(
+      (item): item is SessionWidgetItem =>
+        item.type === 'command_result' &&
+        item.timelineSingletonKey !== undefined,
+    );
+
+    const keys = [
+      ...widgetOpenOrder(),
+      ...Object.keys(entries).filter((key) => !widgetOpenOrder().includes(key)),
+    ];
+
+    const widgets = keys.flatMap((key) => {
+      const entry = entries[key];
+
+      const item =
+        dockItems[key]?.id === entry?.itemId
+          ? dockItems[key]
+          : timelineItems.find((candidate) => candidate.id === entry?.itemId);
+
+      return entry && item
+        ? [
+            {
+              key,
+              item,
+              visible: entry.visible,
+              expanded: expandedDockWidgetKeys().includes(key),
+            },
+          ]
+        : [];
+    });
+
+    writeSessionWidgetLayout(sessionId, {
+      version: 1,
+      widgets,
+      modal:
+        pendingModalRestore?.sessionId === sessionId
+          ? pendingModalRestore.modal
+          : chrome.chromeModal(),
+    });
+  }
+
+  function scheduleSessionWidgetLayoutSave(sessionId: string): void {
+    if (widgetLayoutSaveTimer !== null) {
+      window.clearTimeout(widgetLayoutSaveTimer);
+    }
+
+    widgetLayoutSaveTimer = window.setTimeout(() => {
+      widgetLayoutSaveTimer = null;
+
+      if (timelineId() === sessionId && !restoringWidgetLayout) {
+        persistSessionWidgetLayout(sessionId);
+      }
+    }, 250);
+  }
+
+  function restoreSessionWidgetLayout(sessionId: string): void {
+    const layout = isWebDemoMode() ? null : readSessionWidgetLayout(sessionId);
+    const widgets = layout?.widgets ?? [];
+
+    setWidgetOpenOrder(widgets.map((widget) => widget.key));
+
+    setTaskbarSingletonByKey(
+      Object.fromEntries(
+        widgets.map((widget) => [
+          widget.key,
+          { itemId: widget.item.id, visible: widget.visible },
+        ]),
+      ),
+    );
+
+    setExpandedDockWidgetKeys(
+      widgets.filter((widget) => widget.expanded).map((widget) => widget.key),
+    );
+
+    if (dockVisible()) {
+      setDockWidgetItemsByKey(
+        Object.fromEntries(widgets.map((widget) => [widget.key, widget.item])),
+      );
+    } else {
+      setDockWidgetItemsByKey({});
+      setTimeline(widgets.map((widget) => widget.item));
+    }
+
+    pendingModalRestore = layout?.modal
+      ? { sessionId, modal: layout.modal }
+      : null;
+  }
+
+  createEffect(() => {
+    const sessionId = timelineId();
+
+    void taskbarSingletonByKey();
+    void dockWidgetItemsByKey();
+    void expandedDockWidgetKeys();
+    void widgetOpenOrder();
+    void chrome.chromeModal();
+    void timeline();
+
+    if (sessionId && !restoringWidgetLayout) {
+      scheduleSessionWidgetLayoutSave(sessionId);
+    }
+  });
+
   const connect = useConnect({
     auth,
   });
@@ -457,6 +586,7 @@ function AppInner(): JSX.Element {
     isWebUiBusyFor,
     modelStateUnavailable,
     pendingRequests,
+    loadSessionTimeline,
     requestComposerAiState,
     sendSocketMessage,
     useSocketLifecycle,
@@ -467,11 +597,77 @@ function AppInner(): JSX.Element {
     setTimeline,
     timelineId,
     setTimelineId: (sessionId) => {
-      setTimelineId(sessionId);
-      setTimeline([]);
-      setPendingPromptRequestId(promptRequestBySession.get(sessionId) ?? null);
-      setChatRunStatus(readChatRunStatus(`session:${sessionId}`));
-      setSessionDiffFiles([]);
+      const previousSessionId = timelineId();
+
+      if (widgetLayoutSaveTimer !== null) {
+        window.clearTimeout(widgetLayoutSaveTimer);
+        widgetLayoutSaveTimer = null;
+      }
+
+      if (previousSessionId) {
+        persistSessionWidgetLayout(previousSessionId);
+      }
+
+      restoringWidgetLayout = true;
+
+      try {
+        setTimelineId(sessionId);
+        setTimeline([]);
+        setDockWidgetItemsByKey({});
+        setTaskbarSingletonByKey({});
+        setExpandedDockWidgetKeys([]);
+        setWidgetOpenOrder([]);
+        chrome.setChromeModal(null);
+        setFirstUnreadId(null);
+        pendingUnreadFocusSessionId = null;
+        setTimelineScrolledAwayFromBottom(false);
+
+        setPendingPromptRequestId(
+          promptRequestBySession.get(sessionId) ?? null,
+        );
+
+        setChatRunStatus(readChatRunStatus(`session:${sessionId}`));
+        setSessionDiffFiles([]);
+        restoreSessionWidgetLayout(sessionId);
+      } finally {
+        restoringWidgetLayout = false;
+      }
+    },
+    setFirstUnreadId: (eventId) => {
+      setFirstUnreadId(eventId);
+      pendingUnreadFocusSessionId = eventId ? timelineId() : null;
+    },
+    focusUnreadDivider: (sessionId, onFocused) => {
+      requestAnimationFrame(() => {
+        if (
+          sessionId !== timelineId() ||
+          document.visibilityState !== 'visible'
+        ) {
+          pendingUnreadFocusSessionId = null;
+
+          return;
+        }
+
+        const divider = timelineEl?.querySelector<HTMLElement>(
+          '.timeline-unread-divider',
+        );
+
+        if (!divider || !timelineEl) {
+          pendingUnreadFocusSessionId = null;
+
+          return;
+        }
+
+        timelineEl.scrollTop =
+          divider.getBoundingClientRect().top -
+          timelineEl.getBoundingClientRect().top +
+          timelineEl.scrollTop -
+          12;
+
+        divider.focus({ preventScroll: true });
+        pendingUnreadFocusSessionId = null;
+        onFocused();
+      });
     },
     setCommands,
     setComposerAiState,
@@ -817,12 +1013,19 @@ function AppInner(): JSX.Element {
   const dockedWidgetCards = createMemo<DockedWidgetCard[]>(() => {
     const dockItems = dockWidgetItemsByKey();
 
-    return taskbarWidgets().reduce<DockedWidgetCard[]>((out, widget) => {
-      const key = taskbarDockKey(widget.command, widget.subcommand);
+    const availableWidgets = new Map(
+      taskbarWidgets().map((widget) => [
+        taskbarDockKey(widget.command, widget.subcommand),
+        widget,
+      ]),
+    );
+
+    return widgetOpenOrder().reduce<DockedWidgetCard[]>((out, key) => {
+      const widget = availableWidgets.get(key);
       const entry = taskbarSingletonByKey()[key];
       const item = dockItems[key];
 
-      if (entry && item && item.id === entry.itemId) {
+      if (widget && entry && item && item.id === entry.itemId) {
         out.push({ key, widget, entry, item });
       }
 
@@ -1358,6 +1561,8 @@ function AppInner(): JSX.Element {
     const key = taskbarDockKey(widget.command, widget.subcommand);
 
     if (canStorySandboxHandleCommand(widget.command, widget.subcommand)) {
+      setWidgetOpenOrder((order) => order.filter((entry) => entry !== key));
+
       setTaskbarSingletonByKey((prev) => {
         const rest = { ...prev };
         delete rest[key];
@@ -1759,6 +1964,10 @@ function AppInner(): JSX.Element {
     const key = taskbarDockKey(params.command, params.subcommand);
     const existing = taskbarSingletonByKey()[key];
 
+    setWidgetOpenOrder((order) =>
+      order.includes(key) ? order : [...order, key],
+    );
+
     if (dockVisible()) {
       const itemId = existing?.itemId ?? createId();
 
@@ -1861,6 +2070,8 @@ function AppInner(): JSX.Element {
   function closeTaskbarWidget(command: string, subcommand: string): void {
     const key = taskbarDockKey(command, subcommand);
     const existing = taskbarSingletonByKey()[key];
+
+    setWidgetOpenOrder((order) => order.filter((entry) => entry !== key));
 
     setTaskbarSingletonByKey((prev) => {
       const next = { ...prev };
@@ -1987,6 +2198,8 @@ function AppInner(): JSX.Element {
         return rest;
       });
 
+      setWidgetOpenOrder((order) => order.filter((entry) => entry !== key));
+
       removeDockWidgetItem(key);
 
       setTimeline((prev) =>
@@ -2027,6 +2240,8 @@ function AppInner(): JSX.Element {
       existing !== undefined && hasTaskbarItem(key, existing);
 
     if (existing && !hasTimelineItem) {
+      setWidgetOpenOrder((order) => order.filter((entry) => entry !== key));
+
       setTaskbarSingletonByKey((prev) => {
         const rest = { ...prev };
         delete rest[key];
@@ -2234,6 +2449,37 @@ function AppInner(): JSX.Element {
     await runCommand('session', subcommand, defaultPayload(subcommand));
   }
 
+  function renameCurrentSession(title: string): void {
+    const sessionId = timelineId();
+
+    if (!sessionId) {
+      return;
+    }
+
+    const requestId = createId();
+
+    pendingRequests.set(requestId, {
+      onDone: () => requestComposerAiState(),
+      onError: (message) =>
+        appendSystemMessage(`Could not rename session: ${message.message}`),
+    });
+
+    try {
+      sendSocketMessage({
+        type: 'rename_session',
+        requestId,
+        sessionId,
+        title,
+      });
+    } catch (error) {
+      pendingRequests.delete(requestId);
+
+      appendSystemMessage(
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
   function saveTimelineFormBridge(
     item: Extract<TimelineItem, { type: 'command_form' }>,
   ): void {
@@ -2286,6 +2532,27 @@ function AppInner(): JSX.Element {
     isTaskbarSubcommand,
     getTaskbarDockValues,
     setTaskbarDockResult,
+  });
+
+  createEffect(() => {
+    const sessionId = timelineId();
+
+    if (
+      !wsConnected() ||
+      loadingCommands() ||
+      pendingModalRestore?.sessionId !== sessionId
+    ) {
+      return;
+    }
+
+    const modal = pendingModalRestore.modal;
+    pendingModalRestore = null;
+
+    const command = commands().find((entry) => entry.name === modal.command);
+
+    if (command?.subcommands.some((entry) => entry.name === modal.subcommand)) {
+      openChromeWidget(modal);
+    }
   });
 
   const resolveCommandDetail = (name: string) =>
@@ -2446,7 +2713,10 @@ function AppInner(): JSX.Element {
       const grew = length > previousTimelineLength;
       previousTimelineLength = length;
 
-      if (!timelineScrolledAwayFromBottom()) {
+      if (
+        !timelineScrolledAwayFromBottom() &&
+        pendingUnreadFocusSessionId === null
+      ) {
         scrollTimelineToBottomSoon();
       }
 
@@ -2569,7 +2839,30 @@ function AppInner(): JSX.Element {
       void refreshComposerAiState();
     };
 
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        wsConnected() &&
+        timelineId()
+      ) {
+        loadSessionTimeline(timelineId());
+      }
+    };
+
+    const flushSessionWidgetLayout = () => {
+      if (widgetLayoutSaveTimer !== null) {
+        window.clearTimeout(widgetLayoutSaveTimer);
+        widgetLayoutSaveTimer = null;
+      }
+
+      if (timelineId()) {
+        persistSessionWidgetLayout(timelineId());
+      }
+    };
+
     window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('pagehide', flushSessionWidgetLayout);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     window.addEventListener(
       'composer-ai-state-refresh-requested',
@@ -2597,6 +2890,11 @@ function AppInner(): JSX.Element {
     });
 
     onCleanup(() => {
+      if (widgetLayoutSaveTimer !== null) {
+        window.clearTimeout(widgetLayoutSaveTimer);
+        widgetLayoutSaveTimer = null;
+      }
+
       if (timelineBottomFadeFrame !== null) {
         cancelAnimationFrame(timelineBottomFadeFrame);
         timelineBottomFadeFrame = null;
@@ -2617,6 +2915,8 @@ function AppInner(): JSX.Element {
       window.removeEventListener('resize', scheduleTimelineBottomFadeUpdate);
 
       window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('pagehide', flushSessionWidgetLayout);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
 
       window.removeEventListener(
         'composer-ai-state-refresh-requested',
@@ -2689,6 +2989,10 @@ function AppInner(): JSX.Element {
 
           collapseDockWidget(key);
         }
+      }
+
+      if (changed) {
+        setWidgetOpenOrder((order) => order.filter((key) => key in next));
       }
 
       return changed ? next : prev;
@@ -2909,6 +3213,7 @@ function AppInner(): JSX.Element {
             <TimelineView
               activeFormId={activeFormId()}
               timeline={timeline()}
+              firstUnreadId={firstUnreadId()}
               showBottomFade={timelineScrolledAwayFromBottom()}
               isTimelineItemHidden={isTimelineCommandResultHidden}
               setTimelineRef={(el) => {
@@ -3003,6 +3308,11 @@ function AppInner(): JSX.Element {
                       </button>
                       <ComposerContextMenuButton
                         backend={composerAiState()!.backend}
+                        currentSessionId={composerAiState()!.currentSessionId}
+                        currentSessionTitle={
+                          composerAiState()!.currentSessionTitle
+                        }
+                        recentSessions={composerAiState()!.recentSessions}
                         label={
                           formatComposerContextStats(composerAiState()) ??
                           'session'
@@ -3021,6 +3331,10 @@ function AppInner(): JSX.Element {
                         onCreateNewSession={() => {
                           void createNewSessionFromComposerMenu();
                         }}
+                        onRenameSession={renameCurrentSession}
+                        onSelectSession={(sessionId) =>
+                          requestComposerAiState({ sessionId })
+                        }
                       />
                     </Show>
                   </div>

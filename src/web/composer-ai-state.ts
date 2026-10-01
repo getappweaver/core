@@ -11,7 +11,11 @@ import {
   getWorkspaceTarget,
   type WorkspaceTarget,
 } from '@src/db';
-import { getOrCreateCurrentSession } from '@src/session';
+import {
+  getOrCreateCurrentSession,
+  listAppWeaverSessions,
+  type AppWeaverSession,
+} from '@src/session';
 
 import type { WebRouteContext } from './routes';
 import { isSessionRunning } from './session-runs';
@@ -24,6 +28,8 @@ export type ComposerAiState = {
   currentSessionId: string | null;
   workspace: WorkspaceTarget;
   sessionRunning: boolean;
+  currentSessionTitle: string | null;
+  recentSessions: AppWeaverSession[];
   modelSource: ModelSourceSnapshot;
   modelSources: ModelSourceOption[];
   contextStats: AiModelSourceContextUsage | null;
@@ -92,6 +98,19 @@ export async function getComposerAiState(
           .catch(() => null)
       : null;
 
+  // Read titles after asynchronous model/context lookups so a slow state
+  // refresh cannot overwrite a title notification with an older title.
+  const recentSessions = listAppWeaverSessions(ctx.seenDb, workspace, 5);
+
+  const selectedRow = ctx.seenDb
+    .prepare('SELECT title FROM sessions WHERE id = ?')
+    .get(currentSessionId) as { title: string | null } | undefined;
+
+  const currentSessionTitle =
+    recentSessions.find((session) => session.id === currentSessionId)?.title ??
+    selectedRow?.title ??
+    null;
+
   return {
     backend: 'opencode',
     interventionAvailable: ctx.attachUrl === null,
@@ -99,6 +118,8 @@ export async function getComposerAiState(
     currentSessionId,
     workspace,
     sessionRunning: isSessionRunning(currentSessionId),
+    currentSessionTitle,
+    recentSessions,
     modelSource,
     modelSources,
     contextStats,

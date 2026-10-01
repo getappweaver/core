@@ -36,6 +36,9 @@ export type ComposerAiStateResultServerMessage = {
   state: ComposerAiState;
 };
 
+export type SessionTitleUpdatedServerMessage =
+  import('@src/web/ws-schema').SessionTitleUpdatedServerMessage;
+
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
@@ -48,6 +51,7 @@ export type TimelineEventsResultServerMessage = {
   timelineId: string;
   items: TimelineHistoryItem[];
   hasMore: boolean;
+  firstUnreadId: string | null;
 };
 
 export type CapabilityProvidersResultServerMessage = {
@@ -75,6 +79,7 @@ export type ChatResultServerMessage = {
   type: 'chat_result';
   requestId: string;
   sessionId: string;
+  eventId: string | null;
   output: string;
 };
 
@@ -129,6 +134,7 @@ export type PaymentStatusServerMessage = {
 
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
+  | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
   | CapabilityProvidersResultServerMessage

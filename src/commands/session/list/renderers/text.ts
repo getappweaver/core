@@ -15,7 +15,7 @@ export function renderSessionListText(
       return d.rows
         .map(
           (r) =>
-            `[${r.backend}] ${r.id} ${r.createdAtIso}${r.isCurrent ? ' (current)' : ''}`,
+            `[${r.backend}] ${r.title ?? 'Untitled session'} · ${r.id} · ${r.createdAtIso}${r.isCurrent ? ' (current)' : ''}`,
         )
         .join('\n');
     default: {

@@ -28,7 +28,11 @@ export function openCoreDb(): CoreDb {
       created_at INTEGER NOT NULL,
       backend TEXT NOT NULL DEFAULT 'opencode',
       workspace TEXT,
-      updated_at INTEGER
+      updated_at INTEGER,
+      title TEXT,
+      title_origin TEXT NOT NULL DEFAULT 'manual',
+      last_read_message_created_at INTEGER,
+      last_read_message_id TEXT
     )
   `);
 
@@ -40,7 +44,14 @@ export function openCoreDb(): CoreDb {
     /* Column already exists */
   }
 
-  for (const column of ['workspace TEXT', 'updated_at INTEGER']) {
+  for (const column of [
+    'workspace TEXT',
+    'updated_at INTEGER',
+    'title TEXT',
+    "title_origin TEXT NOT NULL DEFAULT 'manual'",
+    'last_read_message_created_at INTEGER',
+    'last_read_message_id TEXT',
+  ]) {
     try {
       db.run(`ALTER TABLE sessions ADD COLUMN ${column}`);
     } catch {

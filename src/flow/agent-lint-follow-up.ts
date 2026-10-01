@@ -13,7 +13,7 @@ import type { CoreDb, WorkspaceTarget } from '../db';
 import { getLinting, getWorkspaceInstructions } from '../db';
 import { formatLintSummary, runPostAgentLint } from '../lint';
 import { C, log } from '../logger';
-import { insertSessionMessage } from '../session';
+import { getAppWeaverSessionTitle, insertSessionMessage } from '../session';
 
 const POST_AGENT_LINT_PROMPT_PREFIX = '[Post-edit lint feedback]';
 
@@ -50,6 +50,13 @@ export async function runAgentWithLintFollowUp({
 }> {
   const modelSources = createModelSourceCoordinator(coreDb);
 
+  const trackedWorkspace = coreDb
+    .prepare('SELECT workspace FROM sessions WHERE id = ?')
+    .get(sessionId) as { workspace: WorkspaceTarget | null } | undefined;
+
+  const titleSessionId =
+    trackedWorkspace?.workspace === currentWorkspace ? sessionId : null;
+
   const runAgentRound = async (content: string, label: string) => {
     log.info(label);
 
@@ -67,6 +74,10 @@ export async function runAgentWithLintFollowUp({
           backendName: 'opencode',
           dmBotRoot,
           cwd,
+          sessionId: titleSessionId,
+          sessionTitle: titleSessionId
+            ? getAppWeaverSessionTitle(coreDb, titleSessionId)
+            : null,
         }),
         workspaceInstructions: getWorkspaceInstructions(
           coreDb,

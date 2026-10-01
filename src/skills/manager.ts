@@ -62,6 +62,21 @@ function activeSkillsRoot(workspaceRoot: string): string {
   return join(workspaceRoot, '.claude', 'skills');
 }
 
+function syncAlwaysAvailableSessionTitleSkill(props: {
+  dmBotRoot: string;
+  workspaceRoot: string;
+}): void {
+  const source = join(activeSkillsRoot(props.dmBotRoot), 'session-title');
+  const target = join(activeSkillsRoot(props.workspaceRoot), 'session-title');
+
+  if (!existsSync(join(source, 'SKILL.md')) || pathExists(target)) {
+    return;
+  }
+
+  mkdirSync(activeSkillsRoot(props.workspaceRoot), { recursive: true });
+  cpSync(source, target, { recursive: true });
+}
+
 function isManagedSkillName(name: string): boolean {
   return (
     name.startsWith(MANAGED_SKILL_PREFIX) &&
@@ -253,6 +268,7 @@ export function initializeWorkspaceSkills({
   for (const root of roots) {
     reconcileWorkspaceSkills({ db, dmBotRoot, workspaceRoot: root });
     syncSkillStatusSkill({ db, dmBotRoot, workspaceRoot: root });
+    syncAlwaysAvailableSessionTitleSkill({ dmBotRoot, workspaceRoot: root });
   }
 }
 

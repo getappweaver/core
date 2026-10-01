@@ -148,6 +148,22 @@ export function insertTimelineEvent(
     createdAt: event.createdAt ?? Date.now(),
   };
 
+  if (
+    event.createdAt === undefined &&
+    record.kind === 'chat' &&
+    record.role === 'assistant'
+  ) {
+    const latest = db
+      .prepare(
+        "SELECT MAX(created_at) AS created_at FROM timeline_events WHERE session_id = ? AND kind = 'chat' AND role = 'assistant'",
+      )
+      .get(event.sessionId) as { created_at: number | null };
+
+    if (latest.created_at !== null) {
+      record.createdAt = Math.max(record.createdAt, latest.created_at + 1);
+    }
+  }
+
   if (record.timelineId !== event.sessionId) {
     throw new Error('Timeline must match its session.');
   }
@@ -443,7 +459,7 @@ function listTimelineEventRows(
           .prepare(
             `SELECT * FROM timeline_events
           WHERE session_id = ? AND timeline_id = ?
-           ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
            LIMIT ?`,
           )
           .all(timelineId, timelineId, limit)
@@ -451,7 +467,7 @@ function listTimelineEventRows(
           .prepare(
             `SELECT * FROM timeline_events
           WHERE session_id = ? AND timeline_id = ? AND created_at < ?
-           ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
            LIMIT ?`,
           )
           .all(timelineId, timelineId, beforeCreatedAt, limit)
@@ -499,4 +515,90 @@ export function listTimelineHistoryBefore(
       .filter((item): item is TimelineHistoryItem => item !== null),
     hasMore,
   };
+}
+
+type ReadCursor = {
+  last_read_message_created_at: number | null;
+  last_read_message_id: string | null;
+};
+
+type MessagePosition = { id: string; created_at: number };
+
+export function getSessionUnreadWindow(
+  db: CoreDb,
+  sessionId: string,
+  minimumLimit: number,
+): { firstUnreadId: string | null; limit: number } {
+  const cursor = db
+    .prepare(
+      'SELECT last_read_message_created_at, last_read_message_id FROM sessions WHERE id = ?',
+    )
+    .get(sessionId) as ReadCursor | undefined;
+
+  if (!cursor || cursor.last_read_message_created_at === null) {
+    return { firstUnreadId: null, limit: minimumLimit };
+  }
+
+  const first = db
+    .prepare(
+      `SELECT id, created_at FROM timeline_events
+       WHERE session_id = ? AND kind = 'chat' AND role = 'assistant'
+         AND (created_at > ? OR (created_at = ? AND id > ?))
+       ORDER BY created_at ASC, id ASC LIMIT 1`,
+    )
+    .get(
+      sessionId,
+      cursor.last_read_message_created_at,
+      cursor.last_read_message_created_at,
+      cursor.last_read_message_id ?? '',
+    ) as MessagePosition | undefined;
+
+  if (!first) {
+    return { firstUnreadId: null, limit: minimumLimit };
+  }
+
+  const count = db
+    .prepare(
+      'SELECT COUNT(*) AS count FROM timeline_events WHERE session_id = ? AND (created_at > ? OR (created_at = ? AND id >= ?))',
+    )
+    .get(sessionId, first.created_at, first.created_at, first.id) as {
+    count: number;
+  };
+
+  return {
+    firstUnreadId: first.id,
+    limit: Math.max(minimumLimit, count.count + 20),
+  };
+}
+
+export function markSessionRead(
+  db: CoreDb,
+  sessionId: string,
+  messageId: string | null,
+): void {
+  const latest = messageId
+    ? (db
+        .prepare(
+          "SELECT id, created_at FROM timeline_events WHERE session_id = ? AND kind = 'chat' AND role = 'assistant' AND id = ?",
+        )
+        .get(sessionId, messageId) as MessagePosition | undefined)
+    : null;
+
+  if (messageId && !latest) {
+    return;
+  }
+
+  const createdAt = latest?.created_at ?? 0;
+  const id = latest?.id ?? '';
+
+  db.run(
+    `UPDATE sessions
+     SET last_read_message_created_at = ?, last_read_message_id = ?
+     WHERE id = ? AND (
+       last_read_message_created_at IS NULL OR
+       last_read_message_created_at < ? OR
+       (last_read_message_created_at = ? AND COALESCE(last_read_message_id, '') < ?)
+     )`,
+    [createdAt, id, sessionId, createdAt, createdAt, id],
+  );
 }

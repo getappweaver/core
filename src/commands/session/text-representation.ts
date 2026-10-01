@@ -13,6 +13,8 @@ import { renderSessionMessagesText } from './messages/renderers/text';
 import type { SessionMessagesRepresentation } from './messages/representation';
 import { renderSessionNewText } from './new/renderers/text';
 import type { SessionNewRepresentation } from './new/representation';
+import { renderSessionRenameText } from './rename/renderers/text';
+import type { SessionRenameRepresentation } from './rename/representation';
 import { renderSessionResumeText } from './resume/renderers/text';
 import type { SessionResumeRepresentation } from './resume/representation';
 import { renderSessionResumeLastText } from './resume-last/renderers/text';
@@ -25,6 +27,7 @@ export type SessionTextRepresentation =
   | SessionAdoptRepresentation
   | SessionAttachRepresentation
   | SessionNewRepresentation
+  | SessionRenameRepresentation
   | SessionResumeLastRepresentation
   | SessionResumeRepresentation
   | SessionListRepresentation
@@ -44,6 +47,8 @@ export function renderSessionText(
       return renderSessionAttachText(representation, context);
     case 'session.new':
       return renderSessionNewText(representation, context);
+    case 'session.rename':
+      return renderSessionRenameText(representation, context);
     case 'session.resume-last':
       return renderSessionResumeLastText(representation, context);
     case 'session.resume':

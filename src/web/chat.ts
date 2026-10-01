@@ -8,7 +8,7 @@ import { createModelSourceCoordinator } from '@src/core/model-source';
 import { getWorkspaceInstructions } from '@src/db';
 import { getWorkspaceTarget } from '@src/db';
 import { debug } from '@src/logger';
-import { assertWebSession } from '@src/session';
+import { assertWebSession, getAppWeaverSessionTitle } from '@src/session';
 
 import type { WebRouteContext } from './routes';
 
@@ -74,6 +74,8 @@ export async function runWebChat(
             backendName: 'opencode',
             dmBotRoot: ctx.dmBotRoot,
             cwd,
+            sessionId,
+            sessionTitle: getAppWeaverSessionTitle(ctx.seenDb, sessionId),
           }),
           workspaceInstructions: getWorkspaceInstructions(ctx.seenDb, workspace)
             .instructions,

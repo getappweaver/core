@@ -8,6 +8,7 @@ import type { ToolIntervention } from '../../ws-types';
 export type TimelineViewProps = {
   activeFormId: string | null;
   timeline: TimelineItem[];
+  firstUnreadId: string | null;
   showBottomFade: boolean;
   isTimelineItemHidden?: (
     item: Extract<TimelineItem, { type: 'command_result' }>,

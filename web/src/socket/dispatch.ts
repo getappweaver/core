@@ -112,12 +112,34 @@ export function handleServerMessage(params: {
     | 'setToolInterventions'
     | 'setPaymentRequest'
     | 'setPaymentStatus'
+    | 'setComposerAiState'
   >;
 }): void {
   const { message, pendingRequests, adapters } = params;
   const pending = pendingRequests.get(message.requestId);
 
   switch (message.type) {
+    case 'session_title_updated':
+      adapters.setComposerAiState((state) => {
+        if (!state || state.workspace !== message.workspace) {
+          return state;
+        }
+
+        return {
+          ...state,
+          currentSessionTitle:
+            state.currentSessionId === message.sessionId
+              ? message.title
+              : state.currentSessionTitle,
+          recentSessions: state.recentSessions.map((session) =>
+            session.id === message.sessionId
+              ? { ...session, title: message.title }
+              : session,
+          ),
+        };
+      });
+
+      return;
     case 'commands_result':
       pending?.onCommandsResult?.(message);
 

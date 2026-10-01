@@ -69,6 +69,20 @@ export const CompactSessionClientMessageSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+export const RenameSessionClientMessageSchema = z.object({
+  type: z.literal('rename_session'),
+  requestId: RequestIdSchema,
+  sessionId: z.string().min(1),
+  title: z.string().trim().min(1).max(120),
+});
+
+export const MarkSessionReadClientMessageSchema = z.object({
+  type: z.literal('mark_session_read'),
+  requestId: RequestIdSchema,
+  sessionId: z.string().min(1),
+  messageId: z.string().min(1).nullable(),
+});
+
 export const LoadTimelineClientMessageSchema = z.object({
   type: z.literal('load_timeline'),
   requestId: RequestIdSchema,
@@ -274,6 +288,8 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   RequestCommandsClientMessageSchema,
   RequestComposerAiStateClientMessageSchema,
   CompactSessionClientMessageSchema,
+  RenameSessionClientMessageSchema,
+  MarkSessionReadClientMessageSchema,
   LoadTimelineClientMessageSchema,
   LoadTimelineBeforeClientMessageSchema,
   RunCommandClientMessageSchema,
@@ -423,12 +439,21 @@ export type ComposerAiStateResultServerMessage = {
   state: ComposerAiState;
 };
 
+export type SessionTitleUpdatedServerMessage = {
+  type: 'session_title_updated';
+  requestId: string;
+  sessionId: string;
+  workspace: ComposerAiState['workspace'];
+  title: string | null;
+};
+
 export type TimelineEventsResultServerMessage = {
   type: 'timeline_events_result';
   requestId: string;
   timelineId: string;
   items: TimelineHistoryItem[];
   hasMore: boolean;
+  firstUnreadId: string | null;
 };
 
 export type CommandResultServerMessage = {
@@ -447,6 +472,7 @@ export type ChatResultServerMessage = {
   type: 'chat_result';
   requestId: string;
   sessionId: string;
+  eventId: string | null;
   output: string;
 };
 
@@ -513,6 +539,7 @@ export type PaymentStatusServerMessage = {
 
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
+  | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
   | CommandResultServerMessage
@@ -593,6 +620,7 @@ export function createTimelineEventsResultMessage(params: {
   timelineId: string;
   items: TimelineHistoryItem[];
   hasMore: boolean;
+  firstUnreadId: string | null;
 }): TimelineEventsResultServerMessage {
   return {
     type: 'timeline_events_result',
@@ -600,6 +628,7 @@ export function createTimelineEventsResultMessage(params: {
     timelineId: params.timelineId,
     items: params.items,
     hasMore: params.hasMore,
+    firstUnreadId: params.firstUnreadId,
   };
 }
 
@@ -617,12 +646,14 @@ export function createPromptMessage(params: {
 export function createChatResultMessage(params: {
   requestId: string;
   sessionId: string;
+  eventId: string | null;
   output: string;
 }): ChatResultServerMessage {
   return {
     type: 'chat_result',
     requestId: params.requestId,
     sessionId: params.sessionId,
+    eventId: params.eventId,
     output: params.output,
   };
 }

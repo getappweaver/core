@@ -7,6 +7,8 @@ import { getState, STATE_CURRENT_SESSION, webSessionStateKey } from './db';
 import {
   assertWebSession,
   getOrCreateCurrentSession,
+  listAppWeaverSessions,
+  renameAppWeaverSession,
   setCurrentSession,
 } from './session';
 
@@ -22,7 +24,7 @@ describe('session selection', () => {
     nextId = 0;
 
     sqlite.run(
-      'CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER, backend TEXT, workspace TEXT, updated_at INTEGER)',
+      "CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER, backend TEXT, workspace TEXT, updated_at INTEGER, title TEXT, title_origin TEXT NOT NULL DEFAULT 'manual', last_read_message_created_at INTEGER, last_read_message_id TEXT)",
     );
 
     sqlite.run('CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT)');
@@ -75,5 +77,49 @@ describe('session selection', () => {
 
     expect(other).not.toBe(web);
     expect(getState(db, webSessionStateKey('parent'))).toBe(web);
+  });
+
+  test('stores manual titles in AppWeaver and scopes them to the workspace', async () => {
+    const id = await getOrCreateCurrentSession({
+      db,
+      backend,
+      cwd: '/parent',
+      workspace: 'parent',
+      selection: 'web',
+    });
+
+    expect(
+      renameAppWeaverSession({
+        db,
+        sessionId: id,
+        workspace: 'parent',
+        title: '  Research task  ',
+        mode: 'manual',
+      }),
+    ).toEqual({ status: 'updated', title: 'Research task' });
+
+    expect(listAppWeaverSessions(db, 'parent', 5)).toMatchObject([
+      { id, title: 'Research task' },
+    ]);
+
+    expect(() =>
+      renameAppWeaverSession({
+        db,
+        sessionId: id,
+        workspace: 'appweaver',
+        title: 'Other',
+        mode: 'manual',
+      }),
+    ).toThrow();
+
+    expect(() =>
+      renameAppWeaverSession({
+        db,
+        sessionId: id,
+        workspace: 'parent',
+        title: ' ',
+        mode: 'manual',
+      }),
+    ).toThrow();
   });
 });

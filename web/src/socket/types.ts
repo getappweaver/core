@@ -24,6 +24,7 @@ import type {
   PaymentStatusServerMessage,
   PromptPayload,
   PromptServerMessage,
+  SessionTitleUpdatedServerMessage,
   TimelineEventsResultServerMessage,
   ToolIntervention,
 } from '../ws-types';
@@ -49,6 +50,7 @@ export type PendingRequest = {
 
 export type IncomingServerMessage =
   | CommandsResultServerMessage
+  | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
   | CapabilityProvidersResultServerMessage
@@ -72,6 +74,8 @@ export type SocketAppAdapters = {
   auth: Pick<NostrAuthContextValue, 'authState' | 'getNip98Token'>;
   timelineId: Accessor<string>;
   setTimelineId: (sessionId: string) => void;
+  setFirstUnreadId: (eventId: string | null) => void;
+  focusUnreadDivider: (sessionId: string, onFocused: () => void) => void;
   setCommands: Setter<CommandDetail[]>;
   setComposerAiState: Setter<
     import('../commands/types').ComposerAiState | null

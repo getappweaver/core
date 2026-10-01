@@ -75,7 +75,7 @@ function shouldRefreshComposerAiState(
         subcommand,
       )) ||
     (command === 'session' &&
-      ['new', 'attach', 'adopt', 'resume', 'resume-last'].includes(
+      ['new', 'rename', 'attach', 'adopt', 'resume', 'resume-last'].includes(
         subcommand,
       )) ||
     (command === 'bot' && subcommand === 'workspace')
@@ -2307,7 +2307,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         if (shouldRefreshComposerAiStateAfterDone) {
           adapters.requestComposerAiState(
-            commandAction.command === 'session' ||
+            (commandAction.command === 'session' &&
+              commandAction.subcommand !== 'rename') ||
               (commandAction.command === 'bot' &&
                 commandAction.subcommand === 'workspace')
               ? 'latest'
@@ -2638,7 +2639,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         if (shouldRefreshComposerAiState(command, subcommand.name)) {
           adapters.requestComposerAiState(
-            command === 'session' ||
+            (command === 'session' && subcommand.name !== 'rename') ||
               (command === 'bot' && subcommand.name === 'workspace')
               ? 'latest'
               : 'current',
