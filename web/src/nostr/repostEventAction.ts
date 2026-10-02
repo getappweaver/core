@@ -24,6 +24,7 @@ const SignalReviewPayloadSchema = z
     targetAuthorPubkey: z.string().min(1).nullable().default(null),
     targetAuthorLabel: z.string().min(1).default('Target author'),
     candidateTopics: z.array(z.string()).default([]),
+    allowReadPost: z.boolean().default(true),
     allowRemember: z.boolean().default(true),
     mode: z.enum(['ask', 'always', 'never']).default('ask'),
     targetEventJson: z.string().nullable().default(null),
@@ -54,6 +55,7 @@ const SendRepostPayloadSchema = RepostPayloadSchema.extend({
   signal_outcome: z.enum(['create', 'without_signal']).optional(),
   signal_topics: z.union([z.string(), z.array(z.string())]).optional(),
   signal_author_pubkey: z.string().nullable().optional(),
+  signal_read_post: z.union([z.boolean(), z.string()]).optional(),
   signal_remember: z.union([z.boolean(), z.string()]).optional(),
 });
 
@@ -225,13 +227,27 @@ function signalReviewNodes(
             children: [text('No topics')],
           }),
         ]),
-    ...(review.allowRemember
+    ...(review.allowReadPost || review.allowRemember
       ? [
           el({
             tag: 'divider',
             props: { className: 'web-form__section-divider' },
             children: [],
           }),
+        ]
+      : []),
+    ...(review.allowReadPost
+      ? [
+          signalReviewCheckbox({
+            fieldName: 'signal_read_post',
+            value: 'true',
+            label: 'Read post',
+            checked: true,
+          }),
+        ]
+      : []),
+    ...(review.allowRemember
+      ? [
           signalReviewCheckbox({
             fieldName: 'signal_remember',
             value: 'true',
@@ -373,6 +389,12 @@ function signalRemember(
   return value === true || value === 'true' || value === '1';
 }
 
+function signalReadPost(
+  value: z.infer<typeof SendRepostPayloadSchema>['signal_read_post'],
+): boolean {
+  return value === true || value === 'true' || value === '1';
+}
+
 function repostAfterRecordCommands({
   payload,
   isQuote,
@@ -396,7 +418,10 @@ function repostAfterRecordCommands({
   const remember =
     review.mode === 'ask' && signalRemember(payload.signal_remember);
 
-  if (outcome === 'without_signal' && !remember) {
+  const readPost =
+    review.mode === 'ask' && signalReadPost(payload.signal_read_post);
+
+  if (outcome === 'without_signal' && !remember && !readPost) {
     return [];
   }
 
@@ -424,6 +449,7 @@ function repostAfterRecordCommands({
               : (payload.signal_author_pubkey ?? null)
             : null,
         signal_remember: remember,
+        signal_read_post: readPost,
         target_event_json: review.targetEventJson,
         candidate_topics: review.candidateTopics,
       },

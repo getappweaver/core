@@ -396,6 +396,7 @@ export const WebNostrPostActivityHeaderSchema = z.object({
   actorPicture: z.string().min(1).optional(),
   actorAbout: z.string().optional(),
   createdAt: z.number().int(),
+  comment: z.string().optional(),
   profileActions: z.array(WebNostrPostExtraActionSchema).optional(),
   profileActionsReadAction: WebActionSchema.nullable().optional(),
 });

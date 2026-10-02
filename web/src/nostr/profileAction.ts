@@ -836,10 +836,13 @@ function addressReferencesForContent({
         authorUsername: profile?.username ?? undefined,
         authorPicture: profile?.picture ?? undefined,
         authorAbout: profile?.about ?? undefined,
-        href: `https://jumble.social/notes/${match[1]!}`,
+        href:
+          decoded.data.kind === 30023
+            ? undefined
+            : `https://jumble.social/notes/${match[1]!}`,
         label:
           decoded.data.kind === 30023
-            ? 'Read long-form post on Jumble'
+            ? undefined
             : 'Open addressable event on Jumble',
         showActions: false,
       });

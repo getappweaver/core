@@ -911,6 +911,15 @@ function shortValue(value: string | undefined): string {
   return value.length > 18 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value;
 }
 
+function formatContentCharCount(count: number): string {
+  if (count >= 1000) {
+    const k = count / 1000;
+    const formatted = k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
+    return `${formatted}K chars`;
+  }
+  return `${count} chars`;
+}
+
 function firstNonEmpty(values: string[]): string | undefined {
   return values.find((value) => value.trim().length > 0);
 }
@@ -1718,7 +1727,26 @@ function ReferenceCard(props: {
   const visitedIds = () => props.visitedIds ?? new Set<string>();
   const name = () => referenceDisplayName(reference());
 
-  const attachments = () => attachmentsFromContent(reference().content ?? '');
+  const [contentExpanded, setContentExpanded] = createSignal(false);
+  const isLongForm = () => reference().kind === 30023;
+  const collapsedChars = 420;
+
+  const isContentCollapsible = () =>
+    isLongForm() && (reference().content?.length ?? 0) > collapsedChars;
+
+  const isContentCollapsed = () =>
+    isContentCollapsible() && !contentExpanded();
+
+  const visibleReferenceContent = () => {
+    const raw = reference().content ?? '';
+    if (isContentCollapsed()) {
+      return `${raw.slice(0, collapsedChars).trimEnd()}...`;
+    }
+    return raw;
+  };
+
+  const attachments = () =>
+    attachmentsFromContent(reference().content ?? '');
 
   const embeddedReferences = () => reference().embeddedReferences ?? [];
 
@@ -2008,11 +2036,39 @@ function ReferenceCard(props: {
                       {(content) => (
                         <div class="web-nostrPost__embedContent">
                           <InlineContent
-                            content={content()}
+                            content={visibleReferenceContent()}
                             inlineProfiles={reference().inlineProfiles ?? {}}
                             embeds={embeddedReferenceMap()}
                             runAction={props.runAction}
                           />
+                          <Show when={isContentCollapsed()}>
+                            <div class="web-nostrPost__contentToggleBlock">
+                              <button
+                                type="button"
+                                class="web-nostrPost__action web-nostrPost__contentToggle"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setContentExpanded(true);
+                                }}
+                              >
+                                Show all content ({formatContentCharCount(content().length)})
+                              </button>
+                            </div>
+                          </Show>
+                          <Show when={contentExpanded() && isContentCollapsible()}>
+                            <div class="web-nostrPost__contentToggleBlock">
+                              <button
+                                type="button"
+                                class="web-nostrPost__action web-nostrPost__contentToggle"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setContentExpanded(false);
+                                }}
+                              >
+                                Hide content
+                              </button>
+                            </div>
+                          </Show>
                         </div>
                       )}
                     </Show>
@@ -2098,11 +2154,41 @@ function ReferenceCard(props: {
                 <>
                   <div class="web-nostrPost__embedContent">
                     <InlineContent
-                      content={content()}
+                      content={visibleReferenceContent()}
                       inlineProfiles={reference().inlineProfiles ?? {}}
                       embeds={embeddedReferenceMap()}
                       runAction={props.runAction}
                     />
+                    <Show when={isContentCollapsed()}>
+                      <div class="web-nostrPost__contentToggleBlock">
+                        <button
+                          type="button"
+                          class="web-nostrPost__action web-nostrPost__contentToggle"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setContentExpanded(true);
+                          }}
+                        >
+                          Show all content ({formatContentCharCount(content().length)})
+                        </button>
+                      </div>
+                    </Show>
+                    <Show when={contentExpanded() && isContentCollapsible()}>
+                      <div class="web-nostrPost__contentToggleBlock">
+                        <button
+                          type="button"
+                          class="web-nostrPost__action web-nostrPost__contentToggle"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setContentExpanded(false);
+                          }}
+                        >
+                          Hide content
+                        </button>
+                      </div>
+                    </Show>
                   </div>
                   <AttachmentPreview
                     attachments={attachmentsFromContent(content())}
@@ -2197,6 +2283,7 @@ export function WebNostrPostElement(
   const embeds = () => elementProps()?.nostrEmbeds ?? {};
   const inlineProfiles = () => elementProps()?.nostrInlineProfiles ?? {};
   const content = () => elementProps()?.nostrContent ?? '';
+  const isLongForm = () => elementProps()?.nostrKind === 30023;
 
   const collapsedContentChars = () =>
     elementProps()?.nostrCollapsedContentChars ?? 420;
@@ -2590,6 +2677,13 @@ export function WebNostrPostElement(
                 activity.actorName ??
                 activity.actorNpub}
             </button>
+            <Show when={activity.comment}>
+              {(comment) => (
+                <span class="web-nostrPost__activityComment">
+                  {' '}· “{comment()}”
+                </span>
+              )}
+            </Show>
             <span> · </span>
             <time class="web-nostrPost__time">
               {relativeTime(activity.createdAt, nowMs())}
@@ -2716,14 +2810,48 @@ export function WebNostrPostElement(
                 />
               </Show>
               <Show when={isContentCollapsed()}>
-                {' '}
-                <button
-                  type="button"
-                  class="web-nostrPost__action web-nostrPost__more"
-                  onClick={() => setExpanded(true)}
+                <Show
+                  when={isLongForm()}
+                  fallback={
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        class="web-nostrPost__action web-nostrPost__more"
+                        onClick={() => setExpanded(true)}
+                      >
+                        More
+                      </button>
+                    </>
+                  }
                 >
-                  More
-                </button>
+                  <div class="web-nostrPost__contentToggleBlock">
+                    <button
+                      type="button"
+                      class="web-nostrPost__action web-nostrPost__contentToggle"
+                      onClick={() => setExpanded(true)}
+                    >
+                      Show all content ({formatContentCharCount(content().length)})
+                    </button>
+                  </div>
+                </Show>
+              </Show>
+              <Show
+                when={
+                  expanded() &&
+                  isLongForm() &&
+                  content().length > collapsedContentChars()
+                }
+              >
+                <div class="web-nostrPost__contentToggleBlock">
+                  <button
+                    type="button"
+                    class="web-nostrPost__action web-nostrPost__contentToggle"
+                    onClick={() => setExpanded(false)}
+                  >
+                    Hide content
+                  </button>
+                </div>
               </Show>
             </div>
           }

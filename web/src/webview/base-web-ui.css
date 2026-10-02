@@ -446,6 +446,11 @@ a.web-button:focus-visible {
   cursor: pointer;
 }
 
+.web-nostrPost__activityComment {
+  color: var(--color-text);
+  font-style: italic;
+}
+
 .web-nostrPost__header {
   justify-content: space-between;
 }
@@ -691,6 +696,16 @@ a.web-button:focus-visible {
 .web-nostrPost__more {
   display: inline;
   margin-left: 0.15rem;
+}
+
+.web-nostrPost__contentToggleBlock {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.35rem;
+}
+
+.web-nostrPost__contentToggle {
+  width: fit-content;
 }
 
 .web-nostrPost__replyContext,

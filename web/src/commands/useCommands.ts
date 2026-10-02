@@ -147,6 +147,16 @@ function showsTimelineLoadingWidget(
   );
 }
 
+type RootRequestTrackingProps = {
+  sourceId: string | undefined;
+  requestId: string;
+};
+
+type RootResponseStalenessProps = {
+  sourceId: string | undefined;
+  requestId: string;
+};
+
 function timelineEventOutputToItem(
   output: TimelineEventOutput,
   id: string,
@@ -502,7 +512,47 @@ function expandHighlightTargetTemplate(
 
 export function useCommands(adapters: CommandsAdapters): CommandsHook {
   const refreshGenerationBySource = new Map<string, number>();
+  const rootGenerationBySource = new Map<string, number>();
+  const rootGenerationByRequest = new Map<string, number>();
   let chromeModalOriginParams: RunWebActionParams | null = null;
+
+  function beginRootGeneration(sourceId: string): number {
+    const generation = (rootGenerationBySource.get(sourceId) ?? 0) + 1;
+    rootGenerationBySource.set(sourceId, generation);
+
+    return generation;
+  }
+
+  function trackRootRequest({
+    sourceId,
+    requestId,
+  }: RootRequestTrackingProps): void {
+    if (sourceId === undefined) {
+      return;
+    }
+
+    rootGenerationByRequest.set(requestId, beginRootGeneration(sourceId));
+  }
+
+  function isStaleRootResponse({
+    sourceId,
+    requestId,
+  }: RootResponseStalenessProps): boolean {
+    if (sourceId === undefined) {
+      return false;
+    }
+
+    const generation = rootGenerationByRequest.get(requestId);
+
+    return (
+      generation !== undefined &&
+      rootGenerationBySource.get(sourceId) !== generation
+    );
+  }
+
+  function untrackRootRequest(requestId: string): void {
+    rootGenerationByRequest.delete(requestId);
+  }
 
   const pendingReleasesBySource = new Map<
     string,
@@ -819,6 +869,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         const command = optimisticPayload.command;
 
         const reconcile = () => {
+          untrackRootRequest(requestId);
+
           const refresh = action.refresh;
 
           if (!refresh || !params?.onReplaceRoot) {
@@ -859,6 +911,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         });
 
         try {
+          trackRootRequest({
+            sourceId: params?.webCommandSourceId,
+            requestId,
+          });
+
           adapters.sendSocketMessage({
             type: 'run_command',
             requestId,
@@ -873,6 +930,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           });
         } catch (err) {
           adapters.pendingRequests.delete(requestId);
+          untrackRootRequest(requestId);
 
           adapters.appendSystemMessage(
             err instanceof Error ? err.message : String(err),
@@ -2011,6 +2069,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             return;
           }
 
+          if (isStaleRootResponse({ sourceId, requestId: refreshRequestId })) {
+            return;
+          }
+
           const refreshOutput = splitCommandOutput(refreshMessage.output);
 
           const highlightedWeb = refreshOutput.web
@@ -2071,6 +2133,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             subcommand: refresh.subcommand,
           });
 
+          untrackRootRequest(refreshRequestId);
+
           if (sourceId && refreshGeneration !== null) {
             settleRefreshGeneration(sourceId, refreshGeneration);
           } else {
@@ -2083,6 +2147,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         },
         onError: () => {
           finishBrowserTrace('error');
+          untrackRootRequest(refreshRequestId);
 
           if (sourceId && refreshGeneration !== null) {
             settleRefreshGeneration(sourceId, refreshGeneration);
@@ -2093,6 +2158,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       });
 
       try {
+        trackRootRequest({ sourceId, requestId: refreshRequestId });
+
         adapters.sendSocketMessage({
           type: 'run_command',
           requestId: refreshRequestId,
@@ -2116,6 +2183,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         refreshChildInFlight = true;
       } catch (err) {
         adapters.pendingRequests.delete(refreshRequestId);
+        untrackRootRequest(refreshRequestId);
         finishBrowserTrace('error');
 
         adapters.appendSystemMessage(
@@ -2242,7 +2310,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           params?.onReplaceRoot &&
           output.web &&
           !action.refresh &&
-          !recordTl
+          !recordTl &&
+          !isStaleRootResponse({ sourceId, requestId })
         ) {
           params.onReplaceRoot(
             withInitialRevealedIds(output.web, commandAction.revealIds),
@@ -2298,6 +2367,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         ]);
       },
       onDone: () => {
+        untrackRootRequest(requestId);
         params?.onCommandSettled?.(null);
 
         emitStoryCommandCompleted({
@@ -2365,6 +2435,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         }
       },
       onError: (message) => {
+        untrackRootRequest(requestId);
         params?.onCommandSettled?.(message.message);
         finishBrowserTrace('error');
 
@@ -2393,6 +2464,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     });
 
     try {
+      trackRootRequest({ sourceId, requestId });
+
       if (sourceId && pendingPresentation === 'entity' && sourceEntityKey) {
         adapters.beginWebEntityPending({
           sourceId,
@@ -2435,6 +2508,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       clearPluginInstallRestartStatus();
       endUserPendingOnce();
       adapters.pendingRequests.delete(requestId);
+      untrackRootRequest(requestId);
       finishBrowserTrace('error');
 
       params?.onCommandSettled?.(

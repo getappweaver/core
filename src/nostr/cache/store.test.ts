@@ -8,6 +8,7 @@ import {
 
 import { createNostrCacheTables, type NostrCacheDb } from './db';
 import { runNostrCacheMaintenance } from './maintenance';
+import { parseNostrEvent } from './schema';
 import {
   getCachedEventById,
   getCachedReplaceableEvent,
@@ -84,7 +85,7 @@ describe('Nostr cache store', () => {
     expect(result.persisted).toBe(true);
 
     expect(getCachedEventById(db, event.id)).toEqual({
-      event,
+      event: parseNostrEvent(event),
       relayHints: ['wss://relay.example/'],
       cachedAt: 1_000,
       lastAccessedAt: 1_000,

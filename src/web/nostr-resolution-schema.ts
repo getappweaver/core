@@ -93,6 +93,7 @@ export const eventReferenceEdgeSchema = z.object({
     'reply-target',
     'reaction-target',
     'repost-target',
+    'zap-target',
   ]),
   target: z.discriminatedUnion('type', [
     eventTargetSchema,

@@ -353,7 +353,9 @@ function parseInteractionTarget(
       ? 'repost-target'
       : event.kind === 7
         ? 'reaction-target'
-        : null;
+        : event.kind === 9735
+          ? 'zap-target'
+          : null;
 
   if (!role) {
     return;

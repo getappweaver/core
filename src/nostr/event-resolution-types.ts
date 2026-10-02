@@ -60,7 +60,8 @@ export type EventReferenceRole =
   | 'embed'
   | 'reply-target'
   | 'reaction-target'
-  | 'repost-target';
+  | 'repost-target'
+  | 'zap-target';
 
 export type EventReferenceTarget =
   | {
