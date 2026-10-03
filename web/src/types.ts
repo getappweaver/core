@@ -216,6 +216,8 @@ export type TimelineItem =
       clientView: ClientViewRoot | null;
       timelineSingletonKey?: string;
       timelineSingletonHidden?: boolean;
+      /** Set when the item was restored from a persisted snapshot instead of a fresh command run. */
+      restoredSnapshot?: boolean;
     }
   | {
       id: string;

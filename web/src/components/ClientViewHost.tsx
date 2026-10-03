@@ -7,6 +7,7 @@ import type { StoryRuntimePayload } from '../story/types';
 import type { AiAgentEditorPayload } from '../types';
 
 import { AiAgentEditorView } from './AiAgentEditorView';
+import { ProcessRestartView } from './ProcessRestartView';
 
 type ClientViewHostProps = {
   view: ClientViewRoot;
@@ -19,6 +20,10 @@ type ClientViewHostProps = {
 };
 
 export function ClientViewHost(props: ClientViewHostProps): JSX.Element {
+  if (props.view.view === 'process-restart') {
+    return <ProcessRestartView view={props.view} />;
+  }
+
   if (props.view.view === 'ai-agent-editor') {
     const raw = props.view.payload as AiAgentEditorPayload;
 

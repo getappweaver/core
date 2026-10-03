@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
@@ -453,6 +454,7 @@ function AppInner(): JSX.Element {
   }
 
   const chrome = useChrome();
+  let appendingTimelineCatchUp = false;
 
   function persistSessionWidgetLayout(sessionId: string): void {
     if (isWebDemoMode()) {
@@ -538,11 +540,19 @@ function AppInner(): JSX.Element {
 
     if (dockVisible()) {
       setDockWidgetItemsByKey(
-        Object.fromEntries(widgets.map((widget) => [widget.key, widget.item])),
+        Object.fromEntries(
+          widgets.map((widget) => [
+            widget.key,
+            { ...widget.item, restoredSnapshot: true },
+          ]),
+        ),
       );
     } else {
       setDockWidgetItemsByKey({});
-      setTimeline(widgets.map((widget) => widget.item));
+
+      setTimeline(
+        widgets.map((widget) => ({ ...widget.item, restoredSnapshot: true })),
+      );
     }
 
     pendingModalRestore = layout?.modal
@@ -595,6 +605,15 @@ function AppInner(): JSX.Element {
   } = useSocket({
     auth,
     setTimeline,
+    appendTimelineCatchUp: (update) => {
+      appendingTimelineCatchUp = true;
+
+      try {
+        batch(() => setTimeline(update));
+      } finally {
+        appendingTimelineCatchUp = false;
+      }
+    },
     timelineId,
     setTimelineId: (sessionId) => {
       const previousSessionId = timelineId();
@@ -2598,7 +2617,7 @@ function AppInner(): JSX.Element {
           continue;
         }
 
-        next[key] = { ...item, web, text: null };
+        next[key] = { ...item, web, text: null, restoredSnapshot: false };
         changed = true;
         replacedDockItem = true;
       }
@@ -2712,6 +2731,11 @@ function AppInner(): JSX.Element {
       const length = items.length;
       const grew = length > previousTimelineLength;
       previousTimelineLength = length;
+
+      if (appendingTimelineCatchUp) {
+        // Background catch-up must not move the viewport or hide live widgets.
+        return;
+      }
 
       if (
         !timelineScrolledAwayFromBottom() &&

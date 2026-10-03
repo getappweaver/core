@@ -43,6 +43,7 @@ export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
   output: string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
+  timelineEventId?: string;
 };
 
 export type TimelineEventsResultServerMessage = {
@@ -52,6 +53,7 @@ export type TimelineEventsResultServerMessage = {
   items: TimelineHistoryItem[];
   hasMore: boolean;
   firstUnreadId: string | null;
+  cursor?: number;
 };
 
 export type CapabilityProvidersResultServerMessage = {
@@ -73,6 +75,7 @@ export type PromptServerMessage = {
   type: 'prompt';
   requestId: string;
   prompt: PromptPayload;
+  timelineEventId?: string;
 };
 
 export type ChatResultServerMessage = {
@@ -112,6 +115,7 @@ export type InterventionRequestServerMessage = {
 export type DoneServerMessage = {
   type: 'done';
   requestId: string;
+  instanceId?: string;
 };
 
 export type ErrorServerMessage = {

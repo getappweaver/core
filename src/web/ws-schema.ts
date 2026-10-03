@@ -88,6 +88,13 @@ export const LoadTimelineClientMessageSchema = z.object({
   requestId: RequestIdSchema,
   timelineId: z.string().min(1),
   limit: z.number().int().positive().max(200).optional().default(100),
+  afterCursor: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .optional()
+    .default(null),
 });
 
 export const LoadTimelineBeforeClientMessageSchema = z.object({
@@ -146,6 +153,7 @@ export const PromptAnswerClientMessageSchema = z.object({
   type: z.literal('prompt_answer'),
   requestId: RequestIdSchema,
   answer: z.string(),
+  eventId: z.string().min(1).optional(),
 });
 
 export const PaymentActionClientMessageSchema = z.object({
@@ -454,18 +462,21 @@ export type TimelineEventsResultServerMessage = {
   items: TimelineHistoryItem[];
   hasMore: boolean;
   firstUnreadId: string | null;
+  cursor?: number;
 };
 
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
   output: string | WebNodeRoot | ClientViewRoot | TimelineEventOutput;
+  timelineEventId?: string;
 };
 
 export type PromptServerMessage = {
   type: 'prompt';
   requestId: string;
   prompt: PromptPayload;
+  timelineEventId?: string;
 };
 
 export type ChatResultServerMessage = {
@@ -517,6 +528,7 @@ export type CapabilityResultServerMessage = {
 export type DoneServerMessage = {
   type: 'done';
   requestId: string;
+  instanceId?: string;
 };
 
 export type ErrorServerMessage = {

@@ -29,14 +29,17 @@ import { debug, log } from '@src/logger';
 import type { InteractivePaymentBroker } from '@src/payments/service';
 import { createBrokerPaymentServiceFactory } from '@src/payments/service';
 import type { WebSocketPaymentSession } from '@src/payments/web-prompt';
+import { PROCESS_INSTANCE_ID } from '@src/process-instance';
 import { assertWebSession, renameAppWeaverSession } from '@src/session';
 import { watchSessionTitles } from '@src/session-title-notifications';
 import { getSubcommandDefinition } from '@src/system/command-definition';
 import {
   deleteTimelineEvent,
+  getTimelineInsertionCursor,
   getSessionUnreadWindow,
   insertTimelineEvent,
   listTimelineHistoryBefore,
+  listTimelineHistoryAfter,
   listTimelineHistoryLatest,
   markSessionRead,
   upsertTimelineCommandForm,
@@ -118,12 +121,12 @@ function insertCommandOutputTimelineEvent(props: {
   ctx: WebRouteContext;
   timelineId: string;
   output: TimelineEventOutput;
-}): void {
+}): string {
   const { ctx, timelineId, output } = props;
 
   switch (output.event.type) {
     case 'diff':
-      insertTimelineEvent(ctx.seenDb, {
+      return insertTimelineEvent(ctx.seenDb, {
         timelineId,
         sessionId: timelineId,
         source: 'web',
@@ -148,9 +151,7 @@ function insertCommandOutputTimelineEvent(props: {
         },
         prompt: null,
         requestId: null,
-      });
-
-      return;
+      }).id;
     default:
       return assertUnreachable(output.event.type);
   }
@@ -822,6 +823,32 @@ async function handleLoadTimeline(params: {
   ctx: WebRouteContext;
   message: LoadTimelineClientMessage;
 }): Promise<void> {
+  if (params.message.afterCursor !== null) {
+    const result = listTimelineHistoryAfter({
+      db: params.ctx.seenDb,
+      timelineId: params.message.timelineId,
+      afterCursor: params.message.afterCursor,
+      limit: params.message.limit,
+    });
+
+    sendMessage(params.ws, {
+      ...createTimelineEventsResultMessage({
+        requestId: params.message.requestId,
+        timelineId: params.message.timelineId,
+        items: result.items,
+        hasMore: result.hasMore,
+        firstUnreadId: null,
+      }),
+      cursor: result.cursor,
+    });
+
+    sendMessage(params.ws, createDoneMessage(params.message.requestId));
+
+    return;
+  }
+
+  const cursor = getTimelineInsertionCursor(params.ctx.seenDb);
+
   const unread = getSessionUnreadWindow(
     params.ctx.seenDb,
     params.message.timelineId,
@@ -840,16 +867,16 @@ async function handleLoadTimeline(params: {
     ? unread.firstUnreadId
     : null;
 
-  sendMessage(
-    params.ws,
-    createTimelineEventsResultMessage({
+  sendMessage(params.ws, {
+    ...createTimelineEventsResultMessage({
       requestId: params.message.requestId,
       timelineId: params.message.timelineId,
       items: result.items,
       hasMore: result.hasMore,
       firstUnreadId,
     }),
-  );
+    cursor,
+  });
 
   sendMessage(params.ws, createDoneMessage(params.message.requestId));
 }
@@ -954,7 +981,7 @@ async function handleRunCommand(params: {
     recordInTimeline: recordTl,
     send: (serverMessage) => {
       if (serverMessage.type === 'prompt' && recordTl) {
-        insertTimelineEvent(ctx.seenDb, {
+        const event = insertTimelineEvent(ctx.seenDb, {
           timelineId: message.timelineId,
           sessionId: message.timelineId,
           source: 'web',
@@ -971,6 +998,10 @@ async function handleRunCommand(params: {
           prompt: serverMessage.prompt,
           requestId: serverMessage.requestId,
         });
+
+        sendMessage(ws, { ...serverMessage, timelineEventId: event.id });
+
+        return;
       }
 
       sendMessage(ws, serverMessage);
@@ -979,6 +1010,7 @@ async function handleRunCommand(params: {
 
   if (recordTl) {
     insertTimelineEvent(ctx.seenDb, {
+      id: `${message.requestId}-user`,
       timelineId: message.timelineId,
       sessionId: message.timelineId,
       source: 'web',
@@ -1007,8 +1039,10 @@ async function handleRunCommand(params: {
     subcommand,
     payload: message.payload,
     sendReply: async (reply) => {
+      let timelineEventId: string | undefined;
+
       if (recordTl) {
-        insertTimelineEvent(ctx.seenDb, {
+        timelineEventId = insertTimelineEvent(ctx.seenDb, {
           timelineId: message.timelineId,
           sessionId: message.timelineId,
           source: 'web',
@@ -1028,16 +1062,16 @@ async function handleRunCommand(params: {
           clientView: null,
           prompt: null,
           requestId: null,
-        });
+        }).id;
       }
 
-      sendMessage(
-        ws,
-        createCommandResultMessage({
+      sendMessage(ws, {
+        ...createCommandResultMessage({
           requestId: message.requestId,
           output: reply,
         }),
-      );
+        timelineEventId,
+      });
     },
     promptFn,
     interactivePaymentServiceFactory: params.paymentBroker
@@ -1048,14 +1082,16 @@ async function handleRunCommand(params: {
       : undefined,
   });
 
+  let timelineEventId: string | undefined;
+
   if (recordTl && isTimelineEventOutput(result.output)) {
-    insertCommandOutputTimelineEvent({
+    timelineEventId = insertCommandOutputTimelineEvent({
       ctx,
       timelineId: message.timelineId,
       output: result.output,
     });
   } else if (recordTl) {
-    insertTimelineEvent(ctx.seenDb, {
+    timelineEventId = insertTimelineEvent(ctx.seenDb, {
       timelineId: message.timelineId,
       sessionId: message.timelineId,
       source: 'web',
@@ -1085,16 +1121,16 @@ async function handleRunCommand(params: {
           : result.output,
       prompt: null,
       requestId: null,
-    });
+    }).id;
   }
 
-  sendMessage(
-    ws,
-    createCommandResultMessage({
+  sendMessage(ws, {
+    ...createCommandResultMessage({
       requestId: message.requestId,
       output: result.output,
     }),
-  );
+    timelineEventId,
+  });
 
   sendMessage(ws, createDoneMessage(message.requestId));
 }
@@ -1266,8 +1302,10 @@ async function handleRunCapability(params: {
   });
 
   if (output) {
+    let timelineEventId: string | undefined;
+
     if (message.surface === 'timeline') {
-      insertTimelineEvent(ctx.seenDb, {
+      timelineEventId = insertTimelineEvent(ctx.seenDb, {
         timelineId: message.timelineId,
         sessionId: message.timelineId,
         source: 'web',
@@ -1288,16 +1326,16 @@ async function handleRunCapability(params: {
         clientView: null,
         prompt: null,
         requestId: null,
-      });
+      }).id;
     }
 
-    sendMessage(
-      ws,
-      createCommandResultMessage({
+    sendMessage(ws, {
+      ...createCommandResultMessage({
         requestId: message.requestId,
         output,
       }),
-    );
+      timelineEventId,
+    });
   }
 
   sendMessage(ws, createDoneMessage(message.requestId));
@@ -1346,6 +1384,7 @@ async function runChatInSession(
   });
 
   insertTimelineEvent(ctx.seenDb, {
+    id: `${message.requestId}-user`,
     timelineId: message.timelineId,
     sessionId: message.sessionId,
     source: 'web',
@@ -1417,7 +1456,7 @@ async function runChatInSession(
                 recordInTimeline: false,
                 send: (serverMessage) => {
                   if (serverMessage.type === 'prompt') {
-                    insertTimelineEvent(ctx.seenDb, {
+                    const event = insertTimelineEvent(ctx.seenDb, {
                       timelineId: message.timelineId,
                       sessionId: message.sessionId,
                       source: 'web',
@@ -1434,6 +1473,13 @@ async function runChatInSession(
                       prompt: serverMessage.prompt,
                       requestId: serverMessage.requestId,
                     });
+
+                    sendMessage(ws, {
+                      ...serverMessage,
+                      timelineEventId: event.id,
+                    });
+
+                    return;
                   }
 
                   sendMessage(ws, serverMessage);
@@ -1755,7 +1801,11 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
           ws.data.nip98Authenticated = true;
           ws.data.demoAuthenticated = demoAuth;
-          sendMessage(ws, createDoneMessage(authTry.data.requestId));
+
+          sendMessage(ws, {
+            ...createDoneMessage(authTry.data.requestId),
+            instanceId: PROCESS_INSTANCE_ID,
+          });
 
           return;
         }
@@ -1820,7 +1870,10 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
           switch (message.type) {
             case 'authenticate': {
-              sendMessage(ws, createDoneMessage(message.requestId));
+              sendMessage(ws, {
+                ...createDoneMessage(message.requestId),
+                instanceId: PROCESS_INSTANCE_ID,
+              });
 
               return;
             }
@@ -1987,6 +2040,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 resolved.recordInTimeline !== false
               ) {
                 insertTimelineEvent(ctx.seenDb, {
+                  id: message.eventId,
                   timelineId: resolved.timelineId,
                   sessionId: resolved.timelineId,
                   source: 'web',

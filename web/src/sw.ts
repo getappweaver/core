@@ -8,7 +8,6 @@ import { NetworkOnly } from 'workbox-strategies';
 declare const self: ServiceWorkerGlobalScope;
 
 clientsClaim();
-self.skipWaiting();
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
@@ -89,6 +88,11 @@ self.addEventListener('notificationclick', (event) => {
             'focus' in client
           ) {
             const windowClient = client as WindowClient;
+
+            if (windowClient.url === targetUrl) {
+              return windowClient.focus();
+            }
+
             const navigated = await windowClient.navigate(targetUrl);
 
             return (navigated ?? windowClient).focus();

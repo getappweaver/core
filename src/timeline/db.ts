@@ -118,6 +118,24 @@ export function createTimelineTables(db: CoreDb): void {
   db.run(
     'CREATE INDEX IF NOT EXISTS timeline_events_timeline_id_idx ON timeline_events (timeline_id, id)',
   );
+
+  // Keep insertion positions even after event deletion; cursors must never rewind.
+  db.run(`CREATE TABLE IF NOT EXISTS timeline_event_positions (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE
+  )`);
+
+  db.run(`INSERT INTO timeline_event_positions (event_id)
+    SELECT id FROM timeline_events e
+    WHERE NOT EXISTS (SELECT 1 FROM timeline_event_positions p WHERE p.event_id = e.id)
+    ORDER BY rowid
+    ON CONFLICT(event_id) DO NOTHING`);
+
+  db.run(`CREATE TRIGGER IF NOT EXISTS timeline_event_position_insert
+    AFTER INSERT ON timeline_events BEGIN
+      INSERT INTO timeline_event_positions (event_id) VALUES (NEW.id)
+      ON CONFLICT(event_id) DO NOTHING;
+    END`);
 }
 
 export function createTimelineEventId(): string {
@@ -514,6 +532,59 @@ export function listTimelineHistoryBefore(
       .map((row) => timelineEventToHistoryItem(rowToTimelineEventRecord(row)))
       .filter((item): item is TimelineHistoryItem => item !== null),
     hasMore,
+  };
+}
+
+export function getTimelineInsertionCursor(db: CoreDb): number {
+  const row = db
+    .prepare(
+      'SELECT COALESCE(MAX(sequence), 0) AS cursor FROM timeline_event_positions',
+    )
+    .get() as { cursor: number };
+
+  return row.cursor;
+}
+
+type ListTimelineHistoryAfterProps = {
+  db: CoreDb;
+  timelineId: string;
+  afterCursor: number;
+  limit: number;
+};
+
+export function listTimelineHistoryAfter({
+  db,
+  timelineId,
+  afterCursor,
+  limit,
+}: ListTimelineHistoryAfterProps): {
+  items: TimelineHistoryItem[];
+  hasMore: boolean;
+  cursor: number;
+} {
+  const rows = db
+    .prepare(
+      `SELECT e.*, p.sequence AS insertion_sequence
+    FROM timeline_event_positions p JOIN timeline_events e ON e.id = p.event_id
+    WHERE p.sequence > ? AND e.session_id = ? AND e.timeline_id = ?
+    ORDER BY p.sequence LIMIT ?
+  `,
+    )
+    .all(afterCursor, timelineId, timelineId, limit + 1) as Array<
+    TimelineEventRow & { insertion_sequence: number }
+  >;
+
+  const hasMore = rows.length > limit;
+  const visibleRows = rows.slice(0, limit);
+
+  return {
+    items: visibleRows
+      .map((row) => timelineEventToHistoryItem(rowToTimelineEventRecord(row)))
+      .filter((item): item is TimelineHistoryItem => item !== null),
+    hasMore,
+    cursor: hasMore
+      ? visibleRows.at(-1)!.insertion_sequence
+      : Math.max(afterCursor, getTimelineInsertionCursor(db)),
   };
 }
 

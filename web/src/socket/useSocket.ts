@@ -9,6 +9,12 @@ import type {
 } from '../commands/types';
 import { isWebDemoMode } from '../demo/runtime';
 import {
+  confirmAuthenticatedProcessInstance,
+  hasExpectedProcessRestart,
+  markProcessRestartDisconnected,
+  registerProcessRestart,
+} from '../processRestartStatus';
+import {
   consumePluginInstallRestartMessage,
   consumePluginInstallSuccessMessage,
   hasActivePluginInstallRestartStatus,
@@ -66,30 +72,6 @@ type DemoStoryEntry = {
     sandbox?: Record<string, unknown>;
   };
 };
-
-function preserveCurrentSingletonRoots(
-  restoredItems: TimelineItem[],
-  currentItems: TimelineItem[],
-): TimelineItem[] {
-  const currentSingletons = currentItems.filter(
-    (
-      item,
-    ): item is Extract<TimelineItem, { type: 'command_result' }> & {
-      timelineSingletonKey: string;
-    } => item.type === 'command_result' && Boolean(item.timelineSingletonKey),
-  );
-
-  if (currentSingletons.length === 0) {
-    return restoredItems;
-  }
-
-  const currentSingletonIds = new Set(currentSingletons.map((item) => item.id));
-
-  return [
-    ...restoredItems.filter((item) => !currentSingletonIds.has(item.id)),
-    ...currentSingletons,
-  ];
-}
 
 type CommandResultTimelineItem = Extract<
   TimelineItem,
@@ -328,6 +310,11 @@ export function useSocket(adapters: SocketAppAdapters) {
   let queuedComposerSelection: SessionSelection = 'current';
   const lastRunningBySession = new Map<string, boolean>();
   const pendingRequests = new Map<string, PendingRequest>();
+  const seenTimelineEventIds = new Set<string>();
+  const sessionByRequestId = new Map<string, string>();
+  let timelineCursor: { sessionId: string; cursor: number } | null = null;
+  let timelineLoadRequestId: string | null = null;
+  let timelineCatchUpQueued = false;
 
   function clearComposerStateRetry(): void {
     if (composerStateRetryTimer !== null) {
@@ -487,7 +474,36 @@ export function useSocket(adapters: SocketAppAdapters) {
       return;
     }
 
-    sendSocketMessage(getState(), message);
+    const record = message as ClientMessageRecord;
+
+    const timelineId =
+      typeof record.timelineId === 'string'
+        ? record.timelineId
+        : sessionByRequestId.get(record.requestId ?? '');
+
+    const answerEventId =
+      record.type === 'prompt_answer' ? createRequestId() : null;
+
+    sendSocketMessage(
+      getState(),
+      answerEventId ? { ...record, eventId: answerEventId } : message,
+    );
+
+    if (record.requestId && timelineId) {
+      sessionByRequestId.set(record.requestId, timelineId);
+    }
+
+    if (timelineId === adapters.timelineId()) {
+      if (answerEventId) {
+        seenTimelineEventIds.add(answerEventId);
+      } else if (
+        record.requestId &&
+        (record.type === 'chat' ||
+          (record.type === 'run_command' && record.recordInTimeline !== false))
+      ) {
+        seenTimelineEventIds.add(`${record.requestId}-user`);
+      }
+    }
   }
 
   function emitDemoMessage(message: WebSocketServerMessage): void {
@@ -663,11 +679,28 @@ export function useSocket(adapters: SocketAppAdapters) {
   }
 
   function loadSessionTimeline(sessionId: string): void {
+    if (sessionId !== adapters.timelineId()) {
+      return;
+    }
+
+    if (timelineLoadRequestId !== null) {
+      timelineCatchUpQueued = true;
+
+      return;
+    }
+
     const timelineRequestId = createRequestId();
+
+    const afterCursor =
+      timelineCursor?.sessionId === sessionId ? timelineCursor.cursor : null;
+
+    let catchUpHasMore = false;
+    timelineLoadRequestId = timelineRequestId;
 
     pendingRequests.set(timelineRequestId, {
       onTimelineEventsResult: (message) => {
         if (
+          timelineLoadRequestId !== timelineRequestId ||
           message.timelineId !== sessionId ||
           sessionId !== adapters.timelineId()
         ) {
@@ -676,6 +709,21 @@ export function useSocket(adapters: SocketAppAdapters) {
 
         const rawItems = message.items as TimelineItem[];
         const restoredItems = rawItems.map(restoredTimelineItem);
+
+        for (const item of restoredItems) {
+          if (item.type === 'command_result' && item.clientView) {
+            registerProcessRestart(item.clientView);
+          }
+        }
+
+        if (message.cursor !== undefined) {
+          timelineCursor = { sessionId, cursor: message.cursor };
+
+          catchUpHasMore =
+            afterCursor !== null &&
+            message.hasMore &&
+            message.cursor > afterCursor;
+        }
 
         const firstUnreadId = restoredItems.some(
           (item) => item.id === message.firstUnreadId,
@@ -723,11 +771,45 @@ export function useSocket(adapters: SocketAppAdapters) {
           });
         }
 
-        adapters.setFirstUnreadId(firstUnreadId);
+        if (afterCursor === null) {
+          adapters.setFirstUnreadId(firstUnreadId);
+        }
 
-        adapters.setTimeline((current) =>
-          preserveCurrentSingletonRoots(restoredItems, current),
-        );
+        const appendHistory =
+          afterCursor === null
+            ? adapters.setTimeline
+            : adapters.appendTimelineCatchUp;
+
+        appendHistory((current: TimelineItem[]) => {
+          const currentIds = new Set(current.map((item) => item.id));
+
+          const currentToolCallIds = new Set(
+            current.flatMap((item) =>
+              item.type === 'tool' ? [item.tool.callId] : [],
+            ),
+          );
+
+          const added = restoredItems.filter((item) => {
+            const alreadyDisplayed =
+              seenTimelineEventIds.has(item.id) ||
+              currentIds.has(item.id) ||
+              (item.type === 'tool' &&
+                currentToolCallIds.has(item.tool.callId));
+
+            seenTimelineEventIds.add(item.id);
+
+            return !alreadyDisplayed;
+          });
+
+          if (added.length === 0) {
+            return current;
+          }
+
+          // Initial history precedes restored widgets and any live activity.
+          return afterCursor === null
+            ? [...added, ...current]
+            : [...current, ...added];
+        });
 
         const acknowledgeRead = () => {
           if (isWebDemoMode() || document.visibilityState !== 'visible') {
@@ -746,20 +828,47 @@ export function useSocket(adapters: SocketAppAdapters) {
           });
         };
 
-        if (firstUnreadId) {
+        if (afterCursor === null && firstUnreadId) {
           adapters.focusUnreadDivider(sessionId, acknowledgeRead);
         } else if (!message.firstUnreadId) {
           acknowledgeRead();
         }
       },
+      onDone: () => {
+        if (timelineLoadRequestId !== timelineRequestId) {
+          return;
+        }
+
+        timelineLoadRequestId = null;
+        const catchUpAgain = catchUpHasMore || timelineCatchUpQueued;
+        timelineCatchUpQueued = false;
+
+        if (catchUpAgain && sessionId === adapters.timelineId()) {
+          loadSessionTimeline(sessionId);
+        }
+      },
+      onError: () => {
+        if (timelineLoadRequestId === timelineRequestId) {
+          timelineLoadRequestId = null;
+          timelineCatchUpQueued = false;
+        }
+      },
     });
 
-    send({
-      type: 'load_timeline',
-      requestId: timelineRequestId,
-      timelineId: sessionId,
-      limit: 100,
-    });
+    try {
+      send({
+        type: 'load_timeline',
+        requestId: timelineRequestId,
+        timelineId: sessionId,
+        afterCursor,
+        limit: 100,
+      });
+    } catch (err) {
+      timelineLoadRequestId = null;
+      timelineCatchUpQueued = false;
+      pendingRequests.delete(timelineRequestId);
+      throw err;
+    }
   }
 
   function loadBootstrapData(): void {
@@ -838,6 +947,10 @@ export function useSocket(adapters: SocketAppAdapters) {
           sessionId &&
           (sessionId !== adapters.timelineId() || !adapters.timelineId())
         ) {
+          timelineCursor = null;
+          timelineLoadRequestId = null;
+          timelineCatchUpQueued = false;
+          seenTimelineEventIds.clear();
           adapters.setTimelineId(sessionId);
           loadSessionTimeline(sessionId);
         } else if (sessionId && wasRunning && !message.state.sessionRunning) {
@@ -955,6 +1068,9 @@ export function useSocket(adapters: SocketAppAdapters) {
       handlers: {
         setWsConnected,
         clearWebPendingState: () => {
+          timelineLoadRequestId = null;
+          timelineCatchUpQueued = false;
+          sessionByRequestId.clear();
           for (const requestId of pendingRequests.keys()) {
             adapters.chat.clearRequest(requestId);
           }
@@ -1002,7 +1118,7 @@ export function useSocket(adapters: SocketAppAdapters) {
           const authRequestId = createRequestId();
 
           pendingRequests.set(authRequestId, {
-            onDone: () => {
+            onDone: (message) => {
               if (
                 sock !== socket ||
                 !socket ||
@@ -1012,6 +1128,7 @@ export function useSocket(adapters: SocketAppAdapters) {
               }
 
               clearReconnectTimer();
+              confirmAuthenticatedProcessInstance(message.instanceId ?? null);
               setWsConnected(true);
 
               const pluginInstallSuccess = consumePluginInstallSuccessMessage();
@@ -1067,6 +1184,36 @@ export function useSocket(adapters: SocketAppAdapters) {
           String(event.data),
         ) as WebSocketServerMessage;
 
+        const pending = pendingRequests.get(serverMessage.requestId);
+
+        if (
+          serverMessage.type === 'command_result' &&
+          typeof serverMessage.output !== 'string' &&
+          serverMessage.output.kind === 'client_view'
+        ) {
+          registerProcessRestart(serverMessage.output);
+        }
+
+        if (
+          pending &&
+          sessionByRequestId.get(serverMessage.requestId) ===
+            adapters.timelineId()
+        ) {
+          const eventId =
+            serverMessage.type === 'chat_result' && pending.onChatResult
+              ? serverMessage.eventId
+              : ((serverMessage.type === 'command_result' &&
+                    pending.onCommandResult) ||
+                    (serverMessage.type === 'prompt' && pending.onPrompt)) &&
+                  'timelineEventId' in serverMessage
+                ? serverMessage.timelineEventId
+                : null;
+
+          if (eventId) {
+            seenTimelineEventIds.add(eventId);
+          }
+        }
+
         if (
           serverMessage.type === 'chat_result' &&
           serverMessage.sessionId === adapters.timelineId() &&
@@ -1096,6 +1243,10 @@ export function useSocket(adapters: SocketAppAdapters) {
             setComposerAiState: adapters.setComposerAiState,
           },
         });
+
+        if (serverMessage.type === 'done' || serverMessage.type === 'error') {
+          sessionByRequestId.delete(serverMessage.requestId);
+        }
       } catch (err) {
         adapters.appendSystemMessage(
           err instanceof Error ? err.message : String(err),
@@ -1104,6 +1255,12 @@ export function useSocket(adapters: SocketAppAdapters) {
     });
 
     socket.addEventListener('close', () => {
+      markProcessRestartDisconnected();
+
+      if (hasExpectedProcessRestart()) {
+        return;
+      }
+
       const pluginInstallRestart = consumePluginInstallRestartMessage();
 
       if (pluginInstallRestart) {
@@ -1113,6 +1270,11 @@ export function useSocket(adapters: SocketAppAdapters) {
 
     socket.addEventListener('error', () => {
       setWsConnected(false);
+      markProcessRestartDisconnected();
+
+      if (hasExpectedProcessRestart()) {
+        return;
+      }
 
       const pluginInstallRestart = consumePluginInstallRestartMessage();
 

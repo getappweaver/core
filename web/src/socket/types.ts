@@ -87,6 +87,9 @@ export type SocketAppAdapters = {
   setPaymentStatus: Setter<WebPaymentStatus | null>;
   setSessionDiffFiles: Setter<AgentFileDiff[]>;
   setTimeline: Setter<TimelineItem[]>;
+  appendTimelineCatchUp: (
+    update: (items: TimelineItem[]) => TimelineItem[],
+  ) => void;
   appendSystemMessage: (text: string) => void;
   createId: () => string;
   chat: Pick<

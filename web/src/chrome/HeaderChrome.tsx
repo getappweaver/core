@@ -11,6 +11,7 @@ import {
 
 import { WebButton } from '../components/WebButton';
 import { resolveWidgetIconUrl } from '../layout/widgetIcons';
+import { pwaReloading, pwaUpdateReady, reloadPwaManually } from '../pwaUpdates';
 
 type HeaderChromeWidget = {
   command: string;
@@ -112,6 +113,7 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   const [accountMenuOpen, setAccountMenuOpen] = createSignal(false);
   const [accountNostrOpen, setAccountNostrOpen] = createSignal(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = createSignal(false);
+  const [pwaReloadError, setPwaReloadError] = createSignal<string | null>(null);
 
   const sortedWidgets = createMemo(() => {
     return [...props.widgets()].sort((a, b) => {
@@ -396,6 +398,30 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
           </WebButton>
           <Show when={accountSettingsOpen()}>
             <div class="topbar-submenu-section topbar-submenu-section--nested">
+              <WebButton
+                type="button"
+                class="connect-btn"
+                disabled={pwaReloading()}
+                onClick={() => {
+                  setPwaReloadError(null);
+
+                  void reloadPwaManually().catch((error: unknown) => {
+                    setPwaReloadError(
+                      error instanceof Error ? error.message : String(error),
+                    );
+                  });
+                }}
+                title="Reload this page manually; applies a downloaded app update when available"
+              >
+                {pwaReloading()
+                  ? 'Reloading…'
+                  : pwaUpdateReady()
+                    ? 'Update & reload'
+                    : 'Reload app'}
+              </WebButton>
+              <Show when={pwaReloadError()}>
+                <div role="status">{pwaReloadError()}</div>
+              </Show>
               <Show when={props.onEnablePiperTts != null}>
                 <WebButton
                   type="button"

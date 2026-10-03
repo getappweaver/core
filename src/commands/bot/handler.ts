@@ -91,7 +91,7 @@ export const handleBotRoot: BuiltinHandler = (ctx) => {
   }
 
   if (sub === 'restart') {
-    return handleBotRestart();
+    return handleBotRestart(ctx);
   }
 
   return Promise.resolve(

@@ -82,7 +82,7 @@ export function useTimeline(adapters: TimelineAdapters): TimelineHook {
     adapters.setTimeline((prev) =>
       prev.map((entry) =>
         entry.id === itemId && entry.type === 'command_result'
-          ? { ...entry, web, text: null }
+          ? { ...entry, web, text: null, restoredSnapshot: false }
           : entry,
       ),
     );
