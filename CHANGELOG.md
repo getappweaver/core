@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.6.0] - 2026-10-04
+
+- feat: implement detailed relay publishing (21ebf4d)
+
 ## [v13.5.3] - 2026-10-03
 
-- fix: changed parts with up-to-date code in plugin new template (b84efdc)
+- fix: changed parts with up-to-date code in plugin new template (812d337)
 
 ## [v13.5.2] - 2026-10-03
 

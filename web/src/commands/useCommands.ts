@@ -1354,6 +1354,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
           action,
           currentUserPubkey: adapters.currentUserPubkey(),
           signEvent: adapters.signEvent,
+          setChromeModal: adapters.setChromeModal,
           setChromeWeb: adapters.setChromeWeb,
           setChromeText: adapters.setChromeText,
           setChromeError: adapters.setChromeError,

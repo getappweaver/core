@@ -1,11 +1,17 @@
 import type { EventTemplate, NostrEvent } from 'nostr-tools';
 import { nip19 } from 'nostr-tools';
-import { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
 
-import type { WebAction, WebNodeRoot } from '@src/web/ui-schema';
+import { PROFILE_RELAYS_FOR_QUERY } from '@src/nostr/nip65';
+import type { WebAction, WebNode, WebNodeRoot } from '@src/web/ui-schema';
 
-const NIP65_KIND = 10002;
+import type { ChromeModalState } from '../chrome/types';
+
+import {
+  fetchUserWriteRelays,
+  publishEventDetailed,
+  type RelayOutcome,
+} from './relayLists';
 
 const OnSuccessCommandSchema = z.object({
   command: z.string().min(1),
@@ -18,7 +24,9 @@ const PublishKind1PayloadSchema = z.object({
   kind: z.number().int().positive().default(1),
   content: z.string().default(''),
   tags: z.array(z.array(z.string())),
-  fallbackRelays: z.array(z.string().min(1)).min(1),
+  fallbackRelays: z
+    .array(z.string().min(1))
+    .default([...PROFILE_RELAYS_FOR_QUERY]),
   signTitle: z.string().min(1).optional(),
   statusTitle: z.string().min(1).default('Published to Nostr'),
   statusMessage: z.string().optional(),
@@ -32,6 +40,7 @@ type PublishKind1Deps = {
     event: EventTemplate,
     options?: { title: string | null },
   ) => Promise<NostrEvent | null>;
+  setChromeModal: (modal: ChromeModalState | null) => void;
   setChromeWeb: (root: WebNodeRoot | null) => void;
   setChromeText: (text: string | null) => void;
   setChromeError: (text: string | null) => void;
@@ -49,7 +58,95 @@ export type PublishKind1Result = {
   nostrUrl: string;
 };
 
-function statusRoot(title: string, body: string): WebNodeRoot {
+function statusRoot({
+  title,
+  message,
+  nostrUrl,
+  outcomes,
+}: {
+  title: string;
+  message?: string;
+  nostrUrl: string;
+  outcomes: RelayOutcome[];
+}): WebNodeRoot {
+  const children: WebNode[] = [
+    {
+      type: 'element',
+      tag: 'text',
+      props: { weight: 'bold', size: 'lg' },
+      children: [{ type: 'text', value: title }],
+    },
+  ];
+
+  if (message) {
+    children.push({
+      type: 'element',
+      tag: 'text',
+      props: { tone: 'muted', size: 'sm' },
+      children: [{ type: 'text', value: message }],
+    });
+  }
+
+  children.push({
+    type: 'element',
+    tag: 'text',
+    props: { whiteSpace: 'pre-wrap' },
+    children: [{ type: 'text', value: nostrUrl }],
+  });
+
+  const acceptedCount = outcomes.filter((outcome) => outcome.success).length;
+  const totalCount = outcomes.length;
+
+  children.push({
+    type: 'element',
+    tag: 'text',
+    props: { weight: 'bold' },
+    children: [
+      {
+        type: 'text',
+        value: `Relays (${acceptedCount}/${totalCount} accepted):`,
+      },
+    ],
+  });
+
+  const relayItems: WebNode[] = outcomes.map((outcome) => ({
+    type: 'element',
+    tag: 'row',
+    props: { gap: 'xs' },
+    children: [
+      {
+        type: 'element',
+        tag: 'text',
+        props: {
+          tone: outcome.success ? 'success' : 'danger',
+          weight: 'bold',
+        },
+        children: [{ type: 'text', value: outcome.success ? '✓' : '✗' }],
+      },
+      {
+        type: 'element',
+        tag: 'text',
+        props: {
+          tone: outcome.success ? 'default' : 'muted',
+          whiteSpace: 'pre-wrap',
+        },
+        children: [
+          {
+            type: 'text',
+            value: `${outcome.relay}${!outcome.success && outcome.reason ? ` (${outcome.reason})` : ''}`,
+          },
+        ],
+      },
+    ],
+  }));
+
+  children.push({
+    type: 'element',
+    tag: 'stack',
+    props: { gap: 'xs' },
+    children: relayItems,
+  });
+
   return {
     kind: 'ui',
     version: 1,
@@ -57,112 +154,36 @@ function statusRoot(title: string, body: string): WebNodeRoot {
     tree: {
       type: 'element',
       tag: 'stack',
-      props: { gap: 'md' },
-      children: [
-        {
-          type: 'element',
-          tag: 'text',
-          props: { weight: 'bold' },
-          children: [{ type: 'text', value: title }],
-        },
-        {
-          type: 'element',
-          tag: 'text',
-          props: { whiteSpace: 'pre-wrap' },
-          children: [{ type: 'text', value: body }],
-        },
-      ],
+      props: { gap: 'sm' },
+      children,
     },
   };
-}
-
-function eventRelayTags(event: NostrEvent): string[] {
-  return event.tags
-    .filter((tag) => tag[0] === 'r' && typeof tag[1] === 'string')
-    .filter((tag) => tag[2] === undefined || tag[2] === 'write')
-    .map((tag) => tag[1]!)
-    .filter((relay) => relay.startsWith('wss://'));
-}
-
-async function fetchUserWriteRelays(
-  pubkey: string,
-  fallbackRelays: string[],
-): Promise<string[]> {
-  const pool = new SimplePool();
-
-  try {
-    const event = await pool.get(fallbackRelays, {
-      kinds: [NIP65_KIND],
-      authors: [pubkey],
-    });
-
-    if (!event) {
-      return fallbackRelays;
-    }
-
-    const writeRelays = eventRelayTags(event);
-
-    return writeRelays.length > 0 ? writeRelays : fallbackRelays;
-  } finally {
-    pool.close(fallbackRelays);
-  }
-}
-
-function publishEvent(relays: string[], event: NostrEvent): Promise<string[]> {
-  const pool = new SimplePool();
-
-  return Promise.allSettled(pool.publish(relays, event))
-    .then((results) => {
-      const acceptedRelays = results
-        .map((result, index) =>
-          result.status === 'fulfilled' ? relays[index] : null,
-        )
-        .filter((relay): relay is string => relay !== null);
-
-      const rejectedRelays = results.flatMap((result, index) =>
-        result.status === 'rejected'
-          ? [
-              {
-                relay: relays[index],
-                reason:
-                  result.reason instanceof Error
-                    ? result.reason.message
-                    : String(result.reason),
-              },
-            ]
-          : [],
-      );
-
-      console.info('[nostr.publishKind1] Relay publish completed', {
-        eventId: event.id,
-        acceptedRelays,
-        rejectedRelays,
-      });
-
-      return acceptedRelays;
-    })
-    .finally(() => {
-      pool.close(relays);
-    });
 }
 
 export async function handleNostrPublishKind1Action({
   action,
   currentUserPubkey,
   signEvent,
+  setChromeModal,
   setChromeWeb,
   setChromeText,
   setChromeError,
   setChromeLoading,
   appendSystemMessage,
 }: PublishKind1Deps): Promise<PublishKind1Result | null> {
+  const payload = PublishKind1PayloadSchema.parse(action.payload ?? {});
+
+  setChromeModal({
+    command: 'nostr',
+    subcommand: 'publish',
+    title: payload.statusTitle,
+  });
+
   setChromeLoading(true);
   setChromeError(null);
   setChromeText(null);
 
   try {
-    const payload = PublishKind1PayloadSchema.parse(action.payload ?? {});
-
     console.info('[nostr.publishKind1] Publish started', {
       kind: payload.kind,
       contentLength: payload.content.length,
@@ -195,20 +216,27 @@ export async function handleNostrPublishKind1Action({
       pubkey: signed.pubkey,
     });
 
-    const relays = await fetchUserWriteRelays(
-      signed.pubkey,
-      payload.fallbackRelays,
-    );
+    const relays = await fetchUserWriteRelays({
+      pubkey: signed.pubkey,
+      fallbackRelays: payload.fallbackRelays,
+    });
 
     console.info('[nostr.publishKind1] Resolved write relays', {
       eventId: signed.id,
       relays,
     });
 
-    const acceptedRelays = await publishEvent(relays, signed);
+    const { acceptedRelays, rejectedRelays, outcomes } =
+      await publishEventDetailed(relays, signed);
 
     if (acceptedRelays.length === 0) {
-      throw new Error('Publish failed on all NIP-65 write relays.');
+      const failureDetails = rejectedRelays
+        .map((r) => `${r.relay}: ${r.reason}`)
+        .join('; ');
+
+      throw new Error(
+        `Publish failed on all relays.${failureDetails ? ` (${failureDetails})` : ''}`,
+      );
     }
 
     const nostrUrl = `nostr://${nip19.neventEncode({
@@ -217,10 +245,12 @@ export async function handleNostrPublishKind1Action({
     })}`;
 
     setChromeWeb(
-      statusRoot(
-        payload.statusTitle,
-        `${payload.statusMessage ? `${payload.statusMessage}\n\n` : ''}${nostrUrl}\n\nRelays:\n${acceptedRelays.join('\n')}`,
-      ),
+      statusRoot({
+        title: payload.statusTitle,
+        message: payload.statusMessage,
+        nostrUrl,
+        outcomes,
+      }),
     );
 
     appendSystemMessage(payload.statusTitle);
@@ -229,6 +259,7 @@ export async function handleNostrPublishKind1Action({
       eventId: signed.id,
       nostrUrl,
       acceptedRelays,
+      rejectedRelays,
     });
 
     return {
