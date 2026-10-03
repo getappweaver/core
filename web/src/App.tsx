@@ -541,18 +541,13 @@ function AppInner(): JSX.Element {
     if (dockVisible()) {
       setDockWidgetItemsByKey(
         Object.fromEntries(
-          widgets.map((widget) => [
-            widget.key,
-            { ...widget.item, restoredSnapshot: true },
-          ]),
+          widgets.map((widget) => [widget.key, widget.item]),
         ),
       );
     } else {
       setDockWidgetItemsByKey({});
 
-      setTimeline(
-        widgets.map((widget) => ({ ...widget.item, restoredSnapshot: true })),
-      );
+      setTimeline(widgets.map((widget) => widget.item));
     }
 
     pendingModalRestore = layout?.modal
@@ -2617,7 +2612,7 @@ function AppInner(): JSX.Element {
           continue;
         }
 
-        next[key] = { ...item, web, text: null, restoredSnapshot: false };
+        next[key] = { ...item, web, text: null };
         changed = true;
         replacedDockItem = true;
       }

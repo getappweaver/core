@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.5.2] - 2026-10-03
+
+- fix: removed stale badge (c4f85a3)
+
 ## [v13.5.1] - 2026-10-03
 
-- fix: timeline, PWA refresh issues (cfbe08c)
+- fix: timeline, PWA refresh issues (3d915c2)
 
 ## [v13.5.0] - 2026-10-02
 

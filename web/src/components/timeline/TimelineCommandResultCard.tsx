@@ -547,23 +547,6 @@ export function TimelineCommandResultCard(
     }
   };
 
-  const refreshRestoredSnapshot = () => {
-    props.onRunWebAction(
-      {
-        type: 'command',
-        command: props.item.command,
-        subcommand: props.item.subcommand,
-        arguments: props.item.values?.arguments ?? {},
-        options: props.item.values?.options ?? {},
-        recordInTimeline: false,
-      },
-      {
-        onReplaceRoot: (root) => props.onReplaceCommandWeb(props.item.id, root),
-        webCommandSourceId: props.item.id,
-      },
-    );
-  };
-
   return (
     <TimelineCollapsibleCard
       class="card result-card"
@@ -605,23 +588,6 @@ export function TimelineCommandResultCard(
             >
               {props.item.subcommandTag}
             </WebButton>
-            <Show when={props.item.restoredSnapshot}>
-              <span
-                class="tag mode-tag card-head__control"
-                title="Restored from a saved snapshot — may be outdated"
-              >
-                stale
-              </span>
-              <WebButton
-                type="button"
-                class="tag tag-button card-head__control"
-                title="Re-run this command for fresh results"
-                aria-label="Refresh stale snapshot"
-                onClick={refreshRestoredSnapshot}
-              >
-                refresh
-              </WebButton>
-            </Show>
           </div>
         </>
       }
@@ -703,23 +669,6 @@ export function TimelineCommandResultCard(
           >
             {props.item.subcommandTag}
           </WebButton>
-          <Show when={props.item.restoredSnapshot}>
-            <span
-              class="tag mode-tag card-head__control"
-              title="Restored from a saved snapshot — may be outdated"
-            >
-              stale
-            </span>
-            <WebButton
-              type="button"
-              class="tag tag-button card-head__control"
-              title="Re-run this command for fresh results"
-              aria-label="Refresh stale snapshot"
-              onClick={refreshRestoredSnapshot}
-            >
-              refresh
-            </WebButton>
-          </Show>
         </>
       }
       onDismiss={() => {
