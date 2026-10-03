@@ -53,12 +53,20 @@ async function main(): Promise<void> {
   const coreApiVersion =
     (await ask(`Core API version [${defaultCore}]: `)) || defaultCore;
 
+  const createDraftsAnswer = (
+    await ask('Create draft commands? [Y/n]: ')
+  ).toLowerCase();
+
+  const createDraftCommands =
+    createDraftsAnswer !== 'n' && createDraftsAnswer !== 'no';
+
   const result = createPluginScaffold({
     dmBotRoot: ROOT,
     alias,
     title,
     description,
     coreApiVersion,
+    createDraftCommands,
     runGenerator: true,
   });
 

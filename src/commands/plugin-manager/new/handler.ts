@@ -16,6 +16,7 @@ type NewPluginFields = {
   title: string;
   description: string;
   coreApiVersion: string;
+  createDraftCommands: boolean;
 };
 
 function argumentOption(args: string[], flag: string): string {
@@ -44,6 +45,73 @@ function stringField(
   const value = options[name];
 
   return typeof value === 'string' ? value.trim() : fallback;
+}
+
+function booleanField(
+  options: Record<string, unknown>,
+  args: string[],
+  name: string,
+  flag: string,
+  defaultValue: boolean,
+): boolean {
+  const payloadValue = options[name];
+
+  if (typeof payloadValue === 'boolean') {
+    return payloadValue;
+  }
+
+  if (typeof payloadValue === 'string') {
+    const trimmed = payloadValue.trim().toLowerCase();
+
+    if (trimmed === 'true' || trimmed === '1') {
+      return true;
+    }
+
+    if (trimmed === 'false' || trimmed === '0') {
+      return false;
+    }
+  }
+
+  const noFlag = flag.startsWith('--') ? `--no-${flag.slice(2)}` : null;
+
+  if (noFlag && args.includes(noFlag)) {
+    return false;
+  }
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+
+    if (arg === flag) {
+      const next = args[index + 1]?.trim().toLowerCase();
+
+      if (next === 'false' || next === '0') {
+        return false;
+      }
+
+      if (next === 'true' || next === '1') {
+        return true;
+      }
+
+      return true;
+    }
+
+    if (arg.startsWith(`${flag}=`)) {
+      const val = arg
+        .slice(flag.length + 1)
+        .trim()
+        .toLowerCase();
+
+      if (val === 'false' || val === '0') {
+        return false;
+      }
+
+      if (val === 'true' || val === '1') {
+        return true;
+      }
+    }
+  }
+
+  return defaultValue;
 }
 
 function newPluginFields(ctx: RouteCommandContext): NewPluginFields {
@@ -76,6 +144,13 @@ function newPluginFields(ctx: RouteCommandContext): NewPluginFields {
     coreApiVersion:
       stringField(options, 'core', argumentOption(ctx.args, '--core')) ||
       defaultCoreApiVersion(ctx.dmBotRoot),
+    createDraftCommands: booleanField(
+      options,
+      ctx.args,
+      'create_draft_commands',
+      '--create-draft-commands',
+      true,
+    ),
   };
 }
 
@@ -94,7 +169,7 @@ export async function handlePluginsNew(
           view: 'form',
           coreApiVersion: fields.coreApiVersion,
         })
-      : `Usage: ${ctx.prefix}plugins new --alias <alias> [--title <title>] [--description <description>] [--core <range>]`;
+      : `Usage: ${ctx.prefix}plugins new --alias <alias> [--title <title>] [--description <description>] [--core <range>] [--create-draft-commands <boolean>]`;
   }
 
   const result = createPluginScaffold({
@@ -103,6 +178,7 @@ export async function handlePluginsNew(
     title: fields.title,
     description: fields.description,
     coreApiVersion: fields.coreApiVersion,
+    createDraftCommands: fields.createDraftCommands,
     runGenerator: true,
   });
 
@@ -121,6 +197,7 @@ export async function handlePluginsNew(
       description: fields.description,
       pluginPath,
       repo: result.repo,
+      createDraftCommands: fields.createDraftCommands,
     });
   }
 

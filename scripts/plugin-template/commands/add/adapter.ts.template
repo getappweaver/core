@@ -8,7 +8,7 @@ export function adaptAddCommand(
   void params.command;
   void params.source;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const result = handleAddCommand({
     db: params.db,

@@ -8,16 +8,18 @@ Scaffold plugin generated from `scripts/plugin-template/`. `list` and `show` inc
 
 ## Layout
 
-- `init.ts` — `BotPlugin`, `PluginContext` / DB handles, `commandDefinition`
+- `init.ts` — `BotPlugin`, `PluginContext` / DB handles, `commandDefinition`, `aiDefinition`
 - `adapter.ts` — `parseCliInput` + per-subcommand adapters
 - `definition.ts` — aggregated `CommandDefinition`
 - `commands/help/module.ts` — `get{{PASCAL_ALIAS}}CommandDefinition`, `get{{PASCAL_ALIAS}}HelpLines`
 - `commands/shared/render.ts` — shared render types and `render{{PASCAL_ALIAS}}Text`
+{{#IF DRAFTS}}
 - `commands/drafts/store.ts` / `commands/drafts/types.ts` — draft persistence + draft types
+{{/IF DRAFTS}}
 - `commands/shared/types.ts` — shared entity/input schemas and types
 - `commands/shared/output.ts` — shared message representation + builder
 - `commands/list/renderers/{text,web}.ts` and `commands/show/renderers/{text,web}.ts` — per-command renderers
 - `db.ts` — SQLite open + table migration + CRUD in one file
-- `ai.ts` — tool schema + `executeTool` (used by `plugin:generate`)
+- `ai.ts` — `aiDefinition` (tool schema + `executeTool`, used by `plugin:generate` and core tool dispatcher)
 
 Regenerate bottom-up docs for this folder after substantive edits (`bun src/cli.ts file bottomup …` per appweaver-file skill).

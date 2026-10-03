@@ -18,7 +18,7 @@ export function adaptAcceptCommand(
   void params.command;
   void params.source;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const targetJoined = stringFromVariadicArgument(
     params.parsed.arguments.target,

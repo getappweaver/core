@@ -1,13 +1,16 @@
 // ---------------------------------------------------------------------------
 // plugins/{{ALIAS}}/format.ts — Display helpers for the {{ALIAS}} plugin
 //
-// Replace with formatters for your entity and drafts, e.g.:
+// Replace with formatters for your entity{{#IF DRAFTS}} and drafts{{/IF DRAFTS}}, e.g.:
 // - format{{PASCAL_ALIAS}}Detail(item) for !{{ALIAS}} show <id>
 // - format{{PASCAL_ALIAS}}s(items) for !{{ALIAS}} list (flat list, not a tree)
+{{#IF DRAFTS}}
 // - formatCreateDraftList(draft), formatDraftReply(cmd, id, kind) for draft UX
 // - hasDraftChildren(draft) only if you support nested drafts
+{{/IF DRAFTS}}
 // ---------------------------------------------------------------------------
 import type { {{PASCAL_ALIAS}} } from './commands/shared/types';
+{{#IF DRAFTS}}
 import type { Create{{PASCAL_ALIAS}}Draft } from './commands/drafts/types';
 
 export function hasDraftChildren(_node: Create{{PASCAL_ALIAS}}Draft): boolean {
@@ -33,6 +36,7 @@ export function formatDraftReply(
 export function formatCreateDraftList(node: Create{{PASCAL_ALIAS}}Draft): string {
   return `  - ${node.data}`;
 }
+{{/IF DRAFTS}}
 
 export function format{{PASCAL_ALIAS}}s(items: {{PASCAL_ALIAS}}[]): string {
   if (items.length === 0) {

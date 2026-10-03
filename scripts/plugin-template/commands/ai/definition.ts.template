@@ -1,11 +1,12 @@
 import type { SubcommandDefinition } from '@src/system/command-definition';
 
-export const aiDefinition = (
+export const aiCommandDefinition = (
   prefix: string,
   alias: string,
 ): SubcommandDefinition => ({
   name: 'ai',
-  summary: 'Natural language {{ALIAS}} changes via the agent (draft flow).',
+  summary:
+    'Natural language {{ALIAS}} changes via the agent{{#IF DRAFTS}} (draft flow){{/IF DRAFTS}}.',
   aliases: [],
   arguments: [
     {

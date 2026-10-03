@@ -10,7 +10,7 @@ export function adaptShowCommand(
 ): string | WebNodeRoot {
   void params.command;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const id = params.parsed.arguments.id;
 

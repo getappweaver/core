@@ -12,7 +12,7 @@ export function adaptListCommand(
   void params.parsed;
   void params.command;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const { items } = handleListCommand({ db: params.db });
 

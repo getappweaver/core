@@ -1,14 +1,22 @@
 import { createHelpSubcommandDefinition } from '@src/commands/help/command';
 import type { CommandDefinition } from '@src/system/command-definition';
 
+{{#IF DRAFTS}}
 import { acceptDefinition } from './commands/accept/definition';
+{{/IF DRAFTS}}
 import { addDefinition } from './commands/add/definition';
-import { aiDefinition } from './commands/ai/definition';
+import { aiCommandDefinition } from './commands/ai/definition';
+{{#IF DRAFTS}}
 import { declineDefinition } from './commands/decline/definition';
+{{/IF DRAFTS}}
 import { deleteDefinition } from './commands/delete/definition';
+{{#IF DRAFTS}}
 import { draftsDefinition } from './commands/drafts/definition';
+{{/IF DRAFTS}}
 import { listDefinition } from './commands/list/definition';
+{{#IF DRAFTS}}
 import { reviseDefinition } from './commands/revise/definition';
+{{/IF DRAFTS}}
 import { showDefinition } from './commands/show/definition';
 
 export const commandDefinition = (
@@ -16,22 +24,25 @@ export const commandDefinition = (
   alias: string,
 ): CommandDefinition => ({
   name: alias,
-  summary: '{{PASCAL_ALIAS}} plugin scaffold: CRUD, drafts, and ai.',
+  summary:
+    '{{PASCAL_ALIAS}} plugin scaffold: {{#IF DRAFTS}}CRUD, drafts, and ai.{{/IF DRAFTS}}{{#UNLESS DRAFTS}}CRUD and ai.{{/UNLESS DRAFTS}}',
   aliases: [],
   subcommands: [
     createHelpSubcommandDefinition(prefix, alias, {
       topicArgSummary:
-        'Optional subcommand: add, list, show, delete, drafts, accept, ai, …',
-      exampleTopics: ['list', 'add', 'drafts'],
+        '{{#IF DRAFTS}}Optional subcommand: add, list, show, delete, drafts, accept, ai, …{{/IF DRAFTS}}{{#UNLESS DRAFTS}}Optional subcommand: add, list, show, delete, ai, …{{/UNLESS DRAFTS}}',
+      exampleTopics: [{{#IF DRAFTS}}'list', 'add', 'drafts'{{/IF DRAFTS}}{{#UNLESS DRAFTS}}'list', 'add'{{/UNLESS DRAFTS}}],
     }),
-    aiDefinition(prefix, alias),
+    aiCommandDefinition(prefix, alias),
     addDefinition(prefix, alias),
     listDefinition(prefix, alias),
     showDefinition(prefix, alias),
     deleteDefinition(prefix, alias),
+{{#IF DRAFTS}}
     draftsDefinition(prefix, alias),
     acceptDefinition(prefix, alias),
     reviseDefinition(prefix, alias),
     declineDefinition(prefix, alias),
+{{/IF DRAFTS}}
   ],
 });

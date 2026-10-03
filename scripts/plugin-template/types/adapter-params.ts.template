@@ -1,8 +1,8 @@
 import type { Database } from 'bun:sqlite';
 
 import type {
+  PluginAgentService,
   PluginIdentity,
-  RunAgentFn,
 } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
 import type { ParsedCliInvocation } from '@src/system/parser-cli';
@@ -17,5 +17,5 @@ export type {{PASCAL_ALIAS}}CommandAdapterParams = {
   parsed: ParsedCliInvocation;
   command: ReturnType<typeof get{{PASCAL_ALIAS}}CommandDefinition>;
   identity: PluginIdentity;
-  runAgent: RunAgentFn | null;
+  agent: PluginAgentService;
 };

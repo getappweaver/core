@@ -3,27 +3,44 @@
 //
 // Calls the agent with a system prompt and parses tool calls (list, create,
 // update, delete). For list we return the formatted list; for create/update/
-// delete we store drafts and return previews. Replace or extend the prompt
+// delete {{#IF DRAFTS}}we store drafts and return previews{{/IF DRAFTS}}{{#UNLESS DRAFTS}}we execute the operations directly{{/UNLESS DRAFTS}}. Replace or extend the prompt
 // and handling below to match your plugin’s operations.
 // ---------------------------------------------------------------------------
 
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
-import type { AgentRunResult } from '@src/backends/types';
 import { getOutputString } from '@src/backends/types';
-import type { PluginIdentity } from '@src/core/plugin';
+import type { PluginAgentService, PluginIdentity } from '@src/core/plugin';
+import type { AiDefinition } from '@src/system/ai-definition';
 import type { ParseSettledResult } from '@src/tools/utils';
 import { parseToolCalls } from '@src/tools/utils';
 
-import { get{{PASCAL_ALIAS}}, list{{PASCAL_ALIAS}}s } from './db';
+{{#IF DRAFTS}}
 import { storeDraft } from './commands/drafts/store';
+{{/IF DRAFTS}}
 import {
   Create{{PASCAL_ALIAS}}InputSchema,
   Update{{PASCAL_ALIAS}}InputSchema,
 } from './commands/shared/types';
-import { formatDraftReply } from './format';
+import {
+{{#UNLESS DRAFTS}}
+  create{{PASCAL_ALIAS}},
+  delete{{PASCAL_ALIAS}},
+{{/UNLESS DRAFTS}}
+  get{{PASCAL_ALIAS}},
+  list{{PASCAL_ALIAS}}s,
+  openDb,
+{{#UNLESS DRAFTS}}
+  update{{PASCAL_ALIAS}},
+{{/UNLESS DRAFTS}}
+} from './db';
+{{#IF DRAFTS}}
+import { formatDraftReply, format{{PASCAL_ALIAS}}s } from './format';
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
 import { format{{PASCAL_ALIAS}}s } from './format';
+{{/UNLESS DRAFTS}}
 
 const {{PASCAL_ALIAS}}ListCallSchema = z.object({ type: z.literal('list') });
 
@@ -73,7 +90,7 @@ export type Handle{{PASCAL_ALIAS}}AiProps = {
   db: Database;
   identity: PluginIdentity;
   prefix: string;
-  runAgent: (prompt: string) => Promise<AgentRunResult>;
+  agent: PluginAgentService;
 };
 
 export async function handle{{PASCAL_ALIAS}}Ai({
@@ -81,7 +98,7 @@ export async function handle{{PASCAL_ALIAS}}Ai({
   db,
   identity,
   prefix,
-  runAgent,
+  agent,
 }: Handle{{PASCAL_ALIAS}}AiProps): Promise<string> {
   const userPrompt = args.join(' ').trim();
   const alias = identity.alias;
@@ -93,7 +110,15 @@ export async function handle{{PASCAL_ALIAS}}Ai({
   const items = list{{PASCAL_ALIAS}}s(db);
   const context = items.length > 0 ? format{{PASCAL_ALIAS}}s(items) : '(no {{ALIAS}}s yet)';
   const systemPrompt = buildSystemPrompt(userPrompt, context);
-  const result = await runAgent(systemPrompt);
+  const result = await agent.run({
+    prompt: systemPrompt,
+    sessionId: null,
+    workspaceTarget: null,
+    cwd: null,
+    onAgentStreamChunk: null,
+    abortSignal: null,
+    context: null,
+  });
   const raw = getOutputString(result).trim();
 
   if (!raw || raw === '(no output)') {
@@ -123,22 +148,34 @@ export async function handle{{PASCAL_ALIAS}}Ai({
       executeTool({ alias, prefix, call: value, db }),
     ),
   );
-  const cmd = `${prefix}${alias}`;
 
   if (previews.length === 0) {
     return 'No operations to show.';
   }
+
+{{#IF DRAFTS}}
+  const cmd = `${prefix}${alias}`;
 
   return [
     `You can accept all: ${cmd} accept all`,
     '',
     previews.join('\n\n'),
   ].join('\n');
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
+  return previews.join('\n\n');
+{{/UNLESS DRAFTS}}
 }
 
 export async function executeTool({
+{{#IF DRAFTS}}
   alias,
   prefix,
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
+  alias: _alias,
+  prefix: _prefix,
+{{/UNLESS DRAFTS}}
   call,
   db,
 }: {
@@ -147,13 +184,14 @@ export async function executeTool({
   call: {{PASCAL_ALIAS}}ToolCall;
   db: Database;
 }): Promise<string> {
-  const cmd = `${prefix}${alias}`;
-
   if (call.type === 'list') {
     const list = list{{PASCAL_ALIAS}}s(db);
 
     return list.length === 0 ? 'No {{ALIAS}}s.' : format{{PASCAL_ALIAS}}s(list);
   }
+
+{{#IF DRAFTS}}
+  const cmd = `${prefix}${alias}`;
 
   if (call.type === 'create') {
     const draftId = storeDraft(db, {
@@ -210,6 +248,39 @@ export async function executeTool({
     `Draft ID: ${draftId}`,
     formatDraftReply(cmd, draftId, 'delete'),
   ].join('\n');
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
+  if (call.type === 'create') {
+    const item = create{{PASCAL_ALIAS}}(db, call.input);
+
+    return [
+      `Created {{ALIAS}} #${item.id}:`,
+      '',
+      `  - ${item.data}`,
+    ].join('\n');
+  }
+
+  if (call.type === 'update') {
+    const existing = get{{PASCAL_ALIAS}}(db, call.input.id);
+
+    if (!existing) {
+      return `{{PASCAL_ALIAS}} not found: ${call.input.id}. Call list first.`;
+    }
+
+    const updated = update{{PASCAL_ALIAS}}(db, call.input);
+
+    return `Updated {{ALIAS}} #${call.input.id}: "${updated?.data ?? call.input.data}"`;
+  }
+
+  const item = get{{PASCAL_ALIAS}}(db, call.input.id);
+  if (!item) {
+    return `{{PASCAL_ALIAS}} not found: ${call.input.id}. Call list first.`;
+  }
+
+  delete{{PASCAL_ALIAS}}(db, call.input.id);
+
+  return `Deleted {{ALIAS}} #${call.input.id}: "${item.data}"`;
+{{/UNLESS DRAFTS}}
 }
 
 export function agentInstructions(alias: string, _prefix: string): string {
@@ -218,8 +289,43 @@ export function agentInstructions(alias: string, _prefix: string): string {
 When the user asks to manage {{ALIAS}}s:
 - Use bash and call \`bun src/cli.ts ${alias} <toolName> '<json>'\`
 - Call list first to resolve IDs before update/delete
+{{#IF DRAFTS}}
 - Show full tool output exactly (including Draft ID and reply instructions)
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
+- Show full tool output directly to the user
+{{/UNLESS DRAFTS}}
 - For create/update/delete, include original_prompt at the top level of JSON`;
 }
 
-export { openDb } from './db';
+{{#UNLESS DRAFTS}}
+export const skillRules = [
+  "Always wrap the JSON argument in single quotes: `'{\"key\":\"value\"}'`",
+  'Never use backslash-escaped quotes or double quotes around the JSON argument',
+  'Always call `{{ALIAS}} list` first before update/delete to resolve IDs',
+  '`original_prompt` is required on create/update/delete — pass the user request verbatim at the top level of the JSON (same level as `type`)',
+];
+{{/UNLESS DRAFTS}}
+
+export const aiDefinition = {
+  toolCallSchema: {{PASCAL_ALIAS}}ToolCallSchema,
+  skillDescription,
+  openDb,
+  executeTool: (props) =>
+    executeTool({
+      alias: props.alias,
+      prefix: props.prefix,
+      call: props.call,
+      db: props.db,
+    }),
+  agentInstructions,
+{{#UNLESS DRAFTS}}
+  skillRules,
+{{/UNLESS DRAFTS}}
+} satisfies AiDefinition<
+  typeof {{PASCAL_ALIAS}}ToolCallSchema,
+  {{PASCAL_ALIAS}}ToolCall,
+  Database
+>;
+
+export { openDb };

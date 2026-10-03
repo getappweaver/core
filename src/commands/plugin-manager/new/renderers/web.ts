@@ -13,6 +13,7 @@ export type PluginsNewCreatedRepresentation = {
   description: string;
   pluginPath: string;
   repo: string;
+  createDraftCommands?: boolean;
 };
 
 export type PluginsNewRepresentation =
@@ -54,13 +55,21 @@ function formView(coreApiVersion: string): WebNode {
     tag: 'form',
     props: {
       className: 'web-form plugins-new-form',
-      formOptionFieldNames: ['alias', 'title', 'description', 'core'],
+      formOptionFieldNames: [
+        'alias',
+        'title',
+        'description',
+        'core',
+        'create_draft_commands',
+      ],
       action: {
         type: 'command',
         command: 'plugins',
         subcommand: 'new',
         arguments: {},
-        options: {},
+        options: {
+          create_draft_commands: false,
+        },
         recordInTimeline: false,
         pendingUi: { presentation: 'widget', label: 'Creating plugin...' },
       },
@@ -104,6 +113,28 @@ function formView(coreApiVersion: string): WebNode {
       },
       {
         type: 'element',
+        tag: 'row',
+        props: { gap: 'sm', itemAlign: 'center' },
+        children: [
+          {
+            type: 'element',
+            tag: 'checkbox',
+            props: {
+              formFieldName: 'create_draft_commands',
+              checked: true,
+              value: 'true',
+              className: 'web-checkbox web-checkbox--retro',
+            },
+          },
+          {
+            type: 'element',
+            tag: 'text',
+            children: [textNode('Create draft commands')],
+          },
+        ],
+      },
+      {
+        type: 'element',
         tag: 'button',
         props: {
           label: 'Create local app',
@@ -117,11 +148,16 @@ function formView(coreApiVersion: string): WebNode {
 }
 
 function createdView(representation: PluginsNewCreatedRepresentation): WebNode {
+  const preservingConvention =
+    representation.createDraftCommands !== false
+      ? ' while preserving the draft/review conventions.'
+      : '.';
+
   const developmentPrompt = [
     `Develop the new AppWeaver plugin at ${representation.pluginPath}.`,
     `Read ${representation.pluginPath}/AGENTS.md and available .BOTTOMUP.json knowledge before changing it.`,
     `Product goal: ${representation.description}`,
-    'Inspect the generated scaffold, ask focused product questions when needed, and implement the app end-to-end while preserving the draft/review conventions.',
+    `Inspect the generated scaffold, ask focused product questions when needed, and implement the app end-to-end${preservingConvention}`,
   ].join('\n\n');
 
   return {

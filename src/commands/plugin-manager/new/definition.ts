@@ -41,10 +41,21 @@ export function getPluginsNewSubcommandDefinition(
         kind: 'string',
         required: false,
       },
+      {
+        name: 'create_draft_commands',
+        summary:
+          'Create draft and review commands with supporting storage (defaults to true).',
+        flag: '--create-draft-commands',
+        shortFlag: null,
+        kind: 'boolean',
+        required: false,
+      },
     ],
     examples: [
       `${prefix}plugins new`,
       `${prefix}plugins new --alias reminder --title "Reminder app" --description "Manage reminders"`,
+      `${prefix}plugins new --alias reminder --create-draft-commands false`,
+      `${prefix}plugins new --alias reminder --no-create-draft-commands`,
     ],
   };
 }

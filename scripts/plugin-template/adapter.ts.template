@@ -5,25 +5,33 @@
 import type { Database } from 'bun:sqlite';
 
 import type {
+  PluginAgentService,
   PluginContext,
   PluginIdentity,
-  RunAgentFn,
 } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
 import { parseCliInput } from '@src/system/parser-cli';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import type { {{PASCAL_ALIAS}}CommandAdapterParams } from './types/adapter-params';
+{{#IF DRAFTS}}
 import { adaptAcceptCommand } from './commands/accept/adapter';
+{{/IF DRAFTS}}
 import { adaptAddCommand } from './commands/add/adapter';
 import { adaptAiCommand } from './commands/ai/adapter';
+{{#IF DRAFTS}}
 import { adaptDeclineCommand } from './commands/decline/adapter';
+{{/IF DRAFTS}}
 import { adaptDeleteCommand } from './commands/delete/adapter';
+{{#IF DRAFTS}}
 import { adaptDraftsCommand } from './commands/drafts/adapter';
+{{/IF DRAFTS}}
 import { adaptHelpCommand } from './commands/help/adapter';
 import { get{{PASCAL_ALIAS}}CommandDefinition } from './commands/help/module';
 import { adaptListCommand } from './commands/list/adapter';
+{{#IF DRAFTS}}
 import { adaptReviseCommand } from './commands/revise/adapter';
+{{/IF DRAFTS}}
 import { adaptShowCommand } from './commands/show/adapter';
 
 type {{PASCAL_ALIAS}}Subcommand =
@@ -32,11 +40,11 @@ type {{PASCAL_ALIAS}}Subcommand =
   | 'add'
   | 'list'
   | 'show'
-  | 'delete'
+  | 'delete'{{#IF DRAFTS}}
   | 'drafts'
   | 'accept'
   | 'revise'
-  | 'decline';
+  | 'decline'{{/IF DRAFTS}};
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -57,10 +65,12 @@ const subcommandAdapters: Record<{{PASCAL_ALIAS}}Subcommand, {{PASCAL_ALIAS}}Com
     list: adaptListCommand,
     show: adaptShowCommand,
     delete: adaptDeleteCommand,
+{{#IF DRAFTS}}
     drafts: adaptDraftsCommand,
     accept: adaptAcceptCommand,
     revise: adaptReviseCommand,
     decline: adaptDeclineCommand,
+{{/IF DRAFTS}}
   };
 
 function getDefinitionKey(prefix: string, alias: string): string {
@@ -89,11 +99,11 @@ function is{{PASCAL_ALIAS}}Subcommand(value: string): value is {{PASCAL_ALIAS}}S
     value === 'add' ||
     value === 'list' ||
     value === 'show' ||
-    value === 'delete' ||
+    value === 'delete'{{#IF DRAFTS}} ||
     value === 'drafts' ||
     value === 'accept' ||
     value === 'revise' ||
-    value === 'decline'
+    value === 'decline'{{/IF DRAFTS}}
   );
 }
 
@@ -105,7 +115,7 @@ type Handle{{PASCAL_ALIAS}}AdapterProps = {
   source: MessageSource;
   identity: PluginIdentity;
   storedCtx: PluginContext;
-  runAgent: RunAgentFn | null;
+  agent: PluginAgentService;
 };
 
 export async function handle{{PASCAL_ALIAS}}Adapter({
@@ -116,7 +126,7 @@ export async function handle{{PASCAL_ALIAS}}Adapter({
   source,
   identity,
   storedCtx,
-  runAgent,
+  agent,
 }: Handle{{PASCAL_ALIAS}}AdapterProps): Promise<WebHandlerResult> {
   void storedCtx;
 
@@ -150,7 +160,7 @@ export async function handle{{PASCAL_ALIAS}}Adapter({
       parsed,
       command,
       identity,
-      runAgent,
+      agent,
     });
   } catch (err) {
     return String(err instanceof Error ? err.message : err);

@@ -1,10 +1,15 @@
 # AppWeaver Plugin Development
 
-This directory is an independent plugin repository generated from AppWeaver's full draft/review scaffold.
+This directory is an independent plugin repository{{#IF DRAFTS}} generated from AppWeaver's full draft/review scaffold{{/IF DRAFTS}}.
 
 - Read `README.md` and available `.BOTTOMUP.json` knowledge before changing behavior.
 - Keep `.BOTTOMUP.json` knowledge current when files, responsibilities, persistence, commands, or rendering change.
+{{#IF DRAFTS}}
 - Preserve the draft/accept/decline flow for mutating operations unless the product explicitly requires another review model.
+{{/IF DRAFTS}}
+{{#UNLESS DRAFTS}}
+- Mutating operations execute immediately against local SQLite unless draft review is added.
+{{/UNLESS DRAFTS}}
 - Keep plugin-specific code in this repository. Do not add plugin-specific branches or imports to AppWeaver `src/` or `web/`.
 - Update `package.json` metadata and `appweaver.capabilities` as the product becomes concrete.
 - Put the final SVG icon inside this repository and set `appweaver.icon` to its relative path.

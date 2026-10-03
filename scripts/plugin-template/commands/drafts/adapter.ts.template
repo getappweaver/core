@@ -13,7 +13,7 @@ export function adaptDraftsCommand(
   void params.command;
   void params.source;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const draftIdRaw = params.parsed.arguments.draft_id;
   const drafts = listDrafts(params.db);

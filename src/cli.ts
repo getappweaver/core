@@ -23,6 +23,7 @@ import {
   openCoreDb,
 } from './db';
 import { loadBotConfig } from './env';
+import { setInfoLogsEnabled } from './logger';
 import { dmBotRoot, getParentWorkspaceRoot } from './paths';
 import {
   getAppWeaverSessionWorkspace,
@@ -146,6 +147,8 @@ function safeJsonParse(
 }
 
 async function main(): Promise<void> {
+  // Tool stdout is the result payload; initialization info would corrupt JSON.
+  setInfoLogsEnabled(false);
   const startedAt = Date.now();
   const argv = process.argv.slice(2);
   const { alias, toolName, rawArgsJson } = parseArgs(argv);

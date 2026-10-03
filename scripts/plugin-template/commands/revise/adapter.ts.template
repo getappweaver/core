@@ -7,7 +7,7 @@ export function adaptReviseCommand(
   void params.command;
   void params.source;
   void params.identity;
-  void params.runAgent;
+  void params.agent;
 
   const draftIdRaw = params.parsed.arguments.id;
 
@@ -25,5 +25,5 @@ export function adaptReviseCommand(
     return `Revise only applies to create drafts. Use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} and try again.`;
   }
 
-  return `To revise draft #${String(draftIdRaw)}, use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} then ${params.prefix}${params.alias} ai <revised request>. Or implement revise (call runAgent and replace draft).`;
+  return `To revise draft #${String(draftIdRaw)}, use ${params.prefix}${params.alias} decline ${String(draftIdRaw)} then ${params.prefix}${params.alias} ai <revised request>. Or implement revise (call agent.run and replace draft).`;
 }

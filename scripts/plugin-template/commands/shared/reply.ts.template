@@ -20,6 +20,7 @@ export function toneForPlainReply(text: string): 'info' | 'success' | 'error' {
     return 'info';
   }
 
+{{#IF DRAFTS}}
   if (text.startsWith('No pending drafts.')) {
     return 'info';
   }
@@ -27,6 +28,7 @@ export function toneForPlainReply(text: string): 'info' | 'success' | 'error' {
   if (text.startsWith('Pending drafts:')) {
     return 'info';
   }
+{{/IF DRAFTS}}
 
   return 'success';
 }

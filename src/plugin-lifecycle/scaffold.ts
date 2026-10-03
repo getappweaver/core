@@ -21,6 +21,7 @@ export type CreatePluginScaffoldProps = {
   title: string;
   description: string;
   coreApiVersion: string;
+  createDraftCommands?: boolean;
   runGenerator: boolean;
 };
 
@@ -53,11 +54,61 @@ export function defaultCoreApiVersion(dmBotRoot: string): string {
   return `^${major}.0.0`;
 }
 
+function processConditionalBlocks(
+  content: string,
+  flags: Record<string, boolean>,
+): string {
+  let result = content;
+
+  for (const [key, enabled] of Object.entries(flags)) {
+    const ifRegex = new RegExp(
+      `^[ \\t]*\\{\\{#IF ${key}\\}\\}[ \\t]*\\r?\\n([\\s\\S]*?)^[ \\t]*\\{\\{/IF ${key}\\}\\}[ \\t]*(?:\\r?\\n)?`,
+      'gm',
+    );
+
+    result = result.replace(ifRegex, (_, body: string) =>
+      enabled ? body : '',
+    );
+
+    const unlessRegex = new RegExp(
+      `^[ \\t]*\\{\\{#UNLESS ${key}\\}\\}[ \\t]*\\r?\\n([\\s\\S]*?)^[ \\t]*\\{\\{/UNLESS ${key}\\}\\}[ \\t]*(?:\\r?\\n)?`,
+      'gm',
+    );
+
+    result = result.replace(unlessRegex, (_, body: string) =>
+      enabled ? '' : body,
+    );
+
+    const ifInline = new RegExp(
+      `\\{\\{#IF ${key}\\}\\}([\\s\\S]*?)\\{\\{/IF ${key}\\}\\}`,
+      'g',
+    );
+
+    result = result.replace(ifInline, (_, body: string) =>
+      enabled ? body : '',
+    );
+
+    const unlessInline = new RegExp(
+      `\\{\\{#UNLESS ${key}\\}\\}([\\s\\S]*?)\\{\\{/UNLESS ${key}\\}\\}`,
+      'g',
+    );
+
+    result = result.replace(unlessInline, (_, body: string) =>
+      enabled ? '' : body,
+    );
+  }
+
+  return result;
+}
+
 function expandTemplate(
   content: string,
   variables: Record<string, string>,
+  flags: Record<string, boolean>,
 ): string {
-  return content.replace(
+  const processed = processConditionalBlocks(content, flags);
+
+  return processed.replace(
     /\{\{(\w+)\}\}/g,
     (_, key: string) => variables[key] ?? `{{${key}}}`,
   );
@@ -67,18 +118,32 @@ type CopyTemplateProps = {
   templateDir: string;
   outputDir: string;
   variables: Record<string, string>;
+  flags: Record<string, boolean>;
   relativeDir: string;
+  createDraftCommands: boolean;
 };
+
+const DRAFT_DIRECTORIES = new Set(['drafts', 'accept', 'revise', 'decline']);
 
 function copyTemplate({
   templateDir,
   outputDir,
   variables,
+  flags,
   relativeDir,
+  createDraftCommands,
 }: CopyTemplateProps): void {
   const sourceDir = join(templateDir, relativeDir);
 
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+    if (
+      !createDraftCommands &&
+      entry.isDirectory() &&
+      DRAFT_DIRECTORIES.has(entry.name)
+    ) {
+      continue;
+    }
+
     const relativePath = relativeDir
       ? join(relativeDir, entry.name)
       : entry.name;
@@ -90,7 +155,9 @@ function copyTemplate({
         templateDir,
         outputDir,
         variables,
+        flags,
         relativeDir: relativePath,
+        createDraftCommands,
       });
 
       continue;
@@ -121,7 +188,7 @@ function copyTemplate({
 
     writeFileSync(
       join(destinationDir, outputName),
-      expandTemplate(source, fileVariables),
+      expandTemplate(source, fileVariables, flags),
       'utf8',
     );
   }
@@ -155,6 +222,7 @@ export function createPluginScaffold({
   title,
   description,
   coreApiVersion,
+  createDraftCommands = true,
   runGenerator,
 }: CreatePluginScaffoldProps): CreatePluginScaffoldResult {
   const normalizedAlias = alias.trim();
@@ -209,7 +277,11 @@ export function createPluginScaffold({
       DESCRIPTION: normalizedDescription,
       CORE_API_VERSION: normalizedCoreApiVersion,
     },
+    flags: {
+      DRAFTS: createDraftCommands,
+    },
     relativeDir: '',
+    createDraftCommands,
   });
 
   runRequired({

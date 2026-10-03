@@ -8,7 +8,7 @@ export async function adaptAiCommand(
   void params.command;
   void params.source;
 
-  if (!params.runAgent) {
+  if (!params.agent) {
     return `${params.prefix}${params.alias} ai requires an agent backend. Set backend and try again.`;
   }
 
@@ -25,7 +25,7 @@ export async function adaptAiCommand(
     db: params.db,
     identity: params.identity,
     prefix: params.prefix,
-    runAgent: params.runAgent,
+    agent: params.agent,
   });
 
   return text;

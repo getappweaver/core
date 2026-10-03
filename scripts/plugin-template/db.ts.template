@@ -6,7 +6,9 @@ import { join } from 'path';
 
 import { Database, type Database as DatabaseType } from 'bun:sqlite';
 
+{{#IF DRAFTS}}
 import { create{{PASCAL_ALIAS}}DraftsTable } from './commands/drafts/store';
+{{/IF DRAFTS}}
 import type {
   {{PASCAL_ALIAS}},
   Create{{PASCAL_ALIAS}}Input,
@@ -101,7 +103,9 @@ export function openDb(): Database {
   db.run('PRAGMA foreign_keys = ON');
   db.run('PRAGMA journal_mode=WAL');
   create{{PASCAL_ALIAS}}Table(db);
+{{#IF DRAFTS}}
   create{{PASCAL_ALIAS}}DraftsTable(db);
+{{/IF DRAFTS}}
 
   return db;
 }
