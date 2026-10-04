@@ -33,6 +33,7 @@ import {
   handleNostrSendRepostOrQuoteAction,
 } from '../nostr/repostEventAction';
 import { loadSearchRelays } from '../nostr/searchRelays';
+import { handleNostrSignEventAction } from '../nostr/signEventAction';
 import {
   beginPluginInstallRestartStatus,
   clearPluginInstallRestartStatus,
@@ -1376,6 +1377,51 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
                 ...onSuccess.arguments,
                 nostrUrl: result.nostrUrl,
                 url: result.nostrUrl,
+              },
+              options: onSuccess.options,
+              refresh: action.refresh,
+              recordInTimeline: false,
+            },
+            {
+              ...params,
+              uiExecutionPolicy: {
+                ...params?.uiExecutionPolicy,
+                recordInTimeline: false,
+                suppressSystemMessage: true,
+              },
+            },
+          );
+        });
+      } else if (clientActionName === 'nostr.signEvent') {
+        void handleNostrSignEventAction({
+          action,
+          currentUserPubkey: adapters.currentUserPubkey(),
+          signEvent: adapters.signEvent,
+          setChromeModal: adapters.setChromeModal,
+          setChromeWeb: adapters.setChromeWeb,
+          setChromeText: adapters.setChromeText,
+          setChromeError: adapters.setChromeError,
+          setChromeLoading: adapters.setChromeLoading,
+          appendSystemMessage: adapters.appendSystemMessage,
+        }).then((result) => {
+          if (!result) {
+            return;
+          }
+
+          const onSuccess = result.onSuccessCommand;
+
+          runWebAction(
+            {
+              type: 'command',
+              command: onSuccess.command,
+              subcommand: onSuccess.subcommand,
+              arguments: {
+                ...onSuccess.arguments,
+                signedEvent: result.signedEvent,
+                runAt: result.runAt,
+                ...(result.date ? { date: result.date } : {}),
+                ...(result.time ? { time: result.time } : {}),
+                ...(result.tz ? { tz: result.tz } : {}),
               },
               options: onSuccess.options,
               refresh: action.refresh,
