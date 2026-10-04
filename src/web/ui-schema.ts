@@ -614,8 +614,8 @@ export const WebBasePropsSchema = z.object({
   fileSuggestions: z.boolean().optional(),
   /** `textField`: placeholder; display-only, not a command option hint. */
   inputPlaceholder: z.string().optional(),
-  /** `textField`: mask credentials without embedding their values in the UI tree. */
-  inputType: z.enum(['text', 'password']).optional(),
+  /** `textField`: mask credentials without embedding their values in the UI tree, or native date/time pickers. */
+  inputType: z.enum(['text', 'password', 'date', 'time']).optional(),
   /** `select`: allowed option values. */
   choices: z.array(z.string()).optional(),
   /** `select`: display labels keyed by submitted option value. */
