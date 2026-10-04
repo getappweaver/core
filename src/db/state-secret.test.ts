@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
-
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { generateSecretKey, getPublicKey } from 'nostr-tools';
 import { encrypt, getConversationKey } from 'nostr-tools/nip44';
 import { bytesToHex } from 'nostr-tools/utils';
@@ -40,6 +39,7 @@ describe('Routstr secret migration', () => {
     expect(getRoutstrSkKey(db)).toBe(ROUTSTR_KEY);
     const stored = getState(db, STATE_ROUTSTR_SK_KEY)!;
     expect(stored).not.toContain(ROUTSTR_KEY);
+
     expect(JSON.parse(stored)).toMatchObject({
       version: 1,
       algorithm: 'nip44-v2',
@@ -51,6 +51,7 @@ describe('Routstr secret migration', () => {
       ROUTSTR_KEY,
       getConversationKey(privateKey, publicKey),
     );
+
     setState(db, STATE_ROUTSTR_SK_KEY, legacyCiphertext);
 
     expect(getRoutstrSkKey(db)).toBe(ROUTSTR_KEY);

@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
-
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { generateSecretKey, getPublicKey } from 'nostr-tools';
 import { bytesToHex } from 'nostr-tools/utils';
 
@@ -40,10 +39,12 @@ describe('NWC encrypted state', () => {
       label: 'Primary',
       connectionUri: CONNECTION_URI,
     });
+
     const raw = getState(db, STATE_NWC_CONNECTIONS)!;
 
     expect(raw).not.toContain(CONNECTION_URI);
     expect(raw).not.toContain('abcdef0123456789');
+
     expect(JSON.parse(raw)).toMatchObject({
       version: 2,
       connections: [
@@ -56,6 +57,7 @@ describe('NWC encrypted state', () => {
         },
       ],
     });
+
     expect(getStoredNwcConnection(db, connection.id)?.connectionUri).toBe(
       CONNECTION_URI,
     );
@@ -65,6 +67,7 @@ describe('NWC encrypted state', () => {
     const privateKey = generateSecretKey();
     const publicKey = getPublicKey(privateKey);
     initSecretEncryption(bytesToHex(privateKey), publicKey);
+
     const connection = addNwcConnection({
       db,
       label: 'Primary',
@@ -127,11 +130,13 @@ describe('NWC encrypted state', () => {
         },
       ],
     });
+
     setState(db, STATE_NWC_CONNECTIONS, invalid);
 
     expect(() =>
       getStoredNwcConnection(db, '31bcd2f3-92db-428d-9b93-86b389ec21a5'),
     ).toThrow('Stored NWC connection state is invalid.');
+
     expect(getState(db, STATE_NWC_CONNECTIONS)).toBe(invalid);
   });
 
@@ -141,6 +146,7 @@ describe('NWC encrypted state', () => {
       label: 'Primary',
       connectionUri: CONNECTION_URI,
     });
+
     initializeWithNewIdentity();
 
     try {
@@ -159,11 +165,13 @@ describe('NWC encrypted state', () => {
       label: 'Primary',
       connectionUri: CONNECTION_URI,
     });
+
     const state = JSON.parse(getState(db, STATE_NWC_CONNECTIONS)!) as {
       connections: Array<{
         connectionUriCiphertext: { ciphertext: string };
       }>;
     };
+
     state.connections[0]!.connectionUriCiphertext.ciphertext = 'malformed';
     setState(db, STATE_NWC_CONNECTIONS, JSON.stringify(state));
 

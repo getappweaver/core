@@ -58,6 +58,7 @@ import {
 } from './web-node/WebFormElement';
 import { WebNostrPostElement } from './web-node/WebNostrPostElement';
 import { WebTabsElement } from './web-node/WebTabsElement';
+import { WebTimestampElement } from './web-node/WebTimestampElement';
 import { WebTreeElement, WebTreeItemElement } from './web-node/WebTreeElement';
 import { WebTreeTimeFilterStatusElement } from './web-node/WebTreeTimeFilterStatusElement';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
@@ -338,6 +339,10 @@ function renderElement({
         <WebCountdownElement element={element} />
       </Match>
 
+      <Match when={element.tag === 'timestamp'}>
+        <WebTimestampElement element={element} />
+      </Match>
+
       <Match when={element.tag === 'countLabel'}>
         <span
           class={elementClass(element)}
@@ -616,6 +621,7 @@ function renderElement({
               data-ui={elementUi(element)}
               style={elementStyle(element)}
               contentEditable={element.props?.contentEditable}
+              title={element.props?.title}
             >
               <For each={element.children ?? []}>{renderChild}</For>
             </span>

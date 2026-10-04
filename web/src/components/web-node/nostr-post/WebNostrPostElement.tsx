@@ -915,8 +915,10 @@ function formatContentCharCount(count: number): string {
   if (count >= 1000) {
     const k = count / 1000;
     const formatted = k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
+
     return `${formatted}K chars`;
   }
+
   return `${count} chars`;
 }
 
@@ -1734,19 +1736,19 @@ function ReferenceCard(props: {
   const isContentCollapsible = () =>
     isLongForm() && (reference().content?.length ?? 0) > collapsedChars;
 
-  const isContentCollapsed = () =>
-    isContentCollapsible() && !contentExpanded();
+  const isContentCollapsed = () => isContentCollapsible() && !contentExpanded();
 
   const visibleReferenceContent = () => {
     const raw = reference().content ?? '';
+
     if (isContentCollapsed()) {
       return `${raw.slice(0, collapsedChars).trimEnd()}...`;
     }
+
     return raw;
   };
 
-  const attachments = () =>
-    attachmentsFromContent(reference().content ?? '');
+  const attachments = () => attachmentsFromContent(reference().content ?? '');
 
   const embeddedReferences = () => reference().embeddedReferences ?? [];
 
@@ -2051,11 +2053,14 @@ function ReferenceCard(props: {
                                   setContentExpanded(true);
                                 }}
                               >
-                                Show all content ({formatContentCharCount(content().length)})
+                                Show all content (
+                                {formatContentCharCount(content().length)})
                               </button>
                             </div>
                           </Show>
-                          <Show when={contentExpanded() && isContentCollapsible()}>
+                          <Show
+                            when={contentExpanded() && isContentCollapsible()}
+                          >
                             <div class="web-nostrPost__contentToggleBlock">
                               <button
                                 type="button"
@@ -2170,7 +2175,8 @@ function ReferenceCard(props: {
                             setContentExpanded(true);
                           }}
                         >
-                          Show all content ({formatContentCharCount(content().length)})
+                          Show all content (
+                          {formatContentCharCount(content().length)})
                         </button>
                       </div>
                     </Show>
@@ -2680,7 +2686,8 @@ export function WebNostrPostElement(
             <Show when={activity.comment}>
               {(comment) => (
                 <span class="web-nostrPost__activityComment">
-                  {' '}· “{comment()}”
+                  {' '}
+                  · “{comment()}”
                 </span>
               )}
             </Show>
@@ -2831,7 +2838,8 @@ export function WebNostrPostElement(
                       class="web-nostrPost__action web-nostrPost__contentToggle"
                       onClick={() => setExpanded(true)}
                     >
-                      Show all content ({formatContentCharCount(content().length)})
+                      Show all content (
+                      {formatContentCharCount(content().length)})
                     </button>
                   </div>
                 </Show>

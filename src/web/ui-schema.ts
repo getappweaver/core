@@ -553,6 +553,13 @@ export const WebBasePropsSchema = z.object({
   filterTimestamps: z.array(z.number().int()).optional(),
   /** Unix timestamp (seconds) targeted by a live `countdown` element. */
   targetTimestamp: z.number().int().optional(),
+  /** Epoch milliseconds displayed by the generic `timestamp` element in browser-local time. */
+  timestampMs: z
+    .number()
+    .int()
+    .min(-8640000000000000)
+    .max(8640000000000000)
+    .optional(),
   /** Stable range identity used to display selected state on controls. */
   timeFilterRangeKey: z.string().min(1).optional(),
   /** Range keys currently represented by a moving timeline/status control. */
@@ -668,6 +675,8 @@ export const WebElementTagSchema = z.enum([
   'row',
   'box',
   'text',
+  /** Browser-local date/time display using `timestampMs`; optional label prefix. */
+  'timestamp',
   'link',
   'badge',
   'image',
@@ -728,6 +737,7 @@ export const WebGenericElementTagSchema = z.enum([
   'row',
   'box',
   'text',
+  'timestamp',
   'link',
   'badge',
   'image',

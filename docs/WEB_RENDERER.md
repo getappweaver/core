@@ -5,6 +5,12 @@ Current goal
 - Reuse existing command handlers/business logic where possible.
 - Allow web UI actions to map into normal command invocations first, instead of overengineering adapters.
 What already exists
+
+Reusable local date/time display: `timestamp` elements accept `timestampMs`
+(epoch milliseconds) and an optional `label` prefix. The client formats them in
+the browser's locale/timezone, including the timezone abbreviation, with an ISO
+datetime/tooltip for the exact instant. Standard text size/tone/style props apply.
+
 Backend/web
 - Local web server exists in `src/web/server.ts`, `src/web/routes.ts`, `src/web/command-catalog.ts`, `src/web/execute.ts`, `src/web/chat.ts`.
 - Web API supports:

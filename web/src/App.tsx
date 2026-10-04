@@ -540,9 +540,7 @@ function AppInner(): JSX.Element {
 
     if (dockVisible()) {
       setDockWidgetItemsByKey(
-        Object.fromEntries(
-          widgets.map((widget) => [widget.key, widget.item]),
-        ),
+        Object.fromEntries(widgets.map((widget) => [widget.key, widget.item])),
       );
     } else {
       setDockWidgetItemsByKey({});

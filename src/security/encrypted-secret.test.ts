@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-
 import { generateSecretKey, getPublicKey } from 'nostr-tools';
 import { bytesToHex } from 'nostr-tools/utils';
 
@@ -47,9 +46,11 @@ describe('encrypted secret envelopes', () => {
       throw new Error('Expected decryption to fail');
     } catch (error) {
       expect(error).toBeInstanceOf(EncryptedSecretError);
+
       expect((error as EncryptedSecretError).code).toBe(
         'SECRET_DECRYPTION_FAILED',
       );
+
       expect(String(error)).not.toContain('do-not-disclose');
     }
   });
