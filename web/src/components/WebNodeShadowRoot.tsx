@@ -311,6 +311,68 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
     );
   };
 
+  createEffect(() => {
+    const root = props.root;
+    const intervalMs = root.autoRefreshMs;
+    const viewKey = JSON.stringify(root.meta);
+
+    if (!intervalMs || !props.onRunAction || !props.onReplaceRoot) {
+      return;
+    }
+
+    let pending = false;
+    let disposed = false;
+
+    const timer = setInterval(() => {
+      const host = hostEl;
+      const focused = host?.shadowRoot?.activeElement;
+
+      if (
+        pending ||
+        props.busy ||
+        document.hidden ||
+        !host?.getClientRects().length ||
+        focused?.matches('input, textarea, select, [contenteditable]')
+      ) {
+        return;
+      }
+
+      pending = true;
+
+      props.onRunAction?.(
+        {
+          type: 'command',
+          command: root.meta.command,
+          subcommand: root.meta.subcommand,
+          arguments: root.meta.arguments ?? {},
+          options: root.meta.options ?? {},
+          recordInTimeline: false,
+          pendingUi: { presentation: 'none' },
+        },
+        {
+          getWebRoot: () => currentRoot,
+          onReplaceRoot: (next) => {
+            if (!disposed && JSON.stringify(props.root.meta) === viewKey) {
+              props.onReplaceRoot?.(next);
+            }
+          },
+          onCommandSettled: () => {
+            pending = false;
+          },
+          uiExecutionPolicy: {
+            recordInTimeline: false,
+            suppressSystemMessage: true,
+          },
+        },
+      );
+    }, intervalMs);
+
+    onCleanup(() => {
+      disposed = true;
+      clearInterval(timer);
+    });
+  });
+
   onMount(() => {
     const host = hostEl;
 

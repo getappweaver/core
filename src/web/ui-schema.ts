@@ -874,6 +874,8 @@ export const WebRenderResultSchema = z.object({
     .record(z.string().min(1), z.array(WebTreeTimeRangeSchema))
     .optional(),
   shadowMountOverflow: WebShadowMountOverflowSchema.optional(),
+  /** Opt-in polling of this render's read-only meta command while visible. */
+  autoRefreshMs: z.number().int().min(2000).max(60000).optional(),
 });
 
 export const ClientViewResultSchema = z.object({
