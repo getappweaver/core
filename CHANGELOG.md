@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.9.1] - 2026-10-06
+
+- fix: command surface when is timeline (251a932)
+
 ## [v13.9.0] - 2026-10-06
 
-- feat: introducing autoRefreshMs for WebNode (a0c9eb5)
+- feat: introducing autoRefreshMs for WebNode (466dad2)
 
 ## [v13.8.1] - 2026-10-06
 

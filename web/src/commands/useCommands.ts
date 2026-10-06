@@ -1935,10 +1935,12 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       });
     }
 
-    const actionTargetsTaskbar = adapters.isTaskbarSubcommand(
-      commandAction.command,
-      commandAction.subcommand,
-    );
+    const actionTargetsTaskbar =
+      commandAction.surface !== 'timeline' &&
+      adapters.isTaskbarSubcommand(
+        commandAction.command,
+        commandAction.subcommand,
+      );
 
     const recordTl = actionTargetsTaskbar
       ? false
@@ -2356,6 +2358,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         if (
           params?.onReplaceRoot &&
           output.web &&
+          commandAction.surface !== 'timeline' &&
           !action.refresh &&
           !recordTl &&
           !isStaleRootResponse({ sourceId, requestId })
