@@ -564,8 +564,25 @@ a.web-button:focus-visible {
 }
 
 .web-nostrPost__profileMention {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-accent);
   font-weight: 700;
+  box-shadow: none;
+  transform: none;
+}
+
+.web-nostrPost__profileMention:hover,
+.web-nostrPost__profileMention:focus-visible {
+  box-shadow: none;
+  transform: none;
+}
+
+.web-nostrPost__profileMention:active {
+  box-shadow: none;
+  transform: none;
 }
 
 .web-nostrProfile {

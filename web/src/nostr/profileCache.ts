@@ -27,6 +27,12 @@ export class ProfileMemoryCache<T> {
     this.entries.set(key, { value, fetchedAtMs: Date.now() });
   }
 
+  get(key: string): T | undefined {
+    const entry = this.entries.get(key) ?? this.entries.get(key.toLowerCase());
+
+    return entry ? entry.value : undefined;
+  }
+
   clear(): void {
     this.entries.clear();
     this.failedAtMs.clear();

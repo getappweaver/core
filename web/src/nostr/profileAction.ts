@@ -993,6 +993,210 @@ function latestPostNode({
   });
 }
 
+const ABOUT_ACCOUNT_OR_URL_RE =
+  /(https?:\/\/[^\s<>()"']+|@?nostr:[a-z0-9]+|@(?:npub1|nprofile1)[a-z0-9]+|\b(?:npub1|nprofile1)[a-z0-9]+)/gi;
+
+function cleanAboutUrl(value: string): string {
+  return value.replace(/[\].,!?;:]+$/g, '');
+}
+
+type DecodedAccountReference = {
+  pubkey: string;
+  relays: string[];
+};
+
+function decodeAccountReference(token: string): DecodedAccountReference | null {
+  const raw = token.replace(/^(?:@?nostr:|@)/i, '');
+
+  try {
+    const decoded = nip19.decode(raw);
+
+    if (decoded.type === 'npub') {
+      return { pubkey: decoded.data, relays: [] };
+    }
+
+    if (decoded.type === 'nprofile') {
+      return {
+        pubkey: decoded.data.pubkey,
+        relays: decoded.data.relays ?? [],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function extractAccountPubkeysFromAbout(
+  about: string | null | undefined,
+): string[] {
+  if (!about) {
+    return [];
+  }
+
+  const pubkeys = new Set<string>();
+
+  for (const match of about.matchAll(ABOUT_ACCOUNT_OR_URL_RE)) {
+    const account = decodeAccountReference(match[0]);
+
+    if (account) {
+      pubkeys.add(account.pubkey.toLowerCase());
+    }
+  }
+
+  return [...pubkeys];
+}
+
+function aboutAccountMentionLabel({
+  pubkey,
+  metadata,
+}: {
+  pubkey: string;
+  metadata: ProfileMetadata | null | undefined;
+}): string {
+  const npub = npubForPubkey(pubkey);
+
+  const handle =
+    firstNonEmpty([
+      metadata?.username,
+      metadata?.name,
+      shortValue(npub),
+      shortValue(pubkey),
+    ]) ?? 'unknown';
+
+  return `@${handle.replace(/^@/, '')}`;
+}
+
+type RenderAboutNodesProps = {
+  about: string;
+  payload: ProfilePayload;
+};
+
+function renderAboutNodes({
+  about,
+  payload,
+}: RenderAboutNodesProps): WebNode[] {
+  const nodes: WebNode[] = [];
+  let cursor = 0;
+
+  for (const match of about.matchAll(ABOUT_ACCOUNT_OR_URL_RE)) {
+    const index = match.index ?? 0;
+    const rawToken = match[0];
+
+    if (index > cursor) {
+      nodes.push(text(about.slice(cursor, index)));
+    }
+
+    if (rawToken.startsWith('http://') || rawToken.startsWith('https://')) {
+      const url = cleanAboutUrl(rawToken);
+
+      nodes.push(
+        el({
+          tag: 'link',
+          props: {
+            href: url,
+            external: true,
+            className: 'web-nostrPost__inlineLink',
+          },
+          children: [text(url)],
+        }),
+      );
+
+      cursor = index + url.length;
+      continue;
+    }
+
+    const account = decodeAccountReference(rawToken);
+
+    if (account) {
+      const metadata = profileMetadataCache.get(account.pubkey);
+
+      const label = aboutAccountMentionLabel({
+        pubkey: account.pubkey,
+        metadata,
+      });
+
+      const openAction = buildNostrOpenProfileAction(
+        buildNostrProfileActionPayload({
+          pubkey: account.pubkey,
+          npub: npubForPubkey(account.pubkey),
+          name: metadata?.name ?? null,
+          username: metadata?.username ?? null,
+          picture: metadata?.picture ?? null,
+          about: metadata?.about ?? null,
+          relayHints: uniqueRelays([
+            ...account.relays,
+            ...payload.relayHints,
+            ...payload.fallbackRelays,
+          ]),
+          profileActions: payload.profileActions ?? [],
+          profileActionsReadAction: payload.profileActionsReadAction ?? null,
+          resolveReferencesAutomatically:
+            payload.resolveReferencesAutomatically,
+          sharePrefixes: payload.sharePrefixes,
+        }),
+      );
+
+      nodes.push(
+        el({
+          tag: 'button',
+          props: {
+            className: 'web-nostrPost__profileMention',
+            action: openAction,
+          },
+          children: [text(label)],
+        }),
+      );
+
+      cursor = index + rawToken.length;
+      continue;
+    }
+
+    nodes.push(text(rawToken));
+    cursor = index + rawToken.length;
+  }
+
+  if (cursor < about.length) {
+    nodes.push(text(about.slice(cursor)));
+  }
+
+  return nodes;
+}
+
+type FetchMentionedProfileMetadataProps = {
+  about: string | null | undefined;
+  relays: string[];
+  onUpdate: () => void;
+};
+
+function fetchMentionedProfileMetadata({
+  about,
+  relays,
+  onUpdate,
+}: FetchMentionedProfileMetadataProps): void {
+  const pubkeys = extractAccountPubkeysFromAbout(about);
+
+  const uncached = pubkeys.filter(
+    (pk) => profileMetadataCache.get(pk) === undefined,
+  );
+
+  if (uncached.length === 0) {
+    return;
+  }
+
+  void Promise.allSettled(
+    uncached.map((pubkey) =>
+      fetchProfileMetadata({
+        pubkey,
+        relays,
+      }),
+    ),
+  ).then(() => {
+    onUpdate();
+  });
+}
+
 function profileTabButton({
   payload,
   activeTab,
@@ -1039,7 +1243,12 @@ function profileRoot({
       shortValue(payload.pubkey),
     ]) ?? 'unknown';
 
-  const username = firstNonEmpty([payload.username, npub]);
+  const username = firstNonEmpty([
+    payload.username,
+    payload.name,
+    shortValue(npub),
+    shortValue(payload.pubkey),
+  ]);
 
   const followKey =
     `${currentUserPubkey ?? ''}:${payload.pubkey}`.toLowerCase();
@@ -1115,7 +1324,10 @@ function profileRoot({
               whiteSpace: 'pre-wrap',
               className: 'web-nostrProfile__about',
             },
-            children: [text(payload.about)],
+            children: renderAboutNodes({
+              about: payload.about,
+              payload,
+            }),
           }),
         ]
       : []),
@@ -1210,7 +1422,7 @@ function profileRoot({
                     text(
                       username
                         ? `@${username.replace(/^@/, '')}`
-                        : shortValue(payload.pubkey),
+                        : `@${shortValue(payload.pubkey)}`,
                     ),
                   ],
                 }),
@@ -1827,6 +2039,15 @@ async function fetchLatestProfilePosts({
         ),
       );
 
+      for (const [pubkey, metadata] of profileByPubkey) {
+        if (profileMetadataCache.get(pubkey) === undefined) {
+          profileMetadataCache.set({
+            key: pubkey.toLowerCase(),
+            value: metadata,
+          });
+        }
+      }
+
       return buildLatestProfilePostsFromResolution({
         response,
         viewedProfile: profile,
@@ -1883,6 +2104,21 @@ export async function handleNostrOpenProfilePanelAction({
 
   const payload = parseProfilePayload(action.payload ?? {});
 
+  if (
+    (payload.name || payload.username) &&
+    profileMetadataCache.get(payload.pubkey) === undefined
+  ) {
+    profileMetadataCache.set({
+      key: payload.pubkey.toLowerCase(),
+      value: {
+        name: payload.name,
+        username: payload.username,
+        picture: payload.picture,
+        about: payload.about,
+      },
+    });
+  }
+
   const followedByFollowsPromise = fetchFollowedByFollowsCount(
     payload.pubkey,
   ).catch(() => undefined);
@@ -1906,6 +2142,29 @@ export async function handleNostrOpenProfilePanelAction({
     }),
   );
 
+  const panelRelays = uniqueRelays([
+    ...PROFILE_RELAYS_FOR_QUERY,
+    ...payload.relayHints,
+    ...payload.fallbackRelays,
+  ]);
+
+  fetchMentionedProfileMetadata({
+    about: payload.about,
+    relays: panelRelays,
+    onUpdate: () => {
+      if (requestId === activeProfilePanelRequest) {
+        setChromeWeb(
+          profileRoot({
+            payload: renderedPayload,
+            currentUserPubkey,
+            activeTab: renderedPayload.tab,
+            latestPosts,
+          }),
+        );
+      }
+    },
+  });
+
   setChromeLoading(false);
 
   const profileActionsPromise = (async () => {
@@ -1922,11 +2181,7 @@ export async function handleNostrOpenProfilePanelAction({
 
   const metadataPromise = fetchProfileMetadata({
     pubkey: payload.pubkey,
-    relays: uniqueRelays([
-      ...PROFILE_RELAYS_FOR_QUERY,
-      ...payload.relayHints,
-      ...payload.fallbackRelays,
-    ]),
+    relays: panelRelays,
   }).catch(() => null);
 
   renderedPayload = {
@@ -1979,6 +2234,23 @@ export async function handleNostrOpenProfilePanelAction({
       latestPosts,
     }),
   );
+
+  fetchMentionedProfileMetadata({
+    about: renderedPayload.about,
+    relays: panelRelays,
+    onUpdate: () => {
+      if (requestId === activeProfilePanelRequest) {
+        setChromeWeb(
+          profileRoot({
+            payload: renderedPayload,
+            currentUserPubkey,
+            activeTab: renderedPayload.tab,
+            latestPosts,
+          }),
+        );
+      }
+    },
+  });
 
   if (renderedPayload.tab === 'latestPosts') {
     try {
