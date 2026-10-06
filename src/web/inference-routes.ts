@@ -45,6 +45,8 @@ const ChatCompletionRequestSchema = z.object({
 
 type ChatCompletionRequest = z.infer<typeof ChatCompletionRequestSchema>;
 
+class InvalidInferenceModelError extends Error {}
+
 function jsonResponse(data: unknown, init?: ResponseInit): Response {
   const headers = new Headers(init?.headers);
 
@@ -396,19 +398,32 @@ async function handleChatCompletion(
   try {
     return await opencodeRuntimeController.withPreparedRun({
       workspace,
-      prepare: () =>
-        createModelSourceCoordinator(ctx.seenDb).prepareRun(
-          workspace,
-          'opencode',
-        ),
-      run: async (prepared) => {
-        if (request.model !== prepared.modelId) {
-          return errorResponse(
-            `Model must match the active model-source selection: ${prepared.modelId}`,
-            400,
+      prepare: async () => {
+        const coordinator = createModelSourceCoordinator(ctx.seenDb);
+        const snapshot = await coordinator.getSnapshot(workspace, 'opencode');
+
+        const model = snapshot.models.find(
+          (entry) => entry.id === request.model,
+        );
+
+        if (!model) {
+          throw new InvalidInferenceModelError(
+            `Model is not in the active model-source catalog: ${request.model}`,
           );
         }
 
+        if (model.availability.status === 'unavailable') {
+          throw new InvalidInferenceModelError(
+            `Model is unavailable: ${request.model}. ${model.availability.reason}`,
+          );
+        }
+
+        return coordinator.prepareRun(workspace, 'opencode', {
+          providerId: snapshot.providerId,
+          modelId: request.model,
+        });
+      },
+      run: async (prepared) => {
         const context: CompletionContext = {
           id: `chatcmpl-${randomUUID()}`,
           created: Math.floor(Date.now() / 1000),
@@ -428,7 +443,10 @@ async function handleChatCompletion(
       },
     });
   } catch (err) {
-    return errorResponse(err instanceof Error ? err.message : String(err), 500);
+    return errorResponse(
+      err instanceof Error ? err.message : String(err),
+      err instanceof InvalidInferenceModelError ? 400 : 500,
+    );
   }
 }
 
