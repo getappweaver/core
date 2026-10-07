@@ -1,8 +1,12 @@
 import { rotateInferenceApiKey } from '@src/inference/api-key';
+import {
+  listInferenceEndpoints,
+  type RegisteredInferenceEndpoint,
+} from '@src/inference/endpoints';
 
 import type { RouteCommandContext } from '../../dispatch';
 
-function inferenceBaseUrl(): string {
+function inferenceOrigin(): string {
   const configuredHost = process.env.BOT_WEB_HOST?.trim() || '127.0.0.1';
   const host = configuredHost === '0.0.0.0' ? '127.0.0.1' : configuredHost;
   const configuredPort = Number.parseInt(process.env.BOT_WEB_PORT ?? '', 10);
@@ -14,23 +18,43 @@ function inferenceBaseUrl(): string {
       ? configuredPort
       : 5551;
 
-  return `http://${host}:${port}/v1`;
+  const urlHost =
+    host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+
+  return `http://${urlHost}:${port}`;
 }
 
-export function handleBotInferenceKey(
+export async function handleBotInferenceKey(
   ctx: RouteCommandContext,
 ): Promise<string> {
+  const endpoints = await listInferenceEndpoints();
   const apiKey = rotateInferenceApiKey(ctx.seenDb);
+  const groups = new Map<string, RegisteredInferenceEndpoint[]>();
+  for (const endpoint of endpoints) {
+    const group = groups.get(endpoint.provider.providerId) ?? [];
+    group.push(endpoint);
+    groups.set(endpoint.provider.providerId, group);
+  }
 
-  return Promise.resolve(
-    [
-      'Inference API key rotated. The previous key no longer works.',
+  const sections = [...groups.values()].map((group) => {
+    const { bridge } = group[0]!;
+
+    return [
+      `${bridge.title} Inference Bridge settings:`,
+      `Base URL: ${inferenceOrigin()}${bridge.basePath}`,
+      `API key: ${apiKey}`,
+      'Authentication: Authorization: Bearer <key>',
       '',
-      apiKey,
-      '',
-      'Inference Bridge settings:',
-      `Base URL: ${inferenceBaseUrl()}`,
-      'API key: use the value above',
-    ].join('\n'),
-  );
+      'Available inference endpoints:',
+      ...group.map(
+        (endpoint) =>
+          `${endpoint.method} ${endpoint.path} — ${endpoint.description}`,
+      ),
+    ].join('\n');
+  });
+
+  return [
+    'Inference API key rotated. The previous key no longer works.',
+    ...sections,
+  ].join('\n\n');
 }

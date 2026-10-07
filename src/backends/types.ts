@@ -64,6 +64,7 @@ export function getOutputString(result: AgentRunResult): string {
 }
 
 export type RunMessageProps = {
+  tools?: Record<string, boolean>;
   sessionId: string;
   content: string;
   cwd: string;

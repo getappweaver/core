@@ -8,7 +8,11 @@ import type { EventTemplate, NostrEvent, SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
 import type { AgentStreamChunk } from '@src/backends/agent-stream-chunk';
-import type { AgentRunResult } from '@src/backends/types';
+import type {
+  AgentRunResult,
+  ChatCompletionMessage,
+  ChatCompletionResult,
+} from '@src/backends/types';
 import {
   normalizeCapabilityRelations,
   PluginCapabilityRelationsSchema,
@@ -67,6 +71,14 @@ export type PluginAgentRunResult = AgentRunResult & {
   modelSourceId: string;
 };
 
+export type PluginTextCompletionProps = {
+  messages: ChatCompletionMessage[];
+  workspaceTarget: WorkspaceTarget | null;
+  modelSourceId: string | null;
+  modelId: string;
+  abortSignal: AbortSignal | null;
+};
+
 export type PluginAgentService = {
   getDefaults(): PluginAgentDefaults;
   getEffectiveModel(props: {
@@ -80,6 +92,7 @@ export type PluginAgentService = {
     workspaceTarget?: WorkspaceTarget | null;
   }): Promise<string[]>;
   run(props: PluginAgentRunProps): Promise<PluginAgentRunResult>;
+  completeText(props: PluginTextCompletionProps): Promise<ChatCompletionResult>;
 };
 export type TextPromptPayload = {
   type: 'text-prompt';

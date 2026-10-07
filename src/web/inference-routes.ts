@@ -1,480 +1,156 @@
-import { randomUUID } from 'node:crypto';
-
-import { z, ZodError } from 'zod';
-
-import { createBackend } from '@src/backends/factory';
-import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
-import { withOpencodeSource } from '@src/backends/opencode-sdk';
-import type {
-  AgentBackend,
-  ChatCompletionMessage,
-  ChatCompletionResult,
-} from '@src/backends/types';
-import type { AiModelRuntimeConfig } from '@src/capabilities/ai-model-source.v1';
-import { createModelSourceCoordinator } from '@src/core/model-source';
-import {
-  getState,
-  getWorkspaceTarget,
-  STATE_INFERENCE_API_KEY_HASH,
-  type WorkspaceTarget,
-} from '@src/db';
+import { InferenceEndpointV1 } from '@src/capabilities/inference-endpoint.v1';
+import { capabilityRegistry } from '@src/core/capabilities/registry';
+import { getState, STATE_INFERENCE_API_KEY_HASH } from '@src/db';
 import { verifyInferenceApiKey } from '@src/inference/api-key';
+import {
+  inferenceErrorResponse,
+  listInferenceEndpoints,
+} from '@src/inference/endpoints';
 
 import type { WebRouteContext } from './routes';
 
-const MAX_CHAT_COMPLETION_BODY_BYTES = 2 * 1024 * 1024;
-const encoder = new TextEncoder();
+type BoundedInferenceRequestProps = { request: Request; maxBodyBytes: number };
 
-const ChatMessageSchema = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
-  content: z.string(),
-  reasoning: z.string().optional(),
-  reasoning_content: z.string().optional(),
-});
+async function boundedInferenceRequest({
+  request,
+  maxBodyBytes,
+}: BoundedInferenceRequestProps): Promise<Request> {
+  const declaredLength = Number(request.headers.get('Content-Length'));
 
-const ChatCompletionRequestSchema = z.object({
-  model: z.string().trim().min(1),
-  messages: z.array(ChatMessageSchema).min(1),
-  stream: z.boolean().optional(),
-  stream_options: z
-    .object({ include_usage: z.boolean().optional() })
-    .optional(),
-  tools: z.never().optional(),
-  tool_choice: z.never().optional(),
-});
-
-type ChatCompletionRequest = z.infer<typeof ChatCompletionRequestSchema>;
-
-class InvalidInferenceModelError extends Error {}
-
-function jsonResponse(data: unknown, init?: ResponseInit): Response {
-  const headers = new Headers(init?.headers);
-
-  headers.set('Content-Type', 'application/json; charset=utf-8');
-  headers.set('Cache-Control', 'no-store');
-
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-function errorResponse(message: string, status: number): Response {
-  const type =
-    status === 401
-      ? 'authentication_error'
-      : status >= 500
-        ? 'server_error'
-        : 'invalid_request_error';
-
-  return jsonResponse(
-    {
-      error: {
-        message,
-        type,
-      },
-    },
-    { status },
-  );
-}
-
-function bearerToken(req: Request): string | null {
-  const authorization = req.headers.get('Authorization');
-
-  if (!authorization?.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authorization.slice('Bearer '.length).trim();
-
-  return token.length > 0 ? token : null;
-}
-
-function verifyRequestAuthorization(
-  req: Request,
-  ctx: WebRouteContext,
-): Response | null {
-  if (!getState(ctx.seenDb, STATE_INFERENCE_API_KEY_HASH)) {
-    return errorResponse(
-      `Inference API key not configured. Run ${ctx.prefix}bot inference-key first.`,
-      503,
-    );
-  }
-
-  if (!verifyInferenceApiKey(ctx.seenDb, bearerToken(req))) {
-    return errorResponse('Invalid inference API key.', 401);
-  }
-
-  return null;
-}
-
-async function parseRequestBody(req: Request): Promise<ChatCompletionRequest> {
-  const body = await req.text();
-
-  if (Buffer.byteLength(body) > MAX_CHAT_COMPLETION_BODY_BYTES) {
+  if (declaredLength > maxBodyBytes) {
     throw new Error('request_body_too_large');
   }
 
-  return ChatCompletionRequestSchema.parse(JSON.parse(body) as unknown);
-}
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
 
-function createInferenceBackend(ctx: WebRouteContext): AgentBackend {
-  return createBackend({
-    backendName: 'opencode',
-    dmBotRoot: ctx.dmBotRoot,
-  });
-}
+  if (request.body) {
+    const reader = request.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-function inferenceCwd(ctx: WebRouteContext): string {
-  return getWorkspaceTarget(ctx.seenDb) === 'appweaver'
-    ? ctx.dmBotRoot
-    : ctx.parentOfBotRoot;
-}
+        if (done) {
+          break;
+        }
 
-function normalizeMessages(
-  request: ChatCompletionRequest,
-): ChatCompletionMessage[] {
-  return request.messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-    reasoning: message.reasoning ?? message.reasoning_content ?? null,
-  }));
-}
+        bytes += value.byteLength;
 
-function contentFromResult(
-  result: ChatCompletionResult,
-  type: 'text' | 'reasoning',
-): string {
-  return result.outputs
-    .filter((output) => output.type === type)
-    .map((output) => output.value)
-    .join('');
-}
+        if (bytes > maxBodyBytes) {
+          await reader.cancel();
+          throw new Error('request_body_too_large');
+        }
 
-function usageFromResult(result: ChatCompletionResult): {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-} | null {
-  return result.tokens
-    ? {
-        prompt_tokens: result.tokens.input,
-        completion_tokens: result.tokens.output,
-        total_tokens: result.tokens.total,
+        chunks.push(value);
       }
-    : null;
-}
-
-async function handleModels(ctx: WebRouteContext): Promise<Response> {
-  const models = await createModelSourceCoordinator(ctx.seenDb).listModels(
-    getWorkspaceTarget(ctx.seenDb),
-    'opencode',
-  );
-
-  return jsonResponse({
-    object: 'list',
-    data: models.map((model) => ({
-      id: model.id,
-      object: 'model',
-      owned_by: model.group,
-    })),
-  });
-}
-
-type CompletionContext = {
-  id: string;
-  created: number;
-  request: ChatCompletionRequest;
-  runtimeModelId: string;
-  providerId: string;
-  runtimeConfig: AiModelRuntimeConfig;
-  backend: AgentBackend;
-  cwd: string;
-  workspace: WorkspaceTarget;
-  db: WebRouteContext['seenDb'];
-};
-
-type RunCompletionProps = {
-  context: CompletionContext;
-  onChunk: Parameters<AgentBackend['runChatCompletion']>[0]['onChunk'];
-  abortSignal: AbortSignal;
-};
-
-async function runCompletion({
-  context,
-  onChunk,
-  abortSignal,
-}: RunCompletionProps): Promise<ChatCompletionResult> {
-  const result = await context.backend.runChatCompletion({
-    messages: normalizeMessages(context.request),
-    model: context.runtimeModelId,
-    cwd: context.cwd,
-    onChunk,
-    abortSignal,
-  });
-
-  await createModelSourceCoordinator(context.db).recordSuccessfulUse(
-    context.workspace,
-    'opencode',
-    context.request.model,
-    context.providerId,
-  );
-
-  return result;
-}
-
-async function handleNonStreamingCompletion(
-  context: CompletionContext,
-  abortSignal: AbortSignal,
-): Promise<Response> {
-  const result = await runCompletion({
-    context,
-    onChunk: () => {},
-    abortSignal,
-  });
-
-  const reasoning = contentFromResult(result, 'reasoning');
-
-  return jsonResponse({
-    id: context.id,
-    object: 'chat.completion',
-    created: context.created,
-    model: context.request.model,
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: contentFromResult(result, 'text'),
-          ...(reasoning ? { reasoning_content: reasoning } : {}),
-        },
-        finish_reason: 'stop',
-      },
-    ],
-    usage: usageFromResult(result),
-  });
-}
-
-function sseData(value: unknown): Uint8Array {
-  return encoder.encode(`data: ${JSON.stringify(value)}\n\n`);
-}
-
-function handleStreamingCompletion(
-  context: CompletionContext,
-  abortSignal: AbortSignal,
-): Response {
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      let closed = false;
-
-      const enqueue = (data: Uint8Array): boolean => {
-        if (closed) {
-          return false;
-        }
-
-        try {
-          controller.enqueue(data);
-
-          return true;
-        } catch {
-          closed = true;
-
-          return false;
-        }
-      };
-
-      const close = (): void => {
-        if (closed) {
-          return;
-        }
-
-        closed = true;
-
-        try {
-          controller.close();
-        } catch {
-          // The client may already have disconnected.
-        }
-      };
-
-      const emitDelta = (delta: Record<string, string>): void => {
-        enqueue(
-          sseData({
-            id: context.id,
-            object: 'chat.completion.chunk',
-            created: context.created,
-            model: context.request.model,
-            choices: [{ index: 0, delta, finish_reason: null }],
-          }),
-        );
-      };
-
-      emitDelta({ role: 'assistant' });
-
-      void opencodeRuntimeController
-        .holdUntil(() =>
-          withOpencodeSource({
-            workspaceRoot: context.cwd,
-            providerId: context.providerId,
-            config: context.runtimeConfig,
-            run: () =>
-              runCompletion({
-                context,
-                onChunk: (chunk) => {
-                  emitDelta(
-                    chunk.type === 'text_delta'
-                      ? { content: chunk.content }
-                      : { reasoning_content: chunk.content },
-                  );
-                },
-                abortSignal,
-              }),
-          }),
-        )
-        .then((result) => {
-          enqueue(
-            sseData({
-              id: context.id,
-              object: 'chat.completion.chunk',
-              created: context.created,
-              model: context.request.model,
-              choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-              ...(context.request.stream_options?.include_usage
-                ? { usage: usageFromResult(result) }
-                : {}),
-            }),
-          );
-
-          enqueue(encoder.encode('data: [DONE]\n\n'));
-          close();
-        })
-        .catch((err) => {
-          enqueue(
-            sseData({
-              error: {
-                message: err instanceof Error ? err.message : String(err),
-                type: abortSignal.aborted ? 'aborted' : 'server_error',
-              },
-            }),
-          );
-
-          close();
-        });
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Cache-Control': 'no-cache, no-store',
-      Connection: 'keep-alive',
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'X-Accel-Buffering': 'no',
-    },
-  });
-}
-
-async function handleChatCompletion(
-  req: Request,
-  ctx: WebRouteContext,
-): Promise<Response> {
-  let request: ChatCompletionRequest;
-
-  try {
-    request = await parseRequestBody(req);
-  } catch (err) {
-    const message =
-      err instanceof SyntaxError
-        ? 'Invalid JSON body.'
-        : err instanceof ZodError
-          ? err.issues.map((issue) => issue.message).join('; ')
-          : err instanceof Error
-            ? err.message
-            : String(err);
-
-    const status = message === 'request_body_too_large' ? 413 : 400;
-
-    return errorResponse(message, status);
+    } finally {
+      reader.releaseLock();
+    }
   }
 
-  const workspace = getWorkspaceTarget(ctx.seenDb);
-
-  try {
-    return await opencodeRuntimeController.withPreparedRun({
-      workspace,
-      prepare: async () => {
-        const coordinator = createModelSourceCoordinator(ctx.seenDb);
-        const snapshot = await coordinator.getSnapshot(workspace, 'opencode');
-
-        const model = snapshot.models.find(
-          (entry) => entry.id === request.model,
-        );
-
-        if (!model) {
-          throw new InvalidInferenceModelError(
-            `Model is not in the active model-source catalog: ${request.model}`,
-          );
-        }
-
-        if (model.availability.status === 'unavailable') {
-          throw new InvalidInferenceModelError(
-            `Model is unavailable: ${request.model}. ${model.availability.reason}`,
-          );
-        }
-
-        return coordinator.prepareRun(workspace, 'opencode', {
-          providerId: snapshot.providerId,
-          modelId: request.model,
-        });
-      },
-      run: async (prepared) => {
-        const context: CompletionContext = {
-          id: `chatcmpl-${randomUUID()}`,
-          created: Math.floor(Date.now() / 1000),
-          request,
-          runtimeModelId: prepared.runtimeModelId,
-          providerId: prepared.providerId,
-          runtimeConfig: prepared.runtimeConfig,
-          backend: createInferenceBackend(ctx),
-          cwd: inferenceCwd(ctx),
-          workspace,
-          db: ctx.seenDb,
-        };
-
-        return request.stream
-          ? handleStreamingCompletion(context, req.signal)
-          : handleNonStreamingCompletion(context, req.signal);
-      },
-    });
-  } catch (err) {
-    return errorResponse(
-      err instanceof Error ? err.message : String(err),
-      err instanceof InvalidInferenceModelError ? 400 : 500,
-    );
+  const body = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
   }
+
+  const headers = new Headers(request.headers);
+  // Authentication is owned by the bridge; providers do not receive the client key.
+  headers.delete('Authorization');
+  headers.delete('Cookie');
+  headers.delete('Content-Length');
+
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    signal: request.signal,
+    body: request.method === 'POST' ? body : null,
+  });
 }
 
 export function isInferenceRoute(pathname: string): boolean {
-  return pathname === '/v1/models' || pathname === '/v1/chat/completions';
+  return pathname === '/v1' || pathname.startsWith('/v1/');
 }
 
 export async function handleInferenceRoute(
   req: Request,
   ctx: WebRouteContext,
 ): Promise<Response> {
-  const authFailure = verifyRequestAuthorization(req, ctx);
-
-  if (authFailure) {
-    return authFailure;
-  }
-
-  const pathname = new URL(req.url).pathname;
-
-  if (req.method === 'GET' && pathname === '/v1/models') {
-    return handleModels(ctx).catch((err) =>
-      errorResponse(err instanceof Error ? err.message : String(err), 500),
+  if (!getState(ctx.seenDb, STATE_INFERENCE_API_KEY_HASH)) {
+    return inferenceErrorResponse(
+      `Inference API key not configured. Run ${ctx.prefix}bot inference-key first.`,
+      503,
     );
   }
 
-  if (req.method === 'POST' && pathname === '/v1/chat/completions') {
-    return handleChatCompletion(req, ctx);
+  const authorization = req.headers.get('Authorization');
+
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7).trim()
+    : null;
+
+  if (!verifyInferenceApiKey(ctx.seenDb, token)) {
+    return inferenceErrorResponse('Invalid inference API key.', 401);
   }
 
-  return errorResponse('Method not allowed.', 405);
+  try {
+    const path = new URL(req.url).pathname;
+    const endpoints = await listInferenceEndpoints();
+    const matchingPath = endpoints.filter((endpoint) => endpoint.path === path);
+
+    if (!matchingPath.length) {
+      return inferenceErrorResponse('Unknown inference endpoint.', 404);
+    }
+
+    const endpoint = matchingPath.find((entry) => entry.method === req.method);
+
+    if (!endpoint) {
+      const response = inferenceErrorResponse('Method not allowed.', 405);
+
+      response.headers.set(
+        'Allow',
+        matchingPath.map((entry) => entry.method).join(', '),
+      );
+
+      return response;
+    }
+
+    const request = await boundedInferenceRequest({
+      request: req,
+      maxBodyBytes: endpoint.maxBodyBytes,
+    });
+
+    request.signal.throwIfAborted();
+
+    const result = await capabilityRegistry.invoke({
+      operation: InferenceEndpointV1.operations.handle,
+      provider: endpoint.provider.providerId,
+      input: { endpointId: endpoint.id, request },
+      caller: { type: 'core', component: 'inference-bridge' },
+    });
+
+    if (result.status !== 'success') {
+      return inferenceErrorResponse('Inference endpoint is unavailable.', 503);
+    }
+
+    const response = new Response(result.output.body, result.output);
+    response.headers.set('Cache-Control', 'no-store');
+
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.message === 'request_body_too_large') {
+      return inferenceErrorResponse(
+        'Request body exceeds the endpoint payload limit.',
+        413,
+      );
+    }
+
+    return inferenceErrorResponse(
+      req.signal.aborted
+        ? 'Inference request aborted.'
+        : 'Inference endpoint is unavailable.',
+      503,
+    );
+  }
 }

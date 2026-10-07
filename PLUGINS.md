@@ -77,6 +77,25 @@ Currently manual:
 
 ## For Plugin Authors
 
+### Tool-free text generation
+
+Use `ctx.agent.completeText(...)` for a small, model-source-routed text helper without a persistent agent conversation. Pass every property explicitly:
+
+```ts
+const result = await ctx.agent.completeText({
+  messages: [
+    { role: 'system', content: 'Return the requested JSON only.', reasoning: null },
+    { role: 'user', content: 'The input to transform.', reasoning: null },
+  ],
+  workspaceTarget: null,
+  modelSourceId: null,
+  modelId: '<catalog-model-id>',
+  abortSignal: null,
+});
+```
+
+Null workspace/source values inherit the active workspace and its model source; the model ID is explicit. Core prepares the selected source through its runtime coordinator, disables tools on chat-completion prompts, deletes the transient inference session afterward, and records successful use. The result contains text/reasoning output segments, model, and token usage. Plugins own validation of generated text or JSON, timeouts, and any later domain actions. Use `ctx.agent.run(...)` for persistent agent conversations instead.
+
 ### Scaffolding a new plugin (local dev)
 
 In the `appweaver` workspace, run `/plugins new` to open the creation form. The form creates `plugins/<alias>/`, preserves the template `AGENTS.md`, initializes its nested Git repository, adds a `local://plugins/<alias>` entry to `plugins.json`, regenerates plugin registration, and offers a **Develop with AI** action.

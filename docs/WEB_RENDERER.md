@@ -154,6 +154,10 @@ Plugin / handler guardrails:
 
 Schema: `WebStyleSheet` in `src/web/ui-schema.ts` (`{ id, cssText }`); optional `stylesheets` array on `WebRenderResultSchema` / `WebNodeRoot`.
 
+### Opt-in live refresh
+
+`WebNodeRoot.autoRefreshMs` (2,000–60,000 ms) opts a render into polling its own `meta` command. Use it only on read-only view commands, never a command that starts execution. The Shadow DOM host skips polling while hidden/unmounted, busy, or while an input/textarea/select/contenteditable is focused. Requests do not overlap, create timeline entries, or show a pending overlay. Responses use normal root reconciliation and stale-response handling; polling is disposed when the render changes or unmounts. Include a manual Refresh action for recovery after connection errors.
+
 **Shadow mount overflow:** optional `shadowMountOverflow` on `WebNodeRoot` (`'hidden' | 'scroll-y'`). Omitted or `'scroll-y'` lets the inner Solid mount scroll when content is taller than the host (typical timeline cards). Use `'hidden'` when your tree defines its own scroll regions (for example a fixed chrome row plus an `overflow: auto` panel inside `stylesheets`). The file `tree` web renderer sets `'hidden'` so only `.web-file-tree-block` scrolls in the modal.
 
 ## Stable identity and pending UI
@@ -167,6 +171,8 @@ Refreshed `WebNodeRoot` payloads are authoritative complete trees. The client re
 - The client uses a focused recursive WebNode reconciler rather than Solid's stock keyed array reconciler because WebNode arrays may mix keyed elements, unkeyed elements, and text nodes.
 
 Command actions may choose pending presentation:
+
+An explicit `surface: 'timeline'` action renders its result in the main timeline, even when the target command has widget/dock metadata. It does not replace the origin widget or modal root. Actions without a surface can update their origin in place via `onReplaceRoot`.
 
 ```ts
 pendingUi: {

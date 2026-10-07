@@ -23,6 +23,7 @@ import {
   openCoreDb,
 } from './db';
 import { loadBotConfig } from './env';
+import { registerCoreInferenceEndpoints } from './inference/core-provider';
 import { setInfoLogsEnabled } from './logger';
 import { dmBotRoot, getParentWorkspaceRoot } from './paths';
 import {
@@ -294,6 +295,7 @@ async function main(): Promise<void> {
   });
 
   registerCoreModelSource({ db: coreDb, dmBotRoot, parentOfBotRoot });
+  registerCoreInferenceEndpoints({ db: coreDb, dmBotRoot, parentOfBotRoot });
   capabilityRegistry.finalize();
   const config = loadBotConfig();
   const pool = new SimplePool();

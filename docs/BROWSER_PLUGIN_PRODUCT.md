@@ -185,7 +185,59 @@ Notes:
 - No `metadata_json` in MVP
 - No `last_error` / `last_summary` columns in `tasks`; derive from status and event history
 
+## Waiting-tab Recovery Implementation
+
+- [x] Numeric task selection and explicit reopening recover/foreground the waiting child without interpreting selection as login completion.
+- [x] Explicit continuation supports root/child IDs, recovers the live tab, and takes a fresh snapshot before AI steps.
+- [x] Context/tab closure invalidates live handles; recovery avoids tabs assigned to other tasks and reports navigation failures.
+- [x] Browser launch/recovery failures leave an explanatory waiting checkpoint; root status reflects child state.
+- [x] Worker instructions require manual login/signup in the browser and prohibit requesting or entering credentials/codes.
+- [x] Static verification: targeted ESLint with fixes and `tsc --noEmit -p plugins/browser/tsconfig.json` passed.
+- [ ] User verification: close/reopen task #5, complete manual signup, then continue; repeat after closing the browser or restarting the bot.
+
 ## Open Questions
+
+## Dual-model execution
+
+Keep the headed dedicated persistent profile and Playwright controller. Browser owns observation, task state, action execution, recovery, and reports. Browser invokes `system-one:v1` in-process for operation/target decisions; a separately configured small text model supplies initial navigation when needed, TYPE_TEXT values, and final observed reports. Master task decomposition and scoped conversations retain their current agent integration.
+
+Reference repositories were cloned under workspace `tmp/` for analysis only: `browser-use/jev-ultrafast` at `1231850` and `chy4pro/jev-for-chrome` at `d5c24de`. Adopt indexed compatible action spaces, speculative target questions, freshness checks, and bounded loop detection; do not add the Python harness or Chrome extension as runtime dependencies.
+
+- [x] Add explicit decision-provider/model and text-model/source settings and capability declarations. Text-helper model must be explicitly selected; no assumed cheap model or expensive fallback.
+- [x] Add a reusable tool-free text-completion method to the core plugin-agent service using model-source routing; chat-completion prompts disable tools and retain transient-session cleanup.
+- [x] Extend Playwright observation with document identity, compatible operations, observed dropdown choices, viewport/occlusion filtering, and observed-target identity guards. Whole-snapshot equality was superseded by the confidence-policy revision below. Live controller verification remains below.
+- [x] Implement System One decisions with compatible indexed targets and goal checks; call the text helper only for text generation/bootstrap/reporting.
+- [x] Integrate with existing task budgets, events, stop, login checkpoints, recovery, and persistent reports; restore recent observations after continuation and stop rather than retry uncertain mutations.
+- [x] Update docs/bottom-up Markdown and generated registration. Full-project TypeScript, targeted ESLint, and whitespace checks passed. Focused in-memory checks passed for candidate mapping, helper model routing, completion/manual gates, cancellation, settings/observation persistence, task reports, and uncertain-action handling. No real browser or paid inference was run. Repo-wide lint remains blocked by existing NR, PPQ vendor, and Translate errors.
+- [ ] User verification of live dual-model runs, forms/dropdowns, manual login, stale pages, cancellation, and completion reports.
+
+Implementation limits: main-document viewport controls and page scrolling, 120 controls and 6,000 text characters per snapshot, native select options, and ten recent observations per decision/report. Frames, shadow-root controls, uploads, drag/drop, nested scrolling, live latency, and model-based outcome quality remain future/live verification concerns. Completion verification is observation-based model cross-checking, not deterministic site assertions. System One requests retain their provider deadline and discard results after cancellation; upstream abort propagation is not yet part of the decision contract. Backend changes require a deliberate bot restart; no restart signal was issued from this chat.
+
+## Phase 1: Dedicated Task Workspace
+
+### Confidence policy and compact widget revision
+
+Confirmed layout: compact tree rows with title/status/time, expandable latest outcome and Open task action; collapsed new-task composer; task panel with a small toolbar, concise checkpoint and Continue, and collapsed report/activity details. Avoid duplicate controls and raw decision/dispatch logs in the conversation.
+
+- [x] Remove whole-snapshot equality checks on actions/completion; checkpoint operation or target confidence below 0.20. Keep live-tab and observed-target/document identity validation, without comparing page content or unrelated controls.
+- [x] Implement the confirmed compact tree list and streamlined task panel; rename Done — continue to Continue and explain it as resuming after user input/manual work.
+- [x] Update docs and verify confidence behavior, non-blocking completion, task persistence, and generic WebNode structure with static/focused checks. Targeted ESLint and Browser TypeScript passed. In-memory completion/confidence assertions passed; a read-only render/schema check against task #11 passed for compact tree rows, collapsed composer/activity/reports, Continue labels, and nonduplicated browser controls. No authenticated browser/UI run or live model calls were performed.
+- [ ] User verification of the compact widgets and continuing task #11 after restart.
+
+Agreed layout: compact browser list/new-task widget; opening or creating a root places its dedicated task panel in the main timeline, not a modal or docked widget. Messages, checkpoint actions, and refresh update that timeline panel in place. Children are execution steps, not separate conversations. Login stays manual in the local headed browser. Phase 2 schedules executions through the job capability.
+
+- [x] Persistent root conversation and retained agent session; scoped questions, checkpoint replies, and completed-task follow-ups.
+- [x] Background executions with duplicate-run protection, stop handling, and durable execution reports.
+- [x] Web list/new-task widget and dedicated task panel with actionable checkpoints and grouped activity.
+- [x] Read-only live refresh; reopening panels restores current persisted state without rerunning a task.
+- [x] Text command parity and documentation.
+- [x] Pasted Markdown/reference-document correction: use original structured web form values rather than reparsing command text; treat prompt-only CLI tails literally, including `---` and bullet/flag-like text. Persisted task-scoped user messages are supplied to every browser step and conversation continuation. Targeted ESLint, TypeScript, and a one-off in-memory parsing/context check passed.
+- [x] Targeted lint/type verification and final plan reconciliation. Targeted ESLint, browser/root and web TypeScript checks, diff whitespace checks, and an in-memory persistence/restart/command/UI-schema check passed. Repo-wide lint remains blocked by unrelated NR, PPQ vendor, and Translate errors.
+- [ ] User verification in authenticated AppWeaver: create, close/reopen panel, log in manually, continue, ask questions, follow up, stop, and inspect reports.
+
+Implementation: the plugin owns the task widget, scoped conversations, execution locks/cancellation, and browser_runs report history. Core/client changes provide the reusable `WebNodeRoot.autoRefreshMs` primitive and ensure explicit timeline actions take precedence over docking without replacing the origin widget. Timeline-opening correction passed targeted ESLint and web TypeScript checks. A root retains its conversation agent session; each child retains its worker agent session. Phase 2 scheduling is deferred. Bot restart is required to load these backend changes; no restart signal was issued from the active chat.
+
+### Earlier Product Questions
 
 1. How should browser timeline/thread UX map onto current core/web timeline primitives?
 2. For MVP, do we want a dedicated browser thread/timeline immediately, or a simpler `/browser run`-started run that already writes to its own event store?

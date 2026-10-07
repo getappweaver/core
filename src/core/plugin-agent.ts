@@ -21,6 +21,7 @@ import type {
   PluginAgentRunProps,
   PluginAgentRunResult,
   PluginAgentService,
+  PluginTextCompletionProps,
 } from './plugin';
 
 type CreatePluginAgentServiceProps = {
@@ -46,6 +47,44 @@ export function createPluginAgentService({
   const modelSources = createModelSourceCoordinator(db);
 
   return {
+    async completeText(props: PluginTextCompletionProps) {
+      const workspaceTarget = props.workspaceTarget ?? getWorkspaceTarget(db);
+      const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
+
+      return opencodeRuntimeController.withPreparedRun({
+        workspace: workspaceTarget,
+        prepare: () =>
+          modelSources.prepareRun(workspaceTarget, 'opencode', {
+            providerId: props.modelSourceId
+              ? modelSources.resolveSourceId(props.modelSourceId)
+              : null,
+            modelId: props.modelId,
+          }),
+        run: async (run) => {
+          const backend = createBackend({
+            backendName: 'opencode',
+            dmBotRoot: cwd,
+          });
+
+          const result = await backend.runChatCompletion({
+            messages: props.messages,
+            model: run.runtimeModelId,
+            cwd,
+            onChunk: () => undefined,
+            abortSignal: props.abortSignal ?? new AbortController().signal,
+          });
+
+          await modelSources.recordSuccessfulUse(
+            workspaceTarget,
+            'opencode',
+            run.modelId,
+            run.providerId,
+          );
+
+          return result;
+        },
+      });
+    },
     getDefaults(): PluginAgentDefaults {
       const workspaceTarget = getWorkspaceTarget(db);
       const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;

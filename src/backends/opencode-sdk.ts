@@ -2182,6 +2182,7 @@ export function createOpencodeSDKBackend({
         directory: cwd,
         parts: [{ type: 'text' as const, text: runContent }],
         model,
+        ...(props.tools ? { tools: props.tools } : {}),
       };
 
       debug(
@@ -2635,6 +2636,7 @@ export function createOpencodeSDKBackend({
           content: serializeChatCompletionMessages(props.messages),
           cwd: props.cwd,
           context: null,
+          tools: { '*': false },
           modelOverride: props.model,
           onAgentStreamChunk: (chunk) => {
             if (chunk.kind === 'text_delta') {

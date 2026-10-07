@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v13.10.0] - 2026-10-07
+
+- feat: tool-free text generation (completeText) for plugins, systemone contract (8c40bc9)
+
 ## [v13.9.2] - 2026-10-06
 
-- fix: nostr profile parse npub and nprofile (21f828a)
+- fix: nostr profile parse npub and nprofile (3a95046)
 
 ## [v13.9.1] - 2026-10-06
 

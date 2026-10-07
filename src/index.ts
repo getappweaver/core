@@ -78,6 +78,7 @@ import {
 } from './db';
 import { getMissingRequiredBotEnv, loadBotConfig } from './env';
 import { runAgentConversation } from './flow/agent-conversation';
+import { registerCoreInferenceEndpoints } from './inference/core-provider';
 import { C, debug, log } from './logger';
 import { createSendReplyForSource, type MessageSource } from './messaging';
 import {
@@ -220,6 +221,7 @@ async function startSetupOnlyMode(props: {
   });
 
   registerCoreModelSource({ db: seenDb, dmBotRoot, parentOfBotRoot });
+  registerCoreInferenceEndpoints({ db: seenDb, dmBotRoot, parentOfBotRoot });
   await finalizePluginRegistration();
   const prefix = getDmCommandPrefix(seenDb);
 
@@ -369,6 +371,7 @@ async function main() {
   });
 
   registerCoreModelSource({ db: seenDb, dmBotRoot, parentOfBotRoot });
+  registerCoreInferenceEndpoints({ db: seenDb, dmBotRoot, parentOfBotRoot });
   const walletDb = cashuMnemonic ? openWalletDb(cashuMnemonic) : null;
   const nostrCacheDb = openNostrCacheDb();
 

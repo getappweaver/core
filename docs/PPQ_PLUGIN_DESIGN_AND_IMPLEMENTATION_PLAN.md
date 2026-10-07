@@ -909,6 +909,12 @@ Exit criteria:
       created session until its first assistant turn reports usage.
 - [x] Refresh composer state while a background source activation is pending,
       stopping when it becomes stable or fails.
+- [x] Restore HTTP inference request-scoped model selection within the active
+      source, returning HTTP 400 for unknown or catalog-unavailable models without
+      changing the composer's selected model. Targeted ESLint passed.
+- [ ] Manually verify HTTP inference with a catalog model different from the
+      composer selection, in streaming and non-streaming modes, and confirm
+      unknown/unavailable model requests return HTTP 400.
 
 Exit criteria:
 
