@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.0.0] - 2026-10-07
+
+- chore: new localized documentation plugin pages and retiring bottom-up (0ae1473)
+
 ## [v13.10.0] - 2026-10-07
 
-- feat: tool-free text generation (completeText) for plugins, systemone contract (8c40bc9)
+- feat: tool-free text generation (completeText) for plugins, systemone contract (1d67b95)
 
 ## [v13.9.2] - 2026-10-06
 

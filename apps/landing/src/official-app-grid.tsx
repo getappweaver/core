@@ -1,39 +1,14 @@
 import { For, Show } from 'solid-js';
 
 import type { OfficialApp } from './landing-data';
-
-const pluginRouteIconAliases: Record<string, string> = {
-  'apps/bookmark-manager': 'bm',
-  'apps/captains-log': 'journal',
-  'apps/file-manager': 'file',
-  'apps/job-scheduler': 'job',
-  'apps/nostr-radar': 'nr',
-  'apps/ppq': 'ppq',
-  'apps/todo': 'todo',
-};
-
-const pluginRouteIcons: Record<string, string> = {
-  bm: 'bm/commands__list__renderers__list.svg',
-  file: 'file/commands__tree__renderers__tree.svg',
-  job: 'job/commands__list__renderers__clock.svg',
-  journal: 'journal/commands__today__renderers__captains-log.svg',
-  nr: 'nr/commands__list__renderers__nostr-radar.svg',
-  ppq: 'ppq/ppq.svg',
-  todo: 'todo/commands__list__renderers__list.svg',
-};
-
-// Note: HeaderChrome resolves plugin icons from /plugins/... paths differently.
-// The icon in web/src/chrome/HeaderChrome.tsx uses the raw icon path from definition.
-// For the official app grid, we use the landing public folder structure.
+import { officialApps } from './landing-data';
 
 type OfficialAppGridProps = {
   apps: OfficialApp[];
 };
 
 export function pluginIconSrcForSlug(slug: string): string | null {
-  const iconPath = pluginRouteIcons[pluginRouteIconAliases[slug] ?? slug];
-
-  return iconPath ? `/plugin-icons/${iconPath}` : null;
+  return officialApps.find((app) => app.href.slice(1) === slug || app.alias === slug)?.iconSrc ?? null;
 }
 
 export function OfficialAppGrid(props: OfficialAppGridProps) {

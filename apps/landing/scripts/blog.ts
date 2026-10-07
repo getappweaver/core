@@ -9,6 +9,7 @@ import { nip19, verifyEvent } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools/pool';
 import { getEventHash } from 'nostr-tools/pure';
 import { z } from 'zod';
+import { officialApps } from '../src/generated/plugin-content';
 
 import { openCoreDb } from '@src/db';
 import { bunkerSignEvent } from '@src/nostr/bunker';
@@ -29,13 +30,7 @@ const SITE_ORIGIN = 'https://getappweaver.com';
 const DEFAULT_BLOG_IMAGE = `${SITE_ORIGIN}/favicon/android-chrome-512x512.png`;
 const STATIC_SITEMAP_PATHS = [
   { path: '/', priority: '1.0', changefreq: 'weekly' },
-  { path: '/apps/todo', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/bookmark-manager', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/captains-log', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/job-scheduler', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/nostr-radar', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/file-manager', priority: '0.8', changefreq: 'monthly' },
-  { path: '/apps/ppq', priority: '0.8', changefreq: 'monthly' },
+  ...officialApps.map((app) => ({ path: app.href, priority: '0.8', changefreq: 'monthly' })),
   { path: '/blog/', priority: '0.7', changefreq: 'weekly' },
 ] as const;
 

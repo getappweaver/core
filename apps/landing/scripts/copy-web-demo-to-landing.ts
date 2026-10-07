@@ -9,9 +9,9 @@ import {
 } from 'fs';
 import { join } from 'path';
 
-import { copyPluginIconsToLanding } from './copy-plugin-icons-to-landing';
+import { copyPluginIconsToLanding } from './generate-content';
 
-const ROOT = join(import.meta.dir, '..');
+const ROOT = join(import.meta.dir, '../../..');
 const WEB_DIST = join(ROOT, 'web', 'dist');
 const WEB_PUBLIC = join(ROOT, 'web', 'public');
 const LANDING_PUBLIC = join(ROOT, 'apps', 'landing', 'public');

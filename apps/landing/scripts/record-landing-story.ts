@@ -36,7 +36,7 @@ const SELECTOR_POLL_MS = 250;
 const PLAYBACK_POLL_MS = 50;
 
 function usage(): string {
-  return `Usage: bun run record:landing-story [options]
+  return `Usage: bun run --cwd apps/landing record:story [options]
 
 Options:
   --url <url>          Page to record. Default: ${DEFAULT_URL}

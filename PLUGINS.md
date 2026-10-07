@@ -129,7 +129,8 @@ my-plugin/
   format.ts                 ← display helpers
   reply-tone.ts             ← tone hints for plain-text replies (optional pattern)
   renderers/text.ts         ← render*Text + shared representation union
-  .BOTTOMUP.json            ← optional; generated appweaver-file knowledge index
+  AGENTS.md                 ← stable working instructions; edit only when explicitly asked
+  docs/                     ← local architecture, designs, and implementation plans
   commands/
     help/module.ts          ← get*CommandDefinition + get*HelpLines
     help/adapter.ts
@@ -151,6 +152,12 @@ my-plugin/
 ```
 
 Older in-tree plugins may add `output/`, web renderers, or extra `db/` modules; both flat and split `types/` layouts are valid.
+
+Modules use the same documentation pattern: a local `README.md` for responsibilities
+and entrypoints, local `docs/` for deeper architecture, and `AGENTS.md` only for
+stable scope-specific instructions. Update READMEs/docs with code changes; change
+instructions only when the user explicitly requests it. Link to shared core docs
+with relative Markdown links.
 
 ### `package.json`
 

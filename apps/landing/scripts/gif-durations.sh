@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Check if directory argument is provided, otherwise use current directory
+# Inspect plugin-owned GIF files; pass a plugin's landing/assets directory.
 TARGET_DIR="${1:-.}"
 
 # Find all GIF files and process them

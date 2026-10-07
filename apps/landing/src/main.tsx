@@ -268,6 +268,7 @@ function SiteFooter() {
     <footer class="site-footer">
       <div class="site-footer-brand">AppWeaver</div>
       <nav class="site-footer-links" aria-label="AppWeaver social links">
+        <a href="/docs/">Docs</a>
         <For each={socialLinks}>
           {(link) => (
             <a href={link.href} rel="noreferrer" target="_blank">

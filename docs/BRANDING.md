@@ -58,46 +58,11 @@ Recommended official plugin repo descriptions:
 
 ### Official plugin landing features
 
-Use these bullets on the public plugin landing pages. Keep them short enough to scan beside the interactive demo.
-
-#### Nostr Radar
-
-- Fetch recent posts from your Nostr follows without turning your reader into an infinite feed.
-- Let AI classify complete conversations into topics, moods, summaries, and skip decisions.
-- Read by topic, mood, timeline, or archive while keeping replies, quotes, mentions, and profiles in context.
-- Mark posts read or archived so your reading queue stays intentional.
-
-#### Todo app
-
-- Create structured tasks from chat, web UI actions, or AI prompts.
-- Focus on one part of the todo tree when you want to work in detail.
-- Copy part of the tree structurally and paste it into any model you want to work with.
-- AI agents cannot edit your todos directly; they create drafts that you can accept, revise, or decline.
-- Your local todo app, accessible from anywhere you use AppWeaver.
-
-#### Bookmark manager
-
-- Your local bookmarks, accessible from anywhere you use AppWeaver.
-- Ask AI to inspect a link or search for something, then draft a bookmark with a useful description, tags, and category.
-- Publish selected bookmark sets only when you deliberately choose to share.
-
-#### Job scheduler
-
-- Schedule one-off or recurring prompts from the same app hub.
-- Use natural language like “Run X each Monday at 8am” and AppWeaver creates the job in your timezone.
-- Automate checks, reminders, publishing, and maintenance without leaving your workspace.
-
-#### File manager
-
-- Browse workspace trees without leaving the AppWeaver UI.
-- Ask for folder summaries and bottom-up context before editing code.
-- Review git diffs in the UI so you can check what changed before moving on.
-
-#### Captain's Log
-
-- Capture private workspace notes as a local Captain's Log.
-- Stroll through entries like a real notepad instead of treating every note as a search result.
-- Publish selected logs only after reviewing the exact draft.
+Feature bullets, presentation copy, and media are owned by each plugin's
+`landing.ts` and `landing/assets/`, rather than duplicated in core branding docs.
+Keep bullets short enough to scan beside the interactive demo. Core branding
+guidance applies across plugins; the [landing author guide](../apps/landing/README.md)
+describes how the website consumes their typed exports.
 
 ## Nostr repository announcement metadata
 

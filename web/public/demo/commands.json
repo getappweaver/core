@@ -34,7 +34,7 @@
   },
   {
     "name": "session",
-    "summary": "Agent sessions: new, attach, adopt, resume, list, and inspect messages.",
+    "summary": "Agent sessions: new, rename, attach, adopt, resume, list, and inspect messages.",
     "aliases": [],
     "source": "builtin",
     "subcommands": [
@@ -46,7 +46,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name such as new, attach, adopt, list, list-native, resume, or messages.",
+            "summary": "Optional subcommand name such as new, rename, attach, adopt, list, list-native, resume, or messages.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -56,6 +56,7 @@
         "examples": [
           "/session help",
           "/session help new",
+          "/session help rename",
           "/session help attach",
           "/session help adopt",
           "/session help list",
@@ -81,6 +82,36 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "rename",
+        "summary": "Set the AppWeaver title of a tracked session.",
+        "usage": "rename <session_id> <title...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "session_id",
+            "summary": "Session ID to rename.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "title",
+            "summary": "New title (up to 120 characters).",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/session rename <session_id> <title>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       },
       {
@@ -630,7 +661,7 @@
       },
       {
         "name": "inference-key",
-        "summary": "Rotate the Bearer token for the OpenAI-compatible inference API.",
+        "summary": "Rotate the shared inference Bearer token and list available endpoints.",
         "usage": "inference-key",
         "aliases": [],
         "arguments": [],
@@ -817,7 +848,7 @@
       {
         "name": "new",
         "summary": "Create a local plugin from the AppWeaver template.",
-        "usage": "new [--alias <alias>] [--title <title>] [--description <description>] [--core <core>]",
+        "usage": "new [--alias <alias>] [--title <title>] [--description <description>] [--core <core>] [--create-draft-commands]",
         "aliases": [
           "create"
         ],
@@ -854,11 +885,21 @@
             "shortFlag": null,
             "kind": "string",
             "required": false
+          },
+          {
+            "name": "create_draft_commands",
+            "summary": "Create draft and review commands with supporting storage (defaults to true).",
+            "flag": "--create-draft-commands",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false
           }
         ],
         "examples": [
           "/plugins new",
-          "/plugins new --alias reminder --title \"Reminder app\" --description \"Manage reminders\""
+          "/plugins new --alias reminder --title \"Reminder app\" --description \"Manage reminders\"",
+          "/plugins new --alias reminder --create-draft-commands false",
+          "/plugins new --alias reminder --no-create-draft-commands"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2850,7 +2891,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: run, list, clear",
+            "summary": "Optional subcommand: list, new, task, message, open, continue, stop, run, clear, settings",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2859,9 +2900,9 @@
         "options": [],
         "examples": [
           "/browser help",
-          "/browser help run",
           "/browser help list",
-          "/browser help clear"
+          "/browser help task",
+          "/browser help message"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2906,6 +2947,12 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        },
+        "webWidget": {
+          "placement": "header",
+          "surface": "modal",
+          "label": "Browser",
+          "modalTitle": "Browser tasks"
         }
       },
       {
@@ -2921,6 +2968,198 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "settings",
+        "summary": "Configure System One decisions and a separate small text-helper model.",
+        "usage": "settings [--text-model <text-model>] [--text-model-source <text-model-source>] [--decision-provider <decision-provider>] [--decision-model <decision-model>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "text-model",
+            "flag": "--text-model",
+            "aliases": [],
+            "kind": "string",
+            "summary": "text-model; use default to inherit/reset."
+          },
+          {
+            "name": "text-model-source",
+            "flag": "--text-model-source",
+            "aliases": [],
+            "kind": "string",
+            "summary": "text-model-source; use default to inherit/reset."
+          },
+          {
+            "name": "decision-provider",
+            "flag": "--decision-provider",
+            "aliases": [],
+            "kind": "string",
+            "summary": "decision-provider; use default to inherit/reset."
+          },
+          {
+            "name": "decision-model",
+            "flag": "--decision-model",
+            "aliases": [],
+            "kind": "string",
+            "summary": "decision-model; use default to inherit/reset."
+          }
+        ],
+        "examples": [
+          "/browser settings --text-model <catalog-model-id>",
+          "/browser settings --decision-model default"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "new",
+        "summary": "Create a browser task and open its conversation.",
+        "usage": "new <message...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "message",
+            "summary": "Task instruction or conversation message.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser new Find remote frontend jobs"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "task",
+        "summary": "Open a persistent task conversation and reports.",
+        "usage": "task <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Root or child task ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser task 5"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "message",
+        "summary": "Send a scoped question or follow-up to a task.",
+        "usage": "message <id> <message...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Root or child task ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "message",
+            "summary": "Task instruction or conversation message.",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser message 5 What did you find?"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "open",
+        "summary": "Recover and show a task browser tab without continuing.",
+        "usage": "open <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Root or child task ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser open 5"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "continue",
+        "summary": "Continue a manual checkpoint using the current browser state.",
+        "usage": "continue <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Root or child task ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser continue 5"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "stop",
+        "summary": "Stop task automation and leave its browser tabs open.",
+        "usage": "stop <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Root or child task ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/browser stop 5"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       }
     ]
@@ -2940,7 +3179,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name: upload, download, tree, commit, create, delete, init, search, view, edit, rename, restore, diff, history, bottomup.generate, bottomup.summarize, bottomup.enrich, or bottomup.summary.",
+            "summary": "Optional subcommand name: upload, download, tree, commit, create, delete, init, search, view, edit, rename, restore, diff, or history.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2962,11 +3201,7 @@
           "/file help rename",
           "/file help restore",
           "/file help diff",
-          "/file help history",
-          "/file help bottomup.generate",
-          "/file help bottomup.summarize",
-          "/file help bottomup.summary",
-          "/file help bottomup.enrich"
+          "/file help history"
         ],
         "inferredWeb": {
           "generated": true,
@@ -3519,631 +3754,6 @@
           "generated": true,
           "executionMode": "runnable_customizable"
         }
-      },
-      {
-        "name": "bottomup.generate",
-        "summary": "Generate source-grounded .BOTTOMUP.json knowledge.",
-        "usage": "bottomup.generate --path <path> [--root <root>] [--recursive] [--enrich] [--context <context>] [--prompt <prompt>] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "path",
-            "summary": "Directory to generate, relative to workspace root.",
-            "flag": "--path",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "root",
-            "summary": "Logical bottom-up root relative to workspace root.",
-            "flag": "--root",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "recursive",
-            "summary": "Generate the requested directory and all descendants.",
-            "flag": "--recursive",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "enrich",
-            "summary": "Also create contextual knowledge for generated directories.",
-            "flag": "--enrich",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "context",
-            "summary": "Big-picture context used with --enrich.",
-            "flag": "--context",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null,
-            "webInput": "textarea"
-          },
-          {
-            "name": "prompt",
-            "summary": "Optional generation instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null,
-            "webInput": "textarea"
-          },
-          {
-            "name": "ignore",
-            "summary": "Comma-separated extra ignore patterns.",
-            "flag": "--ignore",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "includeHidden",
-            "summary": "Include hidden source files and directories.",
-            "flag": "--include-hidden",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "noGitignore",
-            "summary": "Do not respect .gitignore rules.",
-            "flag": "--no-gitignore",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "draft",
-            "summary": "Create an in-memory web review draft instead of writing.",
-            "flag": "--draft",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "plan",
-            "summary": "Show resolved scope and expected work without AI or writes.",
-            "flag": "--plan",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          }
-        ],
-        "examples": [
-          "/file bottomup.generate --path plugins/todo/commands/create",
-          "/file bottomup.generate --path plugins/todo --root plugins/todo --recursive",
-          "/file bottomup.generate --path plugins/todo/commands/create --enrich --context \"Todo architecture\"",
-          "/file bottomup.generate --path plugins/todo --plan"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.generate.revise",
-        "summary": "Revise an in-memory bottom-up generation draft.",
-        "usage": "bottomup.generate.revise --state <state> --prompt <prompt>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "prompt",
-            "summary": "Revision instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null,
-            "webInput": "textarea"
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.generate.accept",
-        "summary": "Accept an in-memory bottom-up generation draft.",
-        "usage": "bottomup.generate.accept --state <state>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.summarize",
-        "summary": "Build compact hierarchical summaries in .BOTTOMUP.json files.",
-        "usage": "bottomup.summarize --path <path> [--root <root>] [--prompt <prompt>] [--no-partial] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "path",
-            "summary": "Directory subtree to summarize, relative to workspace root.",
-            "flag": "--path",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "root",
-            "summary": "Logical bottom-up root relative to workspace root.",
-            "flag": "--root",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "prompt",
-            "summary": "Optional summarization instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null,
-            "webInput": "textarea"
-          },
-          {
-            "name": "noPartial",
-            "summary": "Reject missing or stale generated coverage.",
-            "flag": "--no-partial",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "ignore",
-            "summary": "Comma-separated extra ignore patterns.",
-            "flag": "--ignore",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "includeHidden",
-            "summary": "Include hidden source files and directories.",
-            "flag": "--include-hidden",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "noGitignore",
-            "summary": "Do not respect .gitignore rules.",
-            "flag": "--no-gitignore",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "draft",
-            "summary": "Create an in-memory web review draft instead of writing.",
-            "flag": "--draft",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "plan",
-            "summary": "Show coverage and expected work without AI or writes.",
-            "flag": "--plan",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          }
-        ],
-        "examples": [
-          "/file bottomup.summarize --path plugins/todo",
-          "/file bottomup.summarize --path plugins/todo --no-partial --draft",
-          "/file bottomup.summarize --path plugins/todo --plan"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.summarize.revise",
-        "summary": "Revise an in-memory bottom-up summarize draft.",
-        "usage": "bottomup.summarize.revise --state <state> --prompt <prompt>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory summarize draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "prompt",
-            "summary": "Revision instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null,
-            "webInput": "textarea"
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.summarize.accept",
-        "summary": "Accept an in-memory bottom-up summarize draft.",
-        "usage": "bottomup.summarize.accept --state <state>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory summarize draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.summary",
-        "summary": "Read current knowledge from .BOTTOMUP.json indexes.",
-        "usage": "bottomup.summary --path <path> [--root <root>] [--format <format>] [--parent-depth <parentDepth>] [--child-depth <childDepth>] [--location <location>] [--draft]",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "path",
-            "summary": "Directory or file to read, relative to workspace root.",
-            "flag": "--path",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "root",
-            "summary": "Logical bottom-up root relative to workspace root.",
-            "flag": "--root",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "format",
-            "summary": "Render as Markdown or JSON.",
-            "flag": "--format",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": [
-              "markdown",
-              "json"
-            ]
-          },
-          {
-            "name": "parentDepth",
-            "summary": "Number of stored parent levels to include.",
-            "flag": "--parent-depth",
-            "shortFlag": null,
-            "kind": "integer",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "childDepth",
-            "summary": "Number of stored child levels to include.",
-            "flag": "--child-depth",
-            "shortFlag": null,
-            "kind": "integer",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "location",
-            "summary": "Optional workspace-relative path for an exported projection.",
-            "flag": "--location",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "draft",
-            "summary": "Open a web preview with an optional export form.",
-            "flag": "--draft",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          }
-        ],
-        "examples": [
-          "/file bottomup.summary --path plugins/file",
-          "/file bottomup.summary --path plugins/file/commands --parent-depth 2",
-          "/file bottomup.summary --path plugins/file --format json",
-          "/file bottomup.summary --path plugins/file --location plugins/file/BOTTOMUP_SUMMARY.md"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.summary.save",
-        "summary": "Save a reviewed bottom-up summary projection.",
-        "usage": "bottomup.summary.save --state <state> --location <location>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory summary preview state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "location",
-            "summary": "Workspace-relative export location.",
-            "flag": "--location",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.enrich",
-        "summary": "Enrich .BOTTOMUP.json knowledge from stored summaries and context.",
-        "usage": "bottomup.enrich --path <path> [--root <root>] [--context <context>] [--prompt <prompt>] [--allow-partial] [--force] [--ignore <ignore>] [--include-hidden] [--no-gitignore] [--draft] [--plan]",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "path",
-            "summary": "Directory subtree to enrich, relative to workspace root.",
-            "flag": "--path",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "root",
-            "summary": "Logical bottom-up root relative to workspace root.",
-            "flag": "--root",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "context",
-            "summary": "Optional replacement big-picture context.",
-            "flag": "--context",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null,
-            "webInput": "textarea"
-          },
-          {
-            "name": "prompt",
-            "summary": "Optional enrichment instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null,
-            "webInput": "textarea"
-          },
-          {
-            "name": "allowPartial",
-            "summary": "Skip missing, stale, or context-blocked directories.",
-            "flag": "--allow-partial",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "force",
-            "summary": "Regenerate enrichment even when input hashes match.",
-            "flag": "--force",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "ignore",
-            "summary": "Comma-separated extra ignore patterns.",
-            "flag": "--ignore",
-            "shortFlag": null,
-            "kind": "string",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "includeHidden",
-            "summary": "Include hidden source files and directories.",
-            "flag": "--include-hidden",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "noGitignore",
-            "summary": "Do not respect .gitignore rules.",
-            "flag": "--no-gitignore",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "draft",
-            "summary": "Create an in-memory web review draft instead of writing.",
-            "flag": "--draft",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          },
-          {
-            "name": "plan",
-            "summary": "Show coverage and expected work without AI or writes.",
-            "flag": "--plan",
-            "shortFlag": null,
-            "kind": "boolean",
-            "required": false,
-            "choices": null
-          }
-        ],
-        "examples": [
-          "/file bottomup.enrich --path plugins/todo",
-          "/file bottomup.enrich --path plugins/todo --context \"Todo architecture\"",
-          "/file bottomup.enrich --path plugins/todo --allow-partial",
-          "/file bottomup.enrich --path plugins/todo --plan"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.enrich.revise",
-        "summary": "Revise an in-memory bottom-up enrichment draft.",
-        "usage": "bottomup.enrich.revise --state <state> --prompt <prompt>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory enrichment draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          },
-          {
-            "name": "prompt",
-            "summary": "Revision instructions.",
-            "flag": "--prompt",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null,
-            "webInput": "textarea"
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "bottomup.enrich.accept",
-        "summary": "Accept an in-memory bottom-up enrichment draft.",
-        "usage": "bottomup.enrich.accept --state <state>",
-        "aliases": [],
-        "arguments": [],
-        "options": [
-          {
-            "name": "state",
-            "summary": "Encoded in-memory enrichment draft state.",
-            "flag": "--state",
-            "shortFlag": null,
-            "kind": "string",
-            "required": true,
-            "choices": null
-          }
-        ],
-        "examples": [],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
       }
     ]
   },
@@ -4576,7 +4186,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: add, list, today, search, edit, delete, publish, config, drafts, accept, decline",
+            "summary": "Optional subcommand: add, list, today, search, edit, delete, schedule-form, schedule-cancel, publish, inspect, inspect-publish, config, drafts, accept, decline",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -4761,6 +4371,78 @@
         }
       },
       {
+        "name": "schedule-form",
+        "summary": "Open the scheduling modal for a journal entry.",
+        "usage": "schedule-form <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal schedule-form 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "schedule-confirm",
+        "summary": "Confirm scheduling for a journal entry.",
+        "usage": "schedule-confirm <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal schedule-confirm 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "schedule-cancel",
+        "summary": "Cancel scheduled publishing for a journal entry.",
+        "usage": "schedule-cancel <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal schedule-cancel 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
         "name": "publish",
         "summary": "Mark a journal entry as published with a Nostr event URL.",
         "usage": "publish <id> [<url>]",
@@ -4805,6 +4487,1068 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "inspect",
+        "summary": "Inspect a published entry on its author's write relays.",
+        "usage": "inspect <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/journal inspect 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "inspect-publish",
+        "summary": "Resend the original published event to missing write relays.",
+        "usage": "inspect-publish <id> --relay <relay>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Journal entry id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "relay",
+            "flag": "--relay",
+            "summary": "Write relay URL, or all missing write relays.",
+            "kind": "string",
+            "shortFlag": null,
+            "required": true,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/journal inspect-publish 1 --relay all"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "memory",
+    "summary": "Local project code and Markdown indexes, search, and graph discovery.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "memory",
+    "subcommands": [
+      {
+        "name": "projects",
+        "summary": "Show indexed workspace projects, HEAD freshness, and hook status.",
+        "usage": "projects [--format <format>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "text",
+              "json"
+            ],
+            "summary": "Structured output instead of the web widget."
+          }
+        ],
+        "examples": [
+          "/memory projects"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "projects.hook",
+        "summary": "Preview opt-in hook changes for a project.",
+        "usage": "projects.hook --project <project>",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "choices": null,
+            "summary": "Project root relative to the active workspace."
+          }
+        ],
+        "examples": [
+          "/memory projects.hook --project plugins/journal"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "code.hook",
+        "summary": "Preview, explicitly install, inspect, or remove per-project automatic indexing.",
+        "usage": "code.hook --project <project> [--format <format>] [--operation <operation>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Whole project root relative to the active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Output format (default text).",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "operation",
+            "flag": "--operation",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default status; install explicitly opts this repository into post-commit indexing.",
+            "choices": [
+              "preview",
+              "install",
+              "status",
+              "remove"
+            ],
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory code.hook --project plugins/journal --operation preview"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "code.parse",
+        "summary": "Index committed TS/TSX immediately; stop on dirty inputs or compiler errors.",
+        "usage": "code.parse --project <project> [--format <format>] [--fresh]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Whole project root relative to the active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Output format (default text).",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "fresh",
+            "flag": "--fresh",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "summary": "Rebuild even when inputs match.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory code.parse --project plugins/nr"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "code.search",
+        "summary": "Search symbol names, signatures, and documentation.",
+        "usage": "code.search --project <project> [--format <format>] --query <query> [--kind <kind>] [--file <file>] [--tests <tests>] [--limit <limit>] [--offset <offset>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Whole project root relative to the active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Output format (default text).",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "query",
+            "flag": "--query",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Symbol or documentation terms.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "kind",
+            "flag": "--kind",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Declaration kind.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "file",
+            "flag": "--file",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Exact project-relative file.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "tests",
+            "flag": "--tests",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Test inclusion.",
+            "choices": [
+              "include",
+              "exclude",
+              "only"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Bound returned results.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "offset",
+            "flag": "--offset",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Pagination offset.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory code.search --project plugins/nr --query NostrResolutionService"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "code.inspect",
+        "summary": "Inspect metadata and direct relationships without source bodies.",
+        "usage": "code.inspect --project <project> [--format <format>] --id <id> [--limit <limit>] [--offset <offset>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Whole project root relative to the active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Output format (default text).",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "id",
+            "flag": "--id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Node ID returned by code.search.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Bound returned results.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "offset",
+            "flag": "--offset",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Pagination offset.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory code.inspect --project plugins/nr --id <node-id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "code.expand",
+        "summary": "Navigate a bounded project graph up to three hops.",
+        "usage": "code.expand --project <project> [--format <format>] --id <id> [--direction <direction>] [--depth <depth>] [--maxNodes <maxNodes>] [--maxEdges <maxEdges>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Whole project root relative to the active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Output format (default text).",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "id",
+            "flag": "--id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Node ID returned by code.search.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "direction",
+            "flag": "--direction",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Edge direction.",
+            "choices": [
+              "incoming",
+              "outgoing",
+              "both"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "depth",
+            "flag": "--depth",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Hops, 1–3.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "maxNodes",
+            "flag": "--maxNodes",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Node budget, at most 200.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "maxEdges",
+            "flag": "--maxEdges",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Edge budget, at most 500.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory code.expand --project plugins/nr --id <node-id> --depth 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "parse",
+        "summary": "Attempt all applicable project indexes independently.",
+        "usage": "parse --project <project> [--format <format>] [--fresh]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "fresh",
+            "flag": "--fresh",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "summary": "Force rebuilding; keeps clean-input guards.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory parse --project ."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "search",
+        "summary": "Search code and Markdown together within one project.",
+        "usage": "search --project <project> [--format <format>] --query <query> [--limit <limit>] [--cursor <cursor>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "query",
+            "flag": "--query",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Full-text terms.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Result budget (1–100).",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "cursor",
+            "flag": "--cursor",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "JSON nextCursor returned by shared search.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory search --project . --query storage"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "markdown.parse",
+        "summary": "Incrementally index committed Markdown sections and links.",
+        "usage": "markdown.parse --project <project> [--format <format>] [--fresh] [--exclude <exclude>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "fresh",
+            "flag": "--fresh",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "summary": "Force rebuilding; keeps clean-input guards.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "exclude",
+            "flag": "--exclude",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Project-relative exclusion glob; repeat for multiple patterns.",
+            "choices": null,
+            "multiple": true
+          }
+        ],
+        "examples": [
+          "/memory markdown.parse --project ."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "markdown.search",
+        "summary": "Search document titles, headings, tags and body with FTS.",
+        "usage": "markdown.search --project <project> [--format <format>] --query <query> [--limit <limit>] [--offset <offset>] [--file <file>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "query",
+            "flag": "--query",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Full-text terms.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Result budget (1–100).",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "offset",
+            "flag": "--offset",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Pagination offset.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "file",
+            "flag": "--file",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Exact project-relative Markdown file.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory markdown.search --project . --query storage"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "markdown.inspect",
+        "summary": "Inspect a document outline or section text and links.",
+        "usage": "markdown.inspect --project <project> [--format <format>] --id <id> [--limit <limit>] [--offset <offset>] [--maxChars <maxChars>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "id",
+            "flag": "--id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Full document/section ID.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Result budget (1–100).",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "offset",
+            "flag": "--offset",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Pagination offset.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "maxChars",
+            "flag": "--maxChars",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Text budget, 6000–50000 characters; default 12000.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory markdown.inspect --project . --id <returned-id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "markdown.expand",
+        "summary": "Follow bounded section hierarchy, links and backlinks.",
+        "usage": "markdown.expand --project <project> [--format <format>] --id <id> [--direction <direction>] [--relations <relations>] [--depth <depth>] [--maxNodes <maxNodes>] [--maxEdges <maxEdges>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "project",
+            "flag": "--project",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Project root relative to active workspace.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "format",
+            "flag": "--format",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Default text; JSON for structured results.",
+            "choices": [
+              "text",
+              "json"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "id",
+            "flag": "--id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": true,
+            "summary": "Full document/section ID.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "direction",
+            "flag": "--direction",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Relationship direction.",
+            "choices": [
+              "incoming",
+              "outgoing",
+              "both"
+            ],
+            "multiple": false
+          },
+          {
+            "name": "relations",
+            "flag": "--relations",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false,
+            "summary": "Relationship filter; repeat.",
+            "choices": [
+              "contains",
+              "links-to"
+            ],
+            "multiple": true
+          },
+          {
+            "name": "depth",
+            "flag": "--depth",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Depth 1–3.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "maxNodes",
+            "flag": "--maxNodes",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Traversal budget.",
+            "choices": null,
+            "multiple": false
+          },
+          {
+            "name": "maxEdges",
+            "flag": "--maxEdges",
+            "shortFlag": null,
+            "kind": "integer",
+            "required": false,
+            "summary": "Traversal budget.",
+            "choices": null,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/memory markdown.expand --project . --id <returned-id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "help",
+        "summary": "Show command help for memory or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: parse, search, markdown.parse/search/inspect/expand, projects, code.hook, code.parse/search/inspect/expand, add, list, show, delete, ai, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/memory help",
+          "/memory help code.search",
+          "/memory help list",
+          "/memory help add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "ai",
+        "summary": "Natural language memory changes via the agent.",
+        "usage": "ai [<prompt...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "prompt",
+            "summary": "What you want the agent to do.",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/memory ai list everything tagged demo"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Create a memory row from plain text.",
+        "usage": "add <text...>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "text",
+            "summary": "Free-form text stored on the row.",
+            "kind": "string",
+            "required": true,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/memory add example item"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List all memory rows (text DM/CLI; optional web card in web UI).",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/memory list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Show one memory row by id.",
+        "usage": "show <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Row id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/memory show 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a memory row by id.",
+        "usage": "delete <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Row id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/memory delete 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       }
     ]
@@ -5097,7 +5841,7 @@
       {
         "name": "settings",
         "summary": "Show or update NR evaluation mode and classifier settings.",
-        "usage": "settings [--mode <mode>] [--jev-api-key <jev_api_key>] [--jev-api-base <jev_api_base>] [--jev-topics <jev_topics>] [--jev-topic-batch-size <jev_topic_batch_size>] [--jev-moods <jev_moods>] [--jev-languages <jev_languages>] [--jev-state-instructions <jev_state_instructions>] [--jev-topic-question <jev_topic_question>] [--jev-mood-question <jev_mood_question>] [--jev-language-question <jev_language_question>] [--jev-relevance-question <jev_relevance_question>] [--backend <backend>] [--model <model>] [--image-backend <image_backend>] [--image-model <image_model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--evaluate-images <evaluate_images>] [--max-images-per-event <max_images_per_event>] [--max-image-mb <max_image_mb>] [--image-fetch-timeout-sec <image_fetch_timeout_sec>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
+        "usage": "settings [--mode <mode>] [--jev-topics <jev_topics>] [--jev-topic-batch-size <jev_topic_batch_size>] [--jev-moods <jev_moods>] [--jev-languages <jev_languages>] [--jev-state-instructions <jev_state_instructions>] [--jev-topic-question <jev_topic_question>] [--jev-mood-question <jev_mood_question>] [--jev-language-question <jev_language_question>] [--jev-relevance-question <jev_relevance_question>] [--backend <backend>] [--model <model>] [--image-backend <image_backend>] [--image-model <image_model>] [--agent] [--instructions <instructions>] [--reset] [--event-share-prefix <event_share_prefix>] [--profile-share-prefix <profile_share_prefix>] [--default-language <default_language>] [--translation-target-language <translation_target_language>] [--hourly-scheduler] [--filter-to-latest-fetched-slot-on-open <filter_to_latest_fetched_slot_on_open>] [--always-resolve-unresolved-references <always_resolve_unresolved_references>] [--relay-fetch-concurrency <relay_fetch_concurrency>] [--ai-evaluation-concurrency <ai_evaluation_concurrency>] [--evaluate-images <evaluate_images>] [--max-images-per-event <max_images_per_event>] [--max-image-mb <max_image_mb>] [--image-fetch-timeout-sec <image_fetch_timeout_sec>] [--archive-signal-review-mode <archive_signal_review_mode>] [--like-signal-review-mode <like_signal_review_mode>] [--reply-signal-review-mode <reply_signal_review_mode>] [--repost-quote-signal-review-mode <repost_quote_signal_review_mode>]",
         "aliases": [
           "config"
         ],
@@ -5106,27 +5850,13 @@
           {
             "name": "mode",
             "flag": "--mode",
-            "summary": "Evaluation mode (LLM or Jev classifier).",
+            "summary": "Evaluation mode (LLM or System One classifier).",
             "kind": "string",
             "required": false,
             "choices": [
               "llm",
               "classifier"
             ]
-          },
-          {
-            "name": "jev_api_key",
-            "flag": "--jev-api-key",
-            "summary": "Jev API key (reset clears it).",
-            "kind": "string",
-            "required": false
-          },
-          {
-            "name": "jev_api_base",
-            "flag": "--jev-api-base",
-            "summary": "Jev API base URL.",
-            "kind": "string",
-            "required": false
           },
           {
             "name": "jev_topics",
@@ -5496,7 +6226,7 @@
       {
         "name": "signal-record",
         "summary": "Persist a web-only reviewed Nostr Radar signal decision.",
-        "usage": "signal-record --target-event-id <target_event_id> --action-category <action_category> [--signal-type <signal_type>] --signal-outcome <signal_outcome> [--signal-topic <signal_topics>] [--signal-author-pubkey <signal_author_pubkey>] [--signal-remember] [--target-author-pubkey <target_author_pubkey>] [--target-event-json <target_event_json>] [--candidate-topic <candidate_topics>]",
+        "usage": "signal-record --target-event-id <target_event_id> --action-category <action_category> [--signal-type <signal_type>] --signal-outcome <signal_outcome> [--signal-topic <signal_topics>] [--signal-author-pubkey <signal_author_pubkey>] [--signal-remember] [--signal-read-post] [--target-author-pubkey <target_author_pubkey>] [--target-event-json <target_event_json>] [--candidate-topic <candidate_topics>]",
         "aliases": [],
         "arguments": [],
         "options": [
@@ -5568,6 +6298,13 @@
             "name": "signal_remember",
             "flag": "--signal-remember",
             "summary": "Persist don't-ask-again mode after a successful action.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "signal_read_post",
+            "flag": "--signal-read-post",
+            "summary": "Mark the post read after a successful action.",
             "kind": "boolean",
             "required": false
           },
@@ -6073,12 +6810,14 @@
             "multiple": true,
             "choices": [
               "posts",
+              "long-form",
               "replies",
               "comments",
               "highlights",
               "reposts",
               "quotes",
-              "reactions"
+              "reactions",
+              "zaps"
             ]
           },
           {
@@ -6405,6 +7144,61 @@
         "arguments": [],
         "options": [],
         "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      }
+    ]
+  },
+  {
+    "name": "systemone",
+    "summary": "System One typed decision capability provider.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "systemone",
+    "subcommands": [
+      {
+        "name": "settings",
+        "summary": "Configure the System One API provider used by capability consumers.",
+        "usage": "settings [--api-key <api_key>] [--clear-api-key] [--api-base <api_base>] [--model <model>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "api_key",
+            "flag": "--api-key",
+            "summary": "Replace the provider API key. Blank keeps the saved key.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "clear_api_key",
+            "flag": "--clear-api-key",
+            "summary": "Remove the saved API key.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "api_base",
+            "flag": "--api-base",
+            "summary": "HTTPS API base URL.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "model",
+            "flag": "--model",
+            "summary": "Default System One model.",
+            "kind": "string",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/systemone settings",
+          "/systemone settings --api-key <key>",
+          "/systemone settings --api-base https://api.typesafe.ai --model jev-latest"
+        ],
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_default"

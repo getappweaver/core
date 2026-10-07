@@ -324,46 +324,31 @@ Each command family becomes a plugin:
 
 ## Add a plugin landing page
 
-Landing pages are built from `apps/landing/src/landing-data.ts` and rendered by
-`apps/landing/src/plugin-pages.tsx`. For example, PayPerQ lives at `/apps/ppq`.
+Plugins own their landing content; the landing app owns generic rendering and
+static generation. For example, PayPerQ's `landing.ts` declares `/apps/ppq`.
 
-1. Give the plugin a local SVG icon and set `appweaver.icon` in
-   `plugins/<alias>/package.json` (for example, `"./ppq.svg"`). Register the
-   plugin in `plugins.json` if it is not already listed. From `apps/landing`, run
-   `bun run apps:icons`. This reads each registered plugin's manifest and copies
-   its icon to `apps/landing/public/plugin-icons/<alias>/<filename>`.
-   `bun run demo:copy` also copies the icons along with the web demo assets, but
-   requires an embedded `web/dist` when that directory exists.
-2. Add an `OfficialApp` entry in `apps/landing/src/landing-data.ts`: set the
-   route (`href: '/apps/<slug>'`), package name, repo, display names, description,
-   feature bullets, and `hasInteractiveDemo`. Add its icon path in
-   `apps/landing/src/official-app-grid.tsx`. If the route slug differs from the
-   command alias, add a mapping in `pluginRouteAliases` in
-   `apps/landing/src/plugin-pages.tsx`.
-3. Add the route to `appRoutes` in `apps/landing/vite.config.ts` so both dev and
-   preview serve it. Optionally add a custom title and description in
-   `pluginPagePresentations` in `plugin-pages.tsx`. A plugin with a header/right
-   web widget can set `hasInteractiveDemo: true` and show the embedded demo.
-   A model-source plugin without such a widget (like PPQ) should set it to
-   `false`; the page then shows its features without an empty demo panel.
-   For an install screenshot, place `<slug>.png` in
-   `apps/landing/public/plugin-install/` (for example, `ppq.png`) and set
-   `installScreenshotSlug: '<slug>'` in its `OfficialApp` entry. The page's
-   `pluginInstallScreenshotSlugs` map can also supply the slug, but an explicit
-   `installScreenshotSlug: null` **hides the screenshot** even if the file and
-   map entry exist. Use `null` only if there is no screenshot; this uses the
-   plugin icon for social previews instead.
-4. If the plugin has interactive demo commands, refresh the demo assets with
-   `bun run demo:generate` from the repository root, build the embedded web
-   demo with `bun run web:demo:build`, then run `bun run demo:copy` from
-   `apps/landing`. The landing page reads command metadata from
-   `apps/landing/public/demo/commands.json` to select the widget.
-5. From `apps/landing`, run `bun run build` after adding or replacing screenshots.
-   Vite copies `public/plugin-install/<slug>.png` into `dist/plugin-install/`;
-   a preview or deployed site serving an older `dist` will not show the new
-   image until rebuilt. The build also syncs manifest icons, builds the site,
-   and runs `bun run apps:build` (the script at
-   `apps/landing/scripts/generate-plugin-pages.ts`). It creates
-   `dist/apps/<slug>/index.html` with page-specific metadata and a static
-   fallback. Open the route in preview to confirm the icon, feature copy,
-   installation section, and any interactive demo.
+1. Register the local plugin in `plugins.json`. Set the package name and local
+   `appweaver.icon` SVG path in the plugin's `package.json`.
+2. Export a data-only `landingPage` from `plugins/<alias>/landing.ts`, typed with
+   `PluginLandingDefinition` from `apps/landing/content-types.ts`. Define its
+   route, names, description, features, demo metadata, presentation, and roadmap
+   target there. No central route/icon/copy mappings are required.
+3. Keep screenshots and GIFs in the plugin's `landing/assets/` directory. Refer
+   to them with plugin-root-relative paths. Set `installScreenshot: null` when
+   unavailable. `assetAliases` can preserve existing `/screenshots/...` URLs
+   referenced by published articles while the source image stays plugin-owned.
+4. Keep plugin documents in the plugin's `docs/`. Use ordinary relative Markdown
+   links to core documents, e.g. `[Web renderer](../../../docs/WEB_RENDERER.md)`
+   from a plugin document, so both local readers and the generator can follow it.
+5. Run `bun run --cwd apps/landing build`. It generates explicit content imports,
+   copies plugin icons/media into `public/plugin-assets/`, generates static docs,
+   builds the site, and writes `dist/apps/<slug>/index.html` with app-specific SEO
+   and fallback content. All steps are local; deployment uses the maintainer's
+   existing Vercel CLI workflow.
+
+For interactive demos, retain the existing root `demo:generate` and
+`web:demo:build` workflow, then run landing's `demo:copy`. The page uses generated
+demo command metadata to select the embedded widget. The reusable demo engine
+remains core-owned; plugin fixtures and story definitions remain plugin-owned.
+
+See the [landing author guide](../apps/landing/README.md) for generator details.

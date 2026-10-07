@@ -20,6 +20,11 @@ Open-source app hub for running AI-powered tools from a project or workspace fol
 
 Built with Bun, TypeScript, nostr-tools, OpenCode, Solid, and SQLite.
 
+For contributors, [local documentation](docs/LOCAL_DOCUMENTATION_MIGRATION.md)
+lives beside its owning plugin/module. READMEs and docs evolve with code;
+`AGENTS.md` contains stable, explicitly maintained working instructions. Memory
+indexes committed source and documentation for discovery.
+
 **Links:** [Nostr](https://nostr.com/) · [NIP-17 encrypted DMs](https://github.com/nostr-protocol/nips/blob/master/17.md) · [OpenCode](https://opencode.ai) · [Cashu](https://cashu.space) · [ngit](https://gitworkshop.dev/ngit)
 
 ## Install And Setup

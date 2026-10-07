@@ -20,7 +20,10 @@ Never retry a mutating tool if it returned a Draft ID.
 
 ## Skills
 
-**All** official agent guidance for this repo lives under `.claude/skills/`. When you work in this workspace, **read every skill** in that directory.
+Task-specific workflows live under `.claude/skills/`. Load a skill when its
+description matches the task; do not read unrelated skills or recursively load
+documentation inventories. Core and local working instructions live in
+`AGENTS.md`; feature context lives in the nearest README and relevant local docs.
 
 Each skill is a folder: `.claude/skills/<skill_name>/SKILL.md` (OpenCode-compatible YAML frontmatter with `name` matching `<skill_name>`).
 
@@ -40,6 +43,17 @@ Before changing files, running implementation commands, linting, or applying the
 - Once the user confirms a concrete direction or asks for edits, switch to implementation mode and carry the change through verification as appropriate.
 
 ## Keep implementation plans current
+
+### Local documentation and stable instructions
+
+- Read the nearest `README.md` and relevant local `docs/` before editing a plugin
+  or module. Keep implementation plans beside their owning feature.
+- Update READMEs and docs when code changes responsibilities, public behavior,
+  entrypoints, persistence, or architecture. Use relative Markdown links between
+  module, plugin, and core documentation instead of duplicating shared contracts.
+- `AGENTS.md` files are manually maintained working instructions. Only create or
+  edit them when the user explicitly requests instruction changes; ordinary code
+  edits must not rewrite agent policy.
 
 - When a feature has an implementation plan, whether attached to its design document or in a separate file, treat that document as the durable progress record. Locate and read it before working on the feature.
 - Update the plan **as work progresses**, not just in a final progress report: check off completed items after implementation and required verification, leave unimplemented or unverified items unchecked, and split partially completed items so the remaining work is explicit.
@@ -148,7 +162,7 @@ Before making a commit, include a version bump flag in the commit message:
 
 Example: `git commit -m "chore: remove unused file --patch"`
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup (hooks, semver) and more.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for setup (hooks, semver) and more.
 
 ---
 
@@ -251,7 +265,7 @@ When editing or extending AppWeaver, use this as the map. AppWeaver is an open-s
 
 OpenCode is the only active agent backend. `createBackend()` uses the OpenCode SDK and the managed runtime controller. Legacy backend names in saved state normalize to OpenCode; there is no backend-switching command. Workspace model selection uses the `ai-model-source` capability: core exposes the normal OpenCode catalog, and installed apps may register their own source. Use `<prefix>ai source` to list sources and `<prefix>ai source core` to select the core catalog. PPQ is an optional model-source app; Routstr has no model-source plugin yet.
 
-The canonical normal OpenCode config lives at `<workspace>/.appweaver/opencode.json`; AppWeaver materializes the active runtime config at `<workspace>/opencode.json`. See `docs/PPQ_PLUGIN_DESIGN_AND_IMPLEMENTATION_PLAN.md` for the managed config and model-source design.
+The canonical normal OpenCode config lives at `<workspace>/.appweaver/opencode.json`; AppWeaver materializes the active runtime config at `<workspace>/opencode.json`. See `docs/MODEL_SOURCES_AND_RUNTIME.md` for the managed config and model-source design, and `plugins/ppq/docs/PPQ_PLUGIN_DESIGN_AND_IMPLEMENTATION_PLAN.md` for PPQ-specific implementation history.
 
 ## ANSI colors (local terminal only)
 

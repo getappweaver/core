@@ -11,22 +11,12 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://getappweaver.com/apps/bookmark-manager</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://getappweaver.com/apps/captains-log</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://getappweaver.com/apps/job-scheduler</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://getappweaver.com/apps/nostr-radar</loc>
+    <loc>https://getappweaver.com/apps/bookmark-manager</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -36,7 +26,42 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://getappweaver.com/apps/browser-actions</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/captains-log</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/nostr-radar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/translate</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/monitor</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://getappweaver.com/apps/ppq</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/memory</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/apps/systemone</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -90,4 +115,174 @@
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
+  <url><loc>https://getappweaver.com/docs/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/todo/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/bm/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/journal/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/translate/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/monitor/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/systemone/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/ai-draft-sessions/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/alpine-setup/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/branding/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/demo-system/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/desktop-layout/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/event-enrichment-nip/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/inference-bridge/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/model-sources-and-runtime/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/new-chat-client/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/nostr-event-resolution-implementation-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/nostr-event-resolution/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/plugin-capability-services-implementation/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/plugin-capability-services/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/plugin-system/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/rebrand-brainstorm/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/roadmap-module/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/routstr-provider-index/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/study-plugin-design/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/wallet-nwc-payments-implementation-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/wallet-nwc-payments/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/web-command-json-execution-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/web-node-keyed-reconciliation-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/web-renderer/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/todo/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/todo/todo-duel-implementation-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/todo/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/ai/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/ai/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/confirm/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/delete/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/disable/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/discard/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/drafts/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/enable/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/help/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/history/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/list/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/revise/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/run/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/commands/show/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/db/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/plugin-and-bot-review/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/drafts/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/job/types/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/bm/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/commit/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/commit/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/create/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/create/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/delete/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/delete/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/diff/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/diff/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/diff/renderers/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/diff/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/download/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/download/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/edit/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/edit/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/help/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/history/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/history/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/history/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/init/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/init/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/rename/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/rename/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/restore/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/restore/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/search/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/search/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/search/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/shared/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/shared/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/tree/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/tree/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/tree/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/upload/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/upload/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/view/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/view/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/view/renderers/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/commands/view/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/file/types/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/help/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/list/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/list/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/run/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/commands/shared/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/browser-plugin-product/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/orchestrator/docs/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/orchestrator/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/tasks/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/journal/captains-log/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/journal/published-event-inspection/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/journal/scheduled-publishing-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/journal/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/ai/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/author-interest-record/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/context/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/fetch-latest/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/help/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/interaction-record/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/interest-record/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/list/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/list/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/list-parse-single/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/list-parse-single/renderers/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/mark/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/parse/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/read/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/reevaluate/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/settings/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/shared/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/commands/taxonomy/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/read-behavior-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/signal-review/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/scripts/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/nr/types/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/monitor/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/monitor/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/ppq-plugin-design-and-implementation-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/vendor/ppq-private-mode/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/vendor/ppq-private-mode/bin/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/vendor/ppq-private-mode/lib/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/vendor/ppq-private-mode/lib/nitro/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/ppq/vendor/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/code/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/memory/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/markdown/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/memory/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/systemone/commands/settings/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/systemone/architecture/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/systemone/system-one-capability-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/systemone/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/apps/landing/readme/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/plugins/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/plugins/browser/agents/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/apps/landing/locality-plan/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/agents/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/.appweaver/agents/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://getappweaver.com/docs/core/contributing/</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>

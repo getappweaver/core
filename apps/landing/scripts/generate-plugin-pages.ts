@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 
 import type { OfficialApp } from '../src/landing-data';
 import { officialApps } from '../src/landing-data';
+import { pluginAssetUrl } from '../src/plugin-content';
 
 const LANDING_ROOT = resolve(import.meta.dirname, '..');
 const DIST_ROOT = join(LANDING_ROOT, 'dist');
@@ -25,13 +26,7 @@ function escapeAttribute(value: string): string {
 }
 
 function appImageUrl(app: OfficialApp): string {
-  if (app.installScreenshotSlug === null) {
-    return `${SITE_ORIGIN}/plugin-icons/${app.label.slice(1)}/${app.label.slice(1)}.svg`;
-  }
-
-  const slug = app.href.split('/').at(-1);
-
-  return `${SITE_ORIGIN}/plugin-install/${app.installScreenshotSlug ?? (slug === 'todo' ? 'todo-app' : slug)}.png`;
+  return `${SITE_ORIGIN}${app.installScreenshot ?? app.iconSrc ?? '/favicon/android-chrome-512x512.png'}`;
 }
 
 function renderStructuredData(app: OfficialApp): string {
@@ -64,11 +59,12 @@ function renderFallback(app: OfficialApp): string {
       <article>
         <p><a href="/" style="color: inherit;">AppWeaver</a> / Official Apps</p>
         <h1>${escapeHtml(app.displayName)} for your AppWeaver workspace</h1>
-        <p>${escapeHtml(app.description)}</p>
+       <p>${escapeHtml(app.presentation?.description ?? app.description)}</p>
         <h2>Features</h2>
         <ul>
           ${app.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('\n          ')}
         </ul>
+        <p><a href="/docs/plugins/${app.alias}/">${escapeHtml(app.displayName)} documentation</a></p>
         <h2>Install ${escapeHtml(app.displayName)}</h2>
         <p>Install AppWeaver, open the Plugin Manager, and choose ${escapeHtml(app.displayName)} from the official AppWeaver app catalog.</p>
         <p>Package: <code>${escapeHtml(app.packageName)}</code></p>
@@ -150,6 +146,14 @@ async function generatePluginPages(): Promise<void> {
 
       await mkdir(routeDir, { recursive: true });
       await writeFile(join(routeDir, 'index.html'), renderPluginPage(baseHtml, app));
+
+      for (const asset of app.assetAliases) {
+        const source = join(DIST_ROOT, decodeURIComponent(pluginAssetUrl(app.alias, asset.source).slice(1)));
+        const target = join(DIST_ROOT, asset.publicPath.slice(1));
+        await mkdir(dirname(target), { recursive: true });
+        await copyFile(source, target);
+      }
+
       console.log(`Generated ${app.href}/index.html`);
     }),
   );

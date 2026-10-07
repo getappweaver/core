@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 import tailwindcss from '@tailwindcss/vite';
+import { officialApps } from './src/generated/plugin-content';
 
 type LandingRouteRequestProps = {
   req: { url?: string };
@@ -17,16 +18,7 @@ type LandingRouteRequestProps = {
 
 function landingRoutesPlugin(): Plugin {
   const redirects = new Map([['/demo/app', '/demo/app/']]);
-  const appRoutes = new Set([
-    '/apps/bookmark-manager',
-    '/apps/captains-log',
-    '/apps/file-manager',
-    '/apps/job-scheduler',
-    '/apps/nostr-radar',
-    '/apps/ppq',
-    '/apps/todo',
-    '/one-page',
-  ]);
+  const appRoutes = new Set([...officialApps.map((app) => app.href), '/one-page']);
 
   function handleRequest({
     req,
@@ -53,12 +45,23 @@ function landingRoutesPlugin(): Plugin {
       return;
     }
 
-    if (url?.startsWith('/blog/') && !url.split('/').at(-1)?.includes('.')) {
+    if ((url?.startsWith('/blog/') || url?.startsWith('/docs/')) && !url.split('/').at(-1)?.includes('.')) {
       req.url = url.endsWith('/') ? `${url}index.html` : `${url}/index.html`;
     }
 
     if (url && appRoutes.has(url)) {
       req.url = appRouteTarget === 'spa' ? '/index.html' : `${url}/index.html`;
+    }
+
+    if (appRouteTarget === 'spa' && url) {
+      for (const app of officialApps) {
+        const asset = app.assetAliases.find((entry) => entry.publicPath === url);
+
+        if (asset) {
+          req.url = `/plugin-assets/${app.alias}/${asset.source}`;
+          break;
+        }
+      }
     }
 
     next();

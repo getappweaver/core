@@ -365,7 +365,7 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                                 type: 'agentPrompt' as const,
                                 prompt: [
                                   `Prepare the local AppWeaver plugin at ${entry.repositoryPath} for its first release.`,
-                                  `Read ${entry.repositoryPath}/AGENTS.md and available .BOTTOMUP.json knowledge first.`,
+                                  `Read ${entry.repositoryPath}/AGENTS.md, the nearest README.md, and relevant local docs/ first. Update READMEs/docs when code changes; edit AGENTS.md only when explicitly requested. Use Memory for committed code/Markdown discovery when indexed.`,
                                   'Review the implementation, package metadata, capabilities, SVG icon, and documentation for consistency. Resolve readiness issues, run targeted lint, create the appropriate release commit, and ensure the package version tag points at HEAD. Do not publish or register remote repositories yet.',
                                 ].join('\n\n'),
                                 recordInTimeline: true,

@@ -113,7 +113,9 @@ Status: implementation substantially complete; compatibility metadata and manual
 - [ ] Manually verify a due Job executes NR through the existing CLI tool path.
 - [ ] Verify existing commands, AI tools, generated skills, and web widgets still work.
 - [x] Signal `restart.requested` after native core or plugin changes are ready.
-- [ ] Regenerate affected bottom-up documentation after implementation is stable. Declined for now.
+- [ ] Update affected module READMEs and local docs after implementation is stable;
+      use Memory for committed documentation discovery. This supersedes the
+      declined bottom-up regeneration step.
 
 ## Remaining Work
 

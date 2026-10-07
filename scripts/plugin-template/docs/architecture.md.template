@@ -1,8 +1,4 @@
----
-scope_root: true
----
-
-# plugins/{{ALIAS}}
+# {{PASCAL_ALIAS}} architecture
 
 Scaffold plugin generated from `scripts/plugin-template/`. `list` and `show` include minimal web renderers when `source === 'web'`; `add` and other commands use shared text rendering.
 
@@ -22,4 +18,6 @@ Scaffold plugin generated from `scripts/plugin-template/`. `list` and `show` inc
 - `db.ts` — SQLite open + table migration + CRUD in one file
 - `ai.ts` — `aiDefinition` (tool schema + `executeTool`, used by `plugin:generate` and core tool dispatcher)
 
-Regenerate bottom-up docs for this folder after substantive edits (`bun src/cli.ts file bottomup …` per appweaver-file skill).
+Update this document and the nearest README when structure or behavior changes.
+Core contracts: [Plugin system](../../../docs/PLUGIN_SYSTEM.md) and
+[AI draft sessions](../../../docs/AI_DRAFT_SESSIONS.md).

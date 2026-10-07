@@ -8,11 +8,13 @@ import {
   onMount,
 } from 'solid-js';
 
+import type { PluginDemoStory, PluginDemoGifVariant, PluginFeatureGallery, PluginFeatureGalleryItem } from '../content-types';
+
 import { AppWeaverInstallBlock } from './appweaver-install-block';
 import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
 import { officialApps, officialAuthor, socialLinks } from './landing-data';
-import { OfficialAppGrid, pluginIconSrcForSlug } from './official-app-grid';
+import { OfficialAppGrid } from './official-app-grid';
 import {
   RoadmapPanel,
   appWeaverRoadmapTarget,
@@ -28,7 +30,9 @@ type PluginPageSectionId =
 
 type PluginPage = {
   routeSlug: string;
-  installScreenshotSlug: string | null;
+  installScreenshot: string | null;
+  docsHref: string;
+  roadmapRepoId: string | null;
   command: string;
   subcommand: string;
   label: string;
@@ -43,41 +47,7 @@ type PluginPage = {
   featureGallery: PluginFeatureGallery | null;
 };
 
-type PluginFeatureGalleryItem = {
-  id: string;
-  title: string;
-  description: string[];
-  mediaSrc: string;
-  mediaAlt: string;
-  mediaLabel: string;
-};
-
-type PluginFeatureGallery = {
-  title: string;
-  description: string;
-  items: PluginFeatureGalleryItem[];
-};
-
-type PluginPagePresentation = {
-  title: string;
-  description: string;
-  featureGallery: PluginFeatureGallery | null;
-};
-
 type PluginDemoViewMode = 'desktop' | 'mobile';
-
-type PluginDemoGifVariant = {
-  view: PluginDemoViewMode;
-  src: string;
-  alt: string;
-  durationMs: number;
-};
-
-type PluginDemoStory = {
-  id: string;
-  label: string;
-  variants: PluginDemoGifVariant[];
-};
 
 type PluginDemoGif = PluginDemoGifVariant & {
   storyId: string;
@@ -117,279 +87,6 @@ type DemoSubcommand = {
     label?: string;
     modalTitle: string;
   };
-};
-
-const pluginRouteAliases: Record<string, string> = {
-  'apps/bookmark-manager': 'bm',
-  'apps/captains-log': 'journal',
-  'apps/file-manager': 'file',
-  'apps/job-scheduler': 'job',
-  'apps/nostr-radar': 'nr',
-  'apps/todo': 'todo',
-  'apps/ppq': 'ppq',
-};
-
-const pluginInstallScreenshotSlugs: Record<string, string> = {
-  bm: 'bookmark-manager',
-  file: 'file-manager',
-  job: 'job-scheduler',
-  journal: 'captains-log',
-  nr: 'nostr-radar',
-  todo: 'todo-app',
-  ppq: 'ppq',
-};
-
-const pluginRoadmapRepoIds: Record<string, string> = {
-  bm: 'bm',
-  file: 'file',
-  job: 'job',
-  journal: 'journal',
-  nr: 'Nostr-Radar',
-  todo: 'todo',
-  ppq: 'ppq',
-};
-
-const pluginDemoStories: Record<string, PluginDemoStory[]> = {
-  bm: [
-    {
-      id: 'bookmark-add-new-ai',
-      label: 'AI-assisted bookmark capture',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/bookmark-add-new-ai.gif',
-          alt: 'Bookmark Manager creating a new bookmark with AI help',
-          durationMs: 29260,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/bookmark-add-new-ai-mobile.gif',
-          alt: 'Bookmark Manager creating a new bookmark with AI help',
-          durationMs: 42760,
-        },
-      ],
-    },
-  ],
-  file: [
-    {
-      id: 'file-edit-diff',
-      label: 'Edit a file and inspect the diff',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/file-edit-diff.gif',
-          alt: 'File Manager opening a markdown file, editing it, and reviewing the diff',
-          durationMs: 29760,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/file-edit-diff-mobile.gif',
-          alt: 'File Manager mobile view editing a file and opening the diff',
-          durationMs: 37260,
-        },
-      ],
-    },
-    {
-      id: 'file-diff-commit',
-      label: 'Review all your file changes and commit',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/file-diff-commit.gif',
-          alt: 'Review your changes in one place, and commit',
-          durationMs: 33260,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/file-diff-commit-mobile.gif',
-          alt: 'Review your changes in mobile view in one place, and commit',
-          durationMs: 50630,
-        },
-      ],
-    },
-    {
-      id: 'file-commit-history',
-      label: 'Check your file commit history',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/file-commit-history.gif',
-          alt: 'See all your commit history in a folder',
-          durationMs: 30380,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/file-commit-history-mobile.gif',
-          alt: 'See all your commit history in a folder on mobile',
-          durationMs: 39760,
-        },
-      ],
-    },
-  ],
-  job: [
-    {
-      label: 'Schedule a job with AI',
-      id: 'job-ai-create',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/job-ai.gif',
-          alt: 'Job Scheduler creating a scheduled job with AI',
-          durationMs: 22380,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/job-ai-mobile.gif',
-          alt: 'Job Scheduler mobile flow creating a scheduled job with AI',
-          durationMs: 32260,
-        },
-      ],
-    },
-  ],
-  todo: [
-    {
-      id: 'todo-add',
-      label: 'Add todos',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/todo-add.gif',
-          alt: 'Todo app desktop view adding a todo from the widget',
-          durationMs: 44380,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/todo-add-mobile.gif',
-          alt: 'Todo app mobile view adding a todo from the widget',
-          durationMs: 58380,
-        },
-      ],
-    },
-    {
-      id: 'todo-add-by-ai',
-      label: 'Create todos with AI',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/todo-add-by-ai.gif',
-          alt: 'Todo app creating tasks from an AI prompt',
-          durationMs: 18760,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/todo-add-by-ai-mobile.gif',
-          alt: 'Todo app mobile view creating tasks from an AI prompt',
-          durationMs: 36760,
-        },
-      ],
-    },
-    {
-      id: 'todo-duel',
-      label: 'Prioritize with duels',
-      variants: [
-        {
-          view: 'desktop',
-          src: '/gifs/todo-duel.gif',
-          alt: 'Todo app desktop view choosing between todos in a duel',
-          durationMs: 37880,
-        },
-        {
-          view: 'mobile',
-          src: '/gifs/todo-duel-mobile.gif',
-          alt: 'Todo app mobile view choosing between todos in a duel',
-          durationMs: 50260,
-        },
-      ],
-    },
-  ],
-};
-
-const pluginPagePresentations: Record<string, PluginPagePresentation> = {
-  ppq: {
-    title: 'Private-model options. Lightning-funded AI in your workspace.',
-    description:
-      'PayPerQ adds a model source to AppWeaver: choose from its catalog, route private/* models through an attested Tinfoil enclave, and top up your account with an approved Lightning payment.',
-    featureGallery: null,
-  },
-  nr: {
-    title: 'Explore Nostr by topic. Rank what matters. Filter out what does not.',
-    description:
-      'Nostr Radar discovers posts through your network and evaluates them in finite time slots. Choose Jev Mode for fast, low-cost topic and mood classification, or LLM Mode for post and image summaries and more reliable classification. Private local signals shape relevance.',
-    featureGallery: {
-      title: 'A reader designed for deliberate discovery.',
-      description:
-        'Move through finite batches, discover posts through overlooked social signals, and decide which topics deserve your attention.',
-      items: [
-        {
-          id: 'timeline',
-          title: 'Timeline',
-          description: [
-            'Browse posts discovered through your Nostr network without turning your reader into an endless feed.',
-            'Nostr Radar fetches and evaluates posts in time slots, making each reading session a manageable batch.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/timeline.png',
-          mediaAlt: 'Nostr Radar Timeline showing an evaluated time slot of posts',
-          mediaLabel: 'Timeline screenshot',
-        },
-        {
-          id: 'for-you',
-          title: 'For You',
-          description: [
-            'See the 25 posts most relevant to you from the posts Nostr Radar has evaluated.',
-            'Ranking uses your preferred topics and private interaction signals stored by your local instance.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/for-you.png',
-          mediaAlt: 'Nostr Radar For You view showing the most relevant posts',
-          mediaLabel: 'For You screenshot',
-        },
-        {
-          id: 'filtering',
-          title: 'Filtering',
-          description: [
-            'Filter both Timeline and For You by time slot, or use mass reading to clear an unwanted topic from either view.',
-            'Click Read all on a topic to quickly remove posts matching that keyword. Add recurring unwanted topics to Unpreferred Topics to skip them in the future, or add topics to Preferred Topics to influence scoring.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/filtering.png',
-          mediaAlt:
-            'Nostr Radar filtering posts by time slot and removing posts with Read all',
-          mediaLabel: 'Filtering demo',
-        },
-        {
-          id: 'reactions',
-          title: 'Reactions',
-          description: [
-            'Surface reactions, not just reposts or quotes.',
-            'People often react or reply when they do not want to repost. Followers’ reactions reveal worthwhile posts that conventional timelines tend to miss.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/reactions.png',
-          mediaAlt: 'Nostr Radar showing a post discovered through a follower reaction',
-          mediaLabel: 'Reactions screenshot',
-        },
-        {
-          id: 'archive',
-          title: 'Archive',
-          description: [
-            'Archive posts that are important to you, that you want to collect, or that you plan to return to later.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/archive.png',
-          mediaAlt: 'Nostr Radar Archive containing saved posts',
-          mediaLabel: 'Archive screenshot',
-        },
-        {
-          id: 'private-scoring',
-          title: 'Private, independent scoring',
-          description: [
-            'Keep two or more Nostr Radar instances for the same pubkey—one for work and another for personal interests.',
-            'Each instance keeps different private signals and runs its own scoring algorithm without requiring another Nostr identity.',
-          ],
-          mediaSrc: '/screenshots/nostr-radar/private-scoring.png',
-          mediaAlt:
-            'Two Nostr Radar instances for the same pubkey with different scoring signals',
-          mediaLabel: 'Independent instances illustration',
-        },
-      ],
-    },
-  },
 };
 
 function demoGifsForView(
@@ -457,18 +154,15 @@ function routeSlugForPath(pathname: string): string {
 }
 
 function officialAppForSlug(slug: string) {
-  const commandToken = pluginRouteAliases[slug] ?? slug;
-
   return officialApps.find(
-    (app) => app.href === `/${slug}` || app.label.slice(1) === commandToken,
+    (app) => app.href === `/${slug}` || app.alias === slug,
   );
 }
 
 export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
   const slug = routeSlugForPath(pathname);
-  const commandToken = pluginRouteAliases[slug] ?? slug;
   const app = officialAppForSlug(slug);
-  const usesFeatureGallery = !!pluginPagePresentations[commandToken]?.featureGallery;
+  const usesFeatureGallery = !!app?.presentation?.featureGallery;
 
   return [
     { sectionId: null, label: 'Back', href: '/' },
@@ -479,17 +173,10 @@ export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
         ? []
         : [{ sectionId: 'demo' as const, label: 'Demo', href: '#demo' }]),
     { sectionId: 'install', label: 'Install', href: '#install' },
+    ...(app ? [{ sectionId: null, label: 'Docs', href: `/docs/plugins/${app.alias}/` }] : []),
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
     { sectionId: 'more', label: 'More', href: '#more' },
   ];
-}
-
-function titleCaseSlug(value: string): string {
-  return value
-    .split('-')
-    .filter(Boolean)
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(' ');
 }
 
 function pluginPageForPath(
@@ -502,9 +189,14 @@ function pluginPageForPath(
     return null;
   }
 
-  const commandToken = pluginRouteAliases[slug] ?? slug;
   const officialApp = officialAppForSlug(slug);
-  const presentation = pluginPagePresentations[commandToken];
+
+  if (!officialApp) {
+    return null;
+  }
+
+  const commandToken = officialApp.alias;
+  const presentation = officialApp.presentation;
   const command = commands.find(
     (entry) =>
       entry.name === commandToken ||
@@ -519,50 +211,33 @@ function pluginPageForPath(
       entry.webWidget?.label,
   );
 
-  if (!command && officialApp?.hasInteractiveDemo !== false) {
-    return null;
-  }
-
-  if (!subcommand?.webWidget && officialApp?.hasInteractiveDemo !== false) {
-    return null;
-  }
-
-  const displayName =
-    officialApp?.displayName ?? subcommand?.webWidget?.modalTitle ?? titleCaseSlug(slug);
-  const description = officialApp?.description ?? command?.summary ?? '';
+  const displayName = officialApp.displayName;
+  const description = officialApp.description;
 
   return {
     routeSlug: slug,
-    installScreenshotSlug: officialApp?.installScreenshotSlug === null
-      ? null
-      : pluginInstallScreenshotSlugs[commandToken] ?? slug,
+    installScreenshot: officialApp.installScreenshot,
+    docsHref: `/docs/plugins/${officialApp.alias}/`,
+    roadmapRepoId: officialApp.roadmapRepoId,
     command: command?.name ?? commandToken,
     subcommand: subcommand?.name ?? 'status',
     label: officialApp?.label ?? `/${commandToken}`,
     shortName: officialApp?.shortName ?? displayName,
-    iconSrc: pluginIconSrcForSlug(slug),
+    iconSrc: officialApp.iconSrc,
     title: presentation?.title ?? `${displayName} for your AppWeaver workspace.`,
     eyebrow: displayName,
     description: presentation?.description ?? description,
-    demoQuery: subcommand?.webWidget && command
+    demoQuery: officialApp.hasInteractiveDemo && subcommand?.webWidget && command
       ? `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`
       : null,
-    demoStories: pluginDemoStories[commandToken] ?? [],
-    features: officialApp?.features ?? [
-      description,
-      'Install it from the AppWeaver plugin manager when it belongs in your workspace.',
-      'Use it through commands, widgets, and AI-assisted workflows.',
-    ],
+    demoStories: officialApp.demoStories,
+    features: officialApp.features,
     featureGallery: presentation?.featureGallery ?? null,
   };
 }
 
 function demoAppSrc(query: string): string {
   return `/demo/app/index.html?${query}`;
-}
-
-function installScreenshotSrc(screenshotSlug: string): string {
-  return `/plugin-install/${screenshotSlug}.png`;
 }
 
 function ScreenshotCard(props: {
@@ -720,9 +395,7 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
 }
 
 function PluginInstallPreview(props: { page: PluginPage }) {
-  const screenshotSrc = () => props.page.installScreenshotSlug
-    ? installScreenshotSrc(props.page.installScreenshotSlug)
-    : null;
+  const screenshotSrc = () => props.page.installScreenshot;
   const [fullscreenScreenshot, setFullscreenScreenshot] = createSignal<{
     src: string;
     alt: string;
@@ -1036,6 +709,7 @@ function SiteFooter() {
     <footer class="site-footer">
       <div class="site-footer-brand">AppWeaver</div>
       <nav class="site-footer-links" aria-label="AppWeaver social links">
+        <a href="/docs/">Docs</a>
         <For each={socialLinks}>
           {(link) => (
             <a href={link.href} rel="noreferrer" target="_blank">
@@ -1049,15 +723,16 @@ function SiteFooter() {
 }
 
 function PluginMoreSection(props: { page: PluginPage }) {
-  const repoId = pluginRoadmapRepoIds[props.page.command] ?? props.page.command;
-
   return (
     <div class="more-section-stack">
-      <RoadmapPanel
-        title={`${props.page.eyebrow} Roadmap`}
-        boardKey={repoId}
-        target={appWeaverRoadmapTarget(repoId)}
-      />
+      <a href={props.page.docsHref}>{props.page.eyebrow} documentation</a>
+      <Show when={props.page.roadmapRepoId}>
+        {(repoId) => <RoadmapPanel
+          title={`${props.page.eyebrow} Roadmap`}
+          boardKey={repoId()}
+          target={appWeaverRoadmapTarget(repoId())}
+        />}
+      </Show>
       <BlogPostsSection />
       <SiteFooter />
     </div>

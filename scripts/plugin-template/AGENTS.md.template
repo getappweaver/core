@@ -2,8 +2,9 @@
 
 This directory is an independent plugin repository{{#IF DRAFTS}} generated from AppWeaver's full draft/review scaffold{{/IF DRAFTS}}.
 
-- Read `README.md` and available `.BOTTOMUP.json` knowledge before changing behavior.
-- Keep `.BOTTOMUP.json` knowledge current when files, responsibilities, persistence, commands, or rendering change.
+- Follow the [core instructions](../../AGENTS.md). Read local `README.md` and relevant `docs/` before changing behavior.
+- Update READMEs and docs when files, responsibilities, persistence, commands, or rendering change. Use Memory for committed code/Markdown discovery when indexed.
+- Only create or edit `AGENTS.md` files when the user explicitly requests instruction changes. Do not regenerate legacy bottom-up artifacts during ordinary maintenance.
 {{#IF DRAFTS}}
 - Preserve the draft/accept/decline flow for mutating operations unless the product explicitly requires another review model.
 {{/IF DRAFTS}}

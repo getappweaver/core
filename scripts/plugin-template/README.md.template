@@ -13,6 +13,9 @@ Replace this README with documentation for your plugin:
 - **Draft/confirm flow** — If you use drafts (e.g. AI proposes, user accepts/revises/declines), describe it here. When generated with `create_draft_commands: false`, mutations execute directly without draft storage or review commands.
 - **CLI tools** — If the plugin exposes CLI tool calls (via `aiDefinition`: `toolCallSchema` and `executeTool`), list them and how they are used.
 
-See PLUGINS.md in the repo root for the full plugin author guide.
+See [PLUGINS.md](../../PLUGINS.md) in the host repo root for the full plugin author guide.
 
-After you change structure or behavior, use the appweaver-file `bottomup.generate`, `bottomup.summarize`, and `bottomup.enrich` tools to refresh `.BOTTOMUP.json` knowledge.
+See [local architecture](docs/architecture.md) for the scaffold's source map.
+Keep READMEs and local docs current when code changes behavior or responsibilities.
+Use Memory to discover committed code and Markdown when indexed; `AGENTS.md`
+contains stable instructions and is edited only when the user explicitly asks.

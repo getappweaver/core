@@ -1,3 +1,6 @@
 .vercel
 dist/
 public/blog/
+public/docs/
+public/plugin-assets/
+src/generated/
