@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.1.0] - 2026-10-08
+
+- feat: add setup URL resolution and button in the menu (66ec087)
+
 ## [v14.0.1] - 2026-10-08
 
-- fix: enhance plugin release inspection with error handling and reporting (78ae6cf)
+- fix: enhance plugin release inspection with error handling and reporting (22ca5d1)
 
 ## [v14.0.0] - 2026-10-07
 
@@ -476,7 +480,7 @@ You can also run `bun run release:changelog` to rewrite this file from tags.
 
 ## [v9.51.7] - 2026-07-08
 
-- build: finalize demo assets (df342c7)
+_No commits in this range._
 
 ## [v9.51.6] - 2026-07-08
 

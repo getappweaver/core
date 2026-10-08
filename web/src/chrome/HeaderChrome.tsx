@@ -50,6 +50,7 @@ type HeaderChromeProps = {
   onOpenNostrSearchRelays: () => void;
   onOpenLayoutSettings?: () => void;
   onRestartBot: () => void;
+  onOpenSetup?: () => void;
   onAnyMenuOpenChange?: (open: boolean) => void;
 };
 
@@ -106,6 +107,14 @@ function LayoutIcon(): JSX.Element {
   );
 }
 
+export function resolveSetupUrl(): string {
+  if (typeof window === 'undefined') {
+    return '/setup';
+  }
+
+  return `${window.location.protocol}//${window.location.host}/setup`;
+}
+
 export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   let accountButtonEl: HTMLButtonElement | undefined;
   let accountMenuPanelEl: HTMLDivElement | undefined;
@@ -149,6 +158,22 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
   function openWidget(widget: HeaderChromeWidget): void {
     closeAllMenus();
     props.onOpenWidget(widget);
+  }
+
+  function handleOpenSetup(): void {
+    closeAllMenus();
+
+    if (props.onOpenSetup) {
+      props.onOpenSetup();
+
+      return;
+    }
+
+    const targetUrl = resolveSetupUrl();
+
+    if (typeof window !== 'undefined' && typeof window.open === 'function') {
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
   }
 
   function widgetKey(widget: HeaderChromeWidget): string {
@@ -455,6 +480,14 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
                 title="Enable browser notifications when the bot receives a DM (tap after connecting Nostr and WebSocket)"
               >
                 {props.pushBusy() ? '…' : 'Push'}
+              </WebButton>
+              <WebButton
+                type="button"
+                class="connect-btn"
+                onClick={handleOpenSetup}
+                title="Open setup screen"
+              >
+                Setup Screen
               </WebButton>
             </div>
           </Show>
