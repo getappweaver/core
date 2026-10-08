@@ -6,17 +6,15 @@ import { NostrAuthProvider } from '@web/src/contexts/NostrAuthContext';
 import { AppWeaverInstallBlock } from './appweaver-install-block';
 import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
-import { officialApps, socialLinks } from './landing-data';
+import { officialApps } from './landing-data';
 import { OfficialAppGrid } from './official-app-grid';
 import {
   PluginRoute,
   isPluginRoute,
   pluginNavItemsForPath,
 } from './plugin-pages';
-import {
-  RoadmapPanel,
-  appWeaverRoadmapTarget,
-} from './roadmap-panel';
+import { RoadmapPanel, appWeaverRoadmapTarget } from './roadmap-panel';
+import { SiteFooter } from './site-footer';
 
 import './lightbox.css';
 import './styles.css';
@@ -93,7 +91,7 @@ const features: Feature[] = [
     points: [
       'Run AI tasks with OpenCode and choose models from the active model source for your workspace.',
       'Install model-source apps to add their own catalogs and provider configuration.',
-      'Use app-specific payment options; like NWC lightning connections or Cashu eCash where it\'s supported.',
+      "Use app-specific payment options; like NWC lightning connections or Cashu eCash where it's supported.",
     ],
   },
   {
@@ -152,7 +150,9 @@ function Header(props: HeaderProps) {
             <a
               href={item.href}
               class="stage-nav-simple-item"
-              classList={{ 'is-active': props.activeSection === item.sectionId }}
+              classList={{
+                'is-active': props.activeSection === item.sectionId,
+              }}
               aria-current={
                 props.activeSection === item.sectionId ? 'location' : undefined
               }
@@ -180,12 +180,16 @@ function HomePage(props: HomePageProps) {
           <img src={logoUrl} alt="" class="hero-brand-logo" />
         </div>
         <h1 class="hero-title">
-          An <span class="hero-title-ai">AI</span>-powered <span class="hero-title-app-hub">App Hub</span> on a computer{' '}
-          <span class="hero-title-mark hero-title-mark--computer">you control</span>.
+          An <span class="hero-title-ai">AI</span>-powered{' '}
+          <span class="hero-title-app-hub">App Hub</span> on a computer{' '}
+          <span class="hero-title-mark hero-title-mark--computer">
+            you control
+          </span>
+          .
         </h1>
         <p class="hero-description">
-          Your data stays <span class="hero-description-mark">local-first</span>.
-          You choose which{' '}
+          Your data stays <span class="hero-description-mark">local-first</span>
+          . You choose which{' '}
           <a href="#apps" class="hero-description-link hero-apps-link">
             <span class="hero-apps-icon" aria-hidden="true">
               <span class="hero-apps-icon-frame hero-apps-icon-frame--todo" />
@@ -204,8 +208,8 @@ function HomePage(props: HomePageProps) {
           <a href={props.demoHref} class="hero-description-link">
             responsive app
           </a>
-          , prompts, local terminal input, WebSocket API, or your favourite Nostr
-          chat app.
+          , prompts, local terminal input, WebSocket API, or your favourite
+          Nostr chat app.
         </p>
         <AppWeaverInstallBlock title={null} />
       </div>
@@ -223,7 +227,9 @@ function FeatureAccordion(props: {
         {(feature, index) => (
           <div
             class="feature-panel"
-            classList={{ 'feature-panel--open': props.openFeatureIndex === index() }}
+            classList={{
+              'feature-panel--open': props.openFeatureIndex === index(),
+            }}
           >
             <button
               type="button"
@@ -254,30 +260,13 @@ function OfficialAppsSection() {
       <h2 class="section-title short-viewport-section-title">Official Apps</h2>
       <div class="section-heading-row">
         <p class="section-summary">
-          Each app adds commands, widgets, AI skills, and local data models to your AppWeaver workspace.
+          Each app adds commands, widgets, AI skills, and local data models to
+          your AppWeaver workspace.
         </p>
       </div>
 
       <OfficialAppGrid apps={officialApps} />
     </div>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer class="site-footer">
-      <div class="site-footer-brand">AppWeaver</div>
-      <nav class="site-footer-links" aria-label="AppWeaver social links">
-        <a href="/docs/">Docs</a>
-        <For each={socialLinks}>
-          {(link) => (
-            <a href={link.href} rel="noreferrer" target="_blank">
-              {link.label}
-            </a>
-          )}
-        </For>
-      </nav>
-    </footer>
   );
 }
 
@@ -374,7 +363,10 @@ function OnePage(props: {
       scheduleUpdate();
     };
 
-    const cancelInitialHashScroll = scheduleStageHashScroll(root, scheduleUpdate);
+    const cancelInitialHashScroll = scheduleStageHashScroll(
+      root,
+      scheduleUpdate,
+    );
 
     const demoSection = document.getElementById('demo');
 
@@ -417,7 +409,10 @@ function OnePage(props: {
       <section id="intro" class="one-page-section one-page-section--intro">
         <HomePage demoHref="#demo" />
       </section>
-      <section id="features" class="one-page-section one-page-section--features">
+      <section
+        id="features"
+        class="one-page-section one-page-section--features"
+      >
         <h2 class="section-title short-viewport-section-title">Features</h2>
         <FeatureAccordion
           openFeatureIndex={openFeatureIndex()}
@@ -425,12 +420,19 @@ function OnePage(props: {
         />
       </section>
       <section id="demo" class="one-page-section one-page-section--demo">
-        <h2 class="section-title short-viewport-section-title">Interactive Demo</h2>
-        <div class="plugin-demo-view-toggle plugin-demo-view-toggle--interactive" aria-label="Choose interactive demo viewport">
+        <h2 class="section-title short-viewport-section-title">
+          Interactive Demo
+        </h2>
+        <div
+          class="plugin-demo-view-toggle plugin-demo-view-toggle--interactive"
+          aria-label="Choose interactive demo viewport"
+        >
           <button
             type="button"
             class="plugin-demo-view-button"
-            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'desktop' }}
+            classList={{
+              'plugin-demo-view-button--active': demoViewMode() === 'desktop',
+            }}
             onClick={() => setDemoViewMode('desktop')}
           >
             Desktop
@@ -438,7 +440,9 @@ function OnePage(props: {
           <button
             type="button"
             class="plugin-demo-view-button"
-            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'mobile' }}
+            classList={{
+              'plugin-demo-view-button--active': demoViewMode() === 'mobile',
+            }}
             onClick={() => setDemoViewMode('mobile')}
           >
             Mobile
@@ -458,7 +462,9 @@ function OnePage(props: {
             src="/demo/app/index.html"
             loading="lazy"
             class="one-page-demo-frame"
-            classList={{ 'one-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
+            classList={{
+              'one-page-demo-frame--mobile': demoViewMode() === 'mobile',
+            }}
           />
         </Show>
       </section>

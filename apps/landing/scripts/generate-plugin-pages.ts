@@ -63,11 +63,10 @@ function renderFallback(app: OfficialApp): string {
         <h2>Features</h2>
         <ul>
           ${app.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('\n          ')}
-        </ul>
-        <p><a href="/docs/plugins/${app.alias}/">${escapeHtml(app.displayName)} documentation</a></p>
         <h2>Install ${escapeHtml(app.displayName)}</h2>
         <p>Install AppWeaver, open the Plugin Manager, and choose ${escapeHtml(app.displayName)} from the official AppWeaver app catalog.</p>
         <p>Package: <code>${escapeHtml(app.packageName)}</code></p>
+        <p><a href="/docs/plugins/${app.alias}/">${escapeHtml(app.displayName)} documentation</a></p>
         <h2>More official AppWeaver apps</h2>
         <ul>
           ${otherApps.map((entry) => `<li><a href="${escapeAttribute(entry.href)}" style="color: inherit;">${escapeHtml(entry.displayName)}</a>: ${escapeHtml(entry.description)}</li>`).join('\n          ')}
@@ -145,10 +144,16 @@ async function generatePluginPages(): Promise<void> {
       const routeDir = join(DIST_ROOT, app.href.slice(1));
 
       await mkdir(routeDir, { recursive: true });
-      await writeFile(join(routeDir, 'index.html'), renderPluginPage(baseHtml, app));
+      await writeFile(
+        join(routeDir, 'index.html'),
+        renderPluginPage(baseHtml, app),
+      );
 
       for (const asset of app.assetAliases) {
-        const source = join(DIST_ROOT, decodeURIComponent(pluginAssetUrl(app.alias, asset.source).slice(1)));
+        const source = join(
+          DIST_ROOT,
+          decodeURIComponent(pluginAssetUrl(app.alias, asset.source).slice(1)),
+        );
         const target = join(DIST_ROOT, asset.publicPath.slice(1));
         await mkdir(dirname(target), { recursive: true });
         await copyFile(source, target);

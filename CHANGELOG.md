@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.1.2] - 2026-10-08
+
+- fix: apps landing adding icons to footer links (1b4dc65)
+
 ## [v14.1.1] - 2026-10-08
 
-- fix: updated branding document (cdaeda1)
+- fix: updated branding document (926e902)
 
 ## [v14.1.0] - 2026-10-08
 

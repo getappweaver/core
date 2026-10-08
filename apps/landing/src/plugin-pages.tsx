@@ -8,25 +8,23 @@ import {
   onMount,
 } from 'solid-js';
 
-import type { PluginDemoStory, PluginDemoGifVariant, PluginFeatureGallery, PluginFeatureGalleryItem } from '../content-types';
+import type {
+  PluginDemoStory,
+  PluginDemoGifVariant,
+  PluginFeatureGallery,
+  PluginFeatureGalleryItem,
+} from '../content-types';
 
 import { AppWeaverInstallBlock } from './appweaver-install-block';
 import { BlogPostsSection } from './blog-posts';
 import { scheduleStageHashScroll, scrollStageToHash } from './hash-scroll';
-import { officialApps, officialAuthor, socialLinks } from './landing-data';
+import { officialApps, officialAuthor } from './landing-data';
 import { OfficialAppGrid } from './official-app-grid';
-import {
-  RoadmapPanel,
-  appWeaverRoadmapTarget,
-} from './roadmap-panel';
+import { RoadmapPanel, appWeaverRoadmapTarget } from './roadmap-panel';
+import { DocsIcon, SiteFooter } from './site-footer';
 
 type PluginPageSectionId =
-  | 'features'
-  | 'gallery'
-  | 'demo'
-  | 'install'
-  | 'apps'
-  | 'more';
+  'features' | 'gallery' | 'demo' | 'install' | 'roadmap' | 'apps' | 'more';
 
 type PluginPage = {
   routeSlug: string;
@@ -145,6 +143,7 @@ const pluginPageSections: PluginPageSectionId[] = [
   'gallery',
   'demo',
   'install',
+  'roadmap',
   'apps',
   'more',
 ];
@@ -163,6 +162,7 @@ export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
   const slug = routeSlugForPath(pathname);
   const app = officialAppForSlug(slug);
   const usesFeatureGallery = !!app?.presentation?.featureGallery;
+  const hasRoadmap = !!app?.roadmapRepoId;
 
   return [
     { sectionId: null, label: 'Back', href: '/' },
@@ -173,7 +173,18 @@ export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
         ? []
         : [{ sectionId: 'demo' as const, label: 'Demo', href: '#demo' }]),
     { sectionId: 'install', label: 'Install', href: '#install' },
-    ...(app ? [{ sectionId: null, label: 'Docs', href: `/docs/plugins/${app.alias}/` }] : []),
+    ...(app
+      ? [
+          {
+            sectionId: null,
+            label: 'Docs',
+            href: `/docs/plugins/${app.alias}/`,
+          },
+        ]
+      : []),
+    ...(hasRoadmap
+      ? [{ sectionId: 'roadmap' as const, label: 'Roadmap', href: '#roadmap' }]
+      : []),
     { sectionId: 'apps', label: 'Apps', href: '#apps' },
     { sectionId: 'more', label: 'More', href: '#more' },
   ];
@@ -224,12 +235,14 @@ function pluginPageForPath(
     label: officialApp?.label ?? `/${commandToken}`,
     shortName: officialApp?.shortName ?? displayName,
     iconSrc: officialApp.iconSrc,
-    title: presentation?.title ?? `${displayName} for your AppWeaver workspace.`,
+    title:
+      presentation?.title ?? `${displayName} for your AppWeaver workspace.`,
     eyebrow: displayName,
     description: presentation?.description ?? description,
-    demoQuery: officialApp.hasInteractiveDemo && subcommand?.webWidget && command
-      ? `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`
-      : null,
+    demoQuery:
+      officialApp.hasInteractiveDemo && subcommand?.webWidget && command
+        ? `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`
+        : null,
     demoStories: officialApp.demoStories,
     features: officialApp.features,
     featureGallery: presentation?.featureGallery ?? null,
@@ -296,7 +309,9 @@ function PluginFeatures(props: { page: PluginPage }) {
       <p class="plugin-page-description">{props.page.description}</p>
       <Show when={props.page.featureGallery === null}>
         <ul class="plugin-page-list">
-          <For each={props.page.features}>{(feature) => <li>{feature}</li>}</For>
+          <For each={props.page.features}>
+            {(feature) => <li>{feature}</li>}
+          </For>
         </ul>
       </Show>
     </div>
@@ -323,14 +338,18 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
               <article
                 id={`feature-${item.id}`}
                 class="plugin-feature-gallery-item"
-                classList={{ 'plugin-feature-gallery-item--reverse': index() % 2 === 1 }}
+                classList={{
+                  'plugin-feature-gallery-item--reverse': index() % 2 === 1,
+                }}
               >
                 <div class="plugin-feature-gallery-copy">
                   <div class="plugin-feature-gallery-index">
                     {String(index() + 1).padStart(2, '0')}
                   </div>
                   <h3>{item.title}</h3>
-                  <For each={item.description}>{(paragraph) => <p>{paragraph}</p>}</For>
+                  <For each={item.description}>
+                    {(paragraph) => <p>{paragraph}</p>}
+                  </For>
                 </div>
                 <figure class="plugin-feature-gallery-media">
                   <button
@@ -409,12 +428,17 @@ function PluginInstallPreview(props: { page: PluginPage }) {
     >
       <div class="plugin-install-preview-copy">
         <div class="plugin-page-eyebrow">Plugin Manager</div>
-        <h2 class="plugin-section-title">Install from the official app author.</h2>
+        <h2 class="plugin-section-title">
+          Install from the official app author.
+        </h2>
         <p class="plugin-page-description">
           AppWeaver shows catalog entries before install. The current app is
           highlighted below, and the author line stays visible so you can verify
           it comes from{' '}
-          <span class="plugin-install-author-emphasis">{officialAuthor.label}</span>.
+          <span class="plugin-install-author-emphasis">
+            {officialAuthor.label}
+          </span>
+          .
         </p>
       </div>
 
@@ -502,8 +526,10 @@ function PluginDemoSection(props: { page: PluginPage }) {
     demoChoicesForView(props.page.demoStories, viewMode()),
   );
   const activeGif = () => selectedGifs()[activeGifIndex()] ?? null;
-  const hasDesktopGifs = () => hasDemoGifsForView(props.page.demoStories, 'desktop');
-  const hasMobileGifs = () => hasDemoGifsForView(props.page.demoStories, 'mobile');
+  const hasDesktopGifs = () =>
+    hasDemoGifsForView(props.page.demoStories, 'desktop');
+  const hasMobileGifs = () =>
+    hasDemoGifsForView(props.page.demoStories, 'mobile');
 
   createEffect(() => {
     const gifs = selectedGifs();
@@ -546,13 +572,20 @@ function PluginDemoSection(props: { page: PluginPage }) {
   return (
     <div class="plugin-demo-section">
       <Show when={props.page.demoStories.length > 0}>
-        <div class="plugin-demo-carousel" aria-label={`${props.page.eyebrow} GIF demos`}>
-          <h2 class="plugin-panel-title">Watch how {props.page.shortName} works</h2>
+        <div
+          class="plugin-demo-carousel"
+          aria-label={`${props.page.eyebrow} GIF demos`}
+        >
+          <h2 class="plugin-panel-title">
+            Watch how {props.page.shortName} works
+          </h2>
           <div class="plugin-demo-view-toggle" aria-label="Choose GIF viewport">
             <button
               type="button"
               class="plugin-demo-view-button"
-              classList={{ 'plugin-demo-view-button--active': viewMode() === 'desktop' }}
+              classList={{
+                'plugin-demo-view-button--active': viewMode() === 'desktop',
+              }}
               disabled={!hasDesktopGifs()}
               onClick={() => {
                 setViewMode('desktop');
@@ -564,7 +597,9 @@ function PluginDemoSection(props: { page: PluginPage }) {
             <button
               type="button"
               class="plugin-demo-view-button"
-              classList={{ 'plugin-demo-view-button--active': viewMode() === 'mobile' }}
+              classList={{
+                'plugin-demo-view-button--active': viewMode() === 'mobile',
+              }}
               disabled={!hasMobileGifs()}
               onClick={() => {
                 setViewMode('mobile');
@@ -589,7 +624,8 @@ function PluginDemoSection(props: { page: PluginPage }) {
                     type="button"
                     class="plugin-demo-thumb"
                     classList={{
-                      'plugin-demo-thumb--active': selectedIndex() === activeGifIndex(),
+                      'plugin-demo-thumb--active':
+                        selectedIndex() === activeGifIndex(),
                     }}
                     disabled={choice.gif === null}
                     onClick={() => {
@@ -615,7 +651,11 @@ function PluginDemoSection(props: { page: PluginPage }) {
                   onClick={() => setFullscreenGif(gif())}
                   aria-label={`Open ${gif().label} fullscreen`}
                 >
-                  <img class="plugin-demo-gif" src={gif().src} alt={gif().alt} />
+                  <img
+                    class="plugin-demo-gif"
+                    src={gif().src}
+                    alt={gif().alt}
+                  />
                 </button>
               </figure>
             )}
@@ -652,11 +692,16 @@ function PluginDemoSection(props: { page: PluginPage }) {
         <h2 class="plugin-panel-title">
           See {props.page.shortName} stories for yourself
         </h2>
-        <div class="plugin-demo-view-toggle plugin-demo-view-toggle--interactive" aria-label="Choose interactive demo viewport">
+        <div
+          class="plugin-demo-view-toggle plugin-demo-view-toggle--interactive"
+          aria-label="Choose interactive demo viewport"
+        >
           <button
             type="button"
             class="plugin-demo-view-button"
-            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'desktop' }}
+            classList={{
+              'plugin-demo-view-button--active': demoViewMode() === 'desktop',
+            }}
             onClick={() => setDemoViewMode('desktop')}
           >
             Desktop
@@ -664,7 +709,9 @@ function PluginDemoSection(props: { page: PluginPage }) {
           <button
             type="button"
             class="plugin-demo-view-button"
-            classList={{ 'plugin-demo-view-button--active': demoViewMode() === 'mobile' }}
+            classList={{
+              'plugin-demo-view-button--active': demoViewMode() === 'mobile',
+            }}
             onClick={() => setDemoViewMode('mobile')}
           >
             Mobile
@@ -674,7 +721,9 @@ function PluginDemoSection(props: { page: PluginPage }) {
           title={`See ${props.page.shortName} stories for yourself`}
           src={demoAppSrc(props.page.demoQuery ?? '')}
           class="plugin-page-demo-frame"
-          classList={{ 'plugin-page-demo-frame--mobile': demoViewMode() === 'mobile' }}
+          classList={{
+            'plugin-page-demo-frame--mobile': demoViewMode() === 'mobile',
+          }}
           loading="lazy"
           tabIndex={-1}
         />
@@ -692,47 +741,83 @@ function PluginAppsSection(props: { page: PluginPage }) {
           <h2 class="section-title">Add more tools to the same local hub.</h2>
         </div>
         <p class="section-summary">
-          {props.page.shortName} can run beside the other official AppWeaver apps.
-          Each one adds focused commands, widgets, and AI skills.
+          {props.page.shortName} can run beside the other official AppWeaver
+          apps. Each one adds focused commands, widgets, and AI skills.
         </p>
       </div>
 
       <OfficialAppGrid
-        apps={officialApps.filter((app) => app.href !== `/${props.page.routeSlug}`)}
+        apps={officialApps.filter(
+          (app) => app.href !== `/${props.page.routeSlug}`,
+        )}
       />
     </div>
   );
 }
 
-function SiteFooter() {
+function ArrowRightIcon(props?: { class?: string }) {
   return (
-    <footer class="site-footer">
-      <div class="site-footer-brand">AppWeaver</div>
-      <nav class="site-footer-links" aria-label="AppWeaver social links">
-        <a href="/docs/">Docs</a>
-        <For each={socialLinks}>
-          {(link) => (
-            <a href={link.href} rel="noreferrer" target="_blank">
-              {link.label}
-            </a>
-          )}
-        </For>
-      </nav>
-    </footer>
+    <svg
+      class={props?.class}
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
   );
 }
 
-function PluginMoreSection(props: { page: PluginPage }) {
+function PluginResourcesSection(props: { page: PluginPage }) {
   return (
     <div class="more-section-stack">
-      <a href={props.page.docsHref}>{props.page.eyebrow} documentation</a>
+      <div class="plugin-docs-banner">
+        <a
+          href={props.page.docsHref}
+          class="plugin-docs-link"
+          aria-label={`${props.page.eyebrow} documentation`}
+        >
+          <span class="plugin-docs-link-icon-wrap" aria-hidden="true">
+            <DocsIcon class="plugin-docs-link-icon" />
+          </span>
+          <span class="plugin-docs-link-content">
+            <span class="plugin-docs-link-eyebrow">Documentation</span>
+            <span class="plugin-docs-link-title">
+              {props.page.eyebrow} documentation
+            </span>
+            <span class="plugin-docs-link-desc">
+              Read setup guides, configuration options, and command reference
+            </span>
+          </span>
+          <span class="plugin-docs-link-arrow" aria-hidden="true">
+            <ArrowRightIcon />
+          </span>
+        </a>
+      </div>
       <Show when={props.page.roadmapRepoId}>
-        {(repoId) => <RoadmapPanel
-          title={`${props.page.eyebrow} Roadmap`}
-          boardKey={repoId()}
-          target={appWeaverRoadmapTarget(repoId())}
-        />}
+        {(repoId) => (
+          <RoadmapPanel
+            title={`${props.page.eyebrow} Roadmap`}
+            boardKey={repoId()}
+            target={appWeaverRoadmapTarget(repoId())}
+          />
+        )}
       </Show>
+    </div>
+  );
+}
+
+function PluginMoreSection() {
+  return (
+    <div class="more-section-stack">
       <BlogPostsSection />
       <SiteFooter />
     </div>
@@ -794,7 +879,10 @@ function PluginLandingPage(props: {
       scheduleUpdate();
     };
 
-    const cancelInitialHashScroll = scheduleStageHashScroll(root, scheduleUpdate);
+    const cancelInitialHashScroll = scheduleStageHashScroll(
+      root,
+      scheduleUpdate,
+    );
 
     root.addEventListener('scroll', scheduleUpdate, { passive: true });
     window.addEventListener('hashchange', handleHashChange);
@@ -813,7 +901,10 @@ function PluginLandingPage(props: {
 
   return (
     <div class="plugin-page-stage" ref={root}>
-      <section id="features" class="plugin-page-section plugin-page-section--features">
+      <section
+        id="features"
+        class="plugin-page-section plugin-page-section--features"
+      >
         <PluginFeatures page={props.page} />
       </section>
       <Show
@@ -840,14 +931,23 @@ function PluginLandingPage(props: {
           </section>
         )}
       </Show>
-      <section id="install" class="plugin-page-section plugin-page-section--install">
+      <section
+        id="install"
+        class="plugin-page-section plugin-page-section--install"
+      >
         <PluginInstallPreview page={props.page} />
+      </section>
+      <section
+        id="roadmap"
+        class="plugin-page-section plugin-page-section--roadmap"
+      >
+        <PluginResourcesSection page={props.page} />
       </section>
       <section id="apps" class="plugin-page-section plugin-page-section--apps">
         <PluginAppsSection page={props.page} />
       </section>
       <section id="more" class="plugin-page-section plugin-page-section--more">
-        <PluginMoreSection page={props.page} />
+        <PluginMoreSection />
       </section>
     </div>
   );
