@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.0.1] - 2026-10-08
+
+- fix: enhance plugin release inspection with error handling and reporting (78ae6cf)
+
 ## [v14.0.0] - 2026-10-07
 
-- chore: new localized documentation plugin pages and retiring bottom-up (0ae1473)
+- chore: new localized documentation plugin pages and retiring bottom-up (87b3842)
 
 ## [v13.10.0] - 2026-10-07
 

@@ -77,6 +77,7 @@ export type PluginsReleasesRepresentation = {
   publishedCount: number;
   unpublishedCount: number;
   hiddenCount: number;
+  inspectionErrors: { alias: string; message: string }[];
   entries: PluginReleaseEntry[];
 };
 
@@ -370,7 +371,7 @@ export async function handlePluginsReleases(
         parent: null,
       });
 
-      const resolvedEntries = await Promise.all(
+      const resolvedEntries = await Promise.allSettled(
         installedPlugins.map(
           async (installed): Promise<PluginReleaseEntry | null> => {
             const entrySpan = monitoring.startSpan({
@@ -465,9 +466,27 @@ export async function handlePluginsReleases(
 
       spanResolve.end();
 
-      const entries = resolvedEntries.filter(
-        (entry): entry is PluginReleaseEntry => entry !== null,
-      );
+      const entries: PluginReleaseEntry[] = [];
+
+      const inspectionErrors: PluginsReleasesRepresentation['inspectionErrors'] =
+        [];
+
+      let hiddenCount = 0;
+
+      for (const [index, result] of resolvedEntries.entries()) {
+        if (result.status === 'rejected') {
+          const reason: unknown = result.reason;
+
+          inspectionErrors.push({
+            alias: installedPlugins[index].alias,
+            message: reason instanceof Error ? reason.message : String(reason),
+          });
+        } else if (result.value === null) {
+          hiddenCount += 1;
+        } else {
+          entries.push(result.value);
+        }
+      }
 
       const publishedEntries = entries.filter(
         (entry) => entry.published !== null,
@@ -489,7 +508,8 @@ export async function handlePluginsReleases(
         installedCount: installedPlugins.length,
         publishedCount: publishedEntries.length,
         unpublishedCount: unpublishedEntries.length,
-        hiddenCount: installedPlugins.length - entries.length,
+        hiddenCount,
+        inspectionErrors,
         entries,
       };
 

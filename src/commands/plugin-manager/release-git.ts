@@ -1,3 +1,4 @@
+import { realpathSync } from 'fs';
 import { join } from 'path';
 
 import { monitoring } from '@src/core/monitoring';
@@ -200,6 +201,25 @@ export async function inspectPluginReleaseGit({
 
   const pluginDir = join(dmBotRoot, 'plugins', alias);
 
+  const repositoryRoot = await runGitAsync(pluginDir, [
+    'rev-parse',
+    '--show-toplevel',
+  ]);
+
+  if (!repositoryRoot.ok) {
+    span.end('error');
+    throw new Error(
+      `Cannot inspect plugin repository: ${repositoryRoot.error}`,
+    );
+  }
+
+  if (realpathSync(repositoryRoot.stdout) !== realpathSync(pluginDir)) {
+    span.end('error');
+    throw new Error(
+      'Plugin directory is not its own Git repository. Initialize a repository before preparing a release.',
+    );
+  }
+
   const localSpan = monitoring.startSpan({
     name: 'plugins.releases.git.local',
     attributes: { alias },
@@ -218,7 +238,7 @@ export async function inspectPluginReleaseGit({
         '-z',
       ]),
       runGitAsync(pluginDir, ['symbolic-ref', '--short', 'HEAD']),
-      runGitAsync(pluginDir, ['rev-parse', 'HEAD']),
+      runGitAsync(pluginDir, ['rev-parse', '--verify', 'HEAD']),
       runGitAsync(pluginDir, ['rev-list', '-n', '1', versionTag]),
     ]);
 
@@ -234,11 +254,29 @@ export async function inspectPluginReleaseGit({
   const localTagAtHead = tagCommit.ok && tagCommit.stdout === headStr;
 
   if (!status.ok) {
+    localSpan.end('error');
+    span.end('error');
     throw new Error(status.error);
   }
 
   if (!head.ok) {
-    throw new Error(head.error);
+    localSpan.end('error');
+    span.end('error');
+
+    const branchRef = branch
+      ? runGit(pluginDir, [
+          'show-ref',
+          '--verify',
+          '--quiet',
+          `refs/heads/${branch}`,
+        ])
+      : null;
+
+    throw new Error(
+      branchRef && !branchRef.ok
+        ? 'Plugin repository has no commits yet. Create its first commit before preparing a release.'
+        : head.error,
+    );
   }
 
   const statusEntries = statusStr

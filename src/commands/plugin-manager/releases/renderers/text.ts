@@ -82,12 +82,21 @@ export function renderPluginsReleasesText(
     `Relays: ${representation.relays.join(', ')}`,
   ].join('\n');
 
+  const inspectionErrors = representation.inspectionErrors.map(
+    (error) => `${error.alias}: inspection failed — ${error.message}`,
+  );
+
   if (representation.entries.length === 0) {
     return [
       header,
       '',
-      'No local plugins can be managed with the available author signers.',
-      `Add a bunker signer with ${context.prefix}bunker add, then try again.`,
+      ...inspectionErrors,
+      ...(inspectionErrors.length > 0
+        ? ['No plugin release inspections completed successfully.']
+        : [
+            'No local plugins can be managed with the available author signers.',
+            `Add a bunker signer with ${context.prefix}bunker add, then try again.`,
+          ]),
     ].join('\n');
   }
 
@@ -99,6 +108,7 @@ export function renderPluginsReleasesText(
         ]
       : []),
     '',
+    ...inspectionErrors,
     ...representation.entries.map(entryLine),
   ].join('\n');
 }

@@ -558,10 +558,15 @@ export function renderPluginsReleasesWeb(
               ),
             ]
           : []),
+        ...representation.inspectionErrors.map((error) =>
+          textBlock(`${error.alias}: inspection failed — ${error.message}`),
+        ),
         ...(representation.entries.length === 0
           ? [
               textBlock(
-                'No installed plugins matched the available author signers.',
+                representation.inspectionErrors.length > 0
+                  ? 'No plugin release inspections completed successfully.'
+                  : 'No installed plugins matched the available author signers.',
                 'muted',
               ),
             ]
