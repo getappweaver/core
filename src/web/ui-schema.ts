@@ -622,7 +622,9 @@ export const WebBasePropsSchema = z.object({
   /** `textField`: placeholder; display-only, not a command option hint. */
   inputPlaceholder: z.string().optional(),
   /** `textField`: mask credentials without embedding their values in the UI tree, or native date/time pickers. */
-  inputType: z.enum(['text', 'password', 'date', 'time']).optional(),
+  inputType: z
+    .enum(['text', 'password', 'date', 'time', 'datetime-local'])
+    .optional(),
   /** `select`: allowed option values. */
   choices: z.array(z.string()).optional(),
   /** `select`: display labels keyed by submitted option value. */
@@ -689,6 +691,9 @@ export const WebElementTagSchema = z.enum([
   'button',
   'checkbox',
   'divider',
+  /** Native collapsed disclosure; use a `summary` child for its heading. */
+  'details',
+  'summary',
   /** Invisible spacing row; useful between items in a shared tree context. */
   'spacer',
   /** Trigger + dropdown; children should be `menuItem` elements. */
@@ -746,6 +751,8 @@ export const WebGenericElementTagSchema = z.enum([
   'button',
   'checkbox',
   'divider',
+  'details',
+  'summary',
   'spacer',
   'overflowMenu',
   'menuItem',

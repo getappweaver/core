@@ -301,6 +301,30 @@ export function PaymentModal(props: PaymentModalProps): JSX.Element {
 
   onCleanup(() => window.clearInterval(clock));
 
+  createEffect(() => {
+    if (
+      activeSource() !== 'other' ||
+      !props.payment.otherAllowed ||
+      !props.payment.lightning
+    ) {
+      return;
+    }
+
+    const poll = () => {
+      const state = relevantStatus()?.state;
+
+      if (
+        !expired() &&
+        !['paying', 'settling', 'success', 'rejected'].includes(state ?? '')
+      ) {
+        sendAction('poll_settlement');
+      }
+    };
+
+    const timer = window.setInterval(poll, 8_000);
+    onCleanup(() => window.clearInterval(timer));
+  });
+
   const statusMessage = () =>
     localError() ??
     (statusMatchesActiveSource() ? (relevantStatus()?.message ?? null) : null);
@@ -632,11 +656,15 @@ export function PaymentModal(props: PaymentModalProps): JSX.Element {
                 <button
                   type="button"
                   class="web-button payment-primary"
-                  disabled={expired() || sourceBusy('other')}
+                  disabled={sourceBusy('other')}
                   onClick={() => sendAction('check_settlement')}
                 >
                   Check payment
                 </button>
+                <span class="payment-message">
+                  Payment confirmation is checked automatically. You can also
+                  check it manually.
+                </span>
               </div>
             </Show>
           </div>

@@ -1,3 +1,5 @@
+import { parseCapabilityCatalogFilter } from '@src/capabilities/relations';
+
 import { handleError, type BuiltinHandler } from '../dispatch';
 import { renderBuiltinHelpText } from '../help/renderers/text';
 
@@ -22,7 +24,9 @@ export const handlePluginsRoot: BuiltinHandler = (ctx) => {
   if (sub === 'install' || sub === 'list') {
     return handleError(
       async () => handlePluginsInstall(ctx),
-      'Failed to list plugins',
+      ctx.args[1] && !parseCapabilityCatalogFilter(ctx.args[1])
+        ? 'Failed to install or update plugin'
+        : 'Failed to list plugins',
     );
   }
 

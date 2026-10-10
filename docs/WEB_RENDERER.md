@@ -11,6 +11,24 @@ Reusable local date/time display: `timestamp` elements accept `timestampMs`
 the browser's locale/timezone, including the timezone abbreviation, with an ISO
 datetime/tooltip for the exact instant. Standard text size/tone/style props apply.
 
+`textField` supports `inputType: "datetime-local"` for a native date/time picker.
+Supply a timezone-qualified ISO datetime in `value` to display that instant in
+the browser's timezone. On form submission, nonempty date/time fields are
+converted from browser-local time to UTC ISO strings before merging into action
+arguments/options. Date-only and time-only fields keep their existing string
+semantics. The picker supports second precision.
+
+Generic `details` and `summary` tags render native HTML disclosures, collapsed
+initially. Put a `summary` element first in a `details` element's children,
+followed by the expandable content. Native keyboard interaction applies; scoped
+stylesheets can style the heading and body without introducing custom actions.
+
+The generic browser `nostr.signEvent` client action accepts
+`signingMode: "immediate"` for current-time signing with an
+`onSuccessCommand` handoff. Its default remains `"scheduled"`, preserving the
+date/runAt requirements of scheduling flows. Immediate signing forwards the
+signed event but does not inject a scheduled `runAt` argument or publish it.
+
 Backend/web
 - Local web server exists in `src/web/server.ts`, `src/web/routes.ts`, `src/web/command-catalog.ts`, `src/web/execute.ts`, `src/web/chat.ts`.
 - Web API supports:

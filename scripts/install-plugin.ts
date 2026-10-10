@@ -14,6 +14,8 @@ import type { NostrEvent } from 'nostr-tools';
 import { nip19, SimplePool } from 'nostr-tools';
 import { z } from 'zod';
 
+import { installPluginDependencies } from '@src/plugin-lifecycle/dependencies';
+
 const PLUGIN_KIND = 32107;
 const ROOT = join(import.meta.dir, '..');
 const PLUGINS_JSON = join(ROOT, 'plugins.json');
@@ -746,7 +748,8 @@ async function selectPluginVersion({
   return { kind: 'catalog', ref: compatible };
 }
 
-function runGenerator(): void {
+function runGenerator(pluginDir: string): void {
+  installPluginDependencies(pluginDir);
   console.log('\nRunning code generators...');
 
   const result = Bun.spawnSync(['bun', 'run', 'scripts/generate-tools.ts'], {
@@ -876,7 +879,7 @@ async function updatePlugin(
       process.exit(1);
     }
 
-    runGenerator();
+    runGenerator(pluginDir);
 
     console.log(
       `\n✓ Plugin "${entry.alias}" is up to date on ${PLUGIN_VERSION_HEAD}.\n`,
@@ -944,7 +947,7 @@ async function updatePlugin(
   writePluginsJson(pluginsData);
   console.log('✓ plugins.json updated.');
 
-  runGenerator();
+  runGenerator(pluginDir);
 
   console.log(`\n✓ Plugin "${entry.alias}" updated to ${label}.\n`);
 }
@@ -1150,7 +1153,7 @@ async function installPlugin(
   writePluginsJson(pluginsData);
   console.log('✓ plugins.json updated.');
 
-  runGenerator();
+  runGenerator(destDir);
 
   console.log(`\n✓ Plugin "${alias}" installed successfully.`);
   console.log(`  Run !${alias} help to see available commands.\n`);

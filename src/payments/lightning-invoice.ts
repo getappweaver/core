@@ -5,6 +5,7 @@ import { Millisatoshi } from './amount';
 
 const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const PAYMENT_HASH_TAG = 1;
+const DESCRIPTION_HASH_TAG = 23;
 const EXPIRY_TAG = 6;
 const SIGNATURE_WORDS = 104;
 const TIMESTAMP_WORDS = 7;
@@ -18,6 +19,7 @@ export type ParsedLightningInvoice = {
   network: LightningNetwork;
   amount: Millisatoshi | null;
   paymentHash: string;
+  descriptionHash: string | null;
   createdAt: number;
   expiresAt: number;
 };
@@ -186,6 +188,7 @@ export function parseLightningInvoice(invoice: string): ParsedLightningInvoice {
   const createdAtBigInt = wordsToBigInt(words.slice(0, TIMESTAMP_WORDS));
   const taggedWords = words.slice(TIMESTAMP_WORDS, -SIGNATURE_WORDS);
   let paymentHash: string | null = null;
+  let descriptionHash: string | null = null;
   let expirySeconds = DEFAULT_EXPIRY_SECONDS;
   let offset = 0;
 
@@ -215,6 +218,16 @@ export function parseLightningInvoice(invoice: string): ParsedLightningInvoice {
       }
 
       paymentHash = bytesToHex(bytes);
+    } else if (tag === DESCRIPTION_HASH_TAG) {
+      const bytes = convertWordsToBytes(data);
+
+      if (bytes.length !== 32 || descriptionHash !== null) {
+        throw new LightningInvoiceError(
+          'BOLT-11 invoice has an invalid description hash.',
+        );
+      }
+
+      descriptionHash = bytesToHex(bytes);
     } else if (tag === EXPIRY_TAG) {
       const parsedExpiry = wordsToBigInt(data);
 
@@ -241,6 +254,7 @@ export function parseLightningInvoice(invoice: string): ParsedLightningInvoice {
     network,
     amount,
     paymentHash,
+    descriptionHash,
     createdAt,
     expiresAt: createdAt + expirySeconds,
   };

@@ -14,6 +14,7 @@ const OnSuccessCommandSchema = z.object({
 
 export const SignEventPayloadSchema = z.object({
   kind: z.number().int().positive().default(1),
+  signingMode: z.enum(['scheduled', 'immediate']).default('scheduled'),
   content: z.string().default(''),
   tags: z.array(z.array(z.string())).default([]),
   date: z.string().optional(),
@@ -51,7 +52,7 @@ export type SignEventResult = {
     options: Record<string, unknown>;
   };
   signedEvent: string;
-  runAt: string;
+  runAt: string | null;
   date?: string;
   time?: string;
   tz?: string;
@@ -125,7 +126,9 @@ export async function handleNostrSignEventAction({
 
     let targetDate: Date;
 
-    if (payload.runAt) {
+    if (payload.signingMode === 'immediate') {
+      targetDate = new Date();
+    } else if (payload.runAt) {
       targetDate = new Date(payload.runAt);
     } else if (payload.date && payload.time) {
       targetDate = new Date(`${payload.date}T${payload.time}`);
@@ -137,7 +140,10 @@ export async function handleNostrSignEventAction({
       throw new Error('Invalid scheduled date or time.');
     }
 
-    if (targetDate.getTime() <= Date.now()) {
+    if (
+      payload.signingMode === 'scheduled' &&
+      targetDate.getTime() <= Date.now()
+    ) {
       throw new Error('Scheduled time must be in the future.');
     }
 
@@ -149,7 +155,11 @@ export async function handleNostrSignEventAction({
     };
 
     const signed = await signEvent(template, {
-      title: payload.signTitle ?? 'Sign Event: Schedule publishing',
+      title:
+        payload.signTitle ??
+        (payload.signingMode === 'immediate'
+          ? 'Sign Nostr event'
+          : 'Sign Event: Schedule publishing'),
     });
 
     if (!signed) {
@@ -168,7 +178,8 @@ export async function handleNostrSignEventAction({
     return {
       onSuccessCommand: payload.onSuccessCommand,
       signedEvent: JSON.stringify(signed),
-      runAt: targetDate.toISOString(),
+      runAt:
+        payload.signingMode === 'scheduled' ? targetDate.toISOString() : null,
       date: payload.date,
       time: payload.time,
       tz: payload.tz,

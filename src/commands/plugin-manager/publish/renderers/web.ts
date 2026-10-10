@@ -276,6 +276,22 @@ export function renderPluginsPublishWeb(
                   ? [textBlock(`Event ID: ${representation.eventId}`, 'muted')]
                   : []),
                 ...relayRows(representation),
+                {
+                  type: 'element',
+                  tag: 'button',
+                  props: {
+                    label: 'Manage catalog & offers',
+                    className: 'web-button',
+                    action: {
+                      type: 'command',
+                      command: 'plugins',
+                      subcommand: 'publish',
+                      arguments: { alias: representation.alias },
+                      options: {},
+                      recordInTimeline: false,
+                    },
+                  },
+                },
               ],
             },
           ],

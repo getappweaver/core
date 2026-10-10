@@ -6,6 +6,8 @@ import type {
   PluginsInstallRepresentation,
 } from '../handler';
 
+import { paymentLabel } from './payments';
+
 const pluginsInstallStylesheet = {
   id: 'plugins-install-web',
   cssText: `
@@ -44,6 +46,15 @@ const pluginsInstallStylesheet = {
 
     .web-stack.plugins-install-changelog-list {
       gap: 0.35rem;
+      max-height: min(24rem, 55vh);
+      overflow-y: auto;
+      overflow-wrap: anywhere;
+      min-height: 0;
+    }
+
+    .web-row.plugins-install-changelog-head {
+      align-items: center;
+      gap: 0.4rem;
     }
 
     .web-stack.plugins-install-card-main {
@@ -139,7 +150,7 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
   }
 
   const label = entry.coreCompatibilityVerified
-    ? `Install ${entry.compatibleRef.tag}`
+    ? `${isUpdate ? 'Update' : 'Install'} ${entry.compatibleRef.tag}`
     : isUpdate
       ? 'Update anyway'
       : 'Install anyway';
@@ -147,11 +158,26 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
   const pending = isUpdate ? 'Updating' : 'Installing';
   const success = isUpdate ? 'Successfully updated' : 'Successfully installed';
 
+  const paid =
+    entry.payment &&
+    !entry.payment.purchased &&
+    ['active', 'unavailable'].includes(entry.payment.status);
+
+  const freeNotice = entry.payment && !entry.payment.purchased && !paid;
+
+  const restore =
+    entry.payment?.purchased &&
+    ['active', 'unavailable'].includes(entry.payment.status);
+
   return {
     type: 'element',
     tag: 'button',
     props: {
-      label,
+      label: paid
+        ? entry.payment?.status === 'unavailable'
+          ? 'Check purchase'
+          : `Buy & ${isUpdate ? 'update' : 'install'}`
+        : label,
       className: 'web-button',
       action: {
         type: 'command',
@@ -159,12 +185,45 @@ function installButton(entry: PluginCatalogEntry): WebNode | null {
         subcommand: 'install',
         arguments: { target: entry.id },
         options: {},
+        ...(paid || freeNotice || restore
+          ? {
+              surface: 'modal' as const,
+              modalTitle:
+                paid || restore ? 'App purchase' : 'Free version notice',
+            }
+          : {}),
         recordInTimeline: false,
-        clientStatus: {
-          pending: `${pending} ${entry.title || entry.name} plugin...`,
-          restarting: 'Restarting AppWeaver...',
-          success: `${success} ${entry.title || entry.name} plugin.`,
-        },
+        ...(!paid && !freeNotice && !restore
+          ? {
+              clientStatus: {
+                pending: `${pending} ${entry.title || entry.name} plugin...`,
+                restarting: 'Restarting AppWeaver...',
+                success: `${success} ${entry.title || entry.name} plugin.`,
+              },
+            }
+          : {}),
+      },
+    },
+  };
+}
+
+function purchaseInfoButton(entry: PluginCatalogEntry): WebNode {
+  return {
+    type: 'element',
+    tag: 'button',
+    props: {
+      label: '[i]',
+      ariaLabel: 'Purchase terms and update consequences',
+      className: 'web-button',
+      action: {
+        type: 'command',
+        command: 'plugins',
+        subcommand: 'install',
+        arguments: { target: entry.id },
+        options: { operation: 'info' },
+        surface: 'modal',
+        modalTitle: 'App purchase terms',
+        recordInTimeline: false,
       },
     },
   };
@@ -223,8 +282,40 @@ function updateActions(entry: PluginCatalogEntry): WebNode | null {
   const action = installButton(entry);
   const coreAction = coreUpdateButton(entry);
   const blockedNote = blockedUpdateNote(entry);
+  const changelog = changelogButton(entry);
 
-  const children = [action, coreAction, blockedNote].filter(
+  const paid =
+    entry.payment &&
+    !entry.payment.purchased &&
+    ['active', 'unavailable'].includes(entry.payment.status);
+
+  const primaryButtons = [
+    action && paid ? purchaseInfoButton(entry) : null,
+    action,
+    changelog,
+  ].filter((node): node is WebNode => node !== null);
+
+  const installAction: WebNode | null =
+    primaryButtons.length > 0
+      ? {
+          type: 'element',
+          tag: 'stack',
+          props: { gap: 'xs' },
+          children: [
+            ...(action && paid
+              ? [textBlock(paymentLabel(entry), 'warning')]
+              : []),
+            {
+              type: 'element',
+              tag: 'row',
+              props: { gap: 'sm', className: 'plugins-install-card-actions' },
+              children: primaryButtons,
+            },
+          ],
+        }
+      : null;
+
+  const children = [installAction, coreAction, blockedNote].filter(
     (node): node is WebNode => node !== null,
   );
 
@@ -250,11 +341,7 @@ function changelogRevealId(entry: PluginCatalogEntry): string {
 }
 
 function changelogButton(entry: PluginCatalogEntry): WebNode | null {
-  if (entry.changelogRefs.length === 0) {
-    return null;
-  }
-
-  if (entry.installedAlias && entry.updateAvailable) {
+  if (entry.refs.length === 0) {
     return null;
   }
 
@@ -272,16 +359,31 @@ function changelogButton(entry: PluginCatalogEntry): WebNode | null {
   };
 }
 
-function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
-  if (entry.changelogRefs.length === 0) {
+type ChangelogPanelProps = {
+  entry: PluginCatalogEntry;
+  focusedUpdate: boolean;
+};
+
+function changelogPanel({
+  entry,
+  focusedUpdate,
+}: ChangelogPanelProps): WebNode | null {
+  const refs = focusedUpdate ? entry.changelogRefs : entry.refs;
+
+  if (
+    refs.length === 0 ||
+    (focusedUpdate && (!entry.installedAlias || !entry.updateAvailable))
+  ) {
     return null;
   }
 
-  const showInline = entry.installedAlias !== null && entry.updateAvailable;
-
-  const label = entry.installedAlias
+  const label = focusedUpdate
     ? `Changes from ${entry.installedVersion ?? 'current'} to ${entry.compatibleRef?.tag ?? 'latest'}`
-    : `Release notes for ${entry.compatibleRef?.tag ?? 'latest'}`;
+    : 'Published release history · newest first';
+
+  const revealId = focusedUpdate
+    ? `${changelogRevealId(entry)}-updates`
+    : changelogRevealId(entry);
 
   return {
     type: 'element',
@@ -289,18 +391,18 @@ function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
     props: {
       padding: 'sm',
       className: 'plugins-install-changelog-panel',
-      ...(showInline
+      revealId,
+      ...(focusedUpdate
         ? {}
         : {
-            revealId: changelogRevealId(entry),
             hiddenUntilRevealed: true,
           }),
     },
     children: [
       {
         type: 'element',
-        tag: 'stack',
-        props: { gap: 'sm', className: 'plugins-install-changelog-list' },
+        tag: 'row',
+        props: { className: 'plugins-install-changelog-head' },
         children: [
           {
             type: 'element',
@@ -308,9 +410,31 @@ function changelogPanel(entry: PluginCatalogEntry): WebNode | null {
             props: { weight: 'semibold', size: 'sm', tone: 'warning' },
             children: [textNode(label)],
           },
-          ...entry.changelogRefs.map((ref) =>
-            textBlock(`${ref.tag}\n${ref.changelog}`, 'default'),
-          ),
+        ],
+      },
+      {
+        type: 'element',
+        tag: 'stack',
+        props: { gap: 'sm', className: 'plugins-install-changelog-list' },
+        children: [
+          ...[...refs].reverse().map((ref) => {
+            return {
+              type: 'element' as const,
+              tag: 'stack' as const,
+              props: { gap: 'xs' as const },
+              children: [
+                {
+                  type: 'element' as const,
+                  tag: 'text' as const,
+                  props: { weight: 'semibold' as const },
+                  children: [
+                    textNode(`${ref.tag} · core ${ref.coreApiVersion}`),
+                  ],
+                },
+                textBlock(ref.changelog, 'default'),
+              ],
+            };
+          }),
         ],
       },
     ],
@@ -432,8 +556,8 @@ function capabilityLabels(entry: PluginCatalogEntry): WebNode[] {
 
 function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   const actions = updateActions(entry);
-  const changelog = changelogButton(entry);
-  const changelogDetails = changelogPanel(entry);
+  const changelogDetails = changelogPanel({ entry, focusedUpdate: false });
+  const updateDetails = changelogPanel({ entry, focusedUpdate: true });
   const icon = pluginIcon(entry);
   const source = sourceCodeLink(entry);
   const capabilities = capabilityLabels(entry);
@@ -459,6 +583,25 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
             children: [
               ...(icon ? [icon] : []),
               pluginTitle(entry),
+              ...(entry.payment &&
+              (entry.payment.purchased ||
+                !['active', 'unavailable'].includes(entry.payment.status))
+                ? [
+                    {
+                      type: 'element' as const,
+                      tag: 'badge' as const,
+                      props: {
+                        label: paymentLabel(entry),
+                        size: 'sm' as const,
+                        tone: entry.payment.purchased
+                          ? ('success' as const)
+                          : entry.payment.status === 'active'
+                            ? ('warning' as const)
+                            : ('muted' as const),
+                      },
+                    },
+                  ]
+                : []),
               pluginAuthor(entry),
             ],
           },
@@ -478,23 +621,18 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
             type: 'element',
             tag: 'row',
             props: { gap: 'sm', className: 'plugins-install-card-actions' },
-            children: [versionStatus(entry, coreVersion)],
+            children: [
+              versionStatus(entry, coreVersion),
+              ...(!installButton(entry) &&
+              entry.payment &&
+              !entry.payment.purchased &&
+              ['active', 'unavailable'].includes(entry.payment.status)
+                ? [textBlock(paymentLabel(entry), 'muted')]
+                : []),
+            ],
           },
-          ...(actions || changelog
-            ? [
-                {
-                  type: 'element' as const,
-                  tag: 'row' as const,
-                  props: {
-                    gap: 'sm' as const,
-                    className: 'plugins-install-card-actions',
-                  },
-                  children: [actions, changelog].filter(
-                    (node): node is WebNode => node !== null,
-                  ),
-                },
-              ]
-            : []),
+          ...(actions ? [actions] : []),
+          ...(updateDetails ? [updateDetails] : []),
           ...(changelogDetails ? [changelogDetails] : []),
         ],
       },

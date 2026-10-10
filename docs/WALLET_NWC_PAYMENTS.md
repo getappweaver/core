@@ -74,6 +74,23 @@ A payment attached to one command request and one active user interaction. Core
 must show Pay and Reject controls before executing it. Interactive payments use
 the request-scoped plugin context.
 
+Shared NIP-57 helpers in [`src/payments/zap.ts`](../src/payments/zap.ts) create
+description-hash invoices and validate provider-signed receipts against caller
+supplied buyer, recipient, reference, amount, and time-window requirements.
+The BOLT11 parser exposes `descriptionHash` alongside amount/payment hash.
+Consumers retain their own purchase/attempt state and use receipt-based
+`checkSettlement` callbacks; a wallet's successful payment result alone is not
+a portable purchase entitlement. See [Plugin Payments Plan](PLUGIN_PAYMENTS_PLAN.md)
+for the installer consumer.
+
+The QR/other-wallet source performs bounded, single-flight settlement polling
+every eight seconds while visible, without initiating wallet payment. Polls are
+serialized with explicit payment actions; pending/unavailable receipt checks
+remain retryable rather than ending the payment session. Manual settlement checks
+remain available for delayed receipts after invoice expiry. A matching successful
+payment status dismisses only that attempt's modal, exposing the consumer's
+subsequent result (including installation failures).
+
 ### Automation Payment
 
 An unattended NWC payment made through a connection explicitly classified for

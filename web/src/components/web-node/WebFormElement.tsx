@@ -54,6 +54,22 @@ type WebFormElementProps = {
   renderChild: (child: WebNode) => JSX.Element;
 };
 
+function localDateTimeValue(value: string): string {
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return '';
+  }
+
+  const pad = (part: number) => String(part).padStart(2, '0');
+
+  return `${String(date.getFullYear()).padStart(4, '0')}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 export function WebFormElement(props: WebFormElementProps): JSX.Element {
   const expandedById = useContext(TreeItemExpandedStateContext);
   const requestTreeItemExpansion = useContext(TreeExpandRequestSetterContext);
@@ -205,6 +221,25 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
 
     const formEl = event.currentTarget;
     const fd = new FormData(formEl);
+
+    // Native local date/time values have no zone. Submit an unambiguous instant.
+    for (const input of formEl.querySelectorAll<HTMLInputElement>(
+      'input[type="datetime-local"][name]',
+    )) {
+      if (input.disabled || !input.value) {
+        continue;
+      }
+
+      const date = new Date(input.value);
+
+      if (!Number.isFinite(date.getTime())) {
+        props.onError?.('Select a valid date and time.');
+
+        return;
+      }
+
+      fd.set(input.name, date.toISOString());
+    }
 
     if (action.type === 'prompt_answer') {
       if (action.valuesFromFields) {
@@ -454,7 +489,16 @@ export function WebTextFieldNode(props: WebTextFieldNodeProps): JSX.Element {
             class="web-textField__input"
             type={props.element.props?.inputType ?? 'text'}
             name={fieldName()}
-            value={props.element.props?.value ?? ''}
+            value={
+              props.element.props?.inputType === 'datetime-local'
+                ? localDateTimeValue(props.element.props?.value ?? '')
+                : (props.element.props?.value ?? '')
+            }
+            step={
+              props.element.props?.inputType === 'datetime-local'
+                ? 1
+                : undefined
+            }
             placeholder={props.element.props?.inputPlaceholder}
             list={choices().length > 0 ? listId : undefined}
             disabled={

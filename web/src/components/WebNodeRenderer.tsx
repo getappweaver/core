@@ -309,6 +309,17 @@ function renderElement({
         })()}
       </Match>
 
+      <Match when={element.tag === 'details'}>
+        <details class={elementClass(element)} style={elementStyle(element)}>
+          <For each={element.children ?? []}>{renderChild}</For>
+        </details>
+      </Match>
+      <Match when={element.tag === 'summary'}>
+        <summary class={elementClass(element)} style={elementStyle(element)}>
+          <For each={element.children ?? []}>{renderChild}</For>
+        </summary>
+      </Match>
+
       <Match when={element.tag === 'treeFilterStatus'}>
         <span
           class={elementClass(element)}

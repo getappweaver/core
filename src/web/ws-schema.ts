@@ -167,6 +167,7 @@ export const PaymentActionClientMessageSchema = z.object({
     'pay_nwc',
     'webln_result',
     'check_settlement',
+    'poll_settlement',
   ]),
   sourceId: z.string().min(1).optional(),
   preimage: z

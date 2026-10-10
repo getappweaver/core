@@ -65,4 +65,5 @@ export type WebPaymentAction =
   | 'refresh_invoice'
   | 'pay_nwc'
   | 'webln_result'
-  | 'check_settlement';
+  | 'check_settlement'
+  | 'poll_settlement';

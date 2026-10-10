@@ -135,6 +135,7 @@ export class WebSocketPaymentSession {
   #sender: WebSocketMessageSender | null = null;
   #pending: PendingPayment | null = null;
   #actionRunning = false;
+  #polling: Promise<void> | null = null;
 
   constructor(params: { coreDb: CoreDb; pool: SimplePool }) {
     this.#coreDb = params.coreDb;
@@ -250,6 +251,32 @@ export class WebSocketPaymentSession {
         reason: message.action === 'close' ? 'modal-closed' : 'user-rejected',
       });
 
+      return;
+    }
+
+    if (message.action === 'poll_settlement') {
+      if (this.#actionRunning || this.#polling) {
+        return;
+      }
+
+      const poll = this.#pollSettlement(pending);
+      this.#polling = poll;
+      try {
+        await poll;
+      } finally {
+        if (this.#polling === poll) {
+          this.#polling = null;
+        }
+      }
+
+      return;
+    }
+
+    if (this.#polling) {
+      await this.#polling;
+    }
+
+    if (this.#pending !== pending) {
       return;
     }
 
@@ -514,7 +541,8 @@ export class WebSocketPaymentSession {
 
     await this.#sendStatus({
       state: 'settling',
-      sourceId: source === 'webln' ? 'webln' : sourceId,
+      sourceId:
+        source === 'webln' ? 'webln' : source === 'other' ? 'other' : sourceId,
       message: 'Waiting for recipient settlement confirmation...',
       fee,
     });
@@ -528,13 +556,26 @@ export class WebSocketPaymentSession {
           CALLBACK_TIMEOUT_MS,
         );
 
+        if (this.#pending !== pending) {
+          return;
+        }
+
         if (settlement.status === 'settled') {
           await this.#sendStatus({
             state: 'success',
-            sourceId: source === 'webln' ? 'webln' : sourceId,
+            sourceId:
+              source === 'webln'
+                ? 'webln'
+                : source === 'other'
+                  ? 'other'
+                  : sourceId,
             message: 'Payment confirmed.',
             fee,
           });
+
+          if (this.#pending !== pending) {
+            return;
+          }
 
           this.#finish({
             status: 'success',
@@ -560,6 +601,10 @@ export class WebSocketPaymentSession {
 
       throw new Error('Settlement confirmation timed out.');
     } catch (error) {
+      if (this.#pending !== pending) {
+        return;
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -567,7 +612,12 @@ export class WebSocketPaymentSession {
 
       await this.#sendStatus({
         state: 'failed',
-        sourceId: source === 'webln' ? 'webln' : sourceId,
+        sourceId:
+          source === 'webln'
+            ? 'webln'
+            : source === 'other'
+              ? 'other'
+              : sourceId,
         code: message.includes('timed out')
           ? 'PAYMENT_TIMEOUT'
           : 'SETTLEMENT_FAILED',
@@ -584,6 +634,64 @@ export class WebSocketPaymentSession {
               : 'SETTLEMENT_FAILED',
             message,
           },
+        });
+      }
+    }
+  }
+
+  async #pollSettlement(pending: PendingPayment): Promise<void> {
+    if (!pending.lightning) {
+      return;
+    }
+
+    try {
+      const settlement = await withTimeout(
+        pending.lightning.checkSettlement(),
+        CALLBACK_TIMEOUT_MS,
+      );
+
+      if (this.#pending !== pending) {
+        return;
+      }
+
+      if (settlement.status === 'settled') {
+        await this.#sendStatus({
+          state: 'success',
+          sourceId: 'other',
+          message: 'Payment confirmed.',
+        });
+
+        if (this.#pending !== pending) {
+          return;
+        }
+
+        this.#finish({
+          status: 'success',
+          receipt: {
+            type: 'lightning',
+            attemptId: pending.presentation.attemptId,
+            amount: pending.presentation.request.amount,
+            paymentHash: pending.lightning.parsed.paymentHash,
+            source: 'other',
+            sourceId: null,
+          },
+        });
+      } else {
+        await this.#sendStatus({
+          state: 'ready',
+          sourceId: 'other',
+          message:
+            settlement.status === 'pending'
+              ? 'Waiting for payment; checking automatically...'
+              : settlement.message,
+        });
+      }
+    } catch {
+      if (this.#pending === pending) {
+        await this.#sendStatus({
+          state: 'ready',
+          sourceId: 'other',
+          message: 'Receipt check unavailable; automatic checks will retry.',
         });
       }
     }

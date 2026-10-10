@@ -1,3 +1,7 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import eslint from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
@@ -5,6 +9,19 @@ import prettier from 'eslint-plugin-prettier';
 import tseslint from 'typescript-eslint';
 
 const tsconfigRootDir = import.meta.dirname;
+const pluginsDir = join(tsconfigRootDir, 'plugins');
+const pluginConfigs = [];
+
+// Installed plugins own their local lint configuration; ESLint does not cascade it.
+if (existsSync(pluginsDir)) {
+  for (const entry of readdirSync(pluginsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const configPath = join(pluginsDir, entry.name, 'eslint.config.js');
+    if (!existsSync(configPath)) continue;
+    const { default: config } = await import(pathToFileURL(configPath).href);
+    pluginConfigs.push(...(Array.isArray(config) ? config : [config]));
+  }
+}
 
 export default [
   eslint.configs.recommended,
@@ -141,4 +158,5 @@ export default [
       ],
     },
   },
+  ...pluginConfigs,
 ];

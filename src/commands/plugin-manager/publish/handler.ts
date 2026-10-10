@@ -43,6 +43,7 @@ import {
 } from '../install/handler';
 import { inspectPluginReleaseGit, pushPluginRelease } from '../release-git';
 
+import { managePaymentOffers, publicationOperation } from './offers';
 import { renderPluginsPublishText } from './renderers/text';
 import {
   renderPluginsPublishPreviewWeb,
@@ -741,11 +742,13 @@ function buildEventTemplate({
   repo,
   refs,
   iconUrl,
+  offerTag,
 }: {
   pkg: PluginPackage;
   repo: string;
   refs: RefEntry[];
   iconUrl: string | null;
+  offerTag: string[] | null;
 }): EventTemplate {
   return {
     kind: PLUGIN_KIND,
@@ -761,6 +764,7 @@ function buildEventTemplate({
       ['version', `v${pkg.version}`],
       ['coreApiVersion', pkg.coreApiVersion],
       ['t', 'appweaver-plugin'],
+      ...(offerTag ? [offerTag] : []),
       ...capabilityRelationTags(pkg.capabilities),
       ...refs.map((ref) => ['ref', ref.tag, ref.coreApiVersion, ref.changelog]),
     ],
@@ -821,6 +825,34 @@ export async function handlePluginsPublish(
 
   const connection = findAuthorConnection({ ctx, published, signerName });
 
+  const operation = publicationOperation(ctx);
+
+  if (operation) {
+    if (ctx.source !== 'web' || !published) {
+      return 'Offer management requires an existing published catalog and the web UI.';
+    }
+
+    if (
+      !['offer-review', 'offer-publish', 'offer-select'].includes(operation)
+    ) {
+      return 'Unknown publication operation.';
+    }
+
+    const relays = await fetchPluginPublishRelays({
+      ctx,
+      authorPubkey: published.pubkey,
+    });
+
+    return managePaymentOffers({
+      ctx,
+      alias,
+      published,
+      connection,
+      relays,
+      releasePreview: null,
+    });
+  }
+
   const versionTag = `v${pkg.version}`;
 
   const repo = published
@@ -858,6 +890,22 @@ export async function handlePluginsPublish(
       published,
     })
   ) {
+    if (ctx.source === 'web' && !publishConfirmed(ctx)) {
+      const relays = await fetchPluginPublishRelays({
+        ctx,
+        authorPubkey: published.pubkey,
+      });
+
+      return managePaymentOffers({
+        ctx,
+        alias,
+        published,
+        connection,
+        relays,
+        releasePreview: null,
+      });
+    }
+
     const representation = rememberPublishResult({
       alias,
       pluginName: pkg.name,
@@ -898,7 +946,7 @@ export async function handlePluginsPublish(
       authorPubkey: connection.data.userPubkey,
     });
 
-    return renderPluginsPublishPreviewWeb({
+    const preview = renderPluginsPublishPreviewWeb({
       alias,
       pluginName: pkg.name,
       title: pkg.title,
@@ -915,6 +963,17 @@ export async function handlePluginsPublish(
       relays,
       firstPublish: published === null,
     });
+
+    return published
+      ? managePaymentOffers({
+          ctx,
+          alias,
+          published,
+          connection,
+          relays,
+          releasePreview: preview,
+        })
+      : preview;
   }
 
   if (published) {
@@ -942,7 +1001,15 @@ export async function handlePluginsPublish(
       })
     : published?.iconUrl || null;
 
-  const template = buildEventTemplate({ pkg, repo, refs, iconUrl });
+  const template = buildEventTemplate({
+    pkg,
+    repo,
+    refs,
+    iconUrl,
+    offerTag:
+      published?.catalogEvent?.tags.find((tag) => tag[0] === 'offer') ?? null,
+  });
+
   const signed = await bunkerSignEvent(ctx.pool, connection.data, template);
 
   const relays = await fetchPluginPublishRelays({

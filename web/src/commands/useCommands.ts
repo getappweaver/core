@@ -1418,7 +1418,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               arguments: {
                 ...onSuccess.arguments,
                 signedEvent: result.signedEvent,
-                runAt: result.runAt,
+                ...(result.runAt ? { runAt: result.runAt } : {}),
                 ...(result.date ? { date: result.date } : {}),
                 ...(result.time ? { time: result.time } : {}),
                 ...(result.tz ? { tz: result.tz } : {}),

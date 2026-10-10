@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 import type { NostrEvent } from 'nostr-tools';
 
@@ -36,9 +36,17 @@ import {
   repoAddressAuthorNip05,
   repoAddressAuthorNpub,
 } from '@src/nostr/repo-address';
+import { installPluginDependencies } from '@src/plugin-lifecycle/dependencies';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import type { RouteCommandContext } from '../../dispatch';
 
+import {
+  attachPluginPayments,
+  gatePluginPayment,
+  purchaseOptions,
+  type PluginPaymentState,
+} from './payments';
 import { renderPluginsInstallText } from './renderers/text';
 import { renderPluginsInstallWeb } from './renderers/web';
 
@@ -63,6 +71,8 @@ type RefEntry = {
 };
 
 export type PluginCatalogEntry = {
+  payment?: PluginPaymentState;
+  catalogEvent?: NostrEvent;
   id: string;
   createdAt: number;
   pubkey: string;
@@ -173,6 +183,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
   const iconTag = event.tags.find((tag) => tag[0] === 'icon');
 
   return {
+    catalogEvent: event,
     id: event.id,
     createdAt: event.created_at,
     pubkey: event.pubkey,
@@ -801,6 +812,64 @@ function runGenerator(dmBotRoot: string): void {
   }
 }
 
+type ValidateResumableCheckoutProps = {
+  pluginDir: string;
+  entry: PluginCatalogEntry;
+  acceptedRepos: string[];
+};
+
+function validateResumableCheckout({
+  pluginDir,
+  entry,
+  acceptedRepos,
+}: ValidateResumableCheckoutProps): void {
+  const git = (args: string[]) => {
+    const result = Bun.spawnSync(['git', ...args], {
+      cwd: pluginDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Existing plugin directory is not a resumable checkout: ${pluginDir}`,
+      );
+    }
+
+    return result.stdout.toString().trim();
+  };
+
+  const packagePath = join(pluginDir, 'package.json');
+
+  if (
+    !existsSync(packagePath) ||
+    resolve(git(['rev-parse', '--show-toplevel'])) !== resolve(pluginDir)
+  ) {
+    throw new Error(
+      `Existing directory is not this plugin's repository root: ${pluginDir}`,
+    );
+  }
+
+  const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as {
+    name?: unknown;
+  };
+
+  const origin = git(['remote', 'get-url', 'origin']);
+
+  if (
+    pkg.name !== entry.name ||
+    !acceptedRepos.includes(origin) ||
+    !entry.compatibleRef ||
+    git(['rev-parse', 'HEAD']) !==
+      git(['rev-parse', `refs/tags/${entry.compatibleRef.tag}^{commit}`]) ||
+    git(['status', '--porcelain']).length > 0
+  ) {
+    throw new Error(
+      `Existing checkout has different metadata, release, or local changes. Keep it backed up and resolve it before installing: ${pluginDir}`,
+    );
+  }
+}
+
 type InstallCatalogEntryProps = {
   ctx: RouteCommandContext;
   target: string;
@@ -811,6 +880,7 @@ type InstallCatalogEntryProps = {
 type InstallCatalogEntryResult = {
   success: boolean;
   message: string;
+  output?: WebNodeRoot;
 };
 
 type UpdateInstalledCatalogEntryProps = {
@@ -902,6 +972,8 @@ function updateInstalledCatalogEntry({
 
   const current = pluginsData.plugins[index];
 
+  installPluginDependencies(pluginDir);
+
   pluginsData.plugins[index] = {
     alias: current.alias,
     ...(current.name ? { name: current.name } : {}),
@@ -956,8 +1028,12 @@ async function installCatalogEntry({
     };
   }
 
-  if (entry.installedAlias) {
-    return updateInstalledCatalogEntry({ ctx, entry, resolvedTarget });
+  if (purchaseOptions(ctx).operation === 'info') {
+    const info = await gatePluginPayment({ ctx, entry });
+
+    if (info && typeof info !== 'string') {
+      return { success: false, message: 'Purchase terms.', output: info };
+    }
   }
 
   if (!entry.compatibleRef) {
@@ -969,6 +1045,48 @@ async function installCatalogEntry({
       success: false,
       message: `No compatible release for bot core ${coreVersion}. Latest catalog ref: ${latest}.`,
     };
+  }
+
+  if (entry.installedAlias && !entry.updateAvailable) {
+    return updateInstalledCatalogEntry({ ctx, entry, resolvedTarget });
+  }
+
+  // Validate a leftover checkout before asking the user to buy or prove ownership.
+  if (!entry.installedAlias) {
+    const alias = suggestedAlias(entry.name);
+    const existing = readPluginsJson(ctx.dmBotRoot);
+
+    if (existing.plugins.some((plugin) => plugin.alias === alias)) {
+      return {
+        success: false,
+        message: `Alias "${alias}" is already in use. Choose a different alias with the CLI installer.`,
+      };
+    }
+
+    const pluginDir = join(ctx.dmBotRoot, 'plugins', alias);
+
+    if (existsSync(pluginDir)) {
+      validateResumableCheckout({
+        pluginDir,
+        entry,
+        acceptedRepos: [
+          entry.repo,
+          ...(resolvedTarget ? [resolvedTarget.repoAddress] : []),
+        ],
+      });
+    }
+  }
+
+  const gate = await gatePluginPayment({ ctx, entry });
+
+  if (gate !== null) {
+    return typeof gate === 'string'
+      ? { success: false, message: gate }
+      : { success: false, message: 'Purchase review required.', output: gate };
+  }
+
+  if (entry.installedAlias) {
+    return updateInstalledCatalogEntry({ ctx, entry, resolvedTarget });
   }
 
   const alias = suggestedAlias(entry.name);
@@ -984,31 +1102,37 @@ async function installCatalogEntry({
   const destDir = join(ctx.dmBotRoot, 'plugins', alias);
 
   if (existsSync(destDir)) {
-    return {
-      success: false,
-      message: `Plugin directory already exists: ${destDir}`,
-    };
-  }
-
-  const cloneResult = Bun.spawnSync(
-    [
-      'git',
-      'clone',
-      '--branch',
-      entry.compatibleRef.tag,
-      '--depth',
-      '1',
-      entry.repo,
-      destDir,
-    ],
-    { stdout: 'pipe', stderr: 'pipe' },
-  );
-
-  if (cloneResult.exitCode !== 0) {
-    throw new Error(
-      `git clone failed:\n${cloneResult.stdout.toString()}${cloneResult.stderr.toString()}`,
+    validateResumableCheckout({
+      pluginDir: destDir,
+      entry,
+      acceptedRepos: [
+        entry.repo,
+        ...(resolvedTarget ? [resolvedTarget.repoAddress] : []),
+      ],
+    });
+  } else {
+    const cloneResult = Bun.spawnSync(
+      [
+        'git',
+        'clone',
+        '--branch',
+        entry.compatibleRef.tag,
+        '--depth',
+        '1',
+        entry.repo,
+        destDir,
+      ],
+      { stdout: 'pipe', stderr: 'pipe' },
     );
+
+    if (cloneResult.exitCode !== 0) {
+      throw new Error(
+        `git clone failed:\n${cloneResult.stdout.toString()}${cloneResult.stderr.toString()}`,
+      );
+    }
   }
+
+  installPluginDependencies(destDir);
 
   pluginsData.plugins.push({
     alias,
@@ -1017,7 +1141,26 @@ async function installCatalogEntry({
   });
 
   writePluginsJson(ctx.dmBotRoot, pluginsData);
-  runGenerator(ctx.dmBotRoot);
+  try {
+    runGenerator(ctx.dmBotRoot);
+  } catch (error) {
+    const latest = readPluginsJson(ctx.dmBotRoot);
+
+    latest.plugins = latest.plugins.filter(
+      (plugin) =>
+        !(
+          plugin.alias === alias &&
+          plugin.name === entry.name &&
+          plugin.repo === (resolvedTarget?.repoAddress ?? entry.repo)
+        ),
+    );
+
+    writePluginsJson(ctx.dmBotRoot, latest);
+    throw new Error(
+      `Installation finalization failed. The checkout is kept for retry and any paid purchase remains valid.\n${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   writeRestartRequestedFile();
 
   return {
@@ -1340,6 +1483,10 @@ export async function handlePluginsInstall(
       installedPlugins,
     });
 
+    if (result.output) {
+      return result.output;
+    }
+
     if (!result.success || ctx.source !== 'web') {
       return result.message;
     }
@@ -1356,7 +1503,7 @@ export async function handlePluginsInstall(
       coreVersion,
       coreUpdate,
       relays: PLUGIN_QUERY_RELAYS,
-      entries,
+      entries: await attachPluginPayments(ctx, entries),
       filter: null,
     });
   }
@@ -1377,7 +1524,7 @@ export async function handlePluginsInstall(
     coreVersion,
     coreUpdate,
     relays: PLUGIN_QUERY_RELAYS,
-    entries,
+    entries: await attachPluginPayments(ctx, entries),
     filter: capabilityFilter ? target : null,
   };
 

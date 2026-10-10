@@ -1,5 +1,7 @@
 import type { PluginsInstallRepresentation } from '../handler';
 
+import { paymentLabel } from './payments';
+
 function changelogLabel(installedAlias: string | null): string {
   return installedAlias ? 'changes' : 'release notes';
 }
@@ -42,6 +44,7 @@ export function renderPluginsInstallText(
 
     lines.push(`- ${entry.title || entry.name} (${status})`);
     lines.push(`  author: ${entry.author.label}`);
+    lines.push(`  price: ${paymentLabel(entry)}`);
 
     if (entry.title) {
       lines.push(`  d: ${entry.name}`);

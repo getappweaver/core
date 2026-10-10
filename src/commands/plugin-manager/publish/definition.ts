@@ -6,7 +6,7 @@ export function getPluginsPublishSubcommandDefinition(
   return {
     name: 'publish',
     summary:
-      'Publish the local plugin package version to the Nostr plugin catalog.',
+      'Publish plugin releases and manage author payment offers in the web UI.',
     aliases: [],
     arguments: [
       {
@@ -19,6 +19,22 @@ export function getPluginsPublishSubcommandDefinition(
       },
     ],
     options: [
+      ...[
+        'operation',
+        'price',
+        'lightning_address',
+        'valid_from',
+        'valid_until',
+        'draft',
+        'offer_id',
+      ].map((name) => ({
+        name,
+        summary: `Web publication form field: ${name}.`,
+        flag: `--${name.replaceAll('_', '-')}`,
+        shortFlag: null,
+        kind: 'string' as const,
+        required: false,
+      })),
       {
         name: 'signer',
         summary: 'Saved bunker connection used for a first publication.',

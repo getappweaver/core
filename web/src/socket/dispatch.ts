@@ -175,6 +175,12 @@ export function handleServerMessage(params: {
     case 'payment_status':
       adapters.setPaymentStatus(message.status);
 
+      if (message.status.state === 'success') {
+        adapters.setPaymentRequest((current) =>
+          current?.attemptId === message.status.attemptId ? null : current,
+        );
+      }
+
       return;
     case 'chat_stream_chunk': {
       const chunk = message.chunk;

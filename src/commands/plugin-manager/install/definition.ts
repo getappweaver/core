@@ -17,8 +17,24 @@ export function getPluginsInstallSubcommandDefinition(
         variadic: false,
         choices: null,
       },
+      {
+        name: 'signedEvent',
+        summary:
+          'Signed purchase request or restoration challenge from the web signer.',
+        kind: 'string',
+        required: false,
+        variadic: false,
+        choices: null,
+      },
     ],
-    options: [],
+    options: ['operation', 'identity', 'attempt', 'challenge'].map((name) => ({
+      name,
+      summary: `Purchase flow field: ${name}.`,
+      flag: `--${name}`,
+      shortFlag: null,
+      kind: 'string' as const,
+      required: false,
+    })),
     examples: [
       `${prefix}plugins install`,
       `${prefix}plugins install appweaver-todo-plugin`,
