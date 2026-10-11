@@ -155,6 +155,7 @@ export const handleSessionRoot: BuiltinHandler = (ctx) => {
         render(
           handleSessionList({
             db: ctx.seenDb,
+            currentSessionId: ctx.source === 'web' ? ctx.sessionId : null,
             limit,
             workspace: getWorkspaceTarget(ctx.seenDb),
             selection: ctx.source === 'web' ? 'web' : 'dm',

@@ -730,6 +730,7 @@ async function main() {
         nostrResolution,
         config,
         source,
+        sessionId: null,
         sendReply: (message: string) => sendReplyForSource(source, message),
         sendDm: pluginContext.sendDm,
         promptFn,

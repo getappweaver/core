@@ -1504,6 +1504,7 @@ export function createWebFetchHandler(
         .then((payload) =>
           executeBuiltinCommand({
             ctx,
+            sessionId: null,
             command,
             subcommand,
             payload,

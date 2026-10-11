@@ -23,6 +23,7 @@ type ExecuteCommandRequest = z.infer<typeof ExecuteCommandRequestSchema>;
 
 type ExecuteBuiltinCommandProps = {
   ctx: WebRouteContext;
+  sessionId: string | null;
   command: CommandDefinition;
   subcommand: SubcommandDefinition;
   payload: unknown;
@@ -139,6 +140,7 @@ function buildInvocationInput(props: {
 
 export async function executeBuiltinCommand({
   ctx,
+  sessionId,
   command,
   subcommand,
   payload,
@@ -182,6 +184,7 @@ export async function executeBuiltinCommand({
     nostrResolution: ctx.nostrResolution,
     config: ctx.config,
     source: 'web',
+    sessionId,
     sendReply,
     promptFn,
     interactivePaymentServiceFactory,
@@ -195,13 +198,18 @@ export async function executeBuiltinCommand({
   };
 }
 
-export async function executeBuiltinJsonCommand(params: {
+type ExecuteBuiltinJsonCommandProps = {
   ctx: WebRouteContext;
+  sessionId: string | null;
   command: CommandDefinition;
   subcommand: SubcommandDefinition;
   payload: unknown;
   interactivePaymentServiceFactory?: InteractivePaymentServiceFactory;
-}): Promise<WebHandlerResult> {
+};
+
+export async function executeBuiltinJsonCommand(
+  params: ExecuteBuiltinJsonCommandProps,
+): Promise<WebHandlerResult> {
   const { ctx, command, subcommand, payload } = params;
   const input = `${ctx.prefix}${command.name} ${subcommand.name}`;
 
@@ -226,6 +234,7 @@ export async function executeBuiltinJsonCommand(params: {
     nostrResolution: ctx.nostrResolution,
     config: ctx.config,
     source: 'web',
+    sessionId: params.sessionId,
     jsonPayload: payload,
     interactivePaymentServiceFactory: params.interactivePaymentServiceFactory,
   });

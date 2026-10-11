@@ -1035,6 +1035,7 @@ async function handleRunCommand(params: {
 
   const result = await executeBuiltinCommand({
     ctx,
+    sessionId: message.timelineId,
     command,
     subcommand,
     payload: message.payload,
@@ -1172,6 +1173,7 @@ async function handleJsonCommand(params: {
 
   const output = await executeBuiltinJsonCommand({
     ctx,
+    sessionId: message.timelineId,
     command,
     subcommand,
     payload: message.payload,

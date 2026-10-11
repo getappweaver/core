@@ -48,6 +48,8 @@ export type RouteCommandProps = {
   nostrResolution: NostrResolutionService | null;
   config: BotConfig;
   source: MessageSource;
+  /** Request-local browser session, or null for commands without a browser context. */
+  sessionId: string | null;
   sendReply?: SendReplyFn;
   sendDm?: SendReplyFn;
   promptFn?: PromptFn;

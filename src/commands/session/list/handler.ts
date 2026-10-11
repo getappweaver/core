@@ -8,6 +8,7 @@ type HandleSessionListProps = {
   limit?: number;
   workspace: WorkspaceTarget;
   selection: 'web' | 'dm';
+  currentSessionId: string | null;
 };
 
 const DEFAULT_SESSION_LIST_LIMIT = 20;
@@ -44,12 +45,14 @@ export function handleSessionList(
     };
   }
 
-  const cur = getState(
-    props.db,
-    props.selection === 'web'
-      ? webSessionStateKey(props.workspace)
-      : STATE_CURRENT_SESSION,
-  );
+  const cur =
+    props.currentSessionId ??
+    getState(
+      props.db,
+      props.selection === 'web'
+        ? webSessionStateKey(props.workspace)
+        : STATE_CURRENT_SESSION,
+    );
 
   return {
     kind: 'session.list',
