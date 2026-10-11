@@ -862,6 +862,40 @@ pre {
   flex: 0 0 auto;
 }
 
+.topbar-widgets-scroll {
+  display: contents;
+}
+
+@media (max-width: 899px) {
+  .topbar.compact .topbar-actions {
+    overflow: visible;
+  }
+
+  .topbar-widgets-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 0.45rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.2rem 0.35rem 0.45rem 0.2rem;
+    margin-block: -0.2rem -0.45rem;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pinch-zoom;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topbar-widgets-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar-widgets-scroll .topbar-actions-left {
+    flex: 0 0 auto;
+  }
+}
+
 .topbar-menu-btn {
   width: 1.5rem;
   height: 1.5rem;

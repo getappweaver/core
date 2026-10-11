@@ -64,6 +64,14 @@ a restart through this command notification path.
   - or a function `(prefix, alias) => CommandDefinition`
 - `src/commands/help/handlers.ts` was updated to resolve plugin command definitions correctly.
 Frontend/web
+
+On viewports narrower than 900px, header app icons occupy a native horizontally
+scrollable single-row strip. Swipe left/right to reach overflow icons; tapping
+still opens the app. The logo, layout control, and account menu remain outside
+the strip. Icon images disable native image dragging, and the strip contains
+horizontal overscroll while permitting pinch zoom. Desktop header placement is
+preserved via a `display: contents` wrapper.
+
 - Solid + Vite app exists under `web/`
 - Main files:
   - `web/src/App.tsx`

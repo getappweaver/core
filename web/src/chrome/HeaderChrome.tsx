@@ -85,6 +85,7 @@ function IconGlyph(props: {
         alt=""
         aria-hidden="true"
         class="topbar-menu-icon topbar-menu-icon--image"
+        draggable={false}
       />
     );
   }
@@ -249,16 +250,50 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
         </a>
       </h1>
       <div class="topbar-actions">
-        <div class="topbar-actions-left">
-          <For each={props.rightWidgets()}>
+        <div class="topbar-widgets-scroll" role="group" aria-label="Apps">
+          <div class="topbar-actions-left">
+            <For each={props.rightWidgets()}>
+              {(widget) => (
+                <WebButton
+                  type="button"
+                  class="connect-btn topbar-menu-btn topbar-icon-btn topbar-widget-right"
+                  data-story-target={`header-widget:${widgetKey(widget)}`}
+                  ref={(el) => props.onWidgetElement?.(widget, el)}
+                  classList={{
+                    'topbar-widget-active': props.isWidgetActive(widget),
+                  }}
+                  disabled={!props.wsConnected()}
+                  onClick={() => openWidget(widget)}
+                  title={
+                    props.wsConnected()
+                      ? `${widget.label} (/${widget.command} ${widget.subcommand})`
+                      : 'Connect Nostr first — waiting for WebSocket'
+                  }
+                  aria-label={widget.label}
+                >
+                  <IconGlyph
+                    icon={widget.icon}
+                    source={widget.source}
+                    pluginAlias={widget.pluginAlias}
+                    fallback="widget"
+                  />
+                </WebButton>
+              )}
+            </For>
+          </div>
+          <For each={sortedWidgets()}>
             {(widget) => (
               <WebButton
                 type="button"
-                class="connect-btn topbar-menu-btn topbar-icon-btn topbar-widget-right"
+                class="connect-btn topbar-menu-btn topbar-icon-btn"
                 data-story-target={`header-widget:${widgetKey(widget)}`}
                 ref={(el) => props.onWidgetElement?.(widget, el)}
                 classList={{
                   'topbar-widget-active': props.isWidgetActive(widget),
+                  'topbar-widget-update-available':
+                    widget.command === 'bot' &&
+                    widget.subcommand === 'status' &&
+                    props.hasCoreUpdate(),
                 }}
                 disabled={!props.wsConnected()}
                 onClick={() => openWidget(widget)}
@@ -279,38 +314,6 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
             )}
           </For>
         </div>
-        <For each={sortedWidgets()}>
-          {(widget) => (
-            <WebButton
-              type="button"
-              class="connect-btn topbar-menu-btn topbar-icon-btn"
-              data-story-target={`header-widget:${widgetKey(widget)}`}
-              ref={(el) => props.onWidgetElement?.(widget, el)}
-              classList={{
-                'topbar-widget-active': props.isWidgetActive(widget),
-                'topbar-widget-update-available':
-                  widget.command === 'bot' &&
-                  widget.subcommand === 'status' &&
-                  props.hasCoreUpdate(),
-              }}
-              disabled={!props.wsConnected()}
-              onClick={() => openWidget(widget)}
-              title={
-                props.wsConnected()
-                  ? `${widget.label} (/${widget.command} ${widget.subcommand})`
-                  : 'Connect Nostr first — waiting for WebSocket'
-              }
-              aria-label={widget.label}
-            >
-              <IconGlyph
-                icon={widget.icon}
-                source={widget.source}
-                pluginAlias={widget.pluginAlias}
-                fallback="widget"
-              />
-            </WebButton>
-          )}
-        </For>
         <Show when={props.onOpenLayoutSettings}>
           {(onOpenLayoutSettings) => (
             <WebButton
