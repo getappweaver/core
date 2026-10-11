@@ -110,6 +110,7 @@ export async function handle{{PASCAL_ALIAS}}Ai({
   const items = list{{PASCAL_ALIAS}}s(db);
   const context = items.length > 0 ? format{{PASCAL_ALIAS}}s(items) : '(no {{ALIAS}}s yet)';
   const systemPrompt = buildSystemPrompt(userPrompt, context);
+
   const result = await agent.run({
     prompt: systemPrompt,
     sessionId: null,
@@ -119,6 +120,7 @@ export async function handle{{PASCAL_ALIAS}}Ai({
     abortSignal: null,
     context: null,
   });
+
   const raw = getOutputString(result).trim();
 
   if (!raw || raw === '(no output)') {
@@ -253,11 +255,7 @@ export async function executeTool({
   if (call.type === 'create') {
     const item = create{{PASCAL_ALIAS}}(db, call.input);
 
-    return [
-      `Created {{ALIAS}} #${item.id}:`,
-      '',
-      `  - ${item.data}`,
-    ].join('\n');
+    return [`Created relays #${item.id}:`, '', `  - ${item.data}`].join('\n');
   }
 
   if (call.type === 'update') {
@@ -273,7 +271,8 @@ export async function executeTool({
   }
 
   const item = get{{PASCAL_ALIAS}}(db, call.input.id);
-  if (!item) {
+
+  f (!item) {
     return `{{PASCAL_ALIAS}} not found: ${call.input.id}. Call list first.`;
   }
 
@@ -300,7 +299,7 @@ When the user asks to manage {{ALIAS}}s:
 
 {{#UNLESS DRAFTS}}
 export const skillRules = [
-  "Always wrap the JSON argument in single quotes: `'{\"key\":\"value\"}'`",
+  'Always wrap the JSON argument in single quotes: `\'{"key":"value"}\'`',
   'Never use backslash-escaped quotes or double quotes around the JSON argument',
   'Always call `{{ALIAS}} list` first before update/delete to resolve IDs',
   '`original_prompt` is required on create/update/delete — pass the user request verbatim at the top level of the JSON (same level as `type`)',
@@ -322,10 +321,6 @@ export const aiDefinition = {
 {{#UNLESS DRAFTS}}
   skillRules,
 {{/UNLESS DRAFTS}}
-} satisfies AiDefinition<
-  typeof {{PASCAL_ALIAS}}ToolCallSchema,
-  {{PASCAL_ALIAS}}ToolCall,
-  Database
->;
+} satisfies AiDefinition<typeof {{PASCAL_ALIAS}}ToolCallSchema, {{PASCAL_ALIAS}}ToolCall, Database>;
 
 export { openDb };

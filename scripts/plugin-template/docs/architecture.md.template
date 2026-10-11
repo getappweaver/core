@@ -19,5 +19,5 @@ Scaffold plugin generated from `scripts/plugin-template/`. `list` and `show` inc
 - `ai.ts` — `aiDefinition` (tool schema + `executeTool`, used by `plugin:generate` and core tool dispatcher)
 
 Update this document and the nearest README when structure or behavior changes.
-Core contracts: [Plugin system](../../../docs/PLUGIN_SYSTEM.md) and
-[AI draft sessions](../../../docs/AI_DRAFT_SESSIONS.md).
+Core contracts: [Plugin system](../../../docs/PLUGIN_SYSTEM.md){{#IF DRAFTS}} and
+[AI draft sessions](../../../docs/AI_DRAFT_SESSIONS.md){{/IF DRAFTS}}.
