@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.3.0] - 2026-10-11
+
+- feat: implement bot restart notifications and enhance WebSocket handling for process restarts (8c3e017)
+
 ## [v14.2.1] - 2026-10-11
 
-- fix: showing the correct session in session list command with the correct tab/window (0e53788)
+- fix: showing the correct session in session list command with the correct tab/window (8fbb4c6)
 
 ## [v14.2.0] - 2026-10-10
 

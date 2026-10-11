@@ -39,6 +39,9 @@ export type ComposerAiStateResultServerMessage = {
 export type SessionTitleUpdatedServerMessage =
   import('@src/web/ws-schema').SessionTitleUpdatedServerMessage;
 
+export type ProcessRestartServerMessage =
+  import('@src/web/ws-schema').ProcessRestartServerMessage;
+
 export type CommandResultServerMessage = {
   type: 'command_result';
   requestId: string;
@@ -138,6 +141,7 @@ export type PaymentStatusServerMessage = {
 
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
+  | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage

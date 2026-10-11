@@ -30,6 +30,27 @@ date/runAt requirements of scheduling flows. Immediate signing forwards the
 signed event but does not inject a scheduled `runAt` argument or publish it.
 
 Backend/web
+
+### Bot restart notifications
+
+After `/bot restart` successfully requests a watch restart, the backend broadcasts
+`process_restart` to every authenticated, non-demo WebSocket connection. Each
+tab/PWA window shows the existing `process-restart` client view in its own active
+timeline and immediately treats connection loss as an expected restart. The
+initiating window's command result uses the same process instance and request
+timestamp, so it replaces the live notice rather than creating a second card.
+Timeline catch-up also deduplicates notices against persisted command results.
+Observer notices are local UI entries; they do not write restart commands into
+other sessions' stored history.
+
+The existing authenticated process-instance handshake changes the cards to
+“Restarted” after reconnection to a new bot process. Real connection errors still
+appear when no restart is expected or the expected-restart window expires. This
+notification covers `/bot restart` from web, DM, and local command transports;
+unexpected process exits and externally written restart signals do not announce
+a restart through this command notification path.
+
+### Backend interfaces
 - Local web server exists in `src/web/server.ts`, `src/web/routes.ts`, `src/web/command-catalog.ts`, `src/web/execute.ts`, `src/web/chat.ts`.
 - Web API supports:
   - `GET /api/health`

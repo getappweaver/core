@@ -26,6 +26,7 @@ import { createId as createRequestId } from '../utils';
 import type { WebSocketServerMessage } from '../ws-types';
 
 import { handleServerMessage } from './dispatch';
+import { deduplicateProcessRestartCards } from './process-restart';
 import {
   clearSocketReconnectTimer,
   connectSocketTransport,
@@ -806,9 +807,11 @@ export function useSocket(adapters: SocketAppAdapters) {
           }
 
           // Initial history precedes restored widgets and any live activity.
-          return afterCursor === null
-            ? [...added, ...current]
-            : [...current, ...added];
+          return deduplicateProcessRestartCards(
+            afterCursor === null
+              ? [...added, ...current]
+              : [...current, ...added],
+          );
         });
 
         const acknowledgeRead = () => {
@@ -1243,6 +1246,10 @@ export function useSocket(adapters: SocketAppAdapters) {
             setComposerAiState: adapters.setComposerAiState,
           },
         });
+
+        if (serverMessage.type === 'command_result') {
+          adapters.setTimeline(deduplicateProcessRestartCards);
+        }
 
         if (serverMessage.type === 'done' || serverMessage.type === 'error') {
           sessionByRequestId.delete(serverMessage.requestId);

@@ -3,6 +3,7 @@ import type { WebNodeRoot } from '@src/web/ui-schema';
 import { logChatDebug } from '../chat/debug';
 import type { CommandOutput } from '../types';
 
+import { showProcessRestartNotice } from './process-restart';
 import type {
   IncomingServerMessage,
   PendingRequest,
@@ -119,6 +120,13 @@ export function handleServerMessage(params: {
   const pending = pendingRequests.get(message.requestId);
 
   switch (message.type) {
+    case 'process_restart':
+      showProcessRestartNotice({
+        view: message.view,
+        setTimeline: adapters.setTimeline,
+      });
+
+      return;
     case 'session_title_updated':
       adapters.setComposerAiState((state) => {
         if (!state || state.workspace !== message.workspace) {

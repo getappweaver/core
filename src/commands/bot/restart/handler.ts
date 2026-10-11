@@ -1,4 +1,4 @@
-import { PROCESS_INSTANCE_ID } from '@src/process-instance';
+import { announceProcessRestart } from '@src/process-restart-notifications';
 import type { WebHandlerResult } from '@src/web/ui-schema';
 
 import { handleError, type RouteCommandContext } from '../../dispatch';
@@ -13,15 +13,10 @@ export function handleBotRestart(
 ): Promise<WebHandlerResult> {
   return handleError(async () => {
     writeRestartRequestedFile();
+    const view = announceProcessRestart();
 
     if (ctx.source === 'web') {
-      return {
-        kind: 'client_view',
-        version: 1,
-        view: 'process-restart',
-        meta: { command: 'bot', subcommand: 'restart' },
-        payload: { instanceId: PROCESS_INSTANCE_ID, requestedAt: Date.now() },
-      };
+      return view;
     }
 
     return WATCH_RESTART_ACK_MESSAGE;

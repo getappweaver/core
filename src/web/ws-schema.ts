@@ -456,6 +456,12 @@ export type SessionTitleUpdatedServerMessage = {
   title: string | null;
 };
 
+export type ProcessRestartServerMessage = {
+  type: 'process_restart';
+  requestId: string;
+  view: ClientViewRoot;
+};
+
 export type TimelineEventsResultServerMessage = {
   type: 'timeline_events_result';
   requestId: string;
@@ -552,6 +558,7 @@ export type PaymentStatusServerMessage = {
 
 export type WebSocketServerMessage =
   | CommandsResultServerMessage
+  | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage

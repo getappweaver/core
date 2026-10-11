@@ -30,6 +30,7 @@ import type { InteractivePaymentBroker } from '@src/payments/service';
 import { createBrokerPaymentServiceFactory } from '@src/payments/service';
 import type { WebSocketPaymentSession } from '@src/payments/web-prompt';
 import { PROCESS_INSTANCE_ID } from '@src/process-instance';
+import { watchProcessRestarts } from '@src/process-restart-notifications';
 import { assertWebSession, renameAppWeaverSession } from '@src/session';
 import { watchSessionTitles } from '@src/session-title-notifications';
 import { getSubcommandDefinition } from '@src/system/command-definition';
@@ -1684,10 +1685,34 @@ async function runChatInSession(
 export function createWebSocketHandler(ctx: WebRouteContext) {
   const connections = new Set<Bun.ServerWebSocket<WebSocketData>>();
   let stopWatchingTitles: (() => void) | null = null;
+  let stopWatchingRestarts: (() => void) | null = null;
 
   return {
     open(ws: Bun.ServerWebSocket<WebSocketData>): void {
       connections.add(ws);
+
+      if (!stopWatchingRestarts && !isDemoMode()) {
+        stopWatchingRestarts = watchProcessRestarts((view) => {
+          for (const connection of connections) {
+            if (
+              connection.data.nip98Authenticated &&
+              !connection.data.demoAuthenticated
+            ) {
+              try {
+                sendMessage(connection, {
+                  type: 'process_restart',
+                  requestId: 'process-restart-notice',
+                  view,
+                });
+              } catch (error) {
+                log.warn(
+                  `[restart] Could not notify browser connection: ${String(error)}`,
+                );
+              }
+            }
+          }
+        });
+      }
 
       if (!stopWatchingTitles && !isDemoMode()) {
         stopWatchingTitles = watchSessionTitles(ctx.seenDb, (update) => {
@@ -1713,6 +1738,8 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
       connections.delete(ws);
 
       if (connections.size === 0) {
+        stopWatchingRestarts?.();
+        stopWatchingRestarts = null;
         stopWatchingTitles?.();
         stopWatchingTitles = null;
       }

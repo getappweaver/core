@@ -24,6 +24,7 @@ import type {
   PaymentStatusServerMessage,
   PromptPayload,
   PromptServerMessage,
+  ProcessRestartServerMessage,
   SessionTitleUpdatedServerMessage,
   TimelineEventsResultServerMessage,
   ToolIntervention,
@@ -50,6 +51,7 @@ export type PendingRequest = {
 
 export type IncomingServerMessage =
   | CommandsResultServerMessage
+  | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage
   | ComposerAiStateResultServerMessage
   | TimelineEventsResultServerMessage
