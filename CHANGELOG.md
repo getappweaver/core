@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.3.3] - 2026-10-12
+
+- fix: handling plugin failures and improved diagnostics (e093e55)
+
 ## [v14.3.2] - 2026-10-11
 
-- fix: lint of plugin templates (3db3416)
+- fix: lint of plugin templates (b0a4137)
 
 ## [v14.3.1] - 2026-10-11
 

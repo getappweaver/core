@@ -8,7 +8,7 @@ import type { Database } from 'bun:sqlite';
 import { SimplePool } from 'nostr-tools/pool';
 import { z } from 'zod';
 
-import { cliRegistry } from '../generated/cli-registry';
+import type { CliPluginEntry } from '../generated/cli-registry';
 
 import { initializeManagedOpencodeConfigs } from './backends/opencode-managed-config';
 import { configureOpencodeRuntimeController } from './backends/opencode-runtime-controller';
@@ -88,7 +88,7 @@ function parseArgs(argv: string[]): CliArgs {
   return { alias, toolName, rawArgsJson };
 }
 
-function printHelp(): void {
+function printHelp(cliRegistry: CliPluginEntry[]): void {
   console.log('Usage: bun src/cli.ts <alias> <toolName> <rawArgsJson>');
 
   console.log(
@@ -117,7 +117,7 @@ function printHelp(): void {
   );
 }
 
-function printPluginSchema(alias: string): void {
+function printPluginSchema(alias: string, cliRegistry: CliPluginEntry[]): void {
   const entry = cliRegistry.find((e) => e.alias === alias);
 
   if (!entry) {
@@ -154,6 +154,11 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const { alias, toolName, rawArgsJson } = parseArgs(argv);
 
+  const cliRegistry =
+    alias === 'session'
+      ? []
+      : (await import('../generated/cli-registry')).cliRegistry;
+
   writeCliLog({
     ts: new Date().toISOString(),
     alias,
@@ -163,7 +168,7 @@ async function main(): Promise<void> {
   });
 
   if (!alias) {
-    printHelp();
+    printHelp(cliRegistry);
 
     return;
   }
@@ -214,7 +219,7 @@ async function main(): Promise<void> {
   }
 
   if (!toolName) {
-    printPluginSchema(alias);
+    printPluginSchema(alias, cliRegistry);
 
     return;
   }

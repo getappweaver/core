@@ -85,6 +85,30 @@ Compatibility: Plugin's required version must fall within Bot's supported range.
 
 Each plugin versions independently. Follows semver (major.minor.patch).
 
+### Startup failure isolation
+
+The generated runtime registry imports and registers installed apps individually,
+in `plugins.json` order. An import, package-validation, or synchronous
+initialization error is logged with the app alias and does not prevent the
+remaining apps from loading. Failed apps are excluded from the registered command
+catalog, so their icons are absent while healthy app icons remain available.
+
+The current process retains alias-specific loading diagnostics. Authenticated
+WebSocket command discovery includes these failures, and each browser/PWA window
+shows `App "<alias>" failed to load: <error>` as a system message. Messages are
+deduplicated per alias and process instance in the displayed timeline. They are
+retained in the browser's socket state and reapplied after timeline restoration
+and session changes, regardless of whether command discovery or timeline loading
+finishes first. Reloaded clients fetch the current failures again. They are local
+diagnostics, not writes to other sessions' persisted history.
+
+[`scripts/generate-tools.ts`](../scripts/generate-tools.ts) uses the shared
+[`registry generator`](../scripts/generate-plugin-registry.ts). To refresh only
+the runtime registry without regenerating skills, run
+`bun scripts/generate-plugin-registry.ts`. Full tool generation also skips a
+broken app's AI-definition import while continuing generation for other apps.
+The built-in session-title CLI path does not load app AI definitions.
+
 ### Capability Version
 
 Each capability has version. Allows incremental capability changes.

@@ -440,6 +440,7 @@ export type CommandsResultServerMessage = {
   type: 'commands_result';
   requestId: string;
   commands: WebCommandListItem[];
+  pluginLoadFailures: import('@src/core/plugin-loading').PluginLoadFailure[];
 };
 
 export type ComposerAiStateResultServerMessage = {
@@ -602,14 +603,20 @@ export function createCapabilityResultMessage(params: {
   };
 }
 
-export function createCommandsResultMessage(params: {
+type CreateCommandsResultMessageProps = {
   requestId: string;
   commands: WebCommandListItem[];
-}): CommandsResultServerMessage {
+  pluginLoadFailures: import('@src/core/plugin-loading').PluginLoadFailure[];
+};
+
+export function createCommandsResultMessage(
+  params: CreateCommandsResultMessageProps,
+): CommandsResultServerMessage {
   return {
     type: 'commands_result',
     requestId: params.requestId,
     commands: params.commands,
+    pluginLoadFailures: params.pluginLoadFailures,
   };
 }
 

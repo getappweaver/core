@@ -28,6 +28,7 @@ export type CommandsResultServerMessage = {
   type: 'commands_result';
   requestId: string;
   commands: CommandDetail[];
+  pluginLoadFailures?: import('@src/core/plugin-loading').PluginLoadFailure[];
 };
 
 export type ComposerAiStateResultServerMessage = {

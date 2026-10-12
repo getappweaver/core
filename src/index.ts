@@ -598,8 +598,8 @@ async function main() {
   try {
     const { registerPlugins } = await import('../generated/plugins');
     log.info(`Registering plugins from ${join(dmBotRoot, 'plugins')}`);
-    registerPlugins(pluginContext);
-    log.info('Plugins registered');
+    await registerPlugins(pluginContext);
+    log.info('Plugin registration completed');
   } catch (err) {
     log.error(`Failed to register plugins: ${String(err)}`);
     log.error(`Run 'bun run scripts/install-plugin.ts' to install plugins`);

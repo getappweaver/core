@@ -19,6 +19,7 @@ import {
   runWithMonitoringContext,
 } from '@src/core/monitoring';
 import { createWebPrompt } from '@src/core/plugin';
+import { listPluginLoadFailures } from '@src/core/plugin-loading';
 import {
   getAgentBackend,
   getWorkspaceTarget,
@@ -492,6 +493,7 @@ async function handleDemoWebSocketMessage(params: {
         createCommandsResultMessage({
           requestId: message.requestId,
           commands: listAllCommandsDetailForWeb(ctx.prefix),
+          pluginLoadFailures: [],
         }),
       );
 
@@ -1913,6 +1915,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
                 createCommandsResultMessage({
                   requestId: message.requestId,
                   commands: listAllCommandsDetailForWeb(ctx.prefix),
+                  pluginLoadFailures: listPluginLoadFailures(),
                 }),
               );
 

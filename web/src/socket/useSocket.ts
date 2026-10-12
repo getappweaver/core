@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal } from 'solid-js';
 
 import { renderStoryListRoot } from '@src/commands/story/renderers/story-list-component';
+import type { PluginLoadFailure } from '@src/core/plugin-loading';
 import type { ClientViewRoot, WebNodeRoot } from '@src/web/ui-schema';
 
 import type {
@@ -316,6 +317,35 @@ export function useSocket(adapters: SocketAppAdapters) {
   let timelineCursor: { sessionId: string; cursor: number } | null = null;
   let timelineLoadRequestId: string | null = null;
   let timelineCatchUpQueued = false;
+  let pluginLoadFailures: PluginLoadFailure[] = [];
+
+  function appendPluginLoadDiagnostics(): void {
+    if (!adapters.timelineId()) {
+      return;
+    }
+
+    adapters.setTimeline((items) => {
+      const currentIds = new Set(items.map((item) => item.id));
+
+      const diagnostics: TimelineItem[] = pluginLoadFailures.flatMap(
+        (failure) => {
+          const id = `app-load-failure:${failure.instanceId}:${failure.alias}`;
+
+          return currentIds.has(id)
+            ? []
+            : [
+                {
+                  id,
+                  type: 'system' as const,
+                  text: `App "${failure.alias}" failed to load: ${failure.message}`,
+                },
+              ];
+        },
+      );
+
+      return diagnostics.length > 0 ? [...items, ...diagnostics] : items;
+    });
+  }
 
   function clearComposerStateRetry(): void {
     if (composerStateRetryTimer !== null) {
@@ -814,6 +844,9 @@ export function useSocket(adapters: SocketAppAdapters) {
           );
         });
 
+        // Session restoration can clear messages received during command bootstrap.
+        appendPluginLoadDiagnostics();
+
         const acknowledgeRead = () => {
           if (isWebDemoMode() || document.visibilityState !== 'visible') {
             return;
@@ -880,6 +913,8 @@ export function useSocket(adapters: SocketAppAdapters) {
     pendingRequests.set(commandsRequestId, {
       onCommandsResult: (message) => {
         adapters.setCommands(message.commands);
+        pluginLoadFailures = message.pluginLoadFailures ?? [];
+        appendPluginLoadDiagnostics();
       },
       onDone: () => {
         adapters.setLoadingCommands(false);
