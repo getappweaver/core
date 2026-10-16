@@ -32,6 +32,7 @@ import {
 } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
 import { expandTreeItemsForAction } from './tree-state';
+import { WebNostrAccountSelectNode } from './WebNostrAccountSelectNode';
 
 type WebRunAction = (
   action: WebAction,
@@ -701,6 +702,10 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
 }
 
 export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
+  if (props.element.props?.choiceSource === 'nostrAccounts') {
+    return <WebNostrAccountSelectNode element={props.element} />;
+  }
+
   const getBusy = useContext(WebShadowUiBusyContext);
   const name = () => props.element.props?.formFieldName;
   let selectEl: HTMLSelectElement | undefined;

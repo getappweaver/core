@@ -37,9 +37,16 @@ import type { Monitoring } from './monitoring';
 
 // ---------------------------------------------------------------------------
 export type SendReplyFn = (message: string) => Promise<void>;
+export type PluginModelSourceOption = {
+  providerId: string;
+  alias: string;
+  title: string;
+};
+
 export type PluginAgentDefaults = {
   backend: 'opencode';
   provider: 'local';
+  modelSource: string;
   model: string | null;
   effectiveModel: string;
   workspaceTarget: WorkspaceTarget;
@@ -91,6 +98,9 @@ export type PluginAgentService = {
     modelSourceId?: string | null;
     workspaceTarget?: WorkspaceTarget | null;
   }): Promise<string[]>;
+  getAvailableModelSources?(props?: {
+    workspaceTarget?: WorkspaceTarget | null;
+  }): Promise<PluginModelSourceOption[]>;
   run(props: PluginAgentRunProps): Promise<PluginAgentRunResult>;
   completeText(props: PluginTextCompletionProps): Promise<ChatCompletionResult>;
 };

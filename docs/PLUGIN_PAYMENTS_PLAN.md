@@ -381,8 +381,8 @@ depending on providers copying custom tags.
 - [x] Integrate checkout with `src/payments`, including receipt-pending rechecks.
 - [x] Apply the soft gate to the agreed plugin manager installation paths and
       render prices/status in text and web output.
-- [ ] Complete authenticated cross-instance recovery verification. Export/import
-      and automatic republishing remain future work.
+- [ ] Complete authenticated cross-instance recovery verification. Export/import,
+      DM recourse, and app reviews are detailed in the [Recovery & Reviews Plan](PLUGIN_PAYMENTS_RECOVERY_AND_REVIEWS_PLAN.md).
 - [x] Document the implemented contracts in [Plugin System](PLUGIN_SYSTEM.md)
       and the owning module's documentation.
 - [x] Perform static verification of the implemented first slice.

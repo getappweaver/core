@@ -71,7 +71,8 @@ export type WebTreeToolbarRegistration = {
 
 /** Web UI renders in a shadow root; timeline chrome is light DOM — publish controls here. */
 export const WebTreeToolbarRegisterContext = createContext<
-  ((registration: WebTreeToolbarRegistration | null) => void) | null
+  | ((registration: WebTreeToolbarRegistration | null, treeId: symbol) => void)
+  | null
 >(null);
 
 /** Root `.web-tree-header` node for timeline intersection (icon toolbar vs inline links). */
@@ -99,6 +100,11 @@ export type TreeBulkExpandState = {
 };
 
 export const TreeBulkExpandContext = createContext<
+  Accessor<TreeBulkExpandState> | undefined
+>(undefined);
+
+/** Card-header controls span independent trees within one WebNodeRoot. */
+export const TreeWidgetBulkExpandContext = createContext<
   Accessor<TreeBulkExpandState> | undefined
 >(undefined);
 

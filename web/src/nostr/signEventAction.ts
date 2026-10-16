@@ -24,6 +24,7 @@ export const SignEventPayloadSchema = z.object({
   signTitle: z.string().min(1).optional(),
   statusTitle: z.string().min(1).default('Event signed'),
   statusMessage: z.string().optional(),
+  allowedPubkeys: z.array(z.string().regex(/^[a-f0-9]{64}$/i)).optional(),
   onSuccessCommand: OnSuccessCommandSchema,
 });
 
@@ -34,7 +35,7 @@ type SignEventDeps = {
   currentUserPubkey: string | null;
   signEvent: (
     event: EventTemplate,
-    options?: { title: string | null },
+    options?: { title: string | null; allowedPubkeys?: string[] | null },
   ) => Promise<NostrEvent | null>;
   setChromeModal: (modal: ChromeModalState | null) => void;
   setChromeWeb: (root: WebNodeRoot | null) => void;
@@ -155,6 +156,9 @@ export async function handleNostrSignEventAction({
     };
 
     const signed = await signEvent(template, {
+      ...(payload.allowedPubkeys
+        ? { allowedPubkeys: payload.allowedPubkeys }
+        : {}),
       title:
         payload.signTitle ??
         (payload.signingMode === 'immediate'
@@ -164,6 +168,17 @@ export async function handleNostrSignEventAction({
 
     if (!signed) {
       throw new Error('Connect or unlock a Nostr signer to proceed.');
+    }
+
+    if (
+      payload.allowedPubkeys &&
+      !payload.allowedPubkeys.some(
+        (pubkey) => pubkey.toLowerCase() === signed.pubkey.toLowerCase(),
+      )
+    ) {
+      throw new Error(
+        'The selected signer does not match the requested account.',
+      );
     }
 
     setChromeWeb(

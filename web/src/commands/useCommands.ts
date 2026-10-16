@@ -54,6 +54,7 @@ import { splitCommandOutput, splitPromptPayload } from '../socket/dispatch';
 import { emitStoryCommandCompleted } from '../story/events';
 import type { TimelineItem } from '../types';
 import { getResultSubcommandTag, summarizeInvocation } from '../utils';
+import { downloadTextFile, parseCommandDownload } from '../utils/download';
 
 import {
   parseBackgroundCommandStatus,
@@ -1081,6 +1082,41 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             );
           } finally {
             adapters.setChromeLoading(false);
+          }
+        })();
+      } else if (clientActionName === 'web.downloadCommand') {
+        void (async () => {
+          const sourceId = params?.webCommandSourceId;
+
+          if (sourceId) {
+            adapters.beginWebUiBusy(sourceId);
+          }
+
+          try {
+            const { command, subcommand } = action.payload;
+
+            if (typeof command !== 'string' || typeof subcommand !== 'string') {
+              throw new Error('Invalid download command.');
+            }
+
+            const output = await runJsonCommandOutput({
+              command,
+              subcommand,
+              payload: {
+                arguments: stringRecordValue(action.payload.arguments),
+                options: stringRecordValue(action.payload.options),
+              },
+            });
+
+            downloadTextFile(parseCommandDownload(output.text ?? ''));
+          } catch (error) {
+            adapters.appendSystemMessage(
+              error instanceof Error ? error.message : String(error),
+            );
+          } finally {
+            if (sourceId) {
+              adapters.endWebUiBusy(sourceId);
+            }
           }
         })();
       } else if (clientActionName === 'web.copyText') {

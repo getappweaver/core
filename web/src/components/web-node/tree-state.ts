@@ -1,4 +1,4 @@
-import type { WebAction } from '@src/web/ui-schema';
+import type { WebAction, WebNode } from '@src/web/ui-schema';
 
 import { writeClipboardText } from '../../utils/clipboard';
 
@@ -36,6 +36,33 @@ export function getTreeItemExpandedStateForScope(
 
 export function clearTreeItemExpandedStateForScope(scopeId: string): void {
   treeItemExpandedByScope.delete(scopeId);
+}
+
+type SetTreeItemsExpandedProps = {
+  node: WebNode;
+  expandedById: Map<string, boolean>;
+  expanded: boolean;
+};
+
+/** Include descendants whose components are unmounted under collapsed parents. */
+export function setTreeItemsExpanded({
+  node,
+  expandedById,
+  expanded,
+}: SetTreeItemsExpandedProps): void {
+  if (node.type !== 'element') {
+    return;
+  }
+
+  if (node.tag === 'treeItem' && node.props?.id) {
+    expandedById.set(node.props.id, expanded);
+  }
+
+  for (const child of [node.summary, ...(node.children ?? [])]) {
+    if (child) {
+      setTreeItemsExpanded({ node: child, expandedById, expanded });
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

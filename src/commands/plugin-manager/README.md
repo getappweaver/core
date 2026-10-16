@@ -108,10 +108,11 @@ restoration challenge, not just the old signature.
 
 Receipt discovery queries kind `9735` by app coordinate and recipient, inspecting
 the buyer's verified embedded request rather than depending on optional uppercase
-`P`. Buyer NIP-65 read relays, offer/catalog hints, configured bot relays, and
-bounded fallbacks are used. Historical offers are fetched by ID, including the
-relay hint in the zap's `e` tag. Lookup is bounded to ten 500-event pages per
-relay; saturated/incomplete results are reported rather than declaring no purchase.
+`P`. Buyer NIP-65 read relays, author NIP-65 write relays, offer/catalog hints,
+configured bot relays, and bounded fallbacks are used. Historical offers are
+fetched by ID, including the relay hint in the zap's `e` tag. Lookup is bounded to
+ten 500-event pages per relay; saturated/incomplete results are reported rather
+than declaring no purchase.
 Relay retention and current relay lists cannot guarantee complete recovery.
 
 Verified receipt/offer pairs are retained in core state as

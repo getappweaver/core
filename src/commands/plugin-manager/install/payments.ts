@@ -145,7 +145,7 @@ async function loadOffer(props: {
   ctx: RouteCommandContext;
   id: string;
   app: string;
-  relays: string[];
+  relays: string[] | (() => Promise<string[]>);
 }): Promise<PaymentOffer | null> {
   if (!/^[0-9a-f]{64}$/.test(props.id)) {
     return null;
@@ -168,8 +168,11 @@ async function loadOffer(props: {
     }
   }
 
+  const relays =
+    typeof props.relays === 'function' ? await props.relays() : props.relays;
+
   const events = await props.ctx.pool.querySync(
-    props.relays,
+    relays,
     { ids: [props.id], kinds: [8107] },
     { maxWait: 5_000 },
   );
@@ -186,17 +189,41 @@ async function loadOffer(props: {
   return offer;
 }
 
-function offerRelays(
+async function authorWriteRelays(
+  ctx: RouteCommandContext,
+  authorPubkey: string,
+): Promise<string[]> {
+  if (!authorPubkey) {
+    return [];
+  }
+
+  try {
+    const relaySet = await fetchNip65RelaySet({
+      pool: ctx.pool,
+      authorPubkey,
+      fallbackRelays: PLUGIN_QUERY_RELAYS,
+    });
+
+    return relaySet.writeRelays.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
+async function offerRelays(
   ctx: RouteCommandContext,
   entry: PluginCatalogEntry,
-): string[] {
+): Promise<string[]> {
   const hint = entry.catalogEvent?.tags.find((tag) => tag[0] === 'offer')?.[2];
+  const authorPubkey = entry.pubkey || entry.catalogEvent?.pubkey || '';
+  const outboxRelays = await authorWriteRelays(ctx, authorPubkey);
 
   return uniqueRelays([
     ...(hint ? [hint] : []),
+    ...outboxRelays,
     ...PLUGIN_QUERY_RELAYS,
     ...ctx.botRelayUrls,
-  ]).slice(0, 12);
+  ]).slice(0, 16);
 }
 
 export async function resolvePluginPayment(
@@ -221,7 +248,7 @@ export async function resolvePluginPayment(
     ctx,
     id: pointers[0][1] ?? '',
     app,
-    relays: offerRelays(ctx, entry),
+    relays: () => offerRelays(ctx, entry),
   });
 
   return {
@@ -441,7 +468,7 @@ export async function gatePluginPayment({
     if (identity) {
       const relays = uniqueRelays([
         ...(await buyerRelays(ctx, identity)),
-        ...offerRelays(ctx, entry),
+        ...(await offerRelays(ctx, entry)),
       ]);
 
       const proof = await findPurchase({
@@ -493,7 +520,7 @@ export async function gatePluginPayment({
 
       const relays = uniqueRelays([
         ...(await buyerRelays(ctx, identity)),
-        ...offerRelays(ctx, entry),
+        ...(await offerRelays(ctx, entry)),
         ...(attempt?.relays ?? []),
       ]).slice(0, 24);
 

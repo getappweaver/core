@@ -2,6 +2,21 @@ import { z } from 'zod';
 
 import { CapabilityOperationIdSchema } from '@src/capabilities/types';
 
+/** Text-file result envelope consumed by the generic web.downloadCommand client action. */
+export const WebCommandDownloadSchema = z.object({
+  filename: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[^/\\]+$/)
+    .refine((value) =>
+      [...value].every((character) => character.charCodeAt(0) >= 32),
+    ),
+  mimeType: z.string().min(1).max(200),
+  content: z.string(),
+});
+export type WebCommandDownload = z.infer<typeof WebCommandDownloadSchema>;
+
 export const WebToneSchema = z.enum([
   'default',
   'muted',
@@ -627,6 +642,8 @@ export const WebBasePropsSchema = z.object({
     .optional(),
   /** `select`: allowed option values. */
   choices: z.array(z.string()).optional(),
+  /** `select`: populate public-key choices from the browser account and saved signer accounts. */
+  choiceSource: z.enum(['nostrAccounts']).optional(),
   /** `select`: display labels keyed by submitted option value. */
   choiceLabels: z.record(z.string(), z.string()).optional(),
   /** `select`/`textField`: initially selected or prefilled value. */

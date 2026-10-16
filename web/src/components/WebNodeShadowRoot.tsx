@@ -24,9 +24,14 @@ import baseWebUiCss from '../webview/base-web-ui.css?raw';
 import webOverflowPanelCss from '../webview/web-overflow-panel.css?raw';
 
 import diffPatchCss from './diff-patch.css?raw';
-import { WebFileSuggestionInputContext } from './web-node/contexts';
+import {
+  TreeWidgetBulkExpandContext,
+  type TreeBulkExpandState,
+  WebFileSuggestionInputContext,
+} from './web-node/contexts';
 import { applyOptimisticMutationsToRoot } from './web-node/optimistic';
 import { reconcileWebNodeRoot } from './web-node/reconcile';
+import { setTreeItemsExpanded } from './web-node/tree-state';
 import { WebShadowUiBusyContext } from './web-shadow-ui-busy-context';
 import {
   getTreeItemExpandedStateForScope,
@@ -133,6 +138,65 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   const treeItemExpandedById = getTreeItemExpandedStateForScope(
     props.stateScopeId,
   );
+
+  const [widgetBulkExpand, setWidgetBulkExpand] =
+    createSignal<TreeBulkExpandState>({ epoch: 0, expanded: true });
+
+  const rootToolbarId = Symbol('root-toolbar');
+
+  const [treeToolbars, setTreeToolbars] = createSignal(
+    new Map<symbol, WebTreeToolbarRegistration>(),
+  );
+
+  function registerTreeToolbar(
+    registration: WebTreeToolbarRegistration | null,
+    treeId: symbol,
+  ): void {
+    setTreeToolbars((previous) => {
+      const next = new Map(previous);
+
+      if (registration) {
+        next.set(treeId, registration);
+      } else {
+        next.delete(treeId);
+      }
+
+      return next;
+    });
+  }
+
+  function setWidgetTreesExpanded(expanded: boolean): void {
+    setTreeItemsExpanded({
+      node: currentRoot.tree,
+      expandedById: treeItemExpandedById,
+      expanded,
+    });
+
+    setWidgetBulkExpand((previous) => ({
+      epoch: previous.epoch + 1,
+      expanded,
+    }));
+  }
+
+  createEffect(() => {
+    const registrations = [...treeToolbars().values()];
+    const primary = treeToolbars().get(rootToolbarId) ?? registrations.at(-1);
+
+    props.onWebTreeToolbarChange?.(
+      primary
+        ? {
+            ...primary,
+            showTreeControls: registrations.some(
+              (tree) => tree.showTreeControls,
+            ),
+            collapseAll: () => setWidgetTreesExpanded(false),
+            expandAll: () => setWidgetTreesExpanded(true),
+          }
+        : null,
+    );
+  });
+
+  onCleanup(() => props.onWebTreeToolbarChange?.(null));
 
   const [revealedIds, setRevealedIds] = createSignal<Set<string>>(new Set());
 
@@ -457,43 +521,46 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
       return;
     }
 
-    props.onWebTreeToolbarChange?.({
-      showFilter: false,
-      filterValue: () => '',
-      filterPlaceholder: 'Filter',
-      setFilterValue: () => {},
-      showTreeControls: false,
-      showRefresh: false,
-      actions,
-      runAction: (action) => {
-        if (
-          runLocalWebAction({
-            action,
-            expandedById: treeItemExpandedById,
-            expandTreeItems: null,
-            revealContext,
-            toggleContext,
-            filterState: null,
-            timeFilterState,
-          })
-        ) {
-          return;
-        }
+    registerTreeToolbar(
+      {
+        showFilter: false,
+        filterValue: () => '',
+        filterPlaceholder: 'Filter',
+        setFilterValue: () => {},
+        showTreeControls: false,
+        showRefresh: false,
+        actions,
+        runAction: (action) => {
+          if (
+            runLocalWebAction({
+              action,
+              expandedById: treeItemExpandedById,
+              expandTreeItems: null,
+              revealContext,
+              toggleContext,
+              filterState: null,
+              timeFilterState,
+            })
+          ) {
+            return;
+          }
 
-        props.onRunAction?.(action, {
-          onReplaceRoot: props.onReplaceRoot,
-          getWebRoot: () => currentRoot,
-          applyOptimisticMutations: applyLocalOptimisticMutations,
-          promptRequestId: props.promptRequestId,
-        });
+          props.onRunAction?.(action, {
+            onReplaceRoot: props.onReplaceRoot,
+            getWebRoot: () => currentRoot,
+            applyOptimisticMutations: applyLocalOptimisticMutations,
+            promptRequestId: props.promptRequestId,
+          });
+        },
+        collapseAll: () => {},
+        expandAll: () => {},
+        refresh: () => {},
       },
-      collapseAll: () => {},
-      expandAll: () => {},
-      refresh: () => {},
-    });
+      rootToolbarId,
+    );
 
     onCleanup(() => {
-      props.onWebTreeToolbarChange?.(null);
+      registerTreeToolbar(null, rootToolbarId);
     });
   });
 
@@ -561,7 +628,9 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                 value={() => props.renderSurface ?? null}
               >
                 <WebTreeToolbarRegisterContext.Provider
-                  value={props.onWebTreeToolbarChange ?? null}
+                  value={
+                    props.onWebTreeToolbarChange ? registerTreeToolbar : null
+                  }
                 >
                   <WebTreeHeaderElCallbackContext.Provider
                     value={props.onWebTreeHeaderEl ?? null}
@@ -585,26 +654,32 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                               <WebFileSuggestionInputContext.Provider
                                 value={props.onFileSuggestionInput ?? null}
                               >
-                                <WebNodeRenderer
-                                  root={currentRoot}
-                                  onReplaceRoot={props.onReplaceRoot}
-                                  onError={props.onError}
-                                  promptRequestId={props.promptRequestId}
-                                  speechSentences={speechSentences}
-                                  activeSpeechSentenceIndex={
-                                    activeSpeechSentenceIndex
-                                  }
-                                  onSpeechSentenceClick={onSpeechSentenceClick}
-                                  onRunAction={(action, params) =>
-                                    props.onRunAction?.(action, {
-                                      ...params,
-                                      getWebRoot: () => currentRoot,
-                                      applyOptimisticMutations:
-                                        applyLocalOptimisticMutations,
-                                      webTargetRoot: c.shadow,
-                                    })
-                                  }
-                                />
+                                <TreeWidgetBulkExpandContext.Provider
+                                  value={widgetBulkExpand}
+                                >
+                                  <WebNodeRenderer
+                                    root={currentRoot}
+                                    onReplaceRoot={props.onReplaceRoot}
+                                    onError={props.onError}
+                                    promptRequestId={props.promptRequestId}
+                                    speechSentences={speechSentences}
+                                    activeSpeechSentenceIndex={
+                                      activeSpeechSentenceIndex
+                                    }
+                                    onSpeechSentenceClick={
+                                      onSpeechSentenceClick
+                                    }
+                                    onRunAction={(action, params) =>
+                                      props.onRunAction?.(action, {
+                                        ...params,
+                                        getWebRoot: () => currentRoot,
+                                        applyOptimisticMutations:
+                                          applyLocalOptimisticMutations,
+                                        webTargetRoot: c.shadow,
+                                      })
+                                    }
+                                  />
+                                </TreeWidgetBulkExpandContext.Provider>
                               </WebFileSuggestionInputContext.Provider>
                             </WebPendingEntityContext.Provider>
                           </TreeTimeFilterStateContext.Provider>

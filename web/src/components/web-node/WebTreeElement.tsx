@@ -36,6 +36,7 @@ import {
   TreeExpandRequestContext,
   TreeExpandRequestSetterContext,
   TreeBulkExpandContext,
+  TreeWidgetBulkExpandContext,
   TreeDirectChildCountContext,
   TreeRootItemCountContext,
   TreeFilterStateContext,
@@ -50,7 +51,7 @@ import {
   normalizedFilterQuery,
   EMPTY_TREE_FILTER_INDEX,
 } from './tree-filter';
-import { runLocalWebAction } from './tree-state';
+import { runLocalWebAction, setTreeItemsExpanded } from './tree-state';
 
 const TREE_FILTER_INITIAL_DEBOUNCE_MS = 1_000;
 const TREE_FILTER_MIN_QUERY_LENGTH = 3;
@@ -88,6 +89,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
     body().some(isTreeBodyNodeExpandable) || lazyLoadAction() !== null;
 
   const expandedById = useContext(TreeItemExpandedStateContext);
+  const widgetBulkExpand = useContext(TreeWidgetBulkExpandContext);
   const expandRequest = useContext(TreeExpandRequestContext);
   const filterState = useContext(TreeFilterStateContext);
   const treeItemId = () => props.element.props?.id ?? null;
@@ -104,14 +106,20 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
 
   const initialExpanded = () => {
     const id = treeItemId();
+    const widgetBulk = widgetBulkExpand?.();
+
+    const fallback =
+      widgetBulk && widgetBulk.epoch > 0
+        ? widgetBulk.expanded
+        : (props.element.props?.defaultExpanded ?? true);
 
     if (!(id && expandedById)) {
-      return props.element.props?.defaultExpanded ?? true;
+      return fallback;
     }
 
     const saved = expandedById.get(id);
 
-    return saved ?? props.element.props?.defaultExpanded ?? true;
+    return saved ?? fallback;
   };
 
   const [expanded, setExpanded] = createSignal(initialExpanded());
@@ -123,8 +131,9 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
     ).length;
 
   const bulkExpand = useContext(TreeBulkExpandContext);
-  let lastBulkEpochApplied = 0;
-  let lastExpandRequestEpochApplied = 0;
+  let lastBulkEpochApplied = bulkExpand?.().epoch ?? 0;
+  let lastWidgetBulkEpochApplied = widgetBulkExpand?.().epoch ?? 0;
+  let lastExpandRequestEpochApplied = expandRequest?.()?.epoch ?? 0;
 
   createEffect(() => {
     const id = treeItemId();
@@ -190,6 +199,15 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
 
     if (bulk.epoch > lastBulkEpochApplied) {
       lastBulkEpochApplied = bulk.epoch;
+      setExpanded(bulk.expanded);
+    }
+  });
+
+  createEffect(() => {
+    const bulk = widgetBulkExpand?.();
+
+    if (bulk && bulk.epoch > lastWidgetBulkEpochApplied) {
+      lastWidgetBulkEpochApplied = bulk.epoch;
       setExpanded(bulk.expanded);
     }
   });
@@ -305,6 +323,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
   const renderMeta = useWebRenderMeta();
   const renderSurface = useContext(WebRenderSurfaceContext);
   const registerHoistedToolbar = useContext(WebTreeToolbarRegisterContext);
+  const toolbarId = Symbol('tree-toolbar');
   const reportTreeHeaderEl = useContext(WebTreeHeaderElCallbackContext);
   const revealContext = useContext(WebRevealContext);
   const toggleContext = useContext(WebToggleContext);
@@ -317,6 +336,16 @@ export function WebTreeElement(props: WebTreeElementProps) {
     epoch: 0,
     expanded: true,
   });
+
+  const setTreeExpanded = (expanded: boolean) => {
+    setTreeItemsExpanded({
+      node: props.element,
+      expandedById,
+      expanded,
+    });
+
+    setBulk((previous) => ({ epoch: previous.epoch + 1, expanded }));
+  };
 
   const [expandRequest, setExpandRequest] =
     createSignal<TreeExpandRequest | null>(null);
@@ -506,29 +535,24 @@ export function WebTreeElement(props: WebTreeElementProps) {
 
     const meta = renderMeta();
 
-    publish({
-      showFilter: filterEnabled(),
-      filterValue: filterInput,
-      filterPlaceholder: props.element.props?.filterPlaceholder ?? 'Filter',
-      setFilterValue: setTreeFilterValue,
-      showTreeControls: childTreeItems(props.element).length > 0,
-      showRefresh: meta != null,
-      actions: props.element.props?.toolbarActions,
-      runAction: runTreeAction,
-      collapseAll: () =>
-        setBulk((prev) => ({
-          epoch: prev.epoch + 1,
-          expanded: false,
-        })),
-      expandAll: () =>
-        setBulk((prev) => ({
-          epoch: prev.epoch + 1,
-          expanded: true,
-        })),
-      refresh: () => {
-        runRefreshCommand();
+    publish(
+      {
+        showFilter: filterEnabled(),
+        filterValue: filterInput,
+        filterPlaceholder: props.element.props?.filterPlaceholder ?? 'Filter',
+        setFilterValue: setTreeFilterValue,
+        showTreeControls: childTreeItems(props.element).length > 0,
+        showRefresh: meta != null,
+        actions: props.element.props?.toolbarActions,
+        runAction: runTreeAction,
+        collapseAll: () => setTreeExpanded(false),
+        expandAll: () => setTreeExpanded(true),
+        refresh: () => {
+          runRefreshCommand();
+        },
       },
-    });
+      toolbarId,
+    );
   });
 
   onCleanup(() => {
@@ -536,7 +560,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
       return;
     }
 
-    registerHoistedToolbar?.(null);
+    registerHoistedToolbar?.(null, toolbarId);
   });
 
   if (parentBulk !== undefined) {
@@ -633,12 +657,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
                         data-ui="tree-collapse-all"
                         title="Collapse all"
                         aria-label="Collapse all tree branches"
-                        onClick={() =>
-                          setBulk((prev) => ({
-                            epoch: prev.epoch + 1,
-                            expanded: false,
-                          }))
-                        }
+                        onClick={() => setTreeExpanded(false)}
                       >
                         {cardHeadTreeCollapseAllIcon({ width: 16, height: 16 })}
                       </WebButton>
@@ -648,12 +667,7 @@ export function WebTreeElement(props: WebTreeElementProps) {
                         data-ui="tree-expand-all"
                         title="Expand all"
                         aria-label="Expand all tree branches"
-                        onClick={() =>
-                          setBulk((prev) => ({
-                            epoch: prev.epoch + 1,
-                            expanded: true,
-                          }))
-                        }
+                        onClick={() => setTreeExpanded(true)}
                       >
                         {cardHeadTreeExpandAllIcon({ width: 16, height: 16 })}
                       </WebButton>

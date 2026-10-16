@@ -12,6 +12,7 @@ import {
   getWorkspaceInstructions,
   getWorkspaceTarget,
   type CoreDb,
+  type WorkspaceTarget,
 } from '@src/db';
 
 import { readAgentsInstructions } from './agent-instructions';
@@ -21,6 +22,7 @@ import type {
   PluginAgentRunProps,
   PluginAgentRunResult,
   PluginAgentService,
+  PluginModelSourceOption,
   PluginTextCompletionProps,
 } from './plugin';
 
@@ -89,15 +91,25 @@ export function createPluginAgentService({
       const workspaceTarget = getWorkspaceTarget(db);
       const cwd = workspaceTarget === 'appweaver' ? dmBotRoot : parentOfBotRoot;
 
+      const activeProviderId = getActiveModelSourceProviderId(
+        db,
+        workspaceTarget,
+      );
+
       const model =
-        getActiveModelSourceProviderId(db, workspaceTarget) ===
-        CORE_MODEL_SOURCE_PROVIDER_ID
+        activeProviderId === CORE_MODEL_SOURCE_PROVIDER_ID
           ? getCoreSelectedModel(db, workspaceTarget)
           : null;
+
+      const modelSource =
+        activeProviderId === CORE_MODEL_SOURCE_PROVIDER_ID
+          ? 'core'
+          : activeProviderId;
 
       return {
         backend: 'opencode',
         provider: 'local',
+        modelSource,
         model,
         effectiveModel:
           opencodeRuntimeController.runtimeModelFor(workspaceTarget) ??
@@ -132,6 +144,19 @@ export function createPluginAgentService({
           props?.modelSourceId ?? undefined,
         )
       ).models.map((model) => model.id);
+    },
+
+    async getAvailableModelSources(props?: {
+      workspaceTarget?: WorkspaceTarget | null;
+    }): Promise<PluginModelSourceOption[]> {
+      const workspaceTarget = props?.workspaceTarget ?? getWorkspaceTarget(db);
+      const sources = await modelSources.listSources(workspaceTarget, null);
+
+      return sources.map((source) => ({
+        providerId: source.providerId,
+        alias: source.alias,
+        title: source.title,
+      }));
     },
 
     async run(props: PluginAgentRunProps): Promise<PluginAgentRunResult> {
