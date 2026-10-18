@@ -91,7 +91,7 @@ function writePage(route: string, html: string): void {
   writeFileSync(target, html);
 }
 
-function generateDocs(): void {
+export function generateDocs(): string[] {
   const queue: string[] = [];
   const sources = new Set<string>();
   const routes = new Map<string, string>();
@@ -219,16 +219,20 @@ function generateDocs(): void {
   }
 
   writePage('/docs/', renderPage({ title: 'Documentation', route: '/docs/', body: indexBody }));
+  const docRoutes = ['/docs/', ...[...groups.keys()].map((alias) => `/docs/plugins/${alias}/`), ...pages.map((page) => page.route)];
   const sitemapPath = resolve(LANDING_ROOT, 'public/sitemap.xml');
 
   if (existsSync(sitemapPath)) {
     const sitemap = readFileSync(sitemapPath, 'utf8').replace(/\s*<url>\s*<loc>https:\/\/getappweaver\.com\/docs\/[\s\S]*?<\/url>/g, '');
-    const docRoutes = ['/docs/', ...groups.keys().map((alias) => `/docs/plugins/${alias}/`), ...pages.map((page) => page.route)];
     const urls = docRoutes.map((route) => `  <url><loc>${SITE_ORIGIN}${route}</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`).join('\n');
     writeFileSync(sitemapPath, sitemap.replace('</urlset>', `${urls}\n</urlset>`));
   }
 
   console.log(`Generated ${pages.length} documentation pages plus core/plugin indexes.`);
+  return docRoutes;
 }
 
-generateDocs();
+if (import.meta.main) {
+  generateDocs();
+}
+

@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun run content:generate && bun run docs:build && vite",
-    "build": "bun run content:generate && bun run blog:build && bun run docs:build && vite build && bun run apps:build",
+    "build": "bun run content:generate && vite build && bun run site:build",
     "content:generate": "bun run scripts/generate-content.ts",
     "docs:build": "bun run scripts/generate-docs.ts",
-    "apps:build": "bun run scripts/generate-plugin-pages.ts",
+    "site:build": "bun run scripts/generate-site.ts",
     "deploy": "bun run build && vercel --prod",
     "demo:build": "bun run build && bun run demo:copy",
     "demo:copy": "bun run scripts/copy-web-demo-to-landing.ts",

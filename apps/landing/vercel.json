@@ -43,10 +43,6 @@
     {
       "source": "/.well-known/lnurlp/:name",
       "destination": "/api/lnurlp?name=:name"
-    },
-    {
-      "source": "/one-page",
-      "destination": "/index.html"
     }
   ],
   "redirects": [

@@ -1015,5 +1015,5 @@ export function PluginRoute(props: PluginRouteProps) {
 }
 
 export function isPluginRoute(pathname: string): boolean {
-  return pathname !== '/';
+  return pathname.startsWith('/apps/');
 }

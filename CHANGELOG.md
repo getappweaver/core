@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.5.0] - 2026-10-18
+
+- feat: generate site script to generate both main page and others (8d65bbb)
+
 ## [v14.4.0] - 2026-10-16
 
-- feat: nostrAccounts choice source, introduced getAvailableModelSources into PluginAgentService (64783c3)
+- feat: nostrAccounts choice source, introduced getAvailableModelSources into PluginAgentService (5f6c41f)
 
 ## [v14.3.3] - 2026-10-12
 

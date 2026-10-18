@@ -18,7 +18,7 @@ type LandingRouteRequestProps = {
 
 function landingRoutesPlugin(): Plugin {
   const redirects = new Map([['/demo/app', '/demo/app/']]);
-  const appRoutes = new Set([...officialApps.map((app) => app.href), '/one-page']);
+  const appRoutes = new Set([...officialApps.map((app) => app.href)]);
 
   function handleRequest({
     req,

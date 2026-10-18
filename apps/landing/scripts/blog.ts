@@ -401,7 +401,11 @@ function renderSitemapUrl({ path, priority, changefreq }: SitemapEntry): string 
   </url>`;
 }
 
-function renderSitemap(posts: BlogPost[], tags: string[]): string {
+export function renderSitemap(
+  posts: BlogPost[],
+  tags: string[],
+  docRoutes: string[] = [],
+): string {
   const urls = [
     ...STATIC_SITEMAP_PATHS.map((entry) =>
       renderSitemapUrl(entry),
@@ -420,6 +424,13 @@ function renderSitemap(posts: BlogPost[], tags: string[]): string {
         changefreq: 'monthly',
       }),
     ),
+    ...docRoutes.map((route) =>
+      renderSitemapUrl({
+        path: route,
+        priority: '0.5',
+        changefreq: 'monthly',
+      }),
+    ),
   ];
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -429,11 +440,12 @@ ${urls.join('\n')}
 `;
 }
 
-async function writeSeoDiscoveryFiles(
+export async function writeSeoDiscoveryFiles(
   posts: BlogPost[],
   tags: string[],
+  docRoutes: string[] = [],
 ): Promise<void> {
-  await writeTextFile(join(PUBLIC_ROOT, 'sitemap.xml'), renderSitemap(posts, tags));
+  await writeTextFile(join(PUBLIC_ROOT, 'sitemap.xml'), renderSitemap(posts, tags, docRoutes));
   await writeTextFile(
     join(PUBLIC_ROOT, 'robots.txt'),
     `User-agent: *
@@ -626,7 +638,7 @@ function composeNostrContent(markdown: string, footer: string): string {
   return `${body}\n\n${footer}\n`;
 }
 
-async function buildBlog(): Promise<void> {
+export async function buildBlog(docRoutes: string[] = []): Promise<void> {
   const [blogStylesheet, lightboxStylesheet] = await Promise.all([
     readFile(BLOG_CSS_PATH, 'utf8'),
     readFile(LIGHTBOX_CSS_PATH, 'utf8'),
@@ -691,7 +703,7 @@ async function buildBlog(): Promise<void> {
     }),
   );
 
-  await writeSeoDiscoveryFiles(posts, [...postsByTag.keys()].sort());
+  await writeSeoDiscoveryFiles(posts, [...postsByTag.keys()].sort(), docRoutes);
 
   await Promise.all(
     posts.map(async (post) => {
@@ -864,14 +876,17 @@ async function main(): Promise<void> {
   await buildBlog();
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    if (err instanceof Error) {
-      console.error(err.stack ?? err.message);
-    } else {
-      console.error(String(err));
-    }
+if (import.meta.main) {
+  main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      if (err instanceof Error) {
+        console.error(err.stack ?? err.message);
+      } else {
+        console.error(String(err));
+      }
 
-    process.exit(1);
-  });
+      process.exit(1);
+    });
+}
+
