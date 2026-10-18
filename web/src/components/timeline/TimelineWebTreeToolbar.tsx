@@ -278,7 +278,10 @@ export function TimelineWebTreeToolbar(
               data-ui="tree-refresh"
               title="Refresh"
               aria-label="Refresh list"
-              onClick={() => reg.refresh()}
+              onClick={() => {
+                setActiveToggleKeys(new Set<string>());
+                reg.refresh();
+              }}
             >
               {cardHeadTreeRefreshIcon()}
             </WebButton>

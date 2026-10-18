@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.8.0] - 2026-10-18
+
+- feat: added refreshable to ui-schema (d064a90)
+
 ## [v14.7.1] - 2026-10-18
 
-- fix: increased plugin icon size limit (c58c734)
+- fix: increased plugin icon size limit (7d8caba)
 
 ## [v14.7.0] - 2026-10-18
 

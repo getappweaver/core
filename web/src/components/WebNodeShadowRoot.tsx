@@ -494,6 +494,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
       });
     }
 
+    setActiveToggleKeys(new Set<string>());
     setCurrentRoot(reconcileWebNodeRoot(props.root));
   });
 
@@ -517,7 +518,10 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
       );
     });
 
-    if (actions == null || actions.length === 0) {
+    const showRefresh =
+      tree.props?.refreshable === true && currentRoot.meta != null;
+
+    if (!showRefresh && (actions == null || actions.length === 0)) {
       return;
     }
 
@@ -528,7 +532,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
         filterPlaceholder: 'Filter',
         setFilterValue: () => {},
         showTreeControls: false,
-        showRefresh: false,
+        showRefresh,
         actions,
         runAction: (action) => {
           if (
@@ -554,7 +558,32 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
         },
         collapseAll: () => {},
         expandAll: () => {},
-        refresh: () => {},
+        refresh: () => {
+          const meta = currentRoot.meta;
+
+          if (!meta) {
+            return;
+          }
+
+          setActiveToggleKeys(new Set<string>());
+
+          props.onRunAction?.(
+            {
+              type: 'command',
+              command: meta.command,
+              subcommand: meta.subcommand,
+              arguments: meta.arguments ?? {},
+              options: meta.options ?? {},
+              recordInTimeline: false,
+            },
+            {
+              onReplaceRoot: props.onReplaceRoot,
+              getWebRoot: () => currentRoot,
+              applyOptimisticMutations: applyLocalOptimisticMutations,
+              promptRequestId: props.promptRequestId,
+            },
+          );
+        },
       },
       rootToolbarId,
     );

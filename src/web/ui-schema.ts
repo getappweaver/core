@@ -550,6 +550,8 @@ export const WebBasePropsSchema = z.object({
   buttonVariant: WebButtonVariantSchema.optional(),
   /** Enables built-in client-side filtering for supported collection elements. */
   filterable: z.literal(true).optional(),
+  /** Enables built-in card header refresh for root non-tree UIs using `root.meta`. */
+  refreshable: z.literal(true).optional(),
   /** Text searched by a parent filter; plugins choose the fields included here. */
   filterText: z.string().optional(),
   /** Stable display name for structured filtering/glob matching. */
