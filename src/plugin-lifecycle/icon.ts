@@ -14,7 +14,7 @@ import { bunkerSignEvent } from '@src/nostr/bunker';
 import type { BunkerSignerData } from '@src/nostr/connections';
 import { fetchNip65WriteRelays } from '@src/nostr/nip65';
 
-const MAX_PLUGIN_ICON_BYTES = 2 * 1024;
+const MAX_PLUGIN_ICON_BYTES = 2 * 1024 + 1000;
 
 export type PluginSvgIcon = {
   path: string;
