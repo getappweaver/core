@@ -8,6 +8,13 @@ for the shared plugin architecture.
 
 `/plugins publish <alias>` in the web UI opens the release review and author
 offer manager. It stays available when the current version is already published.
+For a pending release, the expanded release review contains optional offer
+management and an always-visible **Publish release** action row, outside any
+disclosure. Publication terms explicitly show **Free · No offer** or the current
+offer's price and status. Offer creation and history are collapsed by default;
+reviewing, cancelling, or publishing a new offer preserves the local release
+review. Publishing an offer remains a separate explicit catalog update before
+release publication; an unpublished review does not change the release's terms.
 The published catalog event, app coordinate, repository, current offer, and
 verified recent offer history are displayed. Publication requires a saved bunker
 connection matching the catalog author. First publish the app's catalog using the
@@ -40,8 +47,8 @@ These local records remain available when reopening the manager. Older offers
 without a record still display their catalog relay hint where available; previous
 relay acknowledgements cannot be reconstructed from the signed event alone.
 
-The author widget uses a compact app header, current-offer summary, aligned offer
-history, and a two-column form that stacks on small screens. Native disclosure
+The author widget uses a compact app header, offer summary, aligned offer
+history, and an optional two-column form that stacks on small screens. Native disclosure
 sections keep full identifiers, provider fields, and per-relay acknowledgements
 out of the main flow. Relay summaries show the latest attempt's accepted/total
 count and failures; accumulated accepting relays remain inside the details.

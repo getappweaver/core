@@ -91,7 +91,6 @@ export type OfferManagementProps = {
   published: PluginCatalogEntry;
   connection: ConnectionRow;
   relays: string[];
-  releasePreview: WebNodeRoot | null;
 };
 
 const activePublications = new Set<string>();
@@ -170,7 +169,7 @@ async function publishSigned(params: PublishSignedProps): Promise<string[]> {
 export async function managePaymentOffers(
   props: OfferManagementProps,
 ): Promise<WebNodeRoot> {
-  const { ctx, alias, published, connection, relays, releasePreview } = props;
+  const { ctx, alias, published, connection, relays } = props;
   const app = `32107:${published.pubkey}:${published.name}`;
   const options = publicationOptions(ctx);
   const operation = publicationOperation(ctx);
@@ -446,7 +445,9 @@ export async function managePaymentOffers(
     offers,
     notice,
     review,
-    releasePreview,
+    editing:
+      operation === 'offer-review' ||
+      (operation === 'offer-publish' && review !== null),
     publicationRelays: queryRelays,
     relayRecords: Object.fromEntries(
       [published.id, ...offers.map((offer) => offer.event.id)].map((id) => [

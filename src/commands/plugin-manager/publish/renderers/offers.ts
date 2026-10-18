@@ -14,7 +14,7 @@ type RenderOfferManagementProps = {
   offers: PaymentOffer[];
   notice: string | null;
   review: { id: string; template: EventTemplate } | null;
-  releasePreview: WebNodeRoot | null;
+  editing: boolean;
   publicationRelays: string[];
   relayRecords: Record<string, OfferRelayRecord | null>;
 };
@@ -248,7 +248,7 @@ export function renderOfferManagement(
     offers,
     notice,
     review,
-    releasePreview,
+    editing,
     publicationRelays,
     relayRecords,
   } = props;
@@ -274,7 +274,7 @@ export function renderOfferManagement(
           props: { weight: 'bold', className: 'offer-title' },
           children: [textNode(published.title || published.name)],
         },
-        textBlock(published.version, 'muted'),
+        textBlock(`Current catalog · ${published.version}`, 'muted'),
         eventLink(published.id, 'Catalog ↗'),
       ]),
       row('offer-header-meta', [
@@ -294,7 +294,7 @@ export function renderOfferManagement(
         ]
       : []),
     stack('offer-section offer-current', [
-      heading('Current offer'),
+      heading('Offer'),
       ...(current
         ? [
             row('offer-current-price', [
@@ -321,7 +321,7 @@ export function renderOfferManagement(
             textBlock(
               pointer
                 ? 'Advertised offer unavailable or unverified.'
-                : 'No offer advertised.',
+                : 'Free · No offer',
               pointer ? 'warning' : 'muted',
             ),
           ]),
@@ -344,36 +344,31 @@ export function renderOfferManagement(
         ),
       ]),
     ]),
-    ...(releasePreview
-      ? [
-          disclosure('Local release · review publication', [
-            releasePreview.tree,
-          ]),
-        ]
-      : []),
-    stack('offer-section offer-history', [
-      row('offer-section-title', [
-        heading('Offer history'),
-        textBlock(`${offers.length} shown · recent offers`, 'muted'),
-      ]),
-      ...(offers.length
-        ? [
-            row(
-              'offer-history-grid offer-history-head',
-              ['Price', 'Status', 'Validity', 'Action'].map((label) =>
-                textBlock(label, 'muted'),
+    disclosure('Offer history', [
+      stack('offer-section offer-history', [
+        row('offer-section-title', [
+          heading('Offer history'),
+          textBlock(`${offers.length} shown · recent offers`, 'muted'),
+        ]),
+        ...(offers.length
+          ? [
+              row(
+                'offer-history-grid offer-history-head',
+                ['Price', 'Status', 'Validity', 'Action'].map((label) =>
+                  textBlock(label, 'muted'),
+                ),
               ),
-            ),
-            ...offers.map((offer) =>
-              historyRow({
-                alias,
-                offer,
-                advertised: current?.event.id === offer.event.id,
-                record: relayRecords[offer.event.id] ?? null,
-              }),
-            ),
-          ]
-        : [textBlock('No verified offers found.', 'muted')]),
+              ...offers.map((offer) =>
+                historyRow({
+                  alias,
+                  offer,
+                  advertised: current?.event.id === offer.event.id,
+                  record: relayRecords[offer.event.id] ?? null,
+                }),
+              ),
+            ]
+          : [textBlock('No verified offers found.', 'muted')]),
+      ]),
     ]),
   ];
 
@@ -423,7 +418,7 @@ export function renderOfferManagement(
     );
   }
 
-  children.push({
+  const offerForm: WebNode = {
     type: 'element',
     tag: 'form',
     props: {
@@ -438,7 +433,7 @@ export function renderOfferManagement(
     },
     children: [
       row('offer-section-title', [
-        heading('New offer'),
+        heading('Create new offer'),
         textBlock('One-time · all future versions', 'muted'),
       ]),
       stack('offer-form-grid', [
@@ -480,9 +475,67 @@ export function renderOfferManagement(
             htmlType: 'submit',
           },
         },
+        {
+          type: 'element',
+          tag: 'button',
+          props: {
+            label: 'Cancel new offer',
+            className: 'web-button',
+            action: offerAction({
+              alias,
+              operation: 'offer-cancel',
+              options: {},
+            }),
+          },
+        },
       ]),
     ],
+  };
+
+  children.push({
+    type: 'element',
+    tag: editing ? 'stack' : 'details',
+    props: {
+      className: 'offer-details offer-create',
+    },
+    children: [
+      {
+        type: 'element',
+        tag: editing ? 'text' : 'summary',
+        children: [
+          textNode(
+            current ? 'Create new offer (optional)' : 'Create offer (optional)',
+          ),
+        ],
+      },
+      textBlock(
+        'Publish directly with the terms below, or create and publish an offer first.',
+        'muted',
+      ),
+      offerForm,
+    ],
   });
+
+  const terms = current
+    ? `${offerStatus(current) === 'active' ? '' : 'Free installation now · '}Current offer · ${Number(current.price).toLocaleString('en-US')} sats · ${offerStatus(current)} · one-time, all future versions`
+    : pointer
+      ? 'Advertised offer unavailable or unverified · installation requires offer recovery'
+      : 'Free · No offer';
+
+  children.push(
+    stack('offer-section offer-publication-summary', [
+      heading('Publication terms'),
+      textBlock(terms, pointer && !current ? 'warning' : 'default'),
+      ...(review
+        ? [
+            textBlock(
+              'The new offer is not advertised yet. Publish it above to use it for this release.',
+              'warning',
+            ),
+          ]
+        : []),
+    ]),
+  );
 
   return {
     kind: 'ui',
@@ -490,7 +543,6 @@ export function renderOfferManagement(
     meta: { command: 'plugins', subcommand: 'publish' },
     tree: stack('plugin-offer-management', children),
     stylesheets: [
-      ...(releasePreview?.stylesheets ?? []),
       {
         id: 'plugin-offer-management',
         cssText: `

@@ -33,6 +33,7 @@ import {
   isLocalPluginRepo,
   setPluginRepository,
 } from '@src/plugin-lifecycle/manifest';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import {
   type InstalledPluginEntry,
@@ -110,6 +111,7 @@ export type PluginsPublishPreviewRepresentation = {
   refs: RefEntry[];
   relays: string[];
   firstPublish: boolean;
+  offerManagement: WebNodeRoot | null;
 };
 
 const latestPublishResults = new Map<string, PluginsPublishRepresentation>();
@@ -833,24 +835,15 @@ export async function handlePluginsPublish(
     }
 
     if (
-      !['offer-review', 'offer-publish', 'offer-select'].includes(operation)
+      ![
+        'offer-review',
+        'offer-publish',
+        'offer-select',
+        'offer-cancel',
+      ].includes(operation)
     ) {
       return 'Unknown publication operation.';
     }
-
-    const relays = await fetchPluginPublishRelays({
-      ctx,
-      authorPubkey: published.pubkey,
-    });
-
-    return managePaymentOffers({
-      ctx,
-      alias,
-      published,
-      connection,
-      relays,
-      releasePreview: null,
-    });
   }
 
   const versionTag = `v${pkg.version}`;
@@ -902,7 +895,6 @@ export async function handlePluginsPublish(
         published,
         connection,
         relays,
-        releasePreview: null,
       });
     }
 
@@ -946,7 +938,17 @@ export async function handlePluginsPublish(
       authorPubkey: connection.data.userPubkey,
     });
 
-    const preview = renderPluginsPublishPreviewWeb({
+    const offerManagement = published
+      ? await managePaymentOffers({
+          ctx,
+          alias,
+          published,
+          connection,
+          relays,
+        })
+      : null;
+
+    return renderPluginsPublishPreviewWeb({
       alias,
       pluginName: pkg.name,
       title: pkg.title,
@@ -962,18 +964,8 @@ export async function handlePluginsPublish(
       refs,
       relays,
       firstPublish: published === null,
+      offerManagement,
     });
-
-    return published
-      ? managePaymentOffers({
-          ctx,
-          alias,
-          published,
-          connection,
-          relays,
-          releasePreview: preview,
-        })
-      : preview;
   }
 
   if (published) {

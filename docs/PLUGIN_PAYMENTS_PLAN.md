@@ -111,6 +111,23 @@ Cancellation is not part of this slice; existing offers retain their windows.
       app header, current-offer summary, aligned history, two-column form, and
       collapsed technical/relay details.
 - [ ] User verification of the compact publication layout.
+- [x] Make release review and Publish release visible outside offer management;
+      show explicit free/current-offer terms and make new-offer creation optional.
+- [x] Preserve local release context through offer review, cancellation, and
+      publication; statically verify the revised publication flow.
+- [ ] User verification of all four free/current-offer publication paths.
+
+Publication visibility follow-up: the local release review is expanded and owns
+the sticky **Publish release** action row. Optional offer creation and history use
+disclosures; publication terms show free/no-offer or the advertised price/status,
+including upcoming/expired free-installation states and unresolved-offer warnings.
+Offer operations rebuild the pending release review rather than replacing it
+with an offer-only widget. Cancelling a new offer returns to the existing terms;
+reviewing alone does not advertise it. Offer publication remains an explicit
+catalog update before release publication. First catalog publication still uses
+the free release flow described below. Targeted ESLint with fixes and TypeScript
+checks pass. Authenticated visual verification remains pending; a backend restart
+is required to load these changes.
 
 Verification completed: targeted ESLint with fixes, `bunx tsc --noEmit`, and
 `git diff --check`. The first catalog publication still uses the existing release

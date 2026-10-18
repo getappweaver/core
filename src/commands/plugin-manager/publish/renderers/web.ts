@@ -27,6 +27,12 @@ const pluginsPublishStylesheet = {
 
     .web-row.plugins-publish-actions {
       flex-wrap: wrap;
+      justify-content: flex-end;
+      position: sticky;
+      bottom: 0;
+      background: var(--color-panel);
+      padding: .6rem 0;
+      border-top: 1px solid var(--color-border);
     }
 
     .web-stack.plugins-publish-preview {
@@ -65,7 +71,7 @@ export function renderPluginsPublishPreviewWeb(
                   type: 'element',
                   tag: 'text',
                   props: { weight: 'bold' },
-                  children: [textNode(`Review ${representation.title}`)],
+                  children: [textNode(`Publish ${representation.title}`)],
                 },
                 {
                   type: 'element',
@@ -115,6 +121,9 @@ export function renderPluginsPublishPreviewWeb(
                 : 'Confirming will push and verify Git refs, upload the icon when configured, sign the updated catalog event, and publish it.',
               'warning',
             ),
+            ...(representation.offerManagement
+              ? [representation.offerManagement.tree]
+              : [textBlock('Publication terms: Free · No offer', 'muted')]),
             {
               type: 'element',
               tag: 'commandStatus',
@@ -130,9 +139,7 @@ export function renderPluginsPublishPreviewWeb(
                   tag: 'button',
                   props: {
                     id: confirmButtonId,
-                    label: representation.firstPublish
-                      ? 'Register & Publish'
-                      : 'Confirm Publish',
+                    label: 'Publish release',
                     className: 'web-button',
                     tone: 'warning',
                     action: {
@@ -186,7 +193,10 @@ export function renderPluginsPublishPreviewWeb(
         },
       ],
     },
-    stylesheets: [pluginsPublishStylesheet],
+    stylesheets: [
+      pluginsPublishStylesheet,
+      ...(representation.offerManagement?.stylesheets ?? []),
+    ],
   };
 }
 

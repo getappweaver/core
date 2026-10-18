@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.7.0] - 2026-10-18
+
+- feat: enhance offer management and publication flow in plugin manager (ba6d031)
+
 ## [v14.6.0] - 2026-10-18
 
-- feat: new blog engine with images (4e28ca8)
+- feat: new blog engine with images (66ddfbf)
 
 ## [v14.5.0] - 2026-10-18
 
