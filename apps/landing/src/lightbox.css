@@ -66,6 +66,8 @@
   display: block;
   max-width: 100%;
   max-height: calc(94vh - 2.6rem);
+  margin: 0 auto;
+  place-self: center;
   object-fit: contain;
 }
 

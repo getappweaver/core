@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import type { EventTemplate, NostrEvent, VerifiedEvent } from 'nostr-tools';
@@ -707,6 +707,13 @@ export async function buildBlog(docRoutes: string[] = []): Promise<void> {
 
   await Promise.all(
     posts.map(async (post) => {
+      const sourceAssetsDir = join(BLOG_ROOT, post.slug);
+      const targetPostDir = join(PUBLIC_BLOG_ROOT, post.slug);
+
+      if (existsSync(sourceAssetsDir)) {
+        await cp(sourceAssetsDir, targetPostDir, { recursive: true });
+      }
+
       const postBody = `<main>
   <article>
     <p class="meta">${escapeHtml(formatDate(post.publishedAt))}</p>
@@ -720,7 +727,7 @@ export async function buildBlog(docRoutes: string[] = []): Promise<void> {
 </main>`;
 
       await writeTextFile(
-        join(PUBLIC_BLOG_ROOT, post.slug, 'index.html'),
+        join(targetPostDir, 'index.html'),
         renderPage({
           title: `${post.title} · AppWeaver Blog`,
           description: post.summary,

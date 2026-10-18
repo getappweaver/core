@@ -1,8 +1,6 @@
-# Selling apps with Nostr zaps
-
 I want app authors to be able to charge for their AppWeaver apps. Since AppWeaver already uses Nostr for app discovery and Git for distribution, using zaps for payments felt like a good fit.
 
-The first idea is simple: the author gives a Lightning address and a price, the user pays, and AppWeaver lets them install the app after finding the zap receipt.
+The first idea is simple: the author gives a Lightning address and a price, the user pays, and AppWeaver lets them install the app after fetching the zap receipt.
 
 Of course, it's not impossible to install the app without going through our checks, since it is open-source software. The point is to make installing and updating apps easy for users while allowing authors to charge for their work.
 
@@ -47,7 +45,7 @@ An app has a stable coordinate:
 32107:<author-pubkey>:<app-name>
 ```
 
-This is an addressable event. The author can publish a replacement when a new release is published through Git. The previous signed event cannot be edited, but a relay would keep only its latest replacement.
+This is an addressable event. The author can publish a replacement after a new release is published through Git. The previous signed event cannot be edited, but a relay would keep only its latest replacement.
 
 That is useful for discovering the current version. It is less useful for preserving the exact price and payment destination someone agreed to months ago.
 
@@ -82,54 +80,48 @@ Here is an example offer for the app above. As with the catalog example, the key
 }
 ```
 
-The offer fields are tags, so `content` is empty. The validity timestamps are Unix seconds: the start is inclusive and the end is exclusive.
+The offer fields are tags, so `content` is empty. The validity timestamps are Unix seconds: the start is inclusive and the end is exclusive. Both timestamps are required; because an offer is immutable and non-replaceable, an offer without an expiration date could never be closed.
 
-## Can someone pay an old, cheaper offer?
+## What if the price changes or an app becomes paid?
 
-This was one of the first questions.
+Suppose an author publishes an offer for 1,000 sats, then later raises the price to 5,000 sats. Or an app starts free, and the author decides to charge for future versions. How does that affect existing users and pending offers?
 
-Suppose an author publishes an offer for 1,000 sats, then later publishes one for 5,000 sats. If both events remain available, can a user just choose the cheaper one?
-
-My answer is: yes, if it is still within the validity window the author signed.
-
-Publishing a new offer changes what the catalog advertises. It does not silently cancel an earlier offer. If an author made a price available until the end of the month, that price remains available until the end of the month.
-
-For example:
+First, publishing a new offer changes what the catalog advertises; it does not silently cancel an earlier offer that is still within its signed window:
 
 - Offer A costs 1,000 sats and is valid during October.
 - Offer B costs 5,000 sats and is advertised during November.
 - A payment against A made in October remains a valid purchase forever.
-- A payment against A made in November does not qualify.
+- A payment against A attempted in November does not qualify because its validity window ended.
 
-The important distinction is that **the offer expires, not the purchase**.
+The key distinction is that **the offer expires, not the purchase**. Ownership is verified against the terms of the offer you actually paid for, not today's offer price. Changing the price later never invalidates past payments.
 
-We should never compare an old purchase against today's price. Otherwise, raising the price would take away access from people who already paid.
+The same principle governs when a free app becomes paid:
 
-## But the user can backdate a Nostr event
+- **Installed copies keep working:** A price change never disables software you already have installed.
+- **Updating requires accepting an offer:** If a user installed a free version and the author later introduces pricing, managed updates are gated. To update, the user must accept and pay the active offer.
+- **Future updates remain unlocked:** Once the user pays that offer, their identity permanently owns the app. They remain eligible for all subsequent updates—even if the author raises the price or publishes new offers later.
 
-A buyer signs the kind `9734` zap request. That means they control its `created_at` value. Checking that timestamp would let them create a request today and pretend it happened while a cheaper offer was valid.
+I call this **Early-adopter Pricing**. With one-time payments, early supporters who take a chance on an app are permanently rewarded with lifetime updates. The author can raise the price as the software matures, but the protocol guarantees that early adopters are permanently grandfathered in. Later on, new payment primitives (like recurring subscriptions or major-version licenses) could unlock additional pricing strategies, but for one-time payments, rewarding early adopters is the core philosophy.
 
-The timestamp we use is the one on the kind `9735` zap receipt, signed by the recipient's Lightning provider.
+To make expectations clear:
 
-[NIP-57](https://github.com/nostr-protocol/nips/blob/master/57.md) says that the receipt timestamp SHOULD be the invoice's `paid_at` time. The buyer cannot change that signed timestamp without invalidating the signature.
+- Free installations show a brief notice: *"This version is free. The author may charge for future releases. Your installed version will remain usable if pricing changes."*
+- For paid apps, the price sits above the Buy button, with an `[i]` button explaining terms and ownership checks.
+- There are no automatic updates. Users can review release notes from the catalog and decide when an update is worth taking.
 
-The check is:
+![Paid app in the catalog showing price, info button, and Buy & install](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/paid-app.png)
 
-```text
-validFrom <= receipt.created_at < validUntil
-```
-
-This trusts the provider to report payment and its time honestly. It is not independent cryptographic proof that a Lightning payment settled at that exact moment. For this soft gate, I think trusting the author's chosen payment provider is enough.
+![App purchase terms dialog opened from the info button](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/app-purchase-terms.png)
 
 ## How do we know who signed the receipt?
 
 The author's Lightning address resolves to an LNURL-pay endpoint. That endpoint must support Nostr zaps and advertise a `nostrPubkey`.
 
-That is the provider's receipt-signing key. A valid receipt must be signed by it.
+That is the Lightning provider's receipt-signing key. A valid receipt must be signed by it.
 
-There is a historical problem here too. If the provider changes its key next year, checking an old receipt against only today's endpoint could reject a genuine purchase.
+There is a historical problem here too. If the Lightning provider changes its key next year, checking an old receipt against only today's endpoint could reject a genuine purchase.
 
-So the author-signed offer also keeps the provider pubkey. New checkout checks the endpoint against that key. Historical recovery can verify the receipt against the provider key the author authorized in that offer.
+So the author-signed offer also keeps the Lightning provider's pubkey. New checkout checks the endpoint against that key. Historical recovery can verify the receipt against the provider key the author authorized in that offer.
 
 Of course, matching the provider signature alone is not enough. A real receipt for another app or another person shouldn't unlock this app.
 
@@ -161,9 +153,13 @@ Alice signs a kind `9734` request. Its `pubkey` is Alice's identity, while `p` i
 
 The request is sent to the author's LNURL-pay callback to obtain an invoice. It is not published to relays as a standalone request. The `relays` tag tells the provider where to publish the receipt after payment.
 
-### The provider's zap receipt
+![Purchase zap request signed confirmation](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/payment-done-installing.png)
 
-After payment, the provider signs a kind `9735` receipt. Notice that its `pubkey` is the provider's key, not Alice's or the author's. The complete signed request is included as a JSON string in `description`:
+![Payment request dialog with WebLN and QR/invoice options](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/payment-request.png)
+
+### The Lightning provider's zap receipt
+
+After payment, the Lightning provider signs a kind `9735` receipt. Notice that its `pubkey` is the Lightning provider's key, not Alice's or the author's. The complete signed request is included as a JSON string in `description`:
 
 ```json
 {
@@ -186,43 +182,14 @@ After payment, the provider signs a kind `9735` receipt. Notice that its `pubkey
 
 Lowercase `p` is still the recipient. Uppercase `P`, when present, identifies the buyer. We can also get the buyer from the signed request inside `description`, so recovery doesn't depend on the provider including `P`.
 
-### The amount and the description hash
+### Checking the purchase
 
-The receipt contains the BOLT11 invoice, not a separate amount field that we can simply trust. We decode its amount and compare it with the offer and the request:
-
-```text
-Offer price:              5,000 sats
-Request amount tag:       5,000,000 millisats
-Decoded invoice amount:   5,000,000 millisats
-```
-
-AppWeaver already has a focused BOLT11 parser in `src/payments/lightning-invoice.ts`. It checks the Bech32 checksum, decodes the amount and its unit multiplier, and extracts fields such as the payment hash, expiry, and description hash. We reused that parser rather than adding a BOLT11 decoding library. It does not cryptographically verify the invoice's own signature; the provider's signed receipt is the payment attestation we trust.
-
-The description hash is a SHA-256 hash encoded inside the invoice. For a zap invoice, it commits to the exact JSON text of the signed zap request. It is not the request itself, and it is not the request's event ID.
-
-The request above is formatted for readability. In the receipt example, its `description` value is a compact JSON string. The check uses that string exactly as received:
-
-```text
-SHA256(the raw description tag value)
-    == the description hash encoded in the BOLT11 invoice
-```
-
-We use `@noble/hashes` for SHA-256. We don't parse and reserialize the request before hashing it, because even a whitespace change would produce a different hash. Parsing the request and verifying its Nostr signature is a separate check.
-
-### Checking the whole purchase
-
-With these events, we check:
+With these events, the important parts to check are:
 
 - **The offer's author and signature.** The offer's `pubkey` must match the catalog author's `pubkey`, and its `a` tag must reference that author's app. Someone else cannot publish a cheap offer and use it to unlock the author's app.
-- **The receipt's provider and signature.** Its `pubkey` must match the provider key authorized in the signed offer. A receipt signed by an unrelated key doesn't count.
-- **The buyer's request and signature.** The request in `description` must be signed by the selected purchasing identity. Alice's receipt doesn't give Bob ownership.
-- **The app and offer references.** The request and receipt must identify the same app and the exact offer used to verify the price and validity window. A Todo purchase doesn't unlock the Bookmark Manager.
-- **The recipient.** The request and receipt's `p` tags must match the offer's recipient. Paying another pubkey doesn't count as paying this author.
-- **The exact amount.** The decoded invoice amount and request amount must both equal the offer's price in millisats. A 4,999-sat payment doesn't qualify for this 5,000-sat offer.
-- **The invoice description hash.** The hash inside the invoice must match the raw `description` value. An invoice issued for another request cannot be paired with Alice's request to claim this purchase.
-- **The payment time.** The provider-signed receipt timestamp must be within the offer's window. A receipt reporting payment at 12:05 doesn't qualify for an offer that ended at 12:00, even if the request was signed earlier.
+- **The payment time.** The Lightning provider-signed receipt timestamp must be within the offer's window. A receipt reporting payment at 12:05 doesn't qualify for an offer that ended at 12:00, even if the request was signed earlier. The qualifying zap receipt is what we retain for purchase recovery.
 
-A successful wallet response is useful during checkout. The qualifying zap receipt is what we retain for purchase recovery.
+![Second Brain app unlocked and installed after purchase verification](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/purchased.png)
 
 ## Which identity owns the purchase?
 
@@ -234,13 +201,11 @@ This matters when using multiple AppWeaver instances. An instance might be authe
 
 The purchase flow therefore lets the user choose the authenticated identity or a saved bunker identity. If the old purchasing identity isn't connected, the user can add it through the bunker manager.
 
+![Choosing the purchasing identity or opening the bunker manager](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/app-purchase-dialog.png)
+
 Looking up public receipts doesn't require signing a new event. But finding a receipt for Alice doesn't prove that the person asking to install the app can sign as Alice. A saved bunker connection may also have expired or lost its signing permission.
 
-Before restoring a purchase, the selected identity signs a fresh challenge. AppWeaver creates a random nonce and binds it to the app, the buyer, and the fetched receipt. The challenge expires after five minutes and can only be used once. We verify the signature and require its pubkey to match the buyer in the receipt's embedded zap request, not the provider that signed the receipt.
-
-The challenge is not published, and signing it does not authorize another payment. With a bunker, this proves that the user has access to a remote signer for that identity; the private key can remain in the bunker. The payment receipt is verified separately, so signing access alone doesn't prove that the app was paid for.
-
-This check also applies to receipts cached locally. We don't ask every connected bunker to sign something in the background, and an arbitrary entered pubkey isn't enough. A new purchase already requires a signed zap request, which includes a server-generated nonce for that payment attempt. Transfers between unrelated pubkeys remain a separate problem.
+Before restoring a purchase, the selected identity signs a fresh challenge that won't be published. AppWeaver creates a random nonce and binds it to the app, the buyer, and the fetched receipt. The challenge expires after five minutes and can only be used once. We verify the signature and require its pubkey to match the buyer in the receipt's embedded zap request, not the provider that signed the receipt.
 
 ## The receipt needs to be somewhere we can find it again
 
@@ -264,69 +229,45 @@ Here lowercase `p` is the recipient. The receipt's author is the provider, not t
 
 There is still no guarantee that relays will store everything forever. A user may change relays, a relay may go offline, or an old offer may disappear from the relays being queried.
 
-We retain the verified receipt together with its immutable offer locally, revalidate them when reused, and keep relay information for pending payments. The request also carries a relay hint for the offer. A fresh instance can recover a purchase while the required records remain available on reachable relays.
+We retain the verified receipt together with its immutable offer locally, revalidate them when reused, and keep relay information for pending payments. The request also carries a relay hint for the offer. To find the offer on Nostr, the installer checks the catalog's relay hint, our fallback catalog relays, and the author's NIP-65 write relays (outbox). Checking the author's outbox relays means an offer is discoverable even if the specific hint relay went down or dropped older events. A fresh instance can recover a purchase while the required records remain available on reachable relays.
 
-This is a place where "nothing found" and "never paid" are different things. The lookup is bounded, and incomplete results shouldn't be treated as a reason to automatically charge again. Export/import and better recovery tools are still on the list.
+This is a place where "nothing found" and "never paid" are different things. The lookup is bounded, and incomplete results shouldn't be treated as a reason to automatically charge again.
+
+![App purchase dialog when no matching receipt is found on queried relays](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/app-purchase-buy-install.png)
+
+Export/import is also planned for complete relay independence. A user can export their verified `{ offer, receipt }` bundle as a JSON file and bring it to another instance. To prevent people from simply copying receipt files as shared licenses, importing the bundle requires the user to sign an unpublished challenge with their Nostr key (via browser extension or Bunker) to prove they actually hold the private key for the buyer identity embedded in the receipt.
 
 ## Paid, but the receipt hasn't arrived
 
 This is probably the most annoying edge case from the user's point of view.
 
-The wallet says the invoice was paid. The provider hasn't published the receipt yet, or the relays we're querying haven't returned it. The install check can't confirm ownership.
+The wallet says the invoice was paid. The Lightning provider hasn't published the receipt yet, or the relays we're querying haven't returned it. The install check can't confirm ownership.
 
 It would be bad to just show the Buy button again and create another invoice.
 
 Instead, we keep the signed request, invoice, and receipt relay destinations. Reopening checkout can check the receipt again or reuse the existing invoice if it is still unpaid. Starting another payment after expiry is an explicit action.
 
+![Checkout waiting for payment with QR code, invoice, and Check payment action](https://getappweaver.com/blog/selling-open-source-apps-with-nostr-zaps/payment-waiting-qr.png)
+
 Missing confirmation shouldn't erase the payment attempt. The user should be able to come back to it.
 
-## What if publishing succeeds only halfway?
+If the receipt still hasn't arrived because the Lightning provider crashed or failed to emit the kind `9735` event, the client cannot fabricate a provider signature. The cleanest recourse is putting the buyer in direct contact with the author. The checkout screen provides a "Contact Author via DM" action, sending an encrypted NIP-17 direct message containing the invoice, payment timestamp, and buyer public key. The author checks their node or LNURL backend, confirms the invoice was settled, and can simply refund the sats back to the buyer.
 
-The author flow has a similar problem.
+## What are the responsibilities of a paid app author?
 
-Publishing a new offer involves two events: the immutable offer, then a replacement catalog event pointing to it. The offer can reach a relay while the catalog update fails.
+Because AppWeaver relies on decentralized Nostr events rather than a centralized billing backend, keeping a paid app accessible comes with a few clear responsibilities for the author:
 
-We publish the offer first, use an accepting relay as its hint, and save the signed offer before publication. A retry reuses that same event instead of creating another offer with another ID.
-
-The author UI also keeps the relay destinations and acknowledgements. It can show which relays accepted an event and which failed. Having an event ID without knowing where it was published is not very helpful when trying to recover from a failure.
-
-## What if a free app becomes paid?
-
-I don't think installing a free version should force the author to keep every future version free. But I also don't think a pricing change should disable a copy someone already has.
-
-The rule is:
-
-- The installed version keeps working.
-- If an active offer exists, a managed update requires a purchase unless the user already owns the app.
-- A qualifying purchase includes future versions, even if the author raises the price later.
-
-Free installation shows a short notice before continuing:
-
-> This version is free. The author may charge for future releases. Your installed version will remain usable if pricing changes.
-
-For a paid app, we show the price above Buy and keep the longer explanation behind an `[i]` button. The user can check purchase ownership before paying.
-
-There are no automatic app updates. A user can choose to stay on their current version, but that also means possibly missing security fixes or compatibility changes. We mention that without pretending every update is a security patch.
-
-Release notes help with that decision too. The installer can show the whole published release history, newest first, and the notes relevant to an available update. Those notes come from the app's catalog; the publisher normally prepares them from Git commit subjects between release tags, or preserves the author's custom notes.
-
-Selecting an older version that used to be free is something I want to support later. The current manager doesn't yet offer historical free-version installation or detailed commit comparisons.
-
-## What happens when an author forgets to renew an offer?
-
-If the advertised offer expires, we ignore its payment gate and allow installation or updates without payment. An upcoming offer also doesn't gate before its start time.
-
-Keeping an active offer published is the author's responsibility. We don't search for another older offer to force a payment when the advertised one has expired.
-
-An expired offer is different from an advertised offer that is missing or malformed. In the latter case, the manager asks for purchase recovery or author correction instead of silently calling the app free.
-
-And we still need expired offers for people who paid while they were valid. Expiring the purchase window should not delete the historical terms needed to verify those payments.
+- **Keeping an active offer published and renewed:** Every offer has a signed `validUntil` timestamp. If an advertised offer expires, AppWeaver ignores its payment gate and allows installation or updates without payment. If an author wants to keep charging, publishing a renewed, unexpired offer is their responsibility.
+- **Maintaining a working Lightning address:** The author's Lightning address (`lud16`) must remain reachable and its provider key must match the offer. If the Lightning endpoint is unreachable or fails, the offer is treated as **unavailable**—new checkouts and updates are blocked to prevent broken payment attempts. Free apps always keep working.
+- **Preserving historical offer events on relays:** An expired offer must remain accessible on relays. Expiring an offer only closes the window for new buyers; past buyers still need the author's signed historical terms to verify their zap receipts when recovering purchases on a fresh instance.
 
 ## Where I am now
 
 The author offer manager and the payment-aware installation flow are implemented. The next step is verifying the buyer flow end to end: payment, delayed receipts, updates, and recovery from another instance.
 
-There are still things to improve, particularly historical free versions, relay recovery, and comparing what changed between releases.
+There are still things to improve:
+- **Offline export/import**: Portable JSON purchase bundles with cryptographic challenge-response verification on import.
+- **Ratings & Reviews**: Using **NIP-22** (kind `1111`) comments and **NIP-32** (kind `1985`) ratings tagged to the app coordinate. In `/plugins list`, each app can show a badge like `5 💬 · ⭐ 4.9/5 (42 reviews)`. Clicking opens a ratings breakdown and reviews list, with a Web of Trust (WoT) filter to filter spam and highlight reviews from people you follow.
 
 The part I find interesting is that a small payment feature turns into a discussion about identity, history, distribution, and promises made to users. Nostr gives us useful building blocks, but we still have to decide what the events actually mean and how to behave when some of them are missing.
 

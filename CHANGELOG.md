@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.6.0] - 2026-10-18
+
+- feat: new blog engine with images (4e28ca8)
+
 ## [v14.5.0] - 2026-10-18
 
-- feat: generate site script to generate both main page and others (8d65bbb)
+- feat: generate site script to generate both main page and others (1d7c1cf)
 
 ## [v14.4.0] - 2026-10-16
 

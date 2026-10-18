@@ -28,3 +28,8 @@ The `relays` field stays outside the signed event. `blog:publish` copies the
 Markdown into `event.content`, bumps `created_at` when signing is needed, signs
 with the saved bunker connection whose user pubkey matches `event.pubkey`, and
 publishes to every wrapper relay.
+
+Per-post images can be stored in `apps/landing/blog/<slug>/` and referenced in
+Markdown with `https://getappweaver.com/blog/<slug>/<image>.png`. `blog:build`
+copies that directory to `public/blog/<slug>/` so the deployed website and the
+NIP-23 long-form Nostr event use the same image URLs.
