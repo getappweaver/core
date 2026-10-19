@@ -13,6 +13,7 @@ import {
 } from './opencode-managed-config';
 import {
   areOpencodeSessionsIdle,
+  invalidateOpencodeCatalogCache,
   restartOpencodeSdk,
   verifyOpencodeRuntimeProvider,
   withOpencodeSource,
@@ -456,6 +457,7 @@ class OpencodeRuntimeController {
         this.appliedConfigs.set(transition.workspaceRoot, transition.config);
       }
 
+      invalidateOpencodeCatalogCache();
       this.state = 'running';
       this.announce('completed');
       this.releaseAdmissionWaiters();

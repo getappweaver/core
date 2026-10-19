@@ -40,94 +40,112 @@ export type ComposerAiState = {
   contextStats: AiModelSourceContextUsage | null;
 };
 
-export async function getComposerAiState(
+const inFlightComposerAiState = new Map<string, Promise<ComposerAiState>>();
+
+export function getComposerAiState(
   ctx: WebRouteContext,
-  selectedSessionId: string | null,
+  selectedSessionId: string | null = null,
 ): Promise<ComposerAiState> {
   const workspace = getWorkspaceTarget(ctx.seenDb);
+  const dedupeKey = `${workspace}:${selectedSessionId ?? 'current'}`;
 
-  const coordinator = createModelSourceCoordinator(ctx.seenDb);
+  const inFlight = inFlightComposerAiState.get(dedupeKey);
 
-  const modelSource = await coordinator.getSnapshot(workspace, 'opencode');
-  const modelSources = await coordinator.listSources(workspace, modelSource);
-
-  const runtime = opencodeRuntimeController.status();
-
-  if (runtime.state !== 'running') {
-    modelSource.state.transitionState =
-      runtime.state === 'failed' ? 'failed' : 'pending';
-
-    modelSource.state.health =
-      runtime.state === 'failed'
-        ? {
-            status: 'unavailable',
-            message: runtime.lastError ?? 'OpenCode restart failed.',
-          }
-        : {
-            status: 'degraded',
-            message: 'Waiting for OpenCode configuration restart.',
-          };
+  if (inFlight) {
+    return inFlight;
   }
 
-  const cwd = workspace === 'appweaver' ? ctx.dmBotRoot : ctx.parentOfBotRoot;
+  const promise = (async (): Promise<ComposerAiState> => {
+    const coordinator = createModelSourceCoordinator(ctx.seenDb);
 
-  const selected = getSelectedWebSessionId(
-    ctx.seenDb,
-    selectedSessionId,
-    workspace,
-  );
+    const modelSource = await coordinator.getSnapshot(workspace, 'opencode');
+    const modelSources = await coordinator.listSources(workspace, modelSource);
 
-  const currentSessionId = selected
-    ? selected
-    : await getOrCreateCurrentSession({
-        db: ctx.seenDb,
-        backend: createBackend({
-          backendName: 'opencode',
-          dmBotRoot: ctx.dmBotRoot,
-        }),
-        cwd,
-        workspace,
-        selection: 'web',
-      });
+    const runtime = opencodeRuntimeController.status();
 
-  const contextStats =
-    currentSessionId && runtime.state === 'running'
-      ? await coordinator
-          .getContextUsage({
-            workspaceTarget: workspace,
-            backend: 'opencode',
-            providerId: modelSource.providerId,
-            sessionId: currentSessionId,
-            modelId: modelSource.state.effectiveModelId,
-          })
-          .catch(() => null)
-      : null;
+    if (runtime.state !== 'running') {
+      modelSource.state.transitionState =
+        runtime.state === 'failed' ? 'failed' : 'pending';
 
-  // Read titles after asynchronous model/context lookups so a slow state
-  // refresh cannot overwrite a title notification with an older title.
-  const recentSessions = listAppWeaverSessions(ctx.seenDb, workspace, 5);
+      modelSource.state.health =
+        runtime.state === 'failed'
+          ? {
+              status: 'unavailable',
+              message: runtime.lastError ?? 'OpenCode restart failed.',
+            }
+          : {
+              status: 'degraded',
+              message: 'Waiting for OpenCode configuration restart.',
+            };
+    }
 
-  const selectedRow = ctx.seenDb
-    .prepare('SELECT title FROM sessions WHERE id = ?')
-    .get(currentSessionId) as { title: string | null } | undefined;
+    const cwd = workspace === 'appweaver' ? ctx.dmBotRoot : ctx.parentOfBotRoot;
 
-  const currentSessionTitle =
-    recentSessions.find((session) => session.id === currentSessionId)?.title ??
-    selectedRow?.title ??
-    null;
+    const selected = getSelectedWebSessionId(
+      ctx.seenDb,
+      selectedSessionId,
+      workspace,
+    );
 
-  return {
-    backend: 'opencode',
-    interventionAvailable: ctx.attachUrl === null,
-    interventionEnabled: getInterventionMode(ctx.seenDb),
-    currentSessionId,
-    workspace,
-    sessionRunning: isSessionRunning(currentSessionId),
-    runControl: getSessionRunView(currentSessionId),
-    currentSessionTitle,
-    recentSessions,
-    modelSource,
-    modelSources,
-    contextStats,
-  };
+    const currentSessionId = selected
+      ? selected
+      : await getOrCreateCurrentSession({
+          db: ctx.seenDb,
+          backend: createBackend({
+            backendName: 'opencode',
+            dmBotRoot: ctx.dmBotRoot,
+          }),
+          cwd,
+          workspace,
+          selection: 'web',
+        });
+
+    const contextStats =
+      currentSessionId && runtime.state === 'running'
+        ? await coordinator
+            .getContextUsage({
+              workspaceTarget: workspace,
+              backend: 'opencode',
+              providerId: modelSource.providerId,
+              sessionId: currentSessionId,
+              modelId: modelSource.state.effectiveModelId,
+            })
+            .catch(() => null)
+        : null;
+
+    // Read titles after asynchronous model/context lookups so a slow state
+    // refresh cannot overwrite a title notification with an older title.
+    const recentSessions = listAppWeaverSessions(ctx.seenDb, workspace, 5);
+
+    const selectedRow = ctx.seenDb
+      .prepare('SELECT title FROM sessions WHERE id = ?')
+      .get(currentSessionId) as { title: string | null } | undefined;
+
+    const currentSessionTitle =
+      recentSessions.find((session) => session.id === currentSessionId)
+        ?.title ??
+      selectedRow?.title ??
+      null;
+
+    return {
+      backend: 'opencode',
+      interventionAvailable: ctx.attachUrl === null,
+      interventionEnabled: getInterventionMode(ctx.seenDb),
+      currentSessionId,
+      workspace,
+      sessionRunning: isSessionRunning(currentSessionId),
+      runControl: getSessionRunView(currentSessionId),
+      currentSessionTitle,
+      recentSessions,
+      modelSource,
+      modelSources,
+      contextStats,
+    };
+  })().finally(() => {
+    inFlightComposerAiState.delete(dedupeKey);
+  });
+
+  inFlightComposerAiState.set(dedupeKey, promise);
+
+  return promise;
 }

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.11.1] - 2026-10-19
+
+- fix: catalog cache invalidation (536ccbbd)
+
 ## [v14.11.0] - 2026-10-19
 
-- feat: skill learn to create custom skills (02a1de0e)
+- feat: skill learn to create custom skills (50196c82)
 
 ## [v14.10.0] - 2026-10-19
 

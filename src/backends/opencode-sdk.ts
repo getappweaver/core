@@ -70,6 +70,15 @@ const sourceRunCounts = new Map<string, number>();
 const coreCanonicalRevisions = new Map<string, string>();
 let lastStartedPort: number | null = null;
 const lastResolvedModels = new Map<string, string>();
+let opencodeSdkGeneration = 0;
+
+export function getOpencodeSdkGeneration(): number {
+  return opencodeSdkGeneration;
+}
+
+export function invalidateOpencodeCatalogCache(): void {
+  opencodeSdkGeneration += 1;
+}
 
 const DEFAULT_PORT_START = 4099;
 const DEFAULT_PORT_COUNT = 12;
@@ -1125,6 +1134,7 @@ export async function areOpencodeSessionsIdle(
 }
 
 export async function restartOpencodeSdk(): Promise<void> {
+  invalidateOpencodeCatalogCache();
   lastResolvedModels.clear();
   const current = sdk ?? (sdkInitPromise ? await sdkInitPromise : null);
 

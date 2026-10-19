@@ -1,6 +1,7 @@
 import { opencodeRuntimeController } from '@src/backends/opencode-runtime-controller';
 import {
   getOpencodeSdkContextStats,
+  getOpencodeSdkGeneration,
   getOpencodeWorkspaceModels,
 } from '@src/backends/opencode-sdk';
 import type {
@@ -40,11 +41,14 @@ type ContextUsageRequest = SourceContext & {
 type CoreCatalog = Awaited<ReturnType<typeof getOpencodeWorkspaceModels>>;
 
 type CatalogCacheEntry = {
-  expiresAt: number;
+  fetchedAt: number;
+  sdkGeneration: number;
   value: Promise<CoreCatalog>;
+  refreshing?: Promise<CoreCatalog | void>;
 };
 
-const CATALOG_CACHE_MS = 5_000;
+const CATALOG_FRESH_MS = 60_000;
+const CATALOG_MAX_AGE_MS = 600_000;
 
 function hashRevision(values: string[]): string {
   let hash = 2_166_136_261;
@@ -68,24 +72,66 @@ export class CoreModelSourceAdapter {
       : this.props.parentOfBotRoot;
   }
 
-  private async catalog(context: SourceContext) {
-    const cached = this.catalogs.get(context.workspaceTarget);
-
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.value;
-    }
-
+  private fetchCatalog(workspaceTarget: WorkspaceTarget): Promise<CoreCatalog> {
     const value = opencodeRuntimeController
       .withAdmission(() =>
-        getOpencodeWorkspaceModels(this.cwd(context.workspaceTarget)),
+        getOpencodeWorkspaceModels(this.cwd(workspaceTarget)),
       )
       .catch((error) => {
-        this.catalogs.delete(context.workspaceTarget);
+        if (this.catalogs.get(workspaceTarget)?.value === value) {
+          this.catalogs.delete(workspaceTarget);
+        }
+
         throw error;
       });
 
+    return value;
+  }
+
+  private async catalog(context: SourceContext) {
+    const currentGeneration = getOpencodeSdkGeneration();
+    const cached = this.catalogs.get(context.workspaceTarget);
+    const now = Date.now();
+
+    if (cached && cached.sdkGeneration === currentGeneration) {
+      const age = now - cached.fetchedAt;
+
+      if (age < CATALOG_FRESH_MS) {
+        return cached.value;
+      }
+
+      if (age < CATALOG_MAX_AGE_MS) {
+        if (!cached.refreshing) {
+          const refreshPromise = this.fetchCatalog(context.workspaceTarget)
+            .then((freshCatalog) => {
+              this.catalogs.set(context.workspaceTarget, {
+                fetchedAt: Date.now(),
+                sdkGeneration: currentGeneration,
+                value: Promise.resolve(freshCatalog),
+              });
+
+              return freshCatalog;
+            })
+            .catch(() => {
+              const current = this.catalogs.get(context.workspaceTarget);
+
+              if (current && current.refreshing === refreshPromise) {
+                delete current.refreshing;
+              }
+            });
+
+          cached.refreshing = refreshPromise;
+        }
+
+        return cached.value;
+      }
+    }
+
+    const value = this.fetchCatalog(context.workspaceTarget);
+
     this.catalogs.set(context.workspaceTarget, {
-      expiresAt: Date.now() + CATALOG_CACHE_MS,
+      fetchedAt: now,
+      sdkGeneration: currentGeneration,
       value,
     });
 

@@ -587,6 +587,7 @@ function AppInner(): JSX.Element {
   const {
     beginWebEntityPending,
     beginWebUiBusy,
+    disconnectSocket,
     endWebEntityPending,
     endWebUiBusy,
     getWebEntityPendingFor,
@@ -2997,6 +2998,7 @@ function AppInner(): JSX.Element {
       stopStoryClearPromptsListener();
       setPassiveHoveredElement(null);
       finishDockResize();
+      disconnectSocket();
     });
   });
 

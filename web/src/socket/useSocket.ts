@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
 
 import { renderStoryListRoot } from '@src/commands/story/renderers/story-list-component';
 import type { PluginLoadFailure } from '@src/core/plugin-loading';
@@ -305,9 +305,11 @@ export function useSocket(adapters: SocketAppAdapters) {
   let socket: WebSocket | null = null;
   let wsReconnectTimer: number | null = null;
   let composerStateRetryTimer: number | null = null;
+  let composerStateCoalesceTimer: number | null = null;
   let composerStateRequestSequence = 0;
   let composerStateRequestInFlight = false;
   let composerStateRefreshQueued = false;
+  let intentionalDisconnect = false;
   type SessionSelection = 'current' | 'latest' | { sessionId: string };
   let queuedComposerSelection: SessionSelection = 'current';
   const lastRunningBySession = new Map<string, boolean>();
@@ -351,6 +353,11 @@ export function useSocket(adapters: SocketAppAdapters) {
     if (composerStateRetryTimer !== null) {
       window.clearTimeout(composerStateRetryTimer);
       composerStateRetryTimer = null;
+    }
+
+    if (composerStateCoalesceTimer !== null) {
+      window.clearTimeout(composerStateCoalesceTimer);
+      composerStateCoalesceTimer = null;
     }
   }
 
@@ -457,6 +464,7 @@ export function useSocket(adapters: SocketAppAdapters) {
 
   function scheduleReconnect(): void {
     if (
+      intentionalDisconnect ||
       adapters.auth.authState().status !== 'connected' ||
       wsReconnectTimer !== null
     ) {
@@ -1004,19 +1012,11 @@ export function useSocket(adapters: SocketAppAdapters) {
           return;
         }
 
-        if (
-          message.state.sessionRunning ||
-          message.state.modelSource.state.transitionState === 'pending'
-        ) {
-          composerStateRetryTimer = window.setTimeout(
-            () => {
-              composerStateRetryTimer = null;
-              requestComposerAiStateAttempt(0, sequence, 'current');
-            },
-            message.state.sessionRunning
-              ? 2500
-              : COMPOSER_STATE_PENDING_POLL_MS,
-          );
+        if (message.state.modelSource.state.transitionState === 'pending') {
+          composerStateRetryTimer = window.setTimeout(() => {
+            composerStateRetryTimer = null;
+            requestComposerAiStateAttempt(0, sequence, 'current');
+          }, COMPOSER_STATE_PENDING_POLL_MS);
         }
       },
       onError: () => {
@@ -1077,21 +1077,38 @@ export function useSocket(adapters: SocketAppAdapters) {
     clearComposerStateRetry();
     setModelStateUnavailable(false);
 
-    if (composerStateRequestInFlight) {
-      composerStateRefreshQueued = true;
-
-      if (selection !== 'current') {
+    if (selection !== 'current') {
+      if (composerStateRequestInFlight) {
+        composerStateRefreshQueued = true;
         queuedComposerSelection = selection;
+
+        return;
       }
+
+      composerStateRequestSequence += 1;
+      requestComposerAiStateAttempt(0, composerStateRequestSequence, selection);
 
       return;
     }
 
-    composerStateRequestSequence += 1;
-    requestComposerAiStateAttempt(0, composerStateRequestSequence, selection);
+    composerStateCoalesceTimer = window.setTimeout(() => {
+      composerStateCoalesceTimer = null;
+
+      if (composerStateRequestInFlight) {
+        composerStateRefreshQueued = true;
+
+        return;
+      }
+
+      composerStateRequestSequence += 1;
+
+      requestComposerAiStateAttempt(0, composerStateRequestSequence, 'current');
+    }, 80);
   }
 
   function connectSocket(): void {
+    intentionalDisconnect = false;
+
     if (isWebDemoMode()) {
       clearReconnectTimer();
       setWsConnected(true);
@@ -1311,6 +1328,21 @@ export function useSocket(adapters: SocketAppAdapters) {
             setPaymentStatus: adapters.setPaymentStatus,
             setComposerAiState: adapters.setComposerAiState,
           },
+          onSessionRunState: (sessionId, running) => {
+            const wasRunning = lastRunningBySession.get(sessionId) ?? false;
+
+            if (running) {
+              lastRunningBySession.set(sessionId, true);
+
+              return;
+            }
+
+            if (wasRunning && adapters.timelineId() === sessionId) {
+              requestComposerAiState('current');
+            } else {
+              lastRunningBySession.set(sessionId, false);
+            }
+          },
         });
 
         if (serverMessage.type === 'command_result') {
@@ -1366,6 +1398,7 @@ export function useSocket(adapters: SocketAppAdapters) {
   }
 
   function disconnectSocket(): void {
+    intentionalDisconnect = true;
     clearReconnectTimer();
     clearComposerStateRetry();
     composerStateRequestSequence += 1;
@@ -1392,6 +1425,10 @@ export function useSocket(adapters: SocketAppAdapters) {
       }
 
       connectSocket();
+    });
+
+    onCleanup(() => {
+      disconnectSocket();
     });
   }
 

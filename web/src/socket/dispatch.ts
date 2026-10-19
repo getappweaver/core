@@ -115,8 +115,9 @@ export function handleServerMessage(params: {
     | 'setPaymentStatus'
     | 'setComposerAiState'
   >;
+  onSessionRunState?: (sessionId: string, running: boolean) => void;
 }): void {
-  const { message, pendingRequests, adapters } = params;
+  const { message, pendingRequests, adapters, onSessionRunState } = params;
   const pending = pendingRequests.get(message.requestId);
 
   switch (message.type) {
@@ -134,6 +135,8 @@ export function handleServerMessage(params: {
       if (adapters.timelineId() === message.sessionId) {
         adapters.setAgentWorking(message.view.running);
       }
+
+      onSessionRunState?.(message.sessionId, message.view.running);
 
       return;
     case 'chat_started':
