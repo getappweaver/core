@@ -1,5 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, onMount } from 'solid-js';
 
+import type { SessionRunView } from '@src/web/session-runs';
+
 import type { ChatRunStatus } from '../../chat/types';
 
 const SQUARES = 6;
@@ -26,6 +28,10 @@ type ComposerWorkingButtonProps = {
   working: boolean;
   runStatus: ChatRunStatus;
   onStop: () => void;
+  phase: SessionRunView['phase'];
+  pauseAvailable: boolean;
+  onPause: () => void;
+  onContinue: () => void;
 };
 
 export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
@@ -52,7 +58,7 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
   }
 
   createEffect(() => {
-    if (props.working) {
+    if (props.working && props.phase !== 'paused') {
       startTime = null;
       rafId = requestAnimationFrame(tick);
     } else {
@@ -110,9 +116,7 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
       <button
         type="button"
         class="composer-working-bar"
-        aria-label={
-          props.working ? 'AI working — click to stop' : 'AI interrupted'
-        }
+        aria-label={props.working ? 'AI controls' : 'AI interrupted'}
         aria-expanded={open()}
         aria-haspopup="menu"
         onClick={() => {
@@ -121,7 +125,12 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
           }
         }}
       >
-        {props.working ? (
+        {props.working &&
+        (props.phase === 'paused' || props.phase === 'pausing') ? (
+          <span class="composer-working-label">
+            {props.phase === 'pausing' ? 'Pausing…' : 'Paused'}
+          </span>
+        ) : props.working ? (
           <span class="composer-working-squares" aria-hidden="true">
             <For each={Array.from({ length: SQUARES }, (_, i) => i)}>
               {(i) => (
@@ -138,10 +147,34 @@ export function ComposerWorkingButton(props: ComposerWorkingButtonProps) {
       </button>
       {props.working && open() && (
         <div class="web-overflow-panel is-flip-up" role="menu">
+          {(props.pauseAvailable || props.phase === 'paused') &&
+            props.phase !== 'stopping' && (
+              <button
+                type="button"
+                role="menuitem"
+                class="web-button"
+                onClick={() => {
+                  setOpen(false);
+
+                  if (props.phase === 'paused' || props.phase === 'pausing') {
+                    props.onContinue();
+                  } else {
+                    props.onPause();
+                  }
+                }}
+              >
+                {props.phase === 'paused'
+                  ? 'Continue'
+                  : props.phase === 'pausing'
+                    ? "Don't pause"
+                    : 'Pause AI'}
+              </button>
+            )}
           <button
             type="button"
             role="menuitem"
             class="web-button"
+            disabled={props.phase === 'stopping'}
             onClick={() => {
               setOpen(false);
               props.onStop();

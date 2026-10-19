@@ -23,6 +23,7 @@ export type ChatAdapters = {
 export type ChatRunStatus = 'idle' | 'interrupted';
 
 export type ChatHook = {
+  registerChatRequest?: (requestId: string, sessionId: string) => void;
   appendUserMessage: (text: string) => void;
   cancelChat: () => void;
   clearRequest: (requestId: string) => void;

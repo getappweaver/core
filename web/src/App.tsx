@@ -39,6 +39,10 @@ import { ComposerContextMenuButton } from './composer/components/ComposerContext
 import { ComposerFilePicker } from './composer/components/ComposerFilePicker';
 import { ComposerInterventionButton } from './composer/components/ComposerInterventionButton';
 import { ComposerModelOverrideButton } from './composer/components/ComposerModelOverrideButton';
+import {
+  ComposerQueuePanel,
+  type QueueActionInput,
+} from './composer/components/ComposerQueuePanel';
 import { ComposerSkillsButton } from './composer/components/ComposerSkillsButton';
 import { ComposerWorkingButton } from './composer/components/ComposerWorkingButton';
 import { useComposer } from './composer/useComposer';
@@ -692,6 +696,8 @@ function AppInner(): JSX.Element {
     appendSystemMessage,
     createId,
     chat: {
+      registerChatRequest: (requestId, sessionId) =>
+        chat.registerChatRequest?.(requestId, sessionId),
       clearRequest: (requestId) => chat.clearRequest(requestId),
       handleStreamDiff: (requestId, files) =>
         chat.handleStreamDiff(requestId, files),
@@ -2391,6 +2397,51 @@ function AppInner(): JSX.Element {
     }
   }
 
+  function controlQueue(input: QueueActionInput): Promise<boolean> {
+    const sessionId = timelineId();
+
+    if (!sessionId || !wsConnected()) {
+      return Promise.resolve(false);
+    }
+
+    const requestId = createId();
+
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => {
+        pendingRequests.delete(requestId);
+        requestComposerAiState();
+        resolve(false);
+      }, 10_000);
+
+      const finish = (success: boolean): void => {
+        window.clearTimeout(timer);
+        resolve(success);
+      };
+
+      pendingRequests.set(requestId, {
+        onDone: () => finish(true),
+        onError: () => finish(false),
+      });
+
+      try {
+        sendSocketMessage({
+          type: 'session_queue_action',
+          requestId,
+          sessionId,
+          ...input,
+        });
+      } catch (error) {
+        pendingRequests.delete(requestId);
+
+        appendSystemMessage(
+          error instanceof Error ? error.message : String(error),
+        );
+
+        finish(false);
+      }
+    });
+  }
+
   function compactCurrentSession(): void {
     if (!wsConnected()) {
       appendSystemMessage('Connect WebSocket first.');
@@ -3268,6 +3319,15 @@ function AppInner(): JSX.Element {
               }}
             />
             <div class="composer-shell">
+              <ComposerQueuePanel
+                view={composerAiState()?.runControl}
+                disabled={!wsConnected()}
+                pauseAvailable={
+                  composerAiState()?.interventionAvailable === true
+                }
+                onAction={controlQueue}
+                onStop={() => chat.cancelChat()}
+              />
               <Composer
                 setInputRef={(el) => {
                   composerInputEl = el;
@@ -3304,9 +3364,35 @@ function AppInner(): JSX.Element {
                     />
                     <Show when={composerAiState() !== null}>
                       <ComposerWorkingButton
-                        working={agentWorking()}
+                        working={
+                          agentWorking() ||
+                          composerAiState()?.runControl?.phase === 'paused'
+                        }
                         runStatus={chatRunStatus()}
                         onStop={() => chat.cancelChat()}
+                        phase={
+                          composerAiState()?.runControl?.phase ?? 'working'
+                        }
+                        pauseAvailable={
+                          composerAiState()?.interventionAvailable === true
+                        }
+                        onPause={() =>
+                          void controlQueue({
+                            action: 'pause',
+                            itemId: null,
+                            content: null,
+                          })
+                        }
+                        onContinue={() =>
+                          void controlQueue({
+                            action:
+                              composerAiState()?.runControl?.phase === 'pausing'
+                                ? 'dont_pause'
+                                : 'continue',
+                            itemId: null,
+                            content: null,
+                          })
+                        }
                       />
                       <button
                         type="button"

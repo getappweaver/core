@@ -529,8 +529,8 @@ export function useSocket(adapters: SocketAppAdapters) {
         seenTimelineEventIds.add(answerEventId);
       } else if (
         record.requestId &&
-        (record.type === 'chat' ||
-          (record.type === 'run_command' && record.recordInTimeline !== false))
+        record.type === 'run_command' &&
+        record.recordInTimeline !== false
       ) {
         seenTimelineEventIds.add(`${record.requestId}-user`);
       }
@@ -1223,6 +1223,37 @@ export function useSocket(adapters: SocketAppAdapters) {
         ) as WebSocketServerMessage;
 
         const pending = pendingRequests.get(serverMessage.requestId);
+
+        if (serverMessage.type === 'chat_started') {
+          sessionByRequestId.set(
+            serverMessage.requestId,
+            serverMessage.sessionId,
+          );
+        }
+
+        if (
+          serverMessage.type === 'chat_started' &&
+          serverMessage.sessionId === adapters.timelineId()
+        ) {
+          seenTimelineEventIds.add(`${serverMessage.requestId}-user`);
+        }
+
+        if (serverMessage.type === 'session_run_state') {
+          const wasRunning = lastRunningBySession.get(serverMessage.sessionId);
+
+          lastRunningBySession.set(
+            serverMessage.sessionId,
+            serverMessage.view.running,
+          );
+
+          if (
+            wasRunning &&
+            !serverMessage.view.running &&
+            serverMessage.sessionId === adapters.timelineId()
+          ) {
+            loadSessionTimeline(serverMessage.sessionId);
+          }
+        }
 
         if (
           serverMessage.type === 'command_result' &&

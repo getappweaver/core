@@ -191,6 +191,22 @@ export const CancelChatClientMessageSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+export const SessionQueueActionClientMessageSchema = z.object({
+  type: z.literal('session_queue_action'),
+  requestId: RequestIdSchema,
+  sessionId: z.string().min(1),
+  action: z.enum([
+    'pause',
+    'continue',
+    'dont_pause',
+    'send_now',
+    'edit',
+    'remove',
+  ]),
+  itemId: z.string().min(1).nullable(),
+  content: z.string().min(1).nullable(),
+});
+
 export const SetInterventionModeClientMessageSchema = z.object({
   type: z.literal('set_intervention_mode'),
   requestId: RequestIdSchema,
@@ -309,6 +325,7 @@ export const WebSocketClientMessageSchema = z.discriminatedUnion('type', [
   PaymentActionClientMessageSchema,
   ChatClientMessageSchema,
   CancelChatClientMessageSchema,
+  SessionQueueActionClientMessageSchema,
   SetInterventionModeClientMessageSchema,
   ResolveInterventionClientMessageSchema,
   SaveTimelineFormClientMessageSchema,
@@ -557,7 +574,23 @@ export type PaymentStatusServerMessage = {
   status: WebPaymentStatus;
 };
 
+export type SessionRunStateServerMessage = {
+  type: 'session_run_state';
+  requestId: string;
+  sessionId: string;
+  view: import('./session-runs').SessionRunView;
+};
+
+export type ChatStartedServerMessage = {
+  type: 'chat_started';
+  requestId: string;
+  sessionId: string;
+  content: string;
+};
+
 export type WebSocketServerMessage =
+  | SessionRunStateServerMessage
+  | ChatStartedServerMessage
   | CommandsResultServerMessage
   | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage

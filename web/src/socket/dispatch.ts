@@ -120,6 +120,42 @@ export function handleServerMessage(params: {
   const pending = pendingRequests.get(message.requestId);
 
   switch (message.type) {
+    case 'session_run_state':
+      adapters.setComposerAiState((state) =>
+        state?.currentSessionId === message.sessionId
+          ? {
+              ...state,
+              sessionRunning: message.view.running,
+              runControl: message.view,
+            }
+          : state,
+      );
+
+      if (adapters.timelineId() === message.sessionId) {
+        adapters.setAgentWorking(message.view.running);
+      }
+
+      return;
+    case 'chat_started':
+      adapters.chat.registerChatRequest?.(message.requestId, message.sessionId);
+
+      if (adapters.timelineId() === message.sessionId) {
+        adapters.setTimeline((items) =>
+          items.some((item) => item.id === `${message.requestId}-user`)
+            ? items
+            : [
+                ...items,
+                {
+                  id: `${message.requestId}-user`,
+                  type: 'chat',
+                  role: 'user',
+                  text: message.content,
+                },
+              ],
+        );
+      }
+
+      return;
     case 'process_restart':
       showProcessRestartNotice({
         view: message.view,

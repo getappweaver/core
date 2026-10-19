@@ -11,6 +11,7 @@ contributions. The reusable contract is defined in
 
 See [Capability services](./PLUGIN_CAPABILITY_SERVICES.md) for registration and
 validation and [Inference bridge](./INFERENCE_BRIDGE.md) for HTTP consumers.
+Web chat pause/queue behavior is documented in [AI prompt queue](AI_PROMPT_QUEUE.md).
 PPQ-specific accounts, proxy behavior, and funding are documented in the
 [PPQ implementation plan](../plugins/ppq/docs/PPQ_PLUGIN_DESIGN_AND_IMPLEMENTATION_PLAN.md).
 

@@ -141,6 +141,8 @@ export type PaymentStatusServerMessage = {
 };
 
 export type WebSocketServerMessage =
+  | import('@src/web/ws-schema').SessionRunStateServerMessage
+  | import('@src/web/ws-schema').ChatStartedServerMessage
   | CommandsResultServerMessage
   | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage

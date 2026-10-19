@@ -397,28 +397,12 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     }
   }
 
-  function sendChat(text: string): void {
-    const requestId = adapters.createId();
-    const sessionId = adapters.timelineId();
-
-    if (!sessionId) {
-      adapters.appendSystemMessage('Waiting for a session to be ready.');
-
-      return;
-    }
-
+  function registerChatRequest(requestId: string, sessionId: string): void {
     sessionByRequestId.set(requestId, sessionId);
 
-    logChatDebug('chat.send.start', {
-      requestId,
-      timelineId: adapters.timelineId(),
-      length: text.length,
-      preview: text.slice(0, CHAT_PROMPT_PREVIEW_LENGTH),
-    });
-
-    appendUserMessage(text);
-    adapters.setChatRunStatus('idle');
-    adapters.setAgentWorking(true);
+    if (adapters.pendingRequests.has(requestId)) {
+      return;
+    }
 
     adapters.pendingRequests.set(requestId, {
       onPrompt: (message) => {
@@ -473,12 +457,34 @@ export function useChat(adapters: ChatAdapters): ChatHook {
         });
 
         adapters.setAgentWorking(false);
+        adapters.onChatResult();
 
         if (adapters.chatRunStatus() !== 'interrupted') {
           adapters.setChatRunStatus('idle');
         }
       },
     });
+  }
+
+  function sendChat(text: string): void {
+    const requestId = adapters.createId();
+    const sessionId = adapters.timelineId();
+
+    if (!sessionId) {
+      adapters.appendSystemMessage('Waiting for a session to be ready.');
+
+      return;
+    }
+
+    logChatDebug('chat.send.start', {
+      requestId,
+      timelineId: sessionId,
+      length: text.length,
+      preview: text.slice(0, CHAT_PROMPT_PREVIEW_LENGTH),
+    });
+
+    adapters.setChatRunStatus('idle');
+    registerChatRequest(requestId, sessionId);
 
     logChatDebug('chat.pending.registered', {
       requestId,
@@ -548,6 +554,7 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     handleStreamTool,
     handleStreamTextDelta,
     sendChat,
+    registerChatRequest,
     sendPromptAnswer,
   };
 }

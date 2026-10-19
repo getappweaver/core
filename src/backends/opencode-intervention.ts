@@ -9,6 +9,8 @@ import {
 } from '@src/db';
 import { log } from '@src/logger';
 
+import { awaitForegroundRequest } from './opencode-pause';
+
 export const OPENCODE_INTERVENTION_PATH = '/api/opencode/intervention';
 
 const interventionToken = randomUUID();
@@ -183,7 +185,23 @@ export async function handleOpencodeInterventionRequest(
     return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const parsed = RequestSchema.safeParse(await req.json().catch(() => null));
+  const body = await req.json().catch(() => null);
+
+  const modelRequest = z
+    .object({
+      phase: z.literal('model'),
+      sessionId: z.string().min(1),
+      agent: z.string().min(1),
+    })
+    .safeParse(body);
+
+  if (modelRequest.success) {
+    return Response.json({
+      action: await awaitForegroundRequest(modelRequest.data),
+    });
+  }
+
+  const parsed = RequestSchema.safeParse(body);
 
   if (!parsed.success) {
     return Response.json({ error: 'invalid_request' }, { status: 400 });

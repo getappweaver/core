@@ -26,6 +26,7 @@ export type ComposerAiState = {
   currentSessionId: string | null;
   workspace: WorkspaceTarget;
   sessionRunning: boolean;
+  runControl?: import('@src/web/session-runs').SessionRunView;
   currentSessionTitle: string | null;
   recentSessions: AppWeaverSession[];
   modelSource: {

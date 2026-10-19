@@ -10,6 +10,7 @@ import {
   type InterventionBridge,
 } from '@src/backends/opencode-intervention';
 import {
+  OpenCodeAbortCleanupError,
   replyOpencodeSdkQuestion,
   summarizeOpencodeSdkSession,
 } from '@src/backends/opencode-sdk';
@@ -65,9 +66,13 @@ import { executeBuiltinCommand, executeBuiltinJsonCommand } from './execute';
 import { verifyNip98Authorization } from './nip98-verify';
 import type { WebRouteContext } from './routes';
 import {
+  controlSessionQueue,
+  enqueueSessionChat,
   finishSessionRun,
+  getSessionRunView,
   startSessionRun,
   stopSessionRun,
+  watchSessionRuns,
 } from './session-runs';
 import type { WebSocketPromptSession } from './ws-prompt-session';
 import {
@@ -112,6 +117,12 @@ export type WebSocketData = {
   paymentSession: WebSocketPaymentSession;
   paymentBroker: InteractivePaymentBroker;
 };
+
+// A queued turn can be resumed by a reconnected browser or another tab.
+const sessionChatConnections = new Map<
+  string,
+  Bun.ServerWebSocket<WebSocketData>
+>();
 
 function isTimelineEventOutput(
   output: WebHandlerResult,
@@ -579,6 +590,13 @@ async function handleDemoWebSocketMessage(params: {
       return;
 
     case 'chat':
+      sendMessage(ws, {
+        type: 'chat_started',
+        requestId: message.requestId,
+        sessionId: message.sessionId,
+        content: message.content,
+      });
+
       sendMessage(
         ws,
         createChatResultMessage({
@@ -596,6 +614,7 @@ async function handleDemoWebSocketMessage(params: {
 
     case 'prompt_answer':
     case 'cancel_chat':
+    case 'session_queue_action':
     case 'set_intervention_mode':
     case 'resolve_intervention':
     case 'delete_timeline_event':
@@ -1352,13 +1371,60 @@ async function handleChat(params: {
   message: ChatClientMessage;
 }): Promise<void> {
   const { sessionId, requestId } = params.message;
-  const abort = startSessionRun(sessionId, requestId, 'chat');
+  const view = getSessionRunView(sessionId);
+  const workspace = getWorkspaceTarget(params.ctx.seenDb);
+  sessionChatConnections.set(sessionId, params.ws);
 
-  try {
-    await runChatInSession(params, abort);
-  } finally {
-    finishSessionRun(sessionId, requestId);
+  if (params.ctx.attachUrl !== null && view.running) {
+    throw new Error(
+      'Queue with automatic pause requires a managed OpenCode server.',
+    );
   }
+
+  enqueueSessionChat({
+    sessionId,
+    pause: view.running || view.phase === 'paused',
+    item: {
+      id: requestId,
+      content: params.message.content,
+      removed: () => sendMessage(params.ws, createDoneMessage(requestId)),
+      run: async (content) => {
+        const ws = sessionChatConnections.get(sessionId) ?? params.ws;
+        const abort = startSessionRun(sessionId, requestId, 'chat');
+        try {
+          if (workspace !== getWorkspaceTarget(params.ctx.seenDb)) {
+            throw new Error('Queued prompt belongs to a different workspace.');
+          }
+
+          await runChatInSession(
+            { ...params, ws, message: { ...params.message, content } },
+            abort,
+          );
+        } catch (error) {
+          if (
+            !abort.signal.aborted ||
+            error instanceof OpenCodeAbortCleanupError
+          ) {
+            stopSessionRun(sessionId);
+          }
+
+          sendMessage(
+            ws,
+            createErrorMessage({
+              requestId,
+              message: error instanceof Error ? error.message : String(error),
+            }),
+          );
+        } finally {
+          finishSessionRun(sessionId, requestId);
+
+          if (ws !== params.ws) {
+            sendMessage(params.ws, createDoneMessage(requestId));
+          }
+        }
+      },
+    },
+  });
 }
 
 async function runChatInSession(
@@ -1405,6 +1471,13 @@ async function runChatInSession(
     clientView: null,
     prompt: null,
     requestId: null,
+  });
+
+  sendMessage(ws, {
+    type: 'chat_started',
+    requestId: message.requestId,
+    sessionId: message.sessionId,
+    content: message.content,
   });
 
   let result: { output: string; sessionId: string };
@@ -1688,10 +1761,30 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
   const connections = new Set<Bun.ServerWebSocket<WebSocketData>>();
   let stopWatchingTitles: (() => void) | null = null;
   let stopWatchingRestarts: (() => void) | null = null;
+  let stopWatchingRuns: (() => void) | null = null;
 
   return {
     open(ws: Bun.ServerWebSocket<WebSocketData>): void {
       connections.add(ws);
+
+      if (!stopWatchingRuns && !isDemoMode()) {
+        stopWatchingRuns = watchSessionRuns((sessionId) => {
+          const view = getSessionRunView(sessionId);
+          for (const connection of connections) {
+            if (
+              connection.data.nip98Authenticated &&
+              !connection.data.demoAuthenticated
+            ) {
+              sendMessage(connection, {
+                type: 'session_run_state',
+                requestId: 'session-run-state',
+                sessionId,
+                view,
+              });
+            }
+          }
+        });
+      }
 
       if (!stopWatchingRestarts && !isDemoMode()) {
         stopWatchingRestarts = watchProcessRestarts((view) => {
@@ -1738,8 +1831,15 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
     },
     close(ws: Bun.ServerWebSocket<WebSocketData>): void {
       connections.delete(ws);
+      for (const [sessionId, connection] of sessionChatConnections) {
+        if (connection === ws) {
+          sessionChatConnections.delete(sessionId);
+        }
+      }
 
       if (connections.size === 0) {
+        stopWatchingRuns?.();
+        stopWatchingRuns = null;
         stopWatchingRestarts?.();
         stopWatchingRestarts = null;
         stopWatchingTitles?.();
@@ -1883,6 +1983,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
           if (
             message.type === 'compact_session' ||
+            message.type === 'session_queue_action' ||
             message.type === 'cancel_chat'
           ) {
             assertWebSession(
@@ -1900,6 +2001,23 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
           }
 
           switch (message.type) {
+            case 'session_queue_action': {
+              if (message.action === 'pause' && ctx.attachUrl !== null) {
+                throw new Error('Pause requires a managed OpenCode server.');
+              }
+
+              sessionChatConnections.set(message.sessionId, ws);
+              controlSessionQueue(message);
+
+              if (message.action === 'send_now') {
+                clearOpencodeInterventionsForSession(message.sessionId);
+              }
+
+              sendMessage(ws, createDoneMessage(message.requestId));
+
+              return;
+            }
+
             case 'authenticate': {
               sendMessage(ws, {
                 ...createDoneMessage(message.requestId),

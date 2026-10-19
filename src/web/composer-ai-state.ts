@@ -18,7 +18,11 @@ import {
 } from '@src/session';
 
 import type { WebRouteContext } from './routes';
-import { isSessionRunning } from './session-runs';
+import {
+  getSessionRunView,
+  isSessionRunning,
+  type SessionRunView,
+} from './session-runs';
 import { getSelectedWebSessionId } from './session-selection';
 
 export type ComposerAiState = {
@@ -28,6 +32,7 @@ export type ComposerAiState = {
   currentSessionId: string | null;
   workspace: WorkspaceTarget;
   sessionRunning: boolean;
+  runControl?: SessionRunView;
   currentSessionTitle: string | null;
   recentSessions: AppWeaverSession[];
   modelSource: ModelSourceSnapshot;
@@ -118,6 +123,7 @@ export async function getComposerAiState(
     currentSessionId,
     workspace,
     sessionRunning: isSessionRunning(currentSessionId),
+    runControl: getSessionRunView(currentSessionId),
     currentSessionTitle,
     recentSessions,
     modelSource,

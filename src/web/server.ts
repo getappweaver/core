@@ -269,6 +269,8 @@ export function startLocalWebServer(options: StartLocalWebServerOptions): void {
           url.pathname === OPENCODE_INTERVENTION_PATH &&
           req.method === 'POST'
         ) {
+          server.timeout(req, 0);
+
           return handleOpencodeInterventionRequest(req);
         }
 

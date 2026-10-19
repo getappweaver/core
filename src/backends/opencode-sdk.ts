@@ -142,6 +142,16 @@ type WaitForSessionIdleProps = {
   directory: string;
 };
 
+export class OpenCodeAbortCleanupError extends Error {
+  constructor() {
+    super(
+      'OpenCode did not confirm cancellation cleanup. Queued prompts remain paused; try Continue after the session becomes idle.',
+    );
+
+    this.name = 'OpenCodeAbortCleanupError';
+  }
+}
+
 async function waitForSessionIdleAfterAbort({
   client,
   sessionId,
@@ -168,7 +178,13 @@ async function waitForSessionIdleAfterAbort({
       ? (statusResult.data as Record<string, { type?: string }>)[sessionId]
       : undefined;
 
-    if (status?.type === 'idle') {
+    // OpenCode removes idle sessions from the status map. Only a successful
+    // full-map response can establish that absence means idle.
+    if (
+      statusResult?.data &&
+      !statusResult.error &&
+      (!status || status.type === 'idle')
+    ) {
       consecutiveIdleStatuses += 1;
 
       if (consecutiveIdleStatuses >= 2) {
@@ -186,6 +202,8 @@ async function waitForSessionIdleAfterAbort({
   debug('opencode-sdk: timed out waiting for session idle after abort', {
     sessionId,
   });
+
+  throw new OpenCodeAbortCleanupError();
 }
 
 function isFatalStreamErrorMessage(message: string): boolean {
@@ -671,6 +689,10 @@ async function createLocalOpencodeSdk(
         ...process.env,
         OPENCODE_CONFIG_CONTENT: JSON.stringify({
           ...inlineConfig,
+          agent: {
+            ...((inlineConfig.agent as Record<string, unknown>) ?? {}),
+            title: { disable: true },
+          },
           plugin: [
             ...(Array.isArray(inlineConfig.plugin) ? inlineConfig.plugin : []),
             pathToFileURL(interventionPluginPath).href,
@@ -2360,6 +2382,10 @@ export function createOpencodeSDKBackend({
             );
           });
         })();
+
+        // The prompt request may still be unwinding before it awaits this
+        // promise. Preserve its rejection without an unhandled-rejection gap.
+        void externalAbortPromise.catch(() => undefined);
       };
 
       streamAbortSignal.addEventListener('abort', onExternalAbort, {
@@ -2384,7 +2410,7 @@ export function createOpencodeSDKBackend({
             statusResult.data as Record<string, { type?: string }>
           )[sessionId];
 
-          if (status?.type === 'idle') {
+          if (!status || status.type === 'idle') {
             resolveStreamComplete();
 
             return;

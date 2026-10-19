@@ -2703,6 +2703,7 @@ pre {
 .field-row select,
 .nostr-search-relays-modal__row input[type='text'],
 .composer textarea,
+.composer-queue__editor textarea,
 .diff-card__commit-form textarea,
 .palette-filter {
   width: 100%;
@@ -2741,6 +2742,7 @@ pre {
 .field-row input[type='number']::placeholder,
 .nostr-search-relays-modal__row input[type='text']::placeholder,
 .composer textarea::placeholder,
+.composer-queue__editor textarea::placeholder,
 .diff-card__commit-form textarea::placeholder,
 .palette-filter::placeholder {
   color: var(--form-input-placeholder-color);
@@ -2754,6 +2756,7 @@ pre {
 .field-row input[type='number']:focus::placeholder,
 .nostr-search-relays-modal__row input[type='text']:focus::placeholder,
 .composer textarea:focus::placeholder,
+.composer-queue__editor textarea:focus::placeholder,
 .diff-card__commit-form textarea:focus::placeholder,
 .palette-filter:focus::placeholder {
   color: var(--form-input-placeholder-color);
@@ -2768,6 +2771,7 @@ pre {
 .field-row select:focus,
 .nostr-search-relays-modal__row input[type='text']:focus,
 .composer textarea:focus,
+.composer-queue__editor textarea:focus,
 .diff-card__commit-form textarea:focus,
 .palette-filter:focus {
   background: var(--color-warning);
@@ -2875,6 +2879,60 @@ pre {
 
 .composer-shell {
   position: relative;
+}
+
+.composer-queue {
+  margin-top: 0.4rem;
+  max-height: min(16rem, 35vh);
+  overflow-y: auto;
+  padding: 0.3rem 0;
+  font-size: 0.78rem;
+  background: var(--color-panel);
+}
+
+.composer-queue__header,
+.composer-queue__item,
+.composer-queue__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.composer-queue__header,
+.composer-queue__item {
+  padding: 0.2rem 0.45rem;
+}
+
+.composer-queue__count {
+  color: var(--color-text-muted);
+}
+
+.composer-queue__text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.composer-queue__actions {
+  margin-left: auto;
+}
+
+.composer-queue__editor {
+  width: 100%;
+}
+
+.composer-queue__editor textarea {
+  min-height: 4rem;
+  resize: vertical;
+  font: inherit;
+}
+
+.composer-queue .web-button {
+  padding: 0.15rem 0.3rem;
+  font-size: inherit;
 }
 
 .composer-file-picker {

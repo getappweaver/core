@@ -50,6 +50,8 @@ export type PendingRequest = {
 };
 
 export type IncomingServerMessage =
+  | import('@src/web/ws-schema').SessionRunStateServerMessage
+  | import('@src/web/ws-schema').ChatStartedServerMessage
   | CommandsResultServerMessage
   | ProcessRestartServerMessage
   | SessionTitleUpdatedServerMessage
@@ -96,6 +98,7 @@ export type SocketAppAdapters = {
   createId: () => string;
   chat: Pick<
     ChatHook,
+    | 'registerChatRequest'
     | 'clearRequest'
     | 'handleStreamDiff'
     | 'handleStreamReasoningDelta'
