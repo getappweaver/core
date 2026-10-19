@@ -3,6 +3,11 @@ import markdown from 'highlight.js/lib/languages/markdown';
 import xml from 'highlight.js/lib/languages/xml';
 import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
 
+import {
+  parseMarkdownTableSegments,
+  type MarkdownTableSegment,
+} from '@src/web/markdown-table';
+
 import './ChatMarkdown.css';
 
 hljs.registerLanguage('xml', xml);
@@ -14,6 +19,70 @@ function escapeHtmlForFallback(text: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function highlightMarkdownFragment(text: string): string {
+  if (text.length === 0) {
+    return '';
+  }
+
+  try {
+    return hljs.highlight(text, {
+      language: 'markdown',
+      ignoreIllegals: true,
+    }).value;
+  } catch {
+    return escapeHtmlForFallback(text);
+  }
+}
+
+function renderMarkdownTableHtml(segment: MarkdownTableSegment): string {
+  const headerCellsHtml = segment.header.cells
+    .map((cell, index) => {
+      const align = segment.alignments[index] ?? 'left';
+
+      return `<th class="chat-md__cell chat-md__cell--head chat-md__cell--${align}">${highlightMarkdownFragment(cell)}</th>`;
+    })
+    .join('');
+
+  const bodyRowsHtml = segment.rows
+    .map((row) => {
+      const cellsHtml = row.cells
+        .map((cell, index) => {
+          const align = segment.alignments[index] ?? 'left';
+
+          return `<td class="chat-md__cell chat-md__cell--${align}">${highlightMarkdownFragment(cell)}</td>`;
+        })
+        .join('');
+
+      return `<tr class="chat-md__row">${cellsHtml}</tr>`;
+    })
+    .join('');
+
+  const tbodyHtml =
+    bodyRowsHtml.length > 0 ? `<tbody>${bodyRowsHtml}</tbody>` : '';
+
+  return `<table class="chat-md__table"><thead><tr class="chat-md__row chat-md__row--head">${headerCellsHtml}</tr></thead>${tbodyHtml}</table>`;
+}
+
+function highlightMarkdownWithTables(src: string): string {
+  if (src.length === 0) {
+    return '';
+  }
+
+  const segments = parseMarkdownTableSegments(src);
+
+  return segments
+    .map((segment) => {
+      if (segment.type === 'lines') {
+        const chunk = segment.lines.map((entry) => entry.text).join('\n');
+
+        return highlightMarkdownFragment(chunk);
+      }
+
+      return renderMarkdownTableHtml(segment);
+    })
+    .join('');
 }
 
 type ChatMarkdownProps = {
@@ -166,14 +235,7 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
   const html = createMemo(() => {
     const src = props.text ?? '';
 
-    try {
-      return hljs.highlight(src, {
-        language: 'markdown',
-        ignoreIllegals: true,
-      }).value;
-    } catch {
-      return escapeHtmlForFallback(src);
-    }
+    return highlightMarkdownWithTables(src);
   });
 
   createEffect(() => {

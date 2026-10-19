@@ -155,3 +155,47 @@
 .chat-card.user .chat-md .hljs-attr {
   color: #00695c;
 }
+
+.chat-md__table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0.25rem 0;
+  max-width: 100%;
+  font-size: inherit;
+  line-height: 1.4;
+}
+
+.chat-md__cell {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 0.2rem 0.5rem;
+  vertical-align: top;
+  white-space: pre-wrap;
+}
+
+.chat-md__cell--head {
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.chat-md__cell--left {
+  text-align: left;
+}
+
+.chat-md__cell--center {
+  text-align: center;
+}
+
+.chat-md__cell--right {
+  text-align: right;
+}
+
+.chat-card.user .chat-md__cell {
+  border-color: rgba(0, 0, 0, 0.22);
+}
+
+.chat-card.user .chat-md__cell--head {
+  background: rgba(0, 0, 0, 0.05);
+  border-bottom-color: rgba(0, 0, 0, 0.35);
+}
+
