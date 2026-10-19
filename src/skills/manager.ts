@@ -10,21 +10,41 @@ import {
 } from 'fs';
 import { join, resolve } from 'path';
 
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 
 import { getDmCommandPrefix, type CoreDb } from '@src/db';
 
 const MANAGED_SKILL_PREFIX = 'appweaver-';
+const CUSTOM_SKILL_PREFIX = 'custom-';
 
 export type ManagedSkill = {
   name: string;
   description: string;
+  markdown: string;
   enabled: boolean;
+  source: 'builtin' | 'custom';
+};
+
+export type CustomSkillRecord = {
+  name: string;
+  description: string;
+  markdown: string;
+  createdAt: number;
+  updatedAt: number;
 };
 
 type SkillMetadata = {
   name: string;
   description: string;
+  markdown: string;
+};
+
+type CustomSkillRow = {
+  skill_name: string;
+  description: string;
+  markdown: string;
+  created_at: number;
+  updated_at: number;
 };
 
 type InitializeWorkspaceSkillsProps = {
@@ -42,6 +62,29 @@ type ListManagedSkillsProps = {
 type SetManagedSkillEnabledProps = ListManagedSkillsProps & {
   skillName: string;
   enabled: boolean;
+};
+
+type SyncCustomSkillTargetProps = {
+  workspaceRoot: string;
+  skillName: string;
+  markdown: string;
+  enabled: boolean;
+};
+
+type UpsertCustomSkillProps = {
+  db: CoreDb;
+  dmBotRoot: string;
+  workspaceRoot: string;
+  skillName: string;
+  markdown: string;
+  enableInWorkspace: boolean | null;
+};
+
+type DeleteCustomSkillProps = {
+  db: CoreDb;
+  dmBotRoot: string;
+  workspaceRoots: string[];
+  skillName: string;
 };
 
 function pathExists(path: string): boolean {
@@ -77,11 +120,117 @@ function syncAlwaysAvailableSessionTitleSkill(props: {
   cpSync(source, target, { recursive: true });
 }
 
-function isManagedSkillName(name: string): boolean {
+function isBuiltinManagedSkillName(name: string): boolean {
   return (
     name.startsWith(MANAGED_SKILL_PREFIX) &&
     /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)
   );
+}
+
+export function isCustomSkillName(name: string): boolean {
+  return (
+    name.startsWith(CUSTOM_SKILL_PREFIX) &&
+    /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)
+  );
+}
+
+function isManagedSkillName(name: string): boolean {
+  return isBuiltinManagedSkillName(name) || isCustomSkillName(name);
+}
+
+export function normalizeCustomSkillName(rawName: string): string {
+  const trimmed = rawName.trim().toLowerCase();
+
+  if (!trimmed) {
+    throw new Error('Custom skill name is required.');
+  }
+
+  if (trimmed.startsWith(MANAGED_SKILL_PREFIX)) {
+    throw new Error(
+      `Custom skill names cannot start with "${MANAGED_SKILL_PREFIX}".`,
+    );
+  }
+
+  const slug = trimmed.startsWith(CUSTOM_SKILL_PREFIX)
+    ? trimmed.slice(CUSTOM_SKILL_PREFIX.length)
+    : trimmed;
+
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(slug)) {
+    throw new Error(
+      'Custom skill name may only contain letters, digits, hyphens, and underscores.',
+    );
+  }
+
+  return `${CUSTOM_SKILL_PREFIX}${slug}`;
+}
+
+function stripOuterMarkdownFence(text: string): string {
+  const trimmed = text.trim();
+
+  if (!trimmed.startsWith('```')) {
+    return trimmed;
+  }
+
+  return trimmed
+    .replace(/^```[a-z0-9_-]*\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+}
+
+function inferSkillDescriptionFromBody(body: string): string {
+  for (const rawLine of body.split('\n')) {
+    const line = rawLine.trim();
+
+    if (!line || line.startsWith('#') || line.startsWith('>')) {
+      continue;
+    }
+
+    return line.length > 160 ? `${line.slice(0, 157)}...` : line;
+  }
+
+  return 'Custom workspace skill.';
+}
+
+export function parseCustomSkillMarkdown(
+  rawMarkdown: string,
+  skillName: string,
+): { description: string; markdown: string } {
+  const cleaned = stripOuterMarkdownFence(rawMarkdown);
+
+  if (!cleaned) {
+    throw new Error('Skill markdown content cannot be empty.');
+  }
+
+  const match = cleaned.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
+
+  let description = '';
+  let body = cleaned;
+
+  if (match) {
+    body = cleaned.slice(match[0].length).trim();
+
+    try {
+      const frontmatter = parse(match[1]) as Record<string, unknown> | null;
+
+      if (typeof frontmatter?.description === 'string') {
+        description = frontmatter.description.trim();
+      }
+    } catch {
+      description = '';
+    }
+  }
+
+  if (!description) {
+    description = inferSkillDescriptionFromBody(body);
+  }
+
+  const normalizedBody = body || `# ${skillName}\n\n${description}`;
+  const header = stringify({ name: skillName, description }).trimEnd();
+
+  return {
+    description,
+    markdown: `---\n${header}\n---\n\n${normalizedBody}\n`,
+  };
 }
 
 function listSkillNames(root: string): string[] {
@@ -93,11 +242,19 @@ function listSkillNames(root: string): string[] {
     .filter(
       (entry) =>
         (entry.isDirectory() || entry.isSymbolicLink()) &&
-        isManagedSkillName(entry.name) &&
+        isBuiltinManagedSkillName(entry.name) &&
         existsSync(join(root, entry.name, 'SKILL.md')),
     )
     .map((entry) => entry.name)
     .sort();
+}
+
+function listCustomSkillRows(db: CoreDb): CustomSkillRow[] {
+  return db
+    .prepare(
+      'SELECT skill_name, description, markdown, created_at, updated_at FROM custom_skills ORDER BY skill_name ASC',
+    )
+    .all() as CustomSkillRow[];
 }
 
 function listManagedEntryNames(root: string): string[] {
@@ -139,7 +296,7 @@ function readSkillMetadata(path: string, fallbackName: string): SkillMetadata {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
 
   if (!match) {
-    return { name: fallbackName, description: '' };
+    return { name: fallbackName, description: '', markdown: content };
   }
 
   try {
@@ -153,9 +310,9 @@ function readSkillMetadata(path: string, fallbackName: string): SkillMetadata {
         ? frontmatter.description.trim()
         : '';
 
-    return { name, description };
+    return { name, description, markdown: content };
   } catch {
-    return { name: fallbackName, description: '' };
+    return { name: fallbackName, description: '', markdown: content };
   }
 }
 
@@ -189,6 +346,27 @@ function syncSkillTarget({
   cpSync(source, target, { recursive: true });
 }
 
+function syncCustomSkillTarget({
+  workspaceRoot,
+  skillName,
+  markdown,
+  enabled,
+}: SyncCustomSkillTargetProps): void {
+  const targetRoot = activeSkillsRoot(workspaceRoot);
+  const target = join(targetRoot, skillName);
+
+  if (!enabled) {
+    if (pathExists(target)) {
+      rmSync(target, { recursive: true, force: true });
+    }
+
+    return;
+  }
+
+  mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, 'SKILL.md'), markdown, 'utf8');
+}
+
 function reconcileWorkspaceSkills({
   db,
   dmBotRoot,
@@ -196,12 +374,17 @@ function reconcileWorkspaceSkills({
 }: ListManagedSkillsProps): void {
   const resolvedWorkspaceRoot = resolve(workspaceRoot);
   const inventoryNames = listSkillNames(inventoryRoot(dmBotRoot));
-  const inventoryNameSet = new Set(inventoryNames);
+  const customRows = listCustomSkillRows(db);
+
+  const validNameSet = new Set([
+    ...inventoryNames,
+    ...customRows.map((row) => row.skill_name),
+  ]);
 
   for (const staleName of listManagedEntryNames(
     activeSkillsRoot(resolvedWorkspaceRoot),
   )) {
-    if (!inventoryNameSet.has(staleName)) {
+    if (!validNameSet.has(staleName)) {
       rmSync(join(activeSkillsRoot(resolvedWorkspaceRoot), staleName), {
         recursive: true,
         force: true,
@@ -223,6 +406,23 @@ function reconcileWorkspaceSkills({
       enabled: row?.enabled === 1,
     });
   }
+
+  for (const customRow of customRows) {
+    const row = db
+      .prepare(
+        'SELECT enabled FROM workspace_skills WHERE workspace_root = ? AND skill_name = ?',
+      )
+      .get(resolvedWorkspaceRoot, customRow.skill_name) as {
+      enabled: number;
+    } | null;
+
+    syncCustomSkillTarget({
+      workspaceRoot: resolvedWorkspaceRoot,
+      skillName: customRow.skill_name,
+      markdown: customRow.markdown,
+      enabled: row?.enabled === 1,
+    });
+  }
 }
 
 export function createWorkspaceSkillsTable(db: CoreDb): void {
@@ -232,6 +432,16 @@ export function createWorkspaceSkillsTable(db: CoreDb): void {
       skill_name TEXT NOT NULL,
       enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
       PRIMARY KEY (workspace_root, skill_name)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS custom_skills (
+      skill_name TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      markdown TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     )
   `);
 }
@@ -298,7 +508,9 @@ export function listManagedSkills({
     enabledRows.map((row) => [row.skill_name, row.enabled === 1]),
   );
 
-  return listSkillNames(inventoryRoot(dmBotRoot)).map((directoryName) => {
+  const builtinSkills: ManagedSkill[] = listSkillNames(
+    inventoryRoot(dmBotRoot),
+  ).map((directoryName) => {
     const metadata = readSkillMetadata(
       join(inventoryRoot(dmBotRoot), directoryName, 'SKILL.md'),
       directoryName,
@@ -307,9 +519,134 @@ export function listManagedSkills({
     return {
       name: metadata.name,
       description: metadata.description,
+      markdown: metadata.markdown,
       enabled: enabledByName.get(directoryName) === true,
+      source: 'builtin',
     };
   });
+
+  const customSkills: ManagedSkill[] = listCustomSkillRows(db).map((row) => ({
+    name: row.skill_name,
+    description: row.description,
+    markdown: row.markdown,
+    enabled: enabledByName.get(row.skill_name) === true,
+    source: 'custom',
+  }));
+
+  return [...builtinSkills, ...customSkills].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+}
+
+export function getCustomSkill(
+  db: CoreDb,
+  rawName: string,
+): CustomSkillRecord | null {
+  const skillName = normalizeCustomSkillName(rawName);
+
+  const row = db
+    .prepare(
+      'SELECT skill_name, description, markdown, created_at, updated_at FROM custom_skills WHERE skill_name = ?',
+    )
+    .get(skillName) as CustomSkillRow | null;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    name: row.skill_name,
+    description: row.description,
+    markdown: row.markdown,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function upsertCustomSkill({
+  db,
+  dmBotRoot,
+  workspaceRoot,
+  skillName,
+  markdown,
+  enableInWorkspace,
+}: UpsertCustomSkillProps): CustomSkillRecord {
+  const normalizedName = normalizeCustomSkillName(skillName);
+  const parsed = parseCustomSkillMarkdown(markdown, normalizedName);
+  const now = Math.floor(Date.now() / 1000);
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+
+  db.prepare(
+    `INSERT INTO custom_skills (skill_name, description, markdown, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(skill_name)
+     DO UPDATE SET
+       description = excluded.description,
+       markdown = excluded.markdown,
+       updated_at = excluded.updated_at`,
+  ).run(normalizedName, parsed.description, parsed.markdown, now, now);
+
+  if (enableInWorkspace === null) {
+    db.prepare(
+      `INSERT OR IGNORE INTO workspace_skills (workspace_root, skill_name, enabled)
+       VALUES (?, ?, 1)`,
+    ).run(resolvedWorkspaceRoot, normalizedName);
+  } else {
+    db.prepare(
+      `INSERT INTO workspace_skills (workspace_root, skill_name, enabled)
+       VALUES (?, ?, ?)
+       ON CONFLICT(workspace_root, skill_name)
+       DO UPDATE SET enabled = excluded.enabled`,
+    ).run(resolvedWorkspaceRoot, normalizedName, enableInWorkspace ? 1 : 0);
+  }
+
+  reconcileWorkspaceSkills({
+    db,
+    dmBotRoot,
+    workspaceRoot: resolvedWorkspaceRoot,
+  });
+
+  syncSkillStatusSkill({
+    db,
+    dmBotRoot,
+    workspaceRoot: resolvedWorkspaceRoot,
+  });
+
+  return getCustomSkill(db, normalizedName)!;
+}
+
+export function deleteCustomSkill({
+  db,
+  dmBotRoot,
+  workspaceRoots,
+  skillName,
+}: DeleteCustomSkillProps): boolean {
+  const normalizedName = normalizeCustomSkillName(skillName);
+
+  const existing = db
+    .prepare('SELECT 1 FROM custom_skills WHERE skill_name = ?')
+    .get(normalizedName);
+
+  if (!existing) {
+    return false;
+  }
+
+  db.prepare('DELETE FROM custom_skills WHERE skill_name = ?').run(
+    normalizedName,
+  );
+
+  db.prepare('DELETE FROM workspace_skills WHERE skill_name = ?').run(
+    normalizedName,
+  );
+
+  const roots = [...new Set(workspaceRoots.map((root) => resolve(root)))];
+
+  for (const root of roots) {
+    reconcileWorkspaceSkills({ db, dmBotRoot, workspaceRoot: root });
+    syncSkillStatusSkill({ db, dmBotRoot, workspaceRoot: root });
+  }
+
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -402,10 +739,19 @@ export function setManagedSkillEnabled({
   skillName,
   enabled,
 }: SetManagedSkillEnabledProps): void {
-  if (
-    !isManagedSkillName(skillName) ||
-    !existsSync(join(inventoryRoot(dmBotRoot), skillName, 'SKILL.md'))
-  ) {
+  const customRow = isCustomSkillName(skillName)
+    ? (db
+        .prepare(
+          'SELECT skill_name, markdown FROM custom_skills WHERE skill_name = ?',
+        )
+        .get(skillName) as { skill_name: string; markdown: string } | null)
+    : null;
+
+  const builtinExists =
+    isBuiltinManagedSkillName(skillName) &&
+    existsSync(join(inventoryRoot(dmBotRoot), skillName, 'SKILL.md'));
+
+  if (!builtinExists && !customRow) {
     throw new Error(`skill_not_found:${skillName}`);
   }
 
@@ -418,12 +764,21 @@ export function setManagedSkillEnabled({
      DO UPDATE SET enabled = excluded.enabled`,
   ).run(resolvedWorkspaceRoot, skillName, enabled ? 1 : 0);
 
-  syncSkillTarget({
-    dmBotRoot,
-    workspaceRoot: resolvedWorkspaceRoot,
-    skillName,
-    enabled,
-  });
+  if (customRow) {
+    syncCustomSkillTarget({
+      workspaceRoot: resolvedWorkspaceRoot,
+      skillName: customRow.skill_name,
+      markdown: customRow.markdown,
+      enabled,
+    });
+  } else {
+    syncSkillTarget({
+      dmBotRoot,
+      workspaceRoot: resolvedWorkspaceRoot,
+      skillName,
+      enabled,
+    });
+  }
 
   syncSkillStatusSkill({
     db,

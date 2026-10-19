@@ -45,6 +45,7 @@ function updateParentGitignore({
     '.appweaver/opencode.json',
     '.appweaver/ppq/',
     '.claude/skills/appweaver-*',
+    '.claude/skills/custom-*',
   ];
 
   const gitignorePath = join(parentOfBotRoot, '.gitignore');

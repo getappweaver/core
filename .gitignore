@@ -17,6 +17,7 @@ generated/plugins/*
 !generated/plugins/index.ts
 TOOLS.md
 .claude/skills/appweaver*
+.claude/skills/custom*
 .claude/skills/skill-status/
 .appweaver/skills/appweaver*
 .logs/

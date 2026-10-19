@@ -82,7 +82,7 @@ export type PluginTextCompletionProps = {
   messages: ChatCompletionMessage[];
   workspaceTarget: WorkspaceTarget | null;
   modelSourceId: string | null;
-  modelId: string;
+  modelId: string | null;
   abortSignal: AbortSignal | null;
 };
 

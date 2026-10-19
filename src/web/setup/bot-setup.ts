@@ -47,6 +47,7 @@ const PARENT_GITIGNORE_ENTRIES = [
   '.appweaver/opencode.json',
   '.appweaver/ppq/',
   '.claude/skills/appweaver-*',
+  '.claude/skills/custom-*',
 ];
 
 function removeLegacyParentAgentsSymlink(): boolean {
