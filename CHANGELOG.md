@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.9.1] - 2026-10-19
+
+- fix: prevent mid-word wrapping in chat markdown tables (1dc1f1e3)
+
 ## [v14.9.0] - 2026-10-19
 
-- feat: markdown table renderer (976b8119)
+- feat: markdown table renderer (5afbe993)
 
 ## [v14.8.0] - 2026-10-18
 

@@ -170,6 +170,8 @@
   padding: 0.2rem 0.5rem;
   vertical-align: top;
   white-space: pre-wrap;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .chat-md__cell--head {
