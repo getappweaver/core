@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.12.1] - 2026-10-25
+
+- fix: added ability to copy file-diff paths (07aa569a)
+
 ## [v14.12.0] - 2026-10-25
 
-- feat: new story to showcase video pipeline (c1e19550)
+- feat: new story to showcase video pipeline (e214c7dc)
 
 ## [v14.11.2] - 2026-10-25
 

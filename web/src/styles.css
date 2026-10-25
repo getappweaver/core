@@ -1820,8 +1820,23 @@ pre {
   border: none;
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, #fff);
   padding: 0.35rem 0.55rem;
-  cursor: pointer;
+}
+
+.diff-file__toggle {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
+  font-family: monospace;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .diff-file__checkbox {
@@ -1831,6 +1846,10 @@ pre {
 
 .diff-file__summary:hover {
   background: color-mix(in srgb, #141414 80%, #fff);
+}
+
+.diff-file__summary .chat-copy-btn {
+  align-self: center;
 }
 
 .diff-card__commit-form {

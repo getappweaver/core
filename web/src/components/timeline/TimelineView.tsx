@@ -761,6 +761,7 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
   );
 
   const [commitStatus, setCommitStatus] = createSignal<string | null>(null);
+  const [copiedFile, setCopiedFile] = createSignal<string | null>(null);
 
   const workspaceDiff = () => props.item.meta?.origin === 'workspace_diff';
   const scopePath = () => props.item.meta?.scopePath ?? props.item.meta?.title;
@@ -813,6 +814,12 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
 
       return next;
     });
+  }
+
+  async function copyFilePath(file: string): Promise<void> {
+    await navigator.clipboard.writeText(file);
+    setCopiedFile(file);
+    window.setTimeout(() => setCopiedFile(null), 1200);
   }
 
   function selectAllFiles(): void {
@@ -1021,45 +1028,72 @@ export function TimelineDiffCard(props: TimelineDiffCardProps) {
       <For each={props.item.files}>
         {(file, index) => (
           <div class="diff-file">
-            <button
-              type="button"
-              class="diff-file__summary"
-              data-story-target={diffFileTargetId(file.file)}
-              ref={(el) =>
-                registerStoryDomTarget(diffFileTargetId(file.file), el)
-              }
-              onClick={() => {
-                emitStoryTargetClicked(diffFileTargetId(file.file));
-                toggleFile(index());
-              }}
-              aria-expanded={openFiles().has(index())}
-            >
-              <Show when={workspaceDiff()}>
-                <input
-                  type="checkbox"
-                  class="web-checkbox web-checkbox--retro diff-file__checkbox"
-                  data-story-target={diffFileCheckboxTargetId(file.file)}
-                  ref={(el) =>
-                    registerStoryDomTarget(
-                      diffFileCheckboxTargetId(file.file),
-                      el,
-                    )
-                  }
-                  checked={selectedFiles().has(file.file)}
-                  aria-label={`Include ${file.file} in commit`}
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    toggleSelectedFile(file.file);
-                  }}
-                />
-              </Show>
-              <span class="diff-file__name">{file.file}</span>
-              <span class="diff-file__meta">
-                {file.status ?? 'modified'} · +{file.additions} -
-                {file.deletions}
-              </span>
-            </button>
+            <div class="diff-file__summary">
+              <button
+                type="button"
+                class="diff-file__toggle"
+                data-story-target={diffFileTargetId(file.file)}
+                ref={(el) =>
+                  registerStoryDomTarget(diffFileTargetId(file.file), el)
+                }
+                onClick={() => {
+                  emitStoryTargetClicked(diffFileTargetId(file.file));
+                  toggleFile(index());
+                }}
+                aria-expanded={openFiles().has(index())}
+              >
+                <Show when={workspaceDiff()}>
+                  <input
+                    type="checkbox"
+                    class="web-checkbox web-checkbox--retro diff-file__checkbox"
+                    data-story-target={diffFileCheckboxTargetId(file.file)}
+                    ref={(el) =>
+                      registerStoryDomTarget(
+                        diffFileCheckboxTargetId(file.file),
+                        el,
+                      )
+                    }
+                    checked={selectedFiles().has(file.file)}
+                    aria-label={`Include ${file.file} in commit`}
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      toggleSelectedFile(file.file);
+                    }}
+                  />
+                </Show>
+                <span class="diff-file__name">{file.file}</span>
+                <span class="diff-file__meta">
+                  {file.status ?? 'modified'} · +{file.additions} -
+                  {file.deletions}
+                </span>
+              </button>
+              <button
+                type="button"
+                class={`tag tag-button card-head__control card-head-tree-toolbar-btn card-head-chrome-btn chat-copy-btn${copiedFile() === file.file ? ' chat-copy-btn--show-text' : ''}`}
+                title={copiedFile() === file.file ? 'Copied path' : 'Copy path'}
+                aria-label={
+                  copiedFile() === file.file ? 'Copied path' : 'Copy path'
+                }
+                onClick={() => void copyFilePath(file.file)}
+              >
+                <svg
+                  class="chat-copy-btn__icon"
+                  fill="currentColor"
+                  viewBox="0 0 16 16"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M14 12V2H4V0h12v12h-2zM0 4h12v12H0V4zm2 2v8h8V6H2z"
+                    fill-rule="evenodd"
+                  />
+                </svg>
+                <Show when={copiedFile() === file.file}>
+                  <span>copied</span>
+                </Show>
+              </button>
+            </div>
             <Show when={openFiles().has(index())}>
               <Show when={workspaceDiff()}>
                 <div class="diff-file__expanded-actions">
