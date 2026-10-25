@@ -1481,6 +1481,7 @@ async function runChatInSession(
   });
 
   let result: { output: string; sessionId: string };
+  let hasStreamedTextDelta = false;
   let streamedReasoning = '';
   let reasoningSegmentIndex = 0;
   let currentReasoningSegmentId: string | null = null;
@@ -1585,6 +1586,12 @@ async function runChatInSession(
               return;
             }
 
+            if (chunk.kind === 'error' && !hasStreamedTextDelta) {
+              closeCurrentReasoningSegment();
+
+              return;
+            }
+
             sendMessage(
               ws,
               createChatStreamChunkMessage({
@@ -1595,6 +1602,7 @@ async function runChatInSession(
             );
 
             if (chunk.kind === 'text_delta') {
+              hasStreamedTextDelta = true;
               closeCurrentReasoningSegment();
             }
 

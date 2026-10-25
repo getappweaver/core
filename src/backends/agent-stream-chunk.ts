@@ -125,35 +125,62 @@ function logIgnoredOnce(
   );
 }
 
-function extractSessionErrorMessage(error: unknown): string {
+export function extractSessionErrorMessage(error: unknown): string {
   if (!error || typeof error !== 'object') {
     return 'Session error';
   }
 
   const rec = error as Record<string, unknown>;
-  const direct = rec.message ?? rec.reason ?? rec.body;
+
+  const data =
+    rec.data && typeof rec.data === 'object'
+      ? (rec.data as Record<string, unknown>)
+      : null;
+
+  const direct = data?.message ?? rec.message ?? rec.reason ?? rec.body;
 
   if (typeof direct === 'string' && direct.length > 0) {
     return direct;
   }
 
-  const status = rec.status ?? rec.statusCode ?? rec.status_code ?? rec.code;
+  const status =
+    data?.statusCode ??
+    rec.status ??
+    rec.statusCode ??
+    rec.status_code ??
+    rec.code;
 
   if (status === 429 || status === '429') {
     return 'AI provider rate limit: 429';
   }
 
-  const data = rec.data;
+  if (rec.name === 'MessageAbortedError') {
+    return 'Request aborted';
+  }
 
-  if (data && typeof data === 'object') {
-    const message = (data as { message?: unknown }).message;
-
-    return typeof message === 'string' && message.length > 0
-      ? message
-      : 'Session error';
+  if (rec.name === 'MessageOutputLengthError') {
+    return 'Model output exceeded maximum length';
   }
 
   return 'Session error';
+}
+
+function extractUpdatedAssistantErrorMessage(
+  properties: Record<string, unknown>,
+): string | null {
+  const info = properties.info;
+
+  if (!info || typeof info !== 'object') {
+    return null;
+  }
+
+  const message = info as Record<string, unknown>;
+
+  if (message.role !== 'assistant' || message.error == null) {
+    return null;
+  }
+
+  return extractSessionErrorMessage(message.error);
 }
 
 function sessionRetrySummary(
@@ -222,6 +249,16 @@ function isMatchingSession(
 
     if (typeof partSessionId === 'string') {
       return partSessionId === sessionId;
+    }
+  }
+
+  const info = properties.info;
+
+  if (info && typeof info === 'object') {
+    const infoSessionId = (info as { sessionID?: unknown }).sessionID;
+
+    if (typeof infoSessionId === 'string') {
+      return infoSessionId === sessionId;
     }
   }
 
@@ -747,6 +784,18 @@ export function mapOpencodeSsePayloadToChunk(
     }
 
     rememberOpenCodeAssistantMessage(p, logState.parseState);
+
+    const assistantError = extractUpdatedAssistantErrorMessage(p);
+
+    if (assistantError) {
+      debug(
+        'opencode-sdk stream: message.updated assistant error payload',
+        previewPayload(raw, 10_000),
+      );
+
+      return [{ kind: 'error', message: assistantError }];
+    }
+
     logIgnoredOnce(logState, eventType, 'message metadata update', raw);
 
     return [];

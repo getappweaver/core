@@ -22,6 +22,7 @@ import { buildAgentRuntimeContent } from './agent-runtime-context';
 import {
   coerceFileDiff,
   createOpencodeStreamLogState,
+  extractSessionErrorMessage,
   mapOpencodeSsePayloadToChunk,
   type AgentFileDiff,
   type AgentStreamChunk,
@@ -137,10 +138,6 @@ function isTimeoutLikeError(err: unknown): boolean {
   return /\b(timeout|timed out|deadline|abort)\b/i.test(errorMessage(err));
 }
 
-function shortLogText(value: string, maxLength: number = 500): string {
-  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -213,12 +210,6 @@ async function waitForSessionIdleAfterAbort({
   });
 
   throw new OpenCodeAbortCleanupError();
-}
-
-function isFatalStreamErrorMessage(message: string): boolean {
-  return /\b(error|exception|failed|failure|timeout|timed out|deadline|abort|rate limit|429|unauthorized|forbidden)\b/i.test(
-    message,
-  );
 }
 
 function logSdkCallError({
@@ -1964,6 +1955,61 @@ function latestAssistantMessage(
   return latest;
 }
 
+function getAssistantMessageCreatedAt(
+  message: Record<string, unknown> | null,
+): number {
+  if (!message) {
+    return -1;
+  }
+
+  const info = message.info;
+
+  if (!info || typeof info !== 'object') {
+    return -1;
+  }
+
+  const time = (info as { time?: unknown }).time;
+
+  const created =
+    time && typeof time === 'object'
+      ? (time as { created?: unknown }).created
+      : null;
+
+  return typeof created === 'number' && Number.isFinite(created) ? created : -1;
+}
+
+function isAssistantMessageSettled(
+  message: Record<string, unknown> | null,
+): boolean {
+  if (!message) {
+    return false;
+  }
+
+  const info = message.info;
+
+  if (!info || typeof info !== 'object') {
+    return false;
+  }
+
+  const rec = info as Record<string, unknown>;
+
+  if (rec.error != null) {
+    return true;
+  }
+
+  const time = rec.time;
+
+  if (time && typeof time === 'object') {
+    const completed = (time as { completed?: unknown }).completed;
+
+    if (typeof completed === 'number' && Number.isFinite(completed)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function partsFromV2PromptData(data: {
   parts?: unknown[];
   output?: string;
@@ -2087,16 +2133,7 @@ function parsePromptSdkResult({
   const info = data.info;
 
   if (info?.error != null) {
-    const error = info.error as
-      | { data?: { message?: string }; message?: string; name?: string }
-      | undefined;
-
-    const output =
-      error?.data?.message ??
-      error?.message ??
-      (error?.name === 'MessageAbortedError'
-        ? 'Request aborted'
-        : String(info.error));
+    const output = extractSessionErrorMessage(info.error);
 
     debug('opencode-sdk prompt info error', {
       sessionId,
@@ -2266,6 +2303,8 @@ export function createOpencodeSDKBackend({
       const diffSignatures = new Set<string>();
       const patchDiffMessageIds = new Set<string>();
       let streamErrorMessage: string | null = null;
+      let sessionObservedActive = false;
+      let promptStartedAt = 0;
       let resolveStreamComplete: () => void = () => {};
 
       const streamComplete = new Promise<void>((resolve) => {
@@ -2273,6 +2312,17 @@ export function createOpencodeSDKBackend({
       });
 
       const emitStreamChunk = (chunk: AgentStreamChunk): void => {
+        if (
+          (chunk.kind === 'status' && chunk.phase === 'started') ||
+          chunk.kind === 'summary' ||
+          chunk.kind === 'text_delta' ||
+          chunk.kind === 'reasoning_delta' ||
+          chunk.kind === 'tool' ||
+          chunk.kind === 'question'
+        ) {
+          sessionObservedActive = true;
+        }
+
         if (chunk.kind === 'diff') {
           const signature = diffSignature(chunk.files);
 
@@ -2290,16 +2340,12 @@ export function createOpencodeSDKBackend({
         }
 
         if (chunk.kind === 'error') {
-          if (isFatalStreamErrorMessage(chunk.message)) {
-            streamErrorMessage = chunk.message;
-            resolveStreamComplete();
-          } else {
-            log.warn(
-              `OpenCode SDK non-fatal stream error event ignored for session ${sessionId}: ${shortLogText(chunk.message)}`,
-            );
-
+          if (streamErrorMessage !== null) {
             return;
           }
+
+          streamErrorMessage = chunk.message;
+          resolveStreamComplete();
         }
 
         recordStreamDebugChunk(
@@ -2420,7 +2466,37 @@ export function createOpencodeSDKBackend({
             statusResult.data as Record<string, { type?: string }>
           )[sessionId];
 
-          if (!status || status.type === 'idle') {
+          if (status && status.type !== 'idle') {
+            sessionObservedActive = true;
+
+            continue;
+          }
+
+          if (sessionObservedActive) {
+            resolveStreamComplete();
+
+            return;
+          }
+
+          const messagesResult = await client.session
+            .messages({
+              sessionID: sessionId,
+              directory: cwd,
+              limit: 5,
+            })
+            .catch(() => null);
+
+          if (!messagesResult || messagesResult.error) {
+            continue;
+          }
+
+          const latest = latestAssistantMessage(messagesResult.data);
+
+          if (
+            latest &&
+            getAssistantMessageCreatedAt(latest) >= promptStartedAt &&
+            isAssistantMessageSettled(latest)
+          ) {
             resolveStreamComplete();
 
             return;
@@ -2459,6 +2535,10 @@ export function createOpencodeSDKBackend({
               sessionId,
               logState,
             );
+
+            if (logState.parseState.assistantMessageIds.size > 0) {
+              sessionObservedActive = true;
+            }
 
             if (chunks.length > 0) {
               for (const chunk of chunks) {
@@ -2501,6 +2581,7 @@ export function createOpencodeSDKBackend({
         >;
 
         try {
+          promptStartedAt = Date.now();
           promptAsyncResult = await client.session.promptAsync(promptParams);
         } catch (err) {
           logSdkCallError({
@@ -2561,39 +2642,84 @@ export function createOpencodeSDKBackend({
           } satisfies AgentErrorResult;
         }
 
-        let messagesResult: Awaited<ReturnType<typeof client.session.messages>>;
+        let messagesResult: Awaited<
+          ReturnType<typeof client.session.messages>
+        > | null = null;
 
-        try {
-          log.info(`OpenCode SDK fetching final messages: ${sessionId}`);
+        let messagesError: unknown = null;
+        let latest: Record<string, unknown> | null = null;
 
-          messagesResult = await client.session.messages({
-            sessionID: sessionId,
-            directory: cwd,
-            limit: 10,
-          });
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          try {
+            if (attempt === 0) {
+              log.info(`OpenCode SDK fetching final messages: ${sessionId}`);
+            }
 
-          log.info(`OpenCode SDK final messages returned: ${sessionId}`);
-        } catch (err) {
-          logSdkCallError({
-            operation: 'session.messages',
+            messagesResult = await client.session.messages({
+              sessionID: sessionId,
+              directory: cwd,
+              limit: 10,
+            });
+
+            if (attempt === 0) {
+              log.info(`OpenCode SDK final messages returned: ${sessionId}`);
+            }
+          } catch (err) {
+            logSdkCallError({
+              operation: 'session.messages',
+              sessionId,
+              err,
+            });
+
+            throw err;
+          }
+
+          messagesError = sdkResultError(messagesResult);
+
+          if (messagesError) {
+            log.warn(
+              `OpenCode SDK messages returned error for session ${sessionId}: ${String(messagesError)}`,
+            );
+
+            break;
+          }
+
+          latest = latestAssistantMessage(messagesResult.data);
+
+          if (
+            streamErrorMessage !== null ||
+            streamAbortSignal.aborted ||
+            (latest &&
+              getAssistantMessageCreatedAt(latest) >= promptStartedAt &&
+              isAssistantMessageSettled(latest))
+          ) {
+            break;
+          }
+
+          await sleep(100);
+        }
+
+        if (streamAbortSignal.aborted) {
+          await externalAbortPromise;
+
+          return {
+            type: 'error',
+            output: 'Request aborted',
             sessionId,
-            err,
-          });
-
-          throw err;
+          } satisfies AgentErrorResult;
         }
 
-        const messagesError = sdkResultError(messagesResult);
-
-        if (messagesError) {
+        if (streamErrorMessage) {
           log.warn(
-            `OpenCode SDK messages returned error for session ${sessionId}: ${String(messagesError)}`,
+            `OpenCode SDK stream error for session ${sessionId}: ${streamErrorMessage}`,
           );
-        }
 
-        const latest = messagesError
-          ? null
-          : latestAssistantMessage(messagesResult.data);
+          return {
+            type: 'error',
+            output: streamErrorMessage,
+            sessionId,
+          } satisfies AgentErrorResult;
+        }
 
         log.info(
           `OpenCode SDK latest assistant message ${latest ? 'found' : 'missing'}: ${sessionId}`,
@@ -2602,7 +2728,7 @@ export function createOpencodeSDKBackend({
         promptResult = {
           data: latest ?? undefined,
           error: messagesError ?? undefined,
-          response: messagesResult.response,
+          response: messagesResult?.response,
         } as Awaited<ReturnType<typeof client.session.prompt>>;
       } finally {
         stopConsumer = true;

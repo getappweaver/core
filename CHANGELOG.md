@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.11.2] - 2026-10-25
+
+- fix: catched "The usage limit has been reached" properly (8a1b3279)
+
 ## [v14.11.1] - 2026-10-19
 
-- fix: catalog cache invalidation (536ccbbd)
+- fix: catalog cache invalidation (b8c4235c)
 
 ## [v14.11.0] - 2026-10-19
 
