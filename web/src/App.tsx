@@ -268,6 +268,17 @@ function AppInner(): JSX.Element {
 
   const widgetQuery = parseWidgetQuery(window.location.search);
 
+  const storyQuery = cleanQueryToken(
+    new URLSearchParams(window.location.search).get('story'),
+  );
+
+  const isCaptureMode =
+    new URLSearchParams(window.location.search).get('capture') === '1';
+
+  const [queryStoryStartedKey, setQueryStoryStartedKey] = createSignal<
+    string | null
+  >(null);
+
   const [composerAiState, setComposerAiState] =
     createSignal<ComposerAiState | null>(null);
 
@@ -2863,6 +2874,42 @@ function AppInner(): JSX.Element {
     void openHeaderWidget(widget);
   });
 
+  createEffect(() => {
+    if (
+      !storyQuery ||
+      !wsConnected() ||
+      loadingCommands() ||
+      !desktopLayoutReady()
+    ) {
+      return;
+    }
+
+    if (queryStoryStartedKey() === storyQuery) {
+      return;
+    }
+
+    setQueryStoryStartedKey(storyQuery);
+
+    void (async () => {
+      const command = await ensureCommandDetail('story');
+
+      const subcommand = command?.subcommands.find(
+        (entry) => entry.name === 'start',
+      );
+
+      if (!subcommand) {
+        appendSystemMessage(`Unable to start story: ${storyQuery}`);
+
+        return;
+      }
+
+      await runCommand('story', subcommand, {
+        arguments: { id: storyQuery },
+        options: {},
+      });
+    })();
+  });
+
   onMount(() => {
     const desktopLayoutQuery = window.matchMedia('(min-width: 900px)');
 
@@ -3182,6 +3229,7 @@ function AppInner(): JSX.Element {
     <div
       class="app-shell"
       data-demo-mode={isWebDemoMode() ? 'true' : undefined}
+      data-capture={isCaptureMode ? 'true' : undefined}
       data-web-ui-busy-digest={webUiBusyDigest()}
       style={`--desktop-dock-width:${layoutPrefs().dockWidthPx}px`}
     >

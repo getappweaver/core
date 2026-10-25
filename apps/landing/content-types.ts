@@ -1,7 +1,29 @@
+export type PluginFeatureStatus = 'draft' | 'beta' | 'stable' | 'deprecated';
+export type PluginFeatureSurface = 'web' | 'cli' | 'dm';
+export type PluginFeatureShowcase = 'none' | 'app' | 'home';
+
+export type PluginFeatureMedia = {
+  poster: string | null;
+  video: string | null;
+};
+
+export type PluginCatalogFeature = {
+  id: string;
+  title: string;
+  status: PluginFeatureStatus;
+  tags: string[];
+  surfaces: PluginFeatureSurface[];
+  showcase: PluginFeatureShowcase;
+  order: number;
+  media: PluginFeatureMedia;
+  description: string;
+};
+
 /** Data-only contract for plugin-owned website content. Import with `import type`. */
 export type PluginDemoGifVariant = {
   view: 'desktop' | 'mobile';
   src: string;
+  poster: string | null;
   alt: string;
   durationMs: number;
 };
@@ -58,4 +80,5 @@ export type LandingApp = PluginLandingDefinition & {
   packageName: string;
   repo: string;
   iconSrc: string | null;
+  catalogFeatures: PluginCatalogFeature[];
 };

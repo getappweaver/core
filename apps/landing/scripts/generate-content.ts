@@ -1,10 +1,11 @@
-import { copyFileSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { z } from 'zod';
 
 import type { PluginIdentity } from '../src/plugin-content';
+import { parseFeaturesMd } from './parse-features-md';
 import { LANDING_ROOT, pluginSources } from './plugin-sources';
 
 const gallerySchema = z.object({
@@ -22,7 +23,13 @@ const landingSchema = z.object({
   assetAliases: z.array(z.object({ source: z.string(), publicPath: z.string().regex(/^\/screenshots\/[a-z0-9-]+\.(png|jpe?g|gif|svg|webp)$/) })),
   demoStories: z.array(z.object({
     id: z.string(), label: z.string(),
-    variants: z.array(z.object({ view: z.enum(['desktop', 'mobile']), src: z.string(), alt: z.string(), durationMs: z.number().positive() })),
+    variants: z.array(z.object({
+      view: z.enum(['desktop', 'mobile']),
+      src: z.string(),
+      poster: z.string().nullable(),
+      alt: z.string(),
+      durationMs: z.number().positive(),
+    })),
   })),
   presentation: z.object({ title: z.string(), description: z.string(), featureGallery: gallerySchema.nullable() }).nullable(),
   roadmapRepoId: z.string().nullable(),
@@ -85,10 +92,26 @@ async function generateContent(): Promise<void> {
     }
 
     routes.add(definition.route);
+
+    const featuresMdPath = resolve(plugin.root, 'FEATURES.md');
+    const catalogFeatures = existsSync(featuresMdPath)
+      ? parseFeaturesMd({
+          markdown: readFileSync(featuresMdPath, 'utf8'),
+          pluginAlias: plugin.alias,
+        })
+      : [];
+
     const assets = [plugin.icon, definition.installScreenshot,
       ...definition.assetAliases.map((asset) => asset.source),
-      ...definition.demoStories.flatMap((story) => story.variants.map((variant) => variant.src)),
+      ...definition.demoStories.flatMap((story) =>
+        story.variants.flatMap((variant) =>
+          [variant.src, variant.poster].filter((p): p is string => Boolean(p)),
+        ),
+      ),
       ...(definition.presentation?.featureGallery?.items.map((item) => item.mediaSrc) ?? []),
+      ...catalogFeatures.flatMap((feature) =>
+        [feature.media.poster, feature.media.video].filter((p): p is string => Boolean(p)),
+      ),
     ];
 
     for (const path of new Set(assets)) {
@@ -108,7 +131,7 @@ async function generateContent(): Promise<void> {
     const name = `plugin${imports.length}`;
     imports.push(`import { landingPage as ${name} } from '../../../../plugins/${plugin.alias}/landing';`);
     const identity: PluginIdentity = { alias: plugin.alias, packageName: plugin.packageName, repo: plugin.repo, icon: plugin.icon };
-    entries.push(`  createLandingApp(${name}, ${JSON.stringify(identity)}),`);
+    entries.push(`  createLandingApp({ definition: ${name}, identity: ${JSON.stringify(identity)}, catalogFeatures: ${JSON.stringify(catalogFeatures)} }),`);
   }
 
   const output = resolve(LANDING_ROOT, 'src/generated/plugin-content.ts');

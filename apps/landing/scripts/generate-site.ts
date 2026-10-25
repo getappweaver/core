@@ -26,6 +26,7 @@ type NavItem = {
 type HeaderProps = {
   isIntroActive: boolean;
   navItems: NavItem[];
+  brandText?: string;
 };
 
 type BlogPostPreview = {
@@ -53,7 +54,7 @@ function appImageUrl(app: OfficialApp): string {
   return `${SITE_ORIGIN}${app.installScreenshot ?? app.iconSrc ?? '/favicon/android-chrome-512x512.png'}`;
 }
 
-function renderHeader({ isIntroActive, navItems }: HeaderProps): string {
+function renderHeader({ isIntroActive, navItems, brandText }: HeaderProps): string {
   return `<header class="stage-header">
       <a
         href="/"
@@ -61,7 +62,7 @@ function renderHeader({ isIntroActive, navItems }: HeaderProps): string {
         ${isIntroActive ? 'aria-hidden="true" tabindex="-1"' : ''}
       >
         <img src="${LOGO_URL}" alt="AppWeaver" class="stage-brand-logo" />
-        <span class="stage-brand-text" aria-hidden="true">AppWeaver</span>
+        <span class="stage-brand-text" aria-hidden="true">${escapeHtml(brandText ?? 'AppWeaver')}</span>
       </a>
       <nav class="stage-nav-simple" aria-label="Landing pages">
         ${navItems
@@ -380,19 +381,22 @@ function renderIndexMarkup(recentPosts: BlogPostPreview[]): string {
 
 function renderAppMarkup(app: OfficialApp, recentPosts: BlogPostPreview[]): string {
   const otherApps = officialApps.filter((entry) => entry.href !== app.href);
+  const hasCatalogFeatures = (app.catalogFeatures?.length ?? 0) > 0;
   const navItems: NavItem[] = [
     { label: 'Features', href: '#features', isActive: true },
-    { label: app.presentation?.featureGallery ? 'Gallery' : 'Demo', href: app.presentation?.featureGallery ? '#gallery' : '#demo', isActive: false },
+    ...(app.presentation?.featureGallery
+      ? [{ label: 'Gallery', href: '#gallery', isActive: false }]
+      : hasCatalogFeatures || app.hasInteractiveDemo === false
+        ? []
+        : [{ label: 'Demo', href: '#demo', isActive: false }]),
     { label: 'Install', href: '#install', isActive: false },
-    { label: 'Roadmap', href: '#roadmap', isActive: false },
-    { label: 'Apps', href: '#apps', isActive: false },
     { label: 'More', href: '#more', isActive: false },
   ];
 
   return `<div class="stage-page">
   <div class="stage-background"></div>
   <div class="stage-shell">
-    ${renderHeader({ isIntroActive: false, navItems })}
+    ${renderHeader({ isIntroActive: false, navItems, brandText: app.label.toUpperCase() })}
     <main class="page-sections">
       <div class="plugin-page-stage">
         <section id="features" class="plugin-page-section plugin-page-section--features">
@@ -407,10 +411,42 @@ function renderAppMarkup(app: OfficialApp, recentPosts: BlogPostPreview[]): stri
               <h1 class="plugin-page-title">${escapeHtml(app.displayName)}</h1>
             </div>
             <p class="plugin-page-description">${escapeHtml(app.presentation?.description ?? app.description)}</p>
-            <ul class="plugin-page-list">
+            ${
+              hasCatalogFeatures
+                ? ''
+                : `<ul class="plugin-page-list">
               ${app.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('\n              ')}
-            </ul>
+            </ul>`
+            }
           </div>
+          ${
+            hasCatalogFeatures
+              ? `<div class="plugin-catalog-showcase">
+            ${(() => {
+              const videoFeatures = [...app.catalogFeatures]
+                .filter((f) => f.media.video !== null)
+                .sort((a, b) => a.order - b.order);
+              if (videoFeatures.length === 0) return '';
+              return videoFeatures
+                .map(
+                  (feat, idx) => `
+                <div class="plugin-showcase-item">
+                  <header class="plugin-showcase-header">
+                    <span class="plugin-showcase-index">0${idx + 1}</span>
+                    <h2 class="plugin-showcase-active-title">${escapeHtml(feat.title)}</h2>
+                  </header>
+                  <figure class="plugin-showcase-video-frame">
+                    <button type="button" class="plugin-showcase-video-button" aria-label="Open ${escapeAttribute(feat.title)} fullscreen">
+                      <video class="plugin-showcase-video" src="${escapeAttribute(feat.media.video!)}" ${feat.media.poster ? `poster="${escapeAttribute(feat.media.poster)}"` : ''} loop muted playsinline preload="metadata" aria-label="${escapeAttribute(feat.title)}"></video>
+                    </button>
+                  </figure>
+                </div>`,
+                )
+                .join('\n');
+            })()}
+          </div>`
+              : ''
+          }
         </section>
         ${
           app.presentation?.featureGallery
@@ -439,7 +475,9 @@ function renderAppMarkup(app: OfficialApp, recentPosts: BlogPostPreview[]): stri
             </div>
           </div>
         </section>`
-            : `<section id="demo" class="plugin-page-section plugin-page-section--demo" aria-label="${escapeAttribute(app.displayName)} demo">
+            : hasCatalogFeatures || app.hasInteractiveDemo === false
+              ? ''
+              : `<section id="demo" class="plugin-page-section plugin-page-section--demo" aria-label="${escapeAttribute(app.displayName)} demo">
           <div class="plugin-demo-section">
             <div class="plugin-page-eyebrow">Interactive Demo</div>
             <h2 class="plugin-section-title">See ${escapeHtml(app.displayName)} in action</h2>
@@ -474,7 +512,7 @@ function renderAppMarkup(app: OfficialApp, recentPosts: BlogPostPreview[]): stri
             }
           </div>
         </section>
-        <section id="roadmap" class="plugin-page-section plugin-page-section--roadmap">
+        <section id="more" class="plugin-page-section plugin-page-section--roadmap">
           <div class="more-section-stack">
             <div class="plugin-docs-banner">
               <a href="/docs/plugins/${app.alias}/" class="plugin-docs-link" aria-label="${escapeAttribute(app.displayName)} documentation">
@@ -499,7 +537,7 @@ function renderAppMarkup(app: OfficialApp, recentPosts: BlogPostPreview[]): stri
             ${renderOfficialAppGrid(otherApps)}
           </div>
         </section>
-        <section id="more" class="plugin-page-section plugin-page-section--more">
+        <section class="plugin-page-section plugin-page-section--more">
           <div class="more-section-stack">
             ${renderBlogPostsSection(recentPosts)}
             ${renderFooter()}

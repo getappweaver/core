@@ -9,6 +9,7 @@ import {
 } from 'solid-js';
 
 import type {
+  PluginCatalogFeature,
   PluginDemoStory,
   PluginDemoGifVariant,
   PluginFeatureGallery,
@@ -24,7 +25,7 @@ import { RoadmapPanel, appWeaverRoadmapTarget } from './roadmap-panel';
 import { DocsIcon, SiteFooter } from './site-footer';
 
 type PluginPageSectionId =
-  'features' | 'gallery' | 'demo' | 'install' | 'roadmap' | 'apps' | 'more';
+  'features' | 'gallery' | 'demo' | 'install' | 'more';
 
 type PluginPage = {
   routeSlug: string;
@@ -41,6 +42,7 @@ type PluginPage = {
   description: string;
   demoQuery: string | null;
   demoStories: PluginDemoStory[];
+  catalogFeatures: PluginCatalogFeature[];
   features: string[];
   featureGallery: PluginFeatureGallery | null;
 };
@@ -86,6 +88,10 @@ type DemoSubcommand = {
     modalTitle: string;
   };
 };
+
+function isVideoMedia(src: string): boolean {
+  return src.endsWith('.webm') || src.endsWith('.mp4');
+}
 
 function demoGifsForView(
   stories: PluginDemoStory[],
@@ -143,16 +149,14 @@ const pluginPageSections: PluginPageSectionId[] = [
   'gallery',
   'demo',
   'install',
-  'roadmap',
-  'apps',
   'more',
 ];
 
-function routeSlugForPath(pathname: string): string {
+export function routeSlugForPath(pathname: string): string {
   return pathname.replace(/^\/+|\/+$/g, '');
 }
 
-function officialAppForSlug(slug: string) {
+export function officialAppForSlug(slug: string) {
   return officialApps.find(
     (app) => app.href === `/${slug}` || app.alias === slug,
   );
@@ -162,30 +166,16 @@ export function pluginNavItemsForPath(pathname: string): PluginNavItem[] {
   const slug = routeSlugForPath(pathname);
   const app = officialAppForSlug(slug);
   const usesFeatureGallery = !!app?.presentation?.featureGallery;
-  const hasRoadmap = !!app?.roadmapRepoId;
+  const hasCatalogFeatures = (app?.catalogFeatures?.length ?? 0) > 0;
 
   return [
-    { sectionId: null, label: 'Back', href: '/' },
     { sectionId: 'features', label: 'Features', href: '#features' },
     ...(usesFeatureGallery
       ? [{ sectionId: 'gallery' as const, label: 'Gallery', href: '#gallery' }]
-      : app?.hasInteractiveDemo === false
+      : hasCatalogFeatures || app?.hasInteractiveDemo === false
         ? []
         : [{ sectionId: 'demo' as const, label: 'Demo', href: '#demo' }]),
     { sectionId: 'install', label: 'Install', href: '#install' },
-    ...(app
-      ? [
-          {
-            sectionId: null,
-            label: 'Docs',
-            href: `/docs/plugins/${app.alias}/`,
-          },
-        ]
-      : []),
-    ...(hasRoadmap
-      ? [{ sectionId: 'roadmap' as const, label: 'Roadmap', href: '#roadmap' }]
-      : []),
-    { sectionId: 'apps', label: 'Apps', href: '#apps' },
     { sectionId: 'more', label: 'More', href: '#more' },
   ];
 }
@@ -244,6 +234,7 @@ function pluginPageForPath(
         ? `widget=${encodeURIComponent(command.name)}:${encodeURIComponent(subcommand.name)}`
         : null,
     demoStories: officialApp.demoStories,
+    catalogFeatures: officialApp.catalogFeatures,
     features: officialApp.features,
     featureGallery: presentation?.featureGallery ?? null,
   };
@@ -289,32 +280,223 @@ function ScreenshotCard(props: {
   );
 }
 
-function PluginFeatures(props: { page: PluginPage }) {
+function ShowcaseVideoItem(props: {
+  feat: PluginCatalogFeature;
+  index: number;
+  isPaused: boolean;
+  onOpenFullscreen: (feat: PluginCatalogFeature) => void;
+}) {
+  let videoRef: HTMLVideoElement | undefined;
+  let isInView = false;
+  let hasLeftViewCompletely = true;
+  let playPromise: Promise<void> | null = null;
+
+  const play = () => {
+    if (!videoRef || props.isPaused) return;
+    playPromise = videoRef.play().catch(() => {
+      // Suppress playback interruptions during rapid scrolling
+    });
+  };
+
+  const pause = () => {
+    if (!videoRef) return;
+    if (playPromise) {
+      playPromise
+        .then(() => {
+          videoRef?.pause();
+        })
+        .catch(() => {});
+    } else {
+      videoRef.pause();
+    }
+  };
+
+  createEffect(() => {
+    if (props.isPaused) {
+      pause();
+    } else if (isInView) {
+      play();
+    }
+  });
+
+  onMount(() => {
+    if (!videoRef || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
+            isInView = true;
+            if (hasLeftViewCompletely && videoRef) {
+              videoRef.currentTime = 0;
+              hasLeftViewCompletely = false;
+            }
+            play();
+          } else if (!entry.isIntersecting || entry.intersectionRatio === 0) {
+            isInView = false;
+            hasLeftViewCompletely = true;
+            pause();
+          } else if (entry.intersectionRatio < 0.3) {
+            isInView = false;
+            pause();
+          }
+        }
+      },
+      {
+        threshold: [0, 0.3],
+      },
+    );
+
+    observer.observe(videoRef);
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        pause();
+      } else if (isInView) {
+        play();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    onCleanup(() => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      pause();
+    });
+  });
+
   return (
-    <div class="plugin-page-copy">
-      <div class="plugin-page-eyebrow">{props.page.label}</div>
-      <div class="plugin-page-hero-title-row">
-        <Show when={props.page.iconSrc}>
-          {(iconSrc) => (
-            <img
-              class="plugin-page-hero-icon"
-              src={iconSrc()}
-              alt=""
-              aria-hidden="true"
+    <div class="plugin-showcase-item">
+      <header class="plugin-showcase-header">
+        <span class="plugin-showcase-index">0{props.index + 1}</span>
+        <h2 class="plugin-showcase-active-title">{props.feat.title}</h2>
+      </header>
+      <figure class="plugin-showcase-video-frame">
+        <button
+          type="button"
+          class="plugin-showcase-video-button"
+          onClick={() => props.onOpenFullscreen(props.feat)}
+          aria-label={`Open ${props.feat.title} fullscreen`}
+        >
+          <video
+            ref={videoRef}
+            class="plugin-showcase-video"
+            src={props.feat.media.video!}
+            poster={props.feat.media.poster ?? undefined}
+            loop
+            muted
+            playsinline
+            preload="metadata"
+            aria-label={props.feat.title}
+          />
+        </button>
+      </figure>
+    </div>
+  );
+}
+
+function PluginCatalogShowcase(props: {
+  catalogFeatures: PluginCatalogFeature[];
+  shortName: string;
+}) {
+  const videoFeatures = () =>
+    [...props.catalogFeatures]
+      .filter((f) => f.media.video !== null)
+      .sort((a, b) => a.order - b.order);
+  const [fullscreenVideo, setFullscreenVideo] =
+    createSignal<PluginCatalogFeature | null>(null);
+
+  return (
+    <div class="plugin-catalog-showcase">
+      <For each={videoFeatures()}>
+        {(feat, idx) => (
+          <ShowcaseVideoItem
+            feat={feat}
+            index={idx()}
+            isPaused={fullscreenVideo() !== null}
+            onOpenFullscreen={setFullscreenVideo}
+          />
+        )}
+      </For>
+      <Show when={fullscreenVideo()}>
+        {(feat) => (
+          <div class="lightbox" role="dialog" aria-modal="true">
+            <button
+              type="button"
+              class="lightbox__backdrop"
+              aria-label="Close fullscreen video"
+              onClick={() => setFullscreenVideo(null)}
             />
-          )}
-        </Show>
-        <h1 class="plugin-page-title">{props.page.title}</h1>
-      </div>
-      <p class="plugin-page-description">{props.page.description}</p>
-      <Show when={props.page.featureGallery === null}>
-        <ul class="plugin-page-list">
-          <For each={props.page.features}>
-            {(feature) => <li>{feature}</li>}
-          </For>
-        </ul>
+            <figure class="lightbox__card">
+              <div class="lightbox__head">
+                <div>{feat().title}</div>
+                <button
+                  type="button"
+                  class="lightbox__close"
+                  onClick={() => setFullscreenVideo(null)}
+                  aria-label="Close fullscreen video"
+                >
+                  x
+                </button>
+              </div>
+              <video
+                class="lightbox__media"
+                src={feat().media.video!}
+                poster={feat().media.poster ?? undefined}
+                autoplay
+                loop
+                muted
+                playsinline
+                aria-label={feat().title}
+              />
+            </figure>
+          </div>
+        )}
       </Show>
     </div>
+  );
+}
+
+function PluginFeatures(props: { page: PluginPage }) {
+  return (
+    <>
+      <div class="plugin-page-copy">
+        <div class="plugin-page-eyebrow">{props.page.label}</div>
+        <div class="plugin-page-hero-title-row">
+          <Show when={props.page.iconSrc}>
+            {(iconSrc) => (
+              <img
+                class="plugin-page-hero-icon"
+                src={iconSrc()}
+                alt=""
+                aria-hidden="true"
+              />
+            )}
+          </Show>
+          <h1 class="plugin-page-title">{props.page.title}</h1>
+        </div>
+        <p class="plugin-page-description">{props.page.description}</p>
+        <Show
+          when={
+            props.page.catalogFeatures.length === 0 &&
+            props.page.featureGallery === null
+          }
+        >
+          <ul class="plugin-page-list">
+            <For each={props.page.features}>
+              {(feature) => <li>{feature}</li>}
+            </For>
+          </ul>
+        </Show>
+      </div>
+      <Show when={props.page.catalogFeatures.length > 0}>
+        <PluginCatalogShowcase
+          catalogFeatures={props.page.catalogFeatures}
+          shortName={props.page.shortName}
+        />
+      </Show>
+    </>
   );
 }
 
@@ -359,13 +541,30 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
                     onClick={() => setFullscreenItem(item)}
                     aria-label={`Open ${item.mediaLabel} fullscreen`}
                   >
-                    <img
-                      src={item.mediaSrc}
-                      alt={item.mediaAlt}
-                      classList={{ 'is-ready': mediaReady() }}
-                      onLoad={() => setMediaReady(true)}
-                      onError={() => setMediaReady(false)}
-                    />
+                    <Show
+                      when={isVideoMedia(item.mediaSrc)}
+                      fallback={
+                        <img
+                          src={item.mediaSrc}
+                          alt={item.mediaAlt}
+                          classList={{ 'is-ready': mediaReady() }}
+                          onLoad={() => setMediaReady(true)}
+                          onError={() => setMediaReady(false)}
+                        />
+                      }
+                    >
+                      <video
+                        src={item.mediaSrc}
+                        autoplay
+                        loop
+                        muted
+                        playsinline
+                        classList={{ 'is-ready': mediaReady() }}
+                        onLoadedData={() => setMediaReady(true)}
+                        onError={() => setMediaReady(false)}
+                        aria-label={item.mediaAlt}
+                      />
+                    </Show>
                   </button>
                   <Show when={!mediaReady()}>
                     <div class="plugin-feature-gallery-placeholder">
@@ -400,11 +599,26 @@ function PluginFeatureGallery(props: { gallery: PluginFeatureGallery }) {
                   x
                 </button>
               </div>
-              <img
-                class="lightbox__media lightbox__media--screenshot"
-                src={item().mediaSrc}
-                alt={item().mediaAlt}
-              />
+              <Show
+                when={isVideoMedia(item().mediaSrc)}
+                fallback={
+                  <img
+                    class="lightbox__media lightbox__media--screenshot"
+                    src={item().mediaSrc}
+                    alt={item().mediaAlt}
+                  />
+                }
+              >
+                <video
+                  class="lightbox__media lightbox__media--screenshot"
+                  src={item().mediaSrc}
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                  aria-label={item().mediaAlt}
+                />
+              </Show>
             </figure>
           </div>
         )}
@@ -651,11 +865,27 @@ function PluginDemoSection(props: { page: PluginPage }) {
                   onClick={() => setFullscreenGif(gif())}
                   aria-label={`Open ${gif().label} fullscreen`}
                 >
-                  <img
-                    class="plugin-demo-gif"
-                    src={gif().src}
-                    alt={gif().alt}
-                  />
+                  <Show
+                    when={isVideoMedia(gif().src)}
+                    fallback={
+                      <img
+                        class="plugin-demo-gif"
+                        src={gif().src}
+                        alt={gif().alt}
+                      />
+                    }
+                  >
+                    <video
+                      class="plugin-demo-gif"
+                      src={gif().src}
+                      poster={gif().poster ?? undefined}
+                      autoplay
+                      loop
+                      muted
+                      playsinline
+                      aria-label={gif().alt}
+                    />
+                  </Show>
                 </button>
               </figure>
             )}
@@ -683,7 +913,23 @@ function PluginDemoSection(props: { page: PluginPage }) {
                   x
                 </button>
               </div>
-              <img class="lightbox__media" src={gif().src} alt={gif().alt} />
+              <Show
+                when={isVideoMedia(gif().src)}
+                fallback={
+                  <img class="lightbox__media" src={gif().src} alt={gif().alt} />
+                }
+              >
+                <video
+                  class="lightbox__media"
+                  src={gif().src}
+                  poster={gif().poster ?? undefined}
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                  aria-label={gif().alt}
+                />
+              </Show>
             </figure>
           </div>
         )}
@@ -910,7 +1156,12 @@ function PluginLandingPage(props: {
       <Show
         when={props.page.featureGallery}
         fallback={
-          <Show when={props.page.demoQuery !== null}>
+          <Show
+            when={
+              props.page.catalogFeatures.length === 0 &&
+              props.page.demoQuery !== null
+            }
+          >
             <section
               id="demo"
               class="plugin-page-section plugin-page-section--demo"
@@ -938,7 +1189,7 @@ function PluginLandingPage(props: {
         <PluginInstallPreview page={props.page} />
       </section>
       <section
-        id="roadmap"
+        id="more"
         class="plugin-page-section plugin-page-section--roadmap"
       >
         <PluginResourcesSection page={props.page} />
@@ -946,7 +1197,7 @@ function PluginLandingPage(props: {
       <section id="apps" class="plugin-page-section plugin-page-section--apps">
         <PluginAppsSection page={props.page} />
       </section>
-      <section id="more" class="plugin-page-section plugin-page-section--more">
+      <section class="plugin-page-section plugin-page-section--more">
         <PluginMoreSection />
       </section>
     </div>

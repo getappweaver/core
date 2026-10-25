@@ -307,7 +307,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: manager or set.",
+            "summary": "Optional subcommand: manager, set, learn, save-custom, or delete-custom.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -316,7 +316,8 @@
         "options": [],
         "examples": [
           "/skills help",
-          "/skills help manager"
+          "/skills help manager",
+          "/skills help learn"
         ],
         "inferredWeb": {
           "generated": true,
@@ -415,6 +416,107 @@
         "options": [],
         "examples": [
           "/skills set appweaver-todo enable"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "learn",
+        "summary": "Create or refine a custom skill with AI using optional session context.",
+        "usage": "learn <name> [<instructions...>] [--session, -s <session>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name (e.g. relay-debug or custom-relay-debug).",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "instructions",
+            "summary": "Instructions on what the skill should teach or extract from the session.",
+            "kind": "string",
+            "choices": null,
+            "required": false,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "session",
+            "flag": "--session",
+            "shortFlag": "-s",
+            "summary": "Reference session ID (or \"current\" / \"none\") for context.",
+            "kind": "string",
+            "choices": null,
+            "webDefaultValue": "current",
+            "required": false,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/skills learn relay-debug \"Extract the relay debugging workflow from this session\"",
+          "/skills learn relay-debug --session none \"Always check NIP-11 relay info first\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "save-custom",
+        "summary": "Save markdown for a custom skill.",
+        "usage": "save-custom <name> <markdown>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "markdown",
+            "summary": "Full SKILL.md markdown content.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete-custom",
+        "summary": "Delete a custom skill.",
+        "usage": "delete-custom <name>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/skills delete-custom custom-relay-debug"
         ],
         "inferredWeb": {
           "generated": true,
@@ -909,7 +1011,7 @@
       {
         "name": "install",
         "summary": "Discover or install plugins from the Nostr plugin catalog.",
-        "usage": "install [<target>]",
+        "usage": "install [<target>] [<signedEvent>] [--operation <operation>] [--identity <identity>] [--attempt <attempt>] [--challenge <challenge>]",
         "aliases": [
           "list"
         ],
@@ -921,9 +1023,50 @@
             "required": false,
             "variadic": false,
             "choices": null
+          },
+          {
+            "name": "signedEvent",
+            "summary": "Signed purchase request or restoration challenge from the web signer.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "choices": null
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "operation",
+            "summary": "Purchase flow field: operation.",
+            "flag": "--operation",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "identity",
+            "summary": "Purchase flow field: identity.",
+            "flag": "--identity",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "attempt",
+            "summary": "Purchase flow field: attempt.",
+            "flag": "--attempt",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "challenge",
+            "summary": "Purchase flow field: challenge.",
+            "flag": "--challenge",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          }
+        ],
         "examples": [
           "/plugins install",
           "/plugins install appweaver-todo-plugin",
@@ -971,8 +1114,8 @@
       },
       {
         "name": "publish",
-        "summary": "Publish the local plugin package version to the Nostr plugin catalog.",
-        "usage": "publish <alias> [--signer <signer>] [--confirm]",
+        "summary": "Publish plugin releases and manage author payment offers in the web UI.",
+        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--signer <signer>] [--confirm]",
         "aliases": [],
         "arguments": [
           {
@@ -985,6 +1128,62 @@
           }
         ],
         "options": [
+          {
+            "name": "operation",
+            "summary": "Web publication form field: operation.",
+            "flag": "--operation",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "price",
+            "summary": "Web publication form field: price.",
+            "flag": "--price",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "lightning_address",
+            "summary": "Web publication form field: lightning_address.",
+            "flag": "--lightning-address",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "valid_from",
+            "summary": "Web publication form field: valid_from.",
+            "flag": "--valid-from",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "valid_until",
+            "summary": "Web publication form field: valid_until.",
+            "flag": "--valid-until",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "draft",
+            "summary": "Web publication form field: draft.",
+            "flag": "--draft",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "offer_id",
+            "summary": "Web publication form field: offer_id.",
+            "flag": "--offer-id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
           {
             "name": "signer",
             "summary": "Saved bunker connection used for a first publication.",
@@ -2279,7 +2478,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand name (e.g. list, search, ai).",
+            "summary": "Optional subcommand name (e.g. list, search, ai, settings).",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -2290,7 +2489,8 @@
           "/bm help",
           "/bm help list",
           "/bm help search",
-          "/bm help ai"
+          "/bm help ai",
+          "/bm help settings"
         ],
         "inferredWeb": {
           "generated": true,
@@ -2300,7 +2500,7 @@
       {
         "name": "ai",
         "summary": "Create bookmark drafts from natural language (accept / revise / decline).",
-        "usage": "ai <prompt...>",
+        "usage": "ai <prompt...> [--save-selections] [--include-user-instructions] [--runtime-context] [--workspace-instructions] [--agents-instructions]",
         "aliases": [],
         "arguments": [
           {
@@ -2311,13 +2511,108 @@
             "variadic": true
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "save_selections",
+            "flag": "--save-selections",
+            "summary": "Persist the supplied Bookmark AI inclusion selections.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "include_user_instructions",
+            "flag": "--include-user-instructions",
+            "summary": "Include saved Bookmark User Instructions.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "runtime_context",
+            "flag": "--runtime-context",
+            "summary": "Include AppWeaver runtime context.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "workspace_instructions",
+            "flag": "--workspace-instructions",
+            "summary": "Include configured workspace instructions.",
+            "kind": "boolean",
+            "required": false
+          },
+          {
+            "name": "agents_instructions",
+            "flag": "--agents-instructions",
+            "summary": "Include AGENTS.md instructions.",
+            "kind": "boolean",
+            "required": false
+          }
+        ],
         "examples": [
           "/bm ai rust async book for weekend reading"
         ],
         "inferredWeb": {
           "generated": true,
           "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "settings",
+        "summary": "Show or update Bookmark AI configuration.",
+        "usage": "settings [--backend <backend>] [--source <model_source>] [--model <model>] [--user-instructions <user_instructions>] [--reset]",
+        "aliases": [
+          "config"
+        ],
+        "arguments": [],
+        "options": [
+          {
+            "name": "backend",
+            "flag": "--backend",
+            "summary": "Backend override for Bookmark AI.",
+            "kind": "string",
+            "required": false,
+            "choices": [
+              "opencode"
+            ]
+          },
+          {
+            "name": "model_source",
+            "flag": "--source",
+            "summary": "Model source for Bookmark AI (default: core).",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "model",
+            "flag": "--model",
+            "summary": "Model override for Bookmark AI.",
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "user_instructions",
+            "flag": "--user-instructions",
+            "summary": "Persistent Bookmark user instructions.",
+            "kind": "string",
+            "required": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "reset",
+            "flag": "--reset",
+            "summary": "Reset Bookmark AI configuration.",
+            "kind": "boolean",
+            "required": false
+          }
+        ],
+        "examples": [
+          "/bm settings",
+          "/bm settings --source ppq --model deepseek/deepseek-r1",
+          "/bm settings --reset"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
         }
       },
       {
@@ -5426,7 +5721,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: parse, search, markdown.parse/search/inspect/expand, projects, code.hook, code.parse/search/inspect/expand, add, list, show, delete, ai, …",
+            "summary": "Optional subcommand: search, markdown.search/inspect/expand, projects, code.search/inspect/expand, ai, or app maintenance: parse, code.parse, markdown.parse, code.hook.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -5435,9 +5730,9 @@
         "options": [],
         "examples": [
           "/memory help",
+          "/memory help search",
           "/memory help code.search",
-          "/memory help list",
-          "/memory help add"
+          "/memory help projects"
         ],
         "inferredWeb": {
           "generated": true,
@@ -5446,13 +5741,13 @@
       },
       {
         "name": "ai",
-        "summary": "Natural language memory changes via the agent.",
+        "summary": "Query committed code and Markdown via the agent (read-only).",
         "usage": "ai [<prompt...>]",
         "aliases": [],
         "arguments": [
           {
             "name": "prompt",
-            "summary": "What you want the agent to do.",
+            "summary": "Code or documentation you want the agent to discover.",
             "kind": "string",
             "required": false,
             "variadic": true
@@ -5460,95 +5755,11 @@
         ],
         "options": [],
         "examples": [
-          "/memory ai list everything tagged demo"
+          "/memory ai find indexing documentation in plugins/memory"
         ],
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_customizable"
-        }
-      },
-      {
-        "name": "add",
-        "summary": "Create a memory row from plain text.",
-        "usage": "add <text...>",
-        "aliases": [],
-        "arguments": [
-          {
-            "name": "text",
-            "summary": "Free-form text stored on the row.",
-            "kind": "string",
-            "required": true,
-            "variadic": true
-          }
-        ],
-        "options": [],
-        "examples": [
-          "/memory add example item"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "list",
-        "summary": "List all memory rows (text DM/CLI; optional web card in web UI).",
-        "usage": "list",
-        "aliases": [],
-        "arguments": [],
-        "options": [],
-        "examples": [
-          "/memory list"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "runnable_default"
-        }
-      },
-      {
-        "name": "show",
-        "summary": "Show one memory row by id.",
-        "usage": "show <id>",
-        "aliases": [],
-        "arguments": [
-          {
-            "name": "id",
-            "summary": "Row id.",
-            "kind": "integer",
-            "required": true,
-            "variadic": false
-          }
-        ],
-        "options": [],
-        "examples": [
-          "/memory show 1"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
-        }
-      },
-      {
-        "name": "delete",
-        "summary": "Delete a memory row by id.",
-        "usage": "delete <id>",
-        "aliases": [],
-        "arguments": [
-          {
-            "name": "id",
-            "summary": "Row id.",
-            "kind": "integer",
-            "required": true,
-            "variadic": false
-          }
-        ],
-        "options": [],
-        "examples": [
-          "/memory delete 1"
-        ],
-        "inferredWeb": {
-          "generated": true,
-          "executionMode": "requires_input"
         }
       }
     ]
@@ -7152,6 +7363,511 @@
     ]
   },
   {
+    "name": "relays",
+    "summary": "Manage Nostr accounts, relay configuration, and event availability.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "relays",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for relays or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: add, list, show, delete, ai, …",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/relays help",
+          "/relays help list",
+          "/relays help add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Add an account by npub or public key.",
+        "usage": "add <pubkey>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/relays add <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "Open the timeline relay manager.",
+        "usage": "list [--selection <selection>] [--events <events>] [--account <account>] [--operation <operation>] [--page <page>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "selection",
+            "flag": "--selection",
+            "kind": "string",
+            "summary": "Archive selection rules for this view as JSON."
+          },
+          {
+            "name": "events",
+            "flag": "--events",
+            "kind": "string",
+            "summary": "Loaded event branches and pages as JSON; preserved by lazy tree actions."
+          },
+          {
+            "name": "account",
+            "flag": "--account",
+            "kind": "string",
+            "summary": "Selected account npub or hex public key."
+          },
+          {
+            "name": "operation",
+            "flag": "--operation",
+            "kind": "string",
+            "summary": "Sync operation whose outcome page is selected."
+          },
+          {
+            "name": "page",
+            "flag": "--page",
+            "kind": "string",
+            "summary": "Zero-based delivery outcome page (50 copies per page)."
+          }
+        ],
+        "examples": [
+          "/relays list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Remove an account from the manager; retain archived events.",
+        "usage": "delete <pubkey>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/relays delete <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "event",
+        "summary": "Read original archived event JSON (Open JSON uses the shared modal).",
+        "usage": "event <pubkey> <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "kind": "string",
+            "summary": "Account npub or hex public key.",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "id",
+            "kind": "string",
+            "summary": "Hex event ID.",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "event <npub> <event-id>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "export",
+        "summary": "Export original archived events as JSONL, optionally limited to selected scopes.",
+        "usage": "export <pubkey> [--selection <selection>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "kind": "string",
+            "summary": "Account npub or hex public key.",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "selection",
+            "flag": "--selection",
+            "kind": "string",
+            "summary": "Selection rules JSON; omitted exports the entire account archive."
+          }
+        ],
+        "examples": [
+          "export <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "info",
+        "summary": "Refresh cached relay-advertised NIP-11 information for a configured relay or extra fetch source.",
+        "usage": "info <pubkey> --url <url>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "url",
+            "flag": "--url",
+            "kind": "string",
+            "required": true,
+            "summary": "Configured relay/source URL."
+          }
+        ],
+        "examples": [
+          "info <npub> --url wss://relay.example.com"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "update",
+        "summary": "Create/update local account configuration or a relay. Does not publish NIP-65.",
+        "usage": "update <pubkey> [--data <data>] [--url <url>] [--role <role>] [--remove] [--published]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "data",
+            "flag": "--data",
+            "kind": "string",
+            "summary": "Configuration JSON: relays and extraSources.",
+            "webInput": "textarea"
+          },
+          {
+            "name": "url",
+            "flag": "--url",
+            "kind": "string",
+            "summary": "Relay URL to add/update/remove."
+          },
+          {
+            "name": "role",
+            "flag": "--role",
+            "kind": "string",
+            "choices": [
+              "both",
+              "read",
+              "write",
+              "source"
+            ],
+            "summary": "Relay role; defaults to both."
+          },
+          {
+            "name": "remove",
+            "flag": "--remove",
+            "kind": "boolean",
+            "summary": "Remove URL from local configuration."
+          },
+          {
+            "name": "published",
+            "flag": "--published",
+            "kind": "boolean",
+            "summary": "Use the last fetched NIP-65 list locally."
+          }
+        ],
+        "examples": [
+          "update <npub> --url wss://relay.example.com --role both"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "check",
+        "summary": "Measure relay WebSocket connection times.",
+        "usage": "check <pubkey>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "check <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "fetch",
+        "summary": "Fetch kind-0 profile and NIP-65 snapshot without replacing local settings.",
+        "usage": "fetch <pubkey>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "fetch <npub>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "backup",
+        "summary": "Fetch signed public authored events from write relays and extra sources into the local archive; resume partial backups.",
+        "usage": "backup <pubkey> [--limit <limit>] [--history] [--relay <relay>] [--mode <mode>] [--range <range>] [--resume]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "limit",
+            "flag": "--limit",
+            "kind": "string",
+            "summary": "Events per ordinary page (1–1000), default 100; saved with run."
+          },
+          {
+            "name": "history",
+            "flag": "--history",
+            "kind": "boolean",
+            "summary": "Recheck history instead of recent events."
+          },
+          {
+            "name": "relay",
+            "flag": "--relay",
+            "kind": "string",
+            "summary": "Recheck only this configured fetch source; requires --history (or --mode history), without --range/--resume."
+          },
+          {
+            "name": "mode",
+            "flag": "--mode",
+            "kind": "string",
+            "choices": [
+              "recent",
+              "history"
+            ],
+            "summary": "Recent Fetch/Resume or a fresh history recheck; default recent."
+          },
+          {
+            "name": "range",
+            "flag": "--range",
+            "kind": "string",
+            "summary": "Refetch exactly this saved range ID."
+          },
+          {
+            "name": "resume",
+            "flag": "--resume",
+            "kind": "boolean",
+            "summary": "Resume --range with its original settings/bounds."
+          }
+        ],
+        "examples": [
+          "backup <npub>",
+          "backup <npub> --history --relay wss://relay.example.com"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "sync",
+        "summary": "Publish eligible confirmed-missing copies to write relays. Run Recheck history afterward to update Coverage.",
+        "usage": "sync <pubkey> [--relay <relay>] [--kind <kind>] [--since <since>] [--until <until>] [--resume <resume>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "relay",
+            "flag": "--relay",
+            "kind": "string",
+            "summary": "Optional write destination URL; default all."
+          },
+          {
+            "name": "kind",
+            "flag": "--kind",
+            "kind": "string",
+            "summary": "Optional event kind; default all."
+          },
+          {
+            "name": "since",
+            "flag": "--since",
+            "kind": "string",
+            "summary": "Optional inclusive UTC date YYYY-MM-DD or Unix second."
+          },
+          {
+            "name": "until",
+            "flag": "--until",
+            "kind": "string",
+            "summary": "Optional inclusive UTC date YYYY-MM-DD or Unix second."
+          },
+          {
+            "name": "resume",
+            "flag": "--resume",
+            "kind": "string",
+            "summary": "Resume unfinished sync operation ID with its saved selection."
+          }
+        ],
+        "examples": [
+          "sync <npub>",
+          "sync <npub> --kind 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "cancel",
+        "summary": "Stop active Fetch/Sync work and retain resumable checkpoints.",
+        "usage": "cancel <pubkey> [--operation <operation>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "operation",
+            "flag": "--operation",
+            "kind": "string",
+            "summary": "Active operation ID to stop."
+          }
+        ],
+        "examples": [
+          "cancel <npub> --operation 12"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "publish",
+        "summary": "Publish an already-signed NIP-65 list matching this account configuration. The widget opens the signer picker.",
+        "usage": "publish <pubkey> <signedEvent>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "pubkey",
+            "summary": "Account npub or hex public key.",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "signedEvent",
+            "summary": "Signed kind-10002 event JSON.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [],
+        "examples": [
+          "publish <npub> <signed-event-json>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
     "name": "systemone",
     "summary": "System One typed decision capability provider.",
     "aliases": [],
@@ -7301,7 +8017,7 @@
       {
         "name": "settings",
         "summary": "Show or update Todo AI configuration.",
-        "usage": "settings [--backend <backend>] [--model <model>] [--user-instructions <user_instructions>] [--reset]",
+        "usage": "settings [--backend <backend>] [--source <model_source>] [--model <model>] [--user-instructions <user_instructions>] [--reset]",
         "aliases": [
           "config"
         ],
@@ -7316,6 +8032,13 @@
             "choices": [
               "opencode"
             ]
+          },
+          {
+            "name": "model_source",
+            "flag": "--source",
+            "summary": "Model source for Todo AI (default: core).",
+            "kind": "string",
+            "required": false
           },
           {
             "name": "model",

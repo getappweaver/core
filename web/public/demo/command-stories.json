@@ -9,7 +9,8 @@
     "storyIds": [
       "todo-add",
       "todo-add-ai-prompt",
-      "todo-duel-prioritize"
+      "todo-duel-prioritize",
+      "todo-filter-champions"
     ]
   },
   {

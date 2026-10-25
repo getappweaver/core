@@ -10,7 +10,9 @@ import { OfficialAppGrid } from './official-app-grid';
 import {
   PluginRoute,
   isPluginRoute,
+  officialAppForSlug,
   pluginNavItemsForPath,
+  routeSlugForPath,
 } from './plugin-pages';
 import { landingFeatures } from './landing-features';
 import { RoadmapPanel, appWeaverRoadmapTarget } from './roadmap-panel';
@@ -33,6 +35,7 @@ type HeaderProps = {
   activeSection: string | null;
   navItems: NavItem[];
   introActive: boolean;
+  brandText?: string;
   onNavSelect: (sectionId: string) => void;
 };
 
@@ -60,7 +63,7 @@ function Header(props: HeaderProps) {
       >
         <img src={logoUrl} alt="AppWeaver" class="stage-brand-logo" />
         <span class="stage-brand-text" aria-hidden="true">
-          AppWeaver
+          {props.brandText ?? 'AppWeaver'}
         </span>
       </a>
       <nav class="stage-nav-simple" aria-label="Landing pages">
@@ -417,6 +420,13 @@ function App() {
             !pluginRoute &&
             onePageActiveSection() === 'intro' &&
             !heroTitleReached()
+          }
+          brandText={
+            pluginRoute
+              ? officialAppForSlug(
+                  routeSlugForPath(window.location.pathname),
+                )?.label.toUpperCase()
+              : undefined
           }
           navItems={
             pluginRoute

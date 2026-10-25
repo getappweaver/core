@@ -1050,6 +1050,20 @@ pre {
   color: #000;
 }
 
+.app-shell[data-capture='true'] .story-walkthrough,
+.app-shell[data-capture='true'] .widget-help-panel {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.app-shell[data-capture='true'] .singleton-dock-card--active .singleton-dock-card__body,
+.app-shell[data-capture='true'] .singleton-dock-card--active .singleton-dock-card__body > .card {
+  height: auto !important;
+  max-height: max-content !important;
+  align-self: flex-start !important;
+}
+
 .connect-btn.topbar-widget-active:hover,
 .connect-btn.topbar-widget-active:focus-visible {
   background: var(--color-warning);
