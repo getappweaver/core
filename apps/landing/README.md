@@ -51,8 +51,12 @@ Source Markdown remains readable locally; generated HTML lives in
 `public/docs/` and is copied into the deployed static build.
 
 - `/docs/`: complete documentation index
+- `/docs/core/`: core documentation index
+- `/docs/core/<folder>/`: core folder documentation index
 - `/docs/core/<document>/`: core document
+- `/docs/plugins/`: plugins documentation index
 - `/docs/plugins/<alias>/`: plugin documentation index
+- `/docs/plugins/<alias>/<folder>/`: plugin folder documentation index
 - `/docs/plugins/<alias>/<document>/`: plugin document
 
 ## Feature showcase media (Story -> EffectCraft Pipeline)
@@ -61,7 +65,7 @@ The headless [story media pipeline](scripts/story-media/generate.ts) extracts pu
 screenshots and bounding box metadata directly from AppWeaver's native
 `StoryDefinition<TState>` scenarios at 2x DPR and compiles 60 FPS WebM videos
 via `effectcraft-cli`. Source artifacts live in `plugins/<id>/landing/story-media/<storyId>/`
-and published media in `plugins/<id>/landing/assets/`. Todo's [pilot plan](../../plugins/todo/landing/FEATURE_MEDIA_PLAN.md)
+and published media in `plugins/<id>/landing/assets/`. Todo's [pilot plan](../../plugins/todo/docs/FEATURE_MEDIA_PLAN.md)
 tracks the champions showcase implementation.
 
 ## Landing-owned scripts

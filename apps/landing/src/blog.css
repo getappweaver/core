@@ -89,6 +89,7 @@
   gap: 1rem;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .blog-static-page .top {
@@ -217,3 +218,97 @@
 .blog-lightbox-open {
   overflow: hidden;
 }
+
+.doc-tree {
+  margin: 1rem 0 2rem;
+}
+
+.doc-tree-list {
+  list-style: none;
+  padding-left: 1.25rem;
+  margin: 0.35rem 0;
+  border-left: 1px solid rgb(255 255 255 / 12%);
+}
+
+.doc-tree-root {
+  padding-left: 0;
+  border-left: none;
+  margin: 0;
+}
+
+.doc-tree-item {
+  position: relative;
+  margin: 0.4rem 0;
+  line-height: 1.5;
+}
+
+.doc-tree-item::before {
+  content: "";
+  position: absolute;
+  top: 0.75em;
+  left: -1.25rem;
+  width: 0.75rem;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+}
+
+.doc-tree-root > .doc-tree-item::before {
+  display: none;
+}
+
+.doc-tree-folder-title {
+  color: rgb(147 210 218);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  user-select: none;
+}
+
+.doc-tree-folder-icon {
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.doc-tree-file a {
+  color: rgb(250 204 21);
+  text-decoration: none;
+}
+
+.doc-tree-file a:hover {
+  text-decoration: underline;
+}
+
+.doc-empty {
+  color: rgb(161 161 170);
+  font-style: italic;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.doc-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.doc-breadcrumb a {
+  color: rgb(250 204 21);
+  text-decoration: none;
+}
+
+.doc-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.doc-breadcrumb-sep {
+  color: rgb(255 255 255 / 25%);
+  user-select: none;
+}
+
+.doc-breadcrumb-current {
+  color: rgb(215 178 178);
+}
+
+
