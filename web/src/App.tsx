@@ -73,6 +73,7 @@ import { PaletteView } from './palette/PaletteView';
 import { usePalette } from './palette/usePalette';
 import { PaymentModal } from './payments/PaymentModal';
 import { registerWebPushNotifications } from './register-web-push';
+import { UniversalSearch } from './search/UniversalSearch';
 import { SetupView } from './setup/SetupView';
 import { useSocket } from './socket/useSocket';
 import { getStoryDomTarget } from './story/dom-targets';
@@ -344,6 +345,7 @@ function AppInner(): JSX.Element {
   const [headerMenusOpen, setHeaderMenusOpen] = createSignal(false);
 
   const [nostrSearchRelaysOpen, setNostrSearchRelaysOpen] = createSignal(false);
+  const [universalSearchOpen, setUniversalSearchOpen] = createSignal(false);
 
   const [pushBusy, setPushBusy] = createSignal(false);
   const [piperTtsBusy, setPiperTtsBusy] = createSignal(false);
@@ -1851,6 +1853,25 @@ function AppInner(): JSX.Element {
     });
   }
 
+  function webNodeHasScrollTarget(
+    node: import('@src/web/ui-schema').WebNode | undefined,
+  ): boolean {
+    if (!node || node.type !== 'element') {
+      return false;
+    }
+
+    if (
+      node.props?.scrollIntoViewOnMount === true ||
+      node.props?.focused === true
+    ) {
+      return true;
+    }
+
+    return [node.summary, ...(node.children ?? [])].some((child) =>
+      webNodeHasScrollTarget(child),
+    );
+  }
+
   function scrollTimelineToBottomSoon(): void {
     if (timelineBottomScrollFrame !== null) {
       return;
@@ -2065,7 +2086,7 @@ function AppInner(): JSX.Element {
 
       activateSingleTaskbarKey(key, existing.itemId, params.visible);
 
-      if (!dockVisible()) {
+      if (!dockVisible() && !webNodeHasScrollTarget(params.output.web?.tree)) {
         scrollTimelineToBottomSoon();
       }
 
@@ -2092,7 +2113,7 @@ function AppInner(): JSX.Element {
 
     activateSingleTaskbarKey(key, itemId, params.visible);
 
-    if (!dockVisible()) {
+    if (!dockVisible() && !webNodeHasScrollTarget(params.output.web?.tree)) {
       scrollTimelineToBottomSoon();
     }
   }
@@ -2767,6 +2788,7 @@ function AppInner(): JSX.Element {
     blocked: () =>
       isWebDemoMode() ||
       paletteOpen() ||
+      universalSearchOpen() ||
       activeFormId() !== null ||
       headerMenusOpen(),
     focusInput: () => composerInputEl?.focus(),
@@ -2793,9 +2815,16 @@ function AppInner(): JSX.Element {
         return;
       }
 
+      const lastItem = items.at(-1);
+
+      const lastItemHasScrollTarget =
+        lastItem?.type === 'command_result' &&
+        webNodeHasScrollTarget(lastItem.web?.tree);
+
       if (
         !timelineScrolledAwayFromBottom() &&
-        pendingUnreadFocusSessionId === null
+        pendingUnreadFocusSessionId === null &&
+        !lastItemHasScrollTarget
       ) {
         scrollTimelineToBottomSoon();
       }
@@ -3319,6 +3348,7 @@ function AppInner(): JSX.Element {
               void onEnablePiperTts();
             }}
             onOpenNostrSearchRelays={() => setNostrSearchRelaysOpen(true)}
+            onOpenSearch={() => setUniversalSearchOpen(true)}
             onOpenLayoutSettings={
               desktopLayoutEnabled() ? openLayoutSettings : undefined
             }
@@ -3655,6 +3685,30 @@ function AppInner(): JSX.Element {
           />
         </div>
       </Show>
+      <UniversalSearch
+        open={universalSearchOpen}
+        connected={wsConnected}
+        timelineId={timelineId}
+        workspace={() => composerAiState()?.workspace ?? ''}
+        pendingRequests={pendingRequests}
+        send={sendSocketMessage}
+        onClose={() => setUniversalSearchOpen(false)}
+        onOpenAddress={(address, title) => {
+          void runWebAction({
+            type: 'capability',
+            operation: 'capability:v1:resource-view.open',
+            consumerAlias: 'core:search',
+            providerId: address.providerId,
+            input: {
+              resourceType: address.resourceType,
+              resourceId: address.resourceId,
+            },
+            selection: 'auto',
+            surface: address.surface ?? 'modal',
+            modalTitle: title,
+          });
+        }}
+      />
       <Show when={nostrSearchRelaysOpen()}>
         <NostrSearchRelaysModal
           onClose={() => setNostrSearchRelaysOpen(false)}

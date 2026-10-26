@@ -48,6 +48,7 @@ type HeaderChromeProps = {
   onEnablePush: () => void;
   onEnablePiperTts?: () => void;
   onOpenNostrSearchRelays: () => void;
+  onOpenSearch?: () => void;
   onOpenLayoutSettings?: () => void;
   onRestartBot: () => void;
   onOpenSetup?: () => void;
@@ -281,6 +282,27 @@ export function HeaderChrome(props: HeaderChromeProps): JSX.Element {
               )}
             </For>
           </div>
+          <Show when={props.onOpenSearch}>
+            <WebButton
+              type="button"
+              class="connect-btn topbar-menu-btn topbar-icon-btn"
+              disabled={!props.wsConnected()}
+              onClick={props.onOpenSearch}
+              title="Universal search"
+              aria-label="Universal search"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                class="topbar-menu-icon"
+              >
+                <path
+                  d="M10 3a7 7 0 1 0 4.9 12l5.4 5.4 1.4-1.4-5.4-5.4A7 7 0 0 0 10 3Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </WebButton>
+          </Show>
           <For each={sortedWidgets()}>
             {(widget) => (
               <WebButton

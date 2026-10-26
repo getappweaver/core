@@ -41,6 +41,89 @@ export function consumeScrollIntoViewOnceKey(key: string): boolean {
 // Element ref setup (storyTargetId, autoFocus, scrollIntoView)
 // ---------------------------------------------------------------------------
 
+const TIMELINE_SCROLL_TOP_BREATHING_PX = 8;
+
+export function scrollWebElementIntoView(el: HTMLElement): void {
+  const rect = el.getBoundingClientRect();
+
+  const targetEl =
+    rect.height > 0
+      ? el
+      : el.firstElementChild instanceof HTMLElement
+        ? el.firstElementChild
+        : el;
+
+  const rootNode = el.getRootNode();
+
+  const lightAnchor =
+    rootNode instanceof ShadowRoot && rootNode.host instanceof HTMLElement
+      ? rootNode.host
+      : el;
+
+  const card = lightAnchor.closest<HTMLElement>('.card');
+  const cardBody = lightAnchor.closest<HTMLElement>('.timeline-card-body');
+
+  if (cardBody != null) {
+    const bodyOverflowY = window.getComputedStyle(cardBody).overflowY;
+
+    if (bodyOverflowY === 'auto' || bodyOverflowY === 'scroll') {
+      const targetTop =
+        cardBody.scrollTop +
+        (targetEl.getBoundingClientRect().top -
+          cardBody.getBoundingClientRect().top) -
+        TIMELINE_SCROLL_TOP_BREATHING_PX;
+
+      cardBody.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: 'smooth',
+      });
+
+      return;
+    }
+  }
+
+  const timeline = lightAnchor.closest<HTMLElement>('.timeline');
+
+  if (timeline != null) {
+    const stickyHead = card?.querySelector<HTMLElement>(
+      '.card-head--timeline-sticky',
+    );
+
+    const stickyInset =
+      (stickyHead != null
+        ? Math.ceil(stickyHead.getBoundingClientRect().height)
+        : 0) + TIMELINE_SCROLL_TOP_BREATHING_PX;
+
+    const targetTop =
+      timeline.scrollTop +
+      (targetEl.getBoundingClientRect().top -
+        timeline.getBoundingClientRect().top) -
+      stickyInset;
+
+    timeline.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: 'smooth',
+    });
+
+    return;
+  }
+
+  targetEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+export function focusAndScrollWebElement(el: HTMLElement): void {
+  if (isWebDemoMode()) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    el.classList.remove('web-highlight-flash');
+    void el.offsetWidth;
+    el.classList.add('web-highlight-flash');
+    scrollWebElementIntoView(el);
+  });
+}
+
 type WebElementRefProps = {
   element: WebElementNode;
   el: HTMLElement;
@@ -63,7 +146,7 @@ export function setupWebElementRef({ element, el }: WebElementRefProps): void {
     }
 
     requestAnimationFrame(() => {
-      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      scrollWebElementIntoView(el);
     });
   }
 }

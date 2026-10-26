@@ -65,6 +65,80 @@ export function setTreeItemsExpanded({
   }
 }
 
+export type FocusedTreeExpansionPlan = {
+  focusedIds: string[];
+  expandedIds: Set<string>;
+  allIds: Set<string>;
+};
+
+export function collectFocusedTreeItemExpansion(
+  node: WebNode,
+): FocusedTreeExpansionPlan {
+  const focusedIds: string[] = [];
+  const expandedIds = new Set<string>();
+  const allIds = new Set<string>();
+
+  function visit(current: WebNode): boolean {
+    if (current.type !== 'element') {
+      return false;
+    }
+
+    let childHasFocused = false;
+
+    for (const child of [current.summary, ...(current.children ?? [])]) {
+      if (child && visit(child)) {
+        childHasFocused = true;
+      }
+    }
+
+    if (current.tag === 'treeItem') {
+      const id = current.props?.id;
+
+      if (id) {
+        allIds.add(id);
+      }
+
+      const isSelfFocused = current.props?.focused === true;
+
+      if (isSelfFocused && id) {
+        focusedIds.push(id);
+      }
+
+      const shouldExpand = isSelfFocused || childHasFocused;
+
+      if (shouldExpand && id) {
+        expandedIds.add(id);
+      }
+
+      return shouldExpand;
+    }
+
+    return childHasFocused;
+  }
+
+  visit(node);
+
+  return { focusedIds, expandedIds, allIds };
+}
+
+type ApplyFocusedTreeExpansionProps = {
+  plan: FocusedTreeExpansionPlan;
+  expandedById: Map<string, boolean>;
+};
+
+export function applyFocusedTreeExpansion({
+  plan,
+  expandedById,
+}: ApplyFocusedTreeExpansionProps): void {
+  if (plan.focusedIds.length === 0) {
+    return;
+  }
+
+  for (const id of plan.allIds) {
+    expandedById.set(id, plan.expandedIds.has(id));
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Action helpers
 // ---------------------------------------------------------------------------

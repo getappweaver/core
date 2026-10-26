@@ -41,9 +41,15 @@ import {
   TreeRootItemCountContext,
   TreeFilterStateContext,
   TreeTimeFilterStateContext,
+  WebRootUpdateEpochContext,
   useWebRenderMeta,
 } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
+import {
+  consumeScrollIntoViewOnceKey,
+  focusAndScrollWebElement,
+  setupWebElementRef,
+} from './speech';
 import {
   childTreeItems,
   isTreeBodyNodeExpandable,
@@ -51,7 +57,12 @@ import {
   normalizedFilterQuery,
   EMPTY_TREE_FILTER_INDEX,
 } from './tree-filter';
-import { runLocalWebAction, setTreeItemsExpanded } from './tree-state';
+import {
+  applyFocusedTreeExpansion,
+  collectFocusedTreeItemExpansion,
+  runLocalWebAction,
+  setTreeItemsExpanded,
+} from './tree-state';
 
 const TREE_FILTER_INITIAL_DEBOUNCE_MS = 1_000;
 const TREE_FILTER_MIN_QUERY_LENGTH = 3;
@@ -92,7 +103,9 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
   const widgetBulkExpand = useContext(TreeWidgetBulkExpandContext);
   const expandRequest = useContext(TreeExpandRequestContext);
   const filterState = useContext(TreeFilterStateContext);
+  const rootUpdateEpoch = useContext(WebRootUpdateEpochContext);
   const treeItemId = () => props.element.props?.id ?? null;
+  let summaryEl: HTMLDivElement | undefined;
 
   const hasActiveTextFilter = () =>
     normalizedFilterQuery(filterState?.query() ?? '').length > 0;
@@ -220,13 +233,38 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
       return;
     }
 
-    if (
-      request.epoch > lastExpandRequestEpochApplied &&
-      request.ids.includes(id)
-    ) {
+    if (request.epoch > lastExpandRequestEpochApplied) {
       lastExpandRequestEpochApplied = request.epoch;
-      setExpanded(true);
+
+      if (request.ids.includes(id)) {
+        setExpanded(true);
+      } else if (request.collapseOthers === true) {
+        setExpanded(false);
+      }
     }
+  });
+
+  createEffect(() => {
+    const epoch = rootUpdateEpoch();
+    const isFocused = props.element.props?.focused === true;
+
+    if (!isFocused) {
+      return;
+    }
+
+    const onceKey = props.element.props?.scrollIntoViewOnceKey;
+
+    if (typeof onceKey === 'string' && !consumeScrollIntoViewOnceKey(onceKey)) {
+      return;
+    }
+
+    void epoch;
+
+    queueMicrotask(() => {
+      if (summaryEl) {
+        focusAndScrollWebElement(summaryEl);
+      }
+    });
   });
 
   return (
@@ -236,8 +274,12 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
           class={elementClass(props.element)}
           data-ui={elementUi(props.element)}
           data-web-node-id={treeItemId() ?? undefined}
+          ref={(el) => setupWebElementRef({ element: props.element, el })}
         >
           <div
+            ref={(el) => {
+              summaryEl = el;
+            }}
             class="web-tree-item-summary"
             onClick={handleSummaryClick}
             style={{
@@ -328,9 +370,15 @@ export function WebTreeElement(props: WebTreeElementProps) {
   const revealContext = useContext(WebRevealContext);
   const toggleContext = useContext(WebToggleContext);
   const timeFilterState = useContext(TreeTimeFilterStateContext);
+  const rootUpdateEpoch = useContext(WebRootUpdateEpochContext);
 
   const expandedById =
     useContext(TreeItemExpandedStateContext) ?? new Map<string, boolean>();
+
+  applyFocusedTreeExpansion({
+    plan: collectFocusedTreeItemExpansion(props.element),
+    expandedById,
+  });
 
   const [bulk, setBulk] = createSignal<TreeBulkExpandState>({
     epoch: 0,
@@ -460,6 +508,31 @@ export function WebTreeElement(props: WebTreeElementProps) {
     setFilterInput(value);
     setFilterQueryIfQualified(value);
   }
+
+  createEffect(() => {
+    const epoch = rootUpdateEpoch();
+    const plan = collectFocusedTreeItemExpansion(props.element);
+
+    if (plan.focusedIds.length === 0) {
+      return;
+    }
+
+    void epoch;
+
+    applyFocusedTreeExpansion({ plan, expandedById });
+
+    setExpandRequest((previous) => ({
+      epoch: (previous?.epoch ?? 0) + 1,
+      ids: [...plan.expandedIds],
+      collapseOthers: true,
+    }));
+
+    const visible = visibleFilterIds();
+
+    if (visible !== null && !plan.focusedIds.every((id) => visible.has(id))) {
+      setTreeFilterValue('');
+    }
+  });
 
   function requestTreeItemExpansion(ids: string[]): void {
     if (ids.length === 0) {

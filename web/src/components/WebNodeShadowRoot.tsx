@@ -28,6 +28,7 @@ import {
   TreeWidgetBulkExpandContext,
   type TreeBulkExpandState,
   WebFileSuggestionInputContext,
+  WebRootUpdateEpochContext,
 } from './web-node/contexts';
 import { applyOptimisticMutationsToRoot } from './web-node/optimistic';
 import { reconcileWebNodeRoot } from './web-node/reconcile';
@@ -127,6 +128,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
   let hostEl: HTMLDivElement | undefined;
   const [ctx, setCtx] = createSignal<ShadowMountContext | null>(null);
   const [currentRoot, setCurrentRoot] = createStore<WebNodeRoot>(props.root);
+  const [rootUpdateEpoch, setRootUpdateEpoch] = createSignal(0);
   const speechSentences = createMemo(() => props.speechSentences);
 
   const activeSpeechSentenceIndex = createMemo(
@@ -496,6 +498,7 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
 
     setActiveToggleKeys(new Set<string>());
     setCurrentRoot(reconcileWebNodeRoot(props.root));
+    setRootUpdateEpoch((previous) => previous + 1);
   });
 
   createEffect(() => {
@@ -686,28 +689,32 @@ export function WebNodeShadowRoot(props: WebNodeShadowRootProps): JSX.Element {
                                 <TreeWidgetBulkExpandContext.Provider
                                   value={widgetBulkExpand}
                                 >
-                                  <WebNodeRenderer
-                                    root={currentRoot}
-                                    onReplaceRoot={props.onReplaceRoot}
-                                    onError={props.onError}
-                                    promptRequestId={props.promptRequestId}
-                                    speechSentences={speechSentences}
-                                    activeSpeechSentenceIndex={
-                                      activeSpeechSentenceIndex
-                                    }
-                                    onSpeechSentenceClick={
-                                      onSpeechSentenceClick
-                                    }
-                                    onRunAction={(action, params) =>
-                                      props.onRunAction?.(action, {
-                                        ...params,
-                                        getWebRoot: () => currentRoot,
-                                        applyOptimisticMutations:
-                                          applyLocalOptimisticMutations,
-                                        webTargetRoot: c.shadow,
-                                      })
-                                    }
-                                  />
+                                  <WebRootUpdateEpochContext.Provider
+                                    value={rootUpdateEpoch}
+                                  >
+                                    <WebNodeRenderer
+                                      root={currentRoot}
+                                      onReplaceRoot={props.onReplaceRoot}
+                                      onError={props.onError}
+                                      promptRequestId={props.promptRequestId}
+                                      speechSentences={speechSentences}
+                                      activeSpeechSentenceIndex={
+                                        activeSpeechSentenceIndex
+                                      }
+                                      onSpeechSentenceClick={
+                                        onSpeechSentenceClick
+                                      }
+                                      onRunAction={(action, params) =>
+                                        props.onRunAction?.(action, {
+                                          ...params,
+                                          getWebRoot: () => currentRoot,
+                                          applyOptimisticMutations:
+                                            applyLocalOptimisticMutations,
+                                          webTargetRoot: c.shadow,
+                                        })
+                                      }
+                                    />
+                                  </WebRootUpdateEpochContext.Provider>
                                 </TreeWidgetBulkExpandContext.Provider>
                               </WebFileSuggestionInputContext.Provider>
                             </WebPendingEntityContext.Provider>

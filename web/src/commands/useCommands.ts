@@ -334,15 +334,21 @@ function highlightWebNodeTargets(
       shouldHighlight || shouldScroll
         ? {
             ...node.props,
-            ...(shouldHighlight
+            ...(node.tag === 'treeItem'
               ? {
-                  className: appendClassName(
-                    node.props?.className,
-                    'web-highlight-flash',
-                  ),
+                  ...(shouldHighlight ? { focused: true } : {}),
                 }
-              : {}),
-            ...(shouldScroll ? { scrollIntoViewOnMount: true } : {}),
+              : {
+                  ...(shouldHighlight
+                    ? {
+                        className: appendClassName(
+                          node.props?.className,
+                          'web-highlight-flash',
+                        ),
+                      }
+                    : {}),
+                  ...(shouldScroll ? { scrollIntoViewOnMount: true } : {}),
+                }),
           }
         : node.props,
     summary: node.summary
@@ -1745,6 +1751,28 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
           if (action.surface !== 'timeline' && params?.onReplaceRoot) {
             params.onReplaceRoot(web);
+
+            return;
+          }
+
+          if (
+            adapters.isTaskbarSubcommand(web.meta.command, web.meta.subcommand)
+          ) {
+            adapters.setTaskbarDockResult({
+              command: web.meta.command,
+              subcommand: web.meta.subcommand,
+              values: {
+                arguments: web.meta.arguments ?? {},
+                options: web.meta.options ?? {},
+              },
+              output: {
+                text: output.text,
+                web,
+                clientView: output.clientView,
+                timelineEvent: output.timelineEvent,
+              },
+              visible: true,
+            });
 
             return;
           }

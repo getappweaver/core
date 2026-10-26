@@ -63,6 +63,23 @@ notification covers `/bot restart` from web, DM, and local command transports;
 unexpected process exits and externally written restart signals do not announce
 a restart through this command notification path.
 
+### Universal search and resource views
+
+The authenticated header search uses the shared
+[universal-search contracts and coordinator](UNIVERSAL_SEARCH.md). Each source
+returns plain JSON, rendered by core into a `tree` with collapsible source
+`treeItem` branches and leaf `treeItem` results. Selecting a result invokes
+the addressed `resource-view:v1.open` provider through the existing capability
+modal; plugins retain ownership of the resulting `WebNodeRoot`.
+
+`run_capability` accepts `resultFormat: "json"` for generic raw capability output
+(`capability_result`), or `"web"` (default) for contract-defined `webResult` rendering.
+The original fuzzy-file-search operation retains its raw-result compatibility.
+Authenticated core consumers use a reserved `consumerAlias` of `core:<component>`;
+other aliases resolve to installed plugins. These identify callers for registry
+routing/logging, not a plugin sandbox. Source discovery and search don't record
+timeline history. Encoded `#/resource/v1/...` links open after authentication.
+
 ### Backend interfaces
 - Local web server exists in `src/web/server.ts`, `src/web/routes.ts`, `src/web/command-catalog.ts`, `src/web/execute.ts`, `src/web/chat.ts`.
 - Web API supports:
@@ -218,6 +235,11 @@ widget is mounted. Individual reopening overrides the saved state, so refreshing
 does not repeatedly force manually reopened items closed. These controls do not
 fetch unloaded lazy branches or change archive selection. Inline tree toolbars
 remain tree-local, and text filtering retains its match-reveal behavior.
+
+When a `treeItem` sets `props.focused: true`, its enclosing `tree` collapses all
+non-ancestor `treeItem`s, expands the focused `treeItem` and its ancestor branches
+(and activates the enclosing `tabPanel` if inside `tabs`), scrolls the item's summary
+into view below any sticky timeline card header, and plays the focus flash animation.
 
 ## Command-backed downloads
 

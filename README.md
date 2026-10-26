@@ -13,6 +13,7 @@ Open-source app hub for running AI-powered tools from a project or workspace fol
 
 - **Easy UI setup** — Clone the repo, run `bun install` and `bun run start`, then follow the web setup interface.
 - **AI-powered apps** — Install apps for todos, bookmarks, jobs, files, browser actions, publishing, journaling, and more.
+- **Universal search** — Search participating installed apps from the header, with grouped results and direct resource links. See the [search contract and implementation plan](docs/UNIVERSAL_SEARCH.md).
 - **Multiple control surfaces** — Use the web UI, Nostr DMs, terminal chat, or AI-agent tool calls.
 - **OpenCode AI runtime** — Configure OpenCode providers locally; switch between the core model source and installed model-source apps for workspace-specific catalogs.
 - **Bitcoin-native wallet** — Keep Cashu eCash locally; apps can offer payment flows where supported.

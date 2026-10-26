@@ -5,6 +5,7 @@ import {
   BUILTIN_ROOT_NAMES,
   getBuiltinDefinitionsMap,
 } from '@src/commands/definitions-registry';
+import { parsePluginPackageJson } from '@src/core/plugin';
 import { listRegisteredPlugins } from '@src/core/registry';
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
@@ -107,6 +108,15 @@ export function publishWidgetIcons(prefix: string): void {
   }
 
   for (const plugin of listRegisteredPlugins()) {
+    const pkg = parsePluginPackageJson({
+      pluginDir: join(dmBotRoot, 'plugins', plugin.identity.alias),
+    });
+
+    copyIconIfPresent({
+      icon: pkg?.icon ?? undefined,
+      pluginAlias: plugin.identity.alias,
+    });
+
     const definition = resolvePluginDefinition(plugin, prefix);
 
     if (!definition) {

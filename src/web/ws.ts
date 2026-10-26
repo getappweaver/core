@@ -1248,36 +1248,21 @@ async function handleRunCapability(params: {
 }): Promise<void> {
   const { ws, ctx, message } = params;
 
-  // Raw capability path for fuzzy-file-search (composer picker needs JSON output, not WebNodeRoot)
-  if (message.operation === 'capability:v1:fuzzy-file-search.search') {
+  // Keep the existing picker compatible; other consumers explicitly request JSON.
+  if (
+    message.resultFormat === 'json' ||
+    message.operation === 'capability:v1:fuzzy-file-search.search'
+  ) {
     const { capabilityRegistry } =
       await import('@src/core/capabilities/registry');
 
-    const { getPluginByAlias } = await import('@src/core/registry');
-
-    const consumer = getPluginByAlias(message.consumerAlias);
-
-    if (!consumer) {
-      sendMessage(
-        ws,
-        createErrorMessage({
-          requestId: message.requestId,
-          message: `Unknown capability consumer: ${message.consumerAlias}`,
-        }),
-      );
-
-      return;
-    }
+    const { resolveWebCapabilityCaller } = await import('./capability-actions');
 
     const result = await capabilityRegistry.invokeById({
       operationId: message.operation,
       provider: message.providerId ?? 'auto',
       input: message.input,
-      caller: {
-        type: 'plugin',
-        pluginName: consumer.identity.name,
-        alias: consumer.identity.alias,
-      },
+      caller: resolveWebCapabilityCaller(message.consumerAlias),
     });
 
     if (result.status === 'success') {

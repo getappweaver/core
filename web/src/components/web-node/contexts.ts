@@ -115,6 +115,7 @@ export const TreeWidgetBulkExpandContext = createContext<
 export type TreeExpandRequest = {
   epoch: number;
   ids: string[];
+  collapseOthers?: boolean;
 };
 
 export const TreeExpandRequestContext =
@@ -204,6 +205,10 @@ export const WebEntityKeyContext = createContext<Accessor<string | null>>(
 export const WebPendingEntityContext = createContext<
   (entityKey: string) => WebEntityPendingState
 >(() => ({ pending: false, label: null }));
+
+export const WebRootUpdateEpochContext = createContext<Accessor<number>>(
+  () => 0,
+);
 
 // ---------------------------------------------------------------------------
 // Hooks

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.13.0] - 2026-10-26
+
+- feat: implement universal search capability with resource views and UI integration (f7d5e2a4)
+
 ## [v14.12.2] - 2026-10-26
 
-- fix: added proper breadcrumb to docs and generated more index pages (a501bd34)
+- fix: added proper breadcrumb to docs and generated more index pages (f7604122)
 
 ## [v14.12.1] - 2026-10-25
 

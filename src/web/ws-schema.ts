@@ -143,6 +143,7 @@ export const RunCapabilityClientMessageSchema = z.object({
   operation: CapabilityOperationIdSchema,
   input: z.unknown(),
   consumerAlias: z.string().min(1),
+  resultFormat: z.enum(['web', 'json']).optional().default('web'),
   providerId: z.string().min(1).optional(),
   selection: z.enum(['auto', 'always-choose']).optional().default('auto'),
   surface: z.enum(['timeline', 'modal']).optional(),

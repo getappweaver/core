@@ -1,5 +1,12 @@
 import type { JSX } from 'solid-js';
-import { createMemo, createSignal, createEffect, Show, For } from 'solid-js';
+import {
+  createMemo,
+  createSignal,
+  createEffect,
+  Show,
+  For,
+  useContext,
+} from 'solid-js';
 
 import type {
   WebElementNode,
@@ -9,7 +16,9 @@ import type {
 
 import { WebButton } from '../WebButton';
 
+import { WebRootUpdateEpochContext } from './contexts';
 import { elementClass, elementStyle, elementUi } from './element-helpers';
+import { collectFocusedTreeItemExpansion } from './tree-state';
 
 export function tabPanels(element: WebElementNode): WebElementNode[] {
   return (element.children ?? []).filter(
@@ -38,6 +47,7 @@ type WebTabsElementProps = {
 };
 
 export function WebTabsElement(props: WebTabsElementProps): JSX.Element {
+  const rootUpdateEpoch = useContext(WebRootUpdateEpochContext);
   const panels = createMemo(() => tabPanels(props.element));
 
   const firstPanelId = createMemo(() => panels()[0]?.props?.id ?? null);
@@ -48,6 +58,19 @@ export function WebTabsElement(props: WebTabsElementProps): JSX.Element {
   const [activeTabId, setActiveTabId] = createSignal(initialPanelId());
 
   createEffect(() => {
+    const epoch = rootUpdateEpoch();
+    void epoch;
+
+    const focusedPanel = panels().find(
+      (panel) => collectFocusedTreeItemExpansion(panel).focusedIds.length > 0,
+    );
+
+    if (typeof focusedPanel?.props?.id === 'string') {
+      setActiveTabId(focusedPanel.props.id);
+
+      return;
+    }
+
     const ids = new Set(
       panels()
         .map((panel) => panel.props?.id)

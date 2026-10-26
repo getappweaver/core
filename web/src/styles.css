@@ -1813,11 +1813,7 @@ pre {
   gap: 0.5rem;
   align-items: baseline;
   justify-content: space-between;
-  font-family: monospace;
-  font-size: inherit;
-  text-align: left;
   background: color-mix(in srgb, #141414 95%, #fff);
-  border: none;
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, #fff);
   padding: 0.35rem 0.55rem;
 }
@@ -2725,6 +2721,7 @@ pre {
   font-size: 0.86rem;
 }
 
+.universal-search__controls input[type='text'],
 .field-block input[type='text'],
 .field-block input[type='number'],
 .field-block input[type='password'],
@@ -2768,6 +2765,7 @@ pre {
   font-size: 0.9rem;
 }
 
+.universal-search__controls input[type='text']::placeholder,
 .field-block input[type='text']::placeholder,
 .field-block input[type='number']::placeholder,
 .field-block textarea::placeholder,
@@ -2782,6 +2780,7 @@ pre {
   opacity: 1;
 }
 
+.universal-search__controls input[type='text']:focus::placeholder,
 .field-block input[type='text']:focus::placeholder,
 .field-block input[type='number']:focus::placeholder,
 .field-block textarea:focus::placeholder,
@@ -2795,6 +2794,7 @@ pre {
   color: var(--form-input-placeholder-color);
 }
 
+.universal-search__controls input[type='text']:focus,
 .field-block input[type='text']:focus,
 .field-block input[type='number']:focus,
 .field-block select:focus,

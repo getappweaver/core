@@ -213,6 +213,25 @@ function chooserRoot({
   });
 }
 
+/** Authenticated core surfaces and plugins share the same invocation boundary. */
+export function resolveWebCapabilityCaller(consumerAlias: string) {
+  if (consumerAlias.startsWith('core:') && consumerAlias.length > 5) {
+    return { type: 'core' as const, component: consumerAlias.slice(5) };
+  }
+
+  const consumer = getPluginByAlias(consumerAlias);
+
+  if (!consumer) {
+    throw new Error(`Unknown capability consumer: ${consumerAlias}`);
+  }
+
+  return {
+    type: 'plugin' as const,
+    pluginName: consumer.identity.name,
+    alias: consumer.identity.alias,
+  };
+}
+
 export async function executeWebCapability({
   operation,
   input,
@@ -223,14 +242,10 @@ export async function executeWebCapability({
   modalTitle,
 }: ExecuteWebCapabilityProps): Promise<WebNodeRoot | null> {
   const parsed = parseCapabilityOperationId(operation);
-  const consumer = getPluginByAlias(consumerAlias);
+  const caller = resolveWebCapabilityCaller(consumerAlias);
 
   if (!parsed) {
     throw new Error(`Invalid capability operation ID: ${operation}`);
-  }
-
-  if (!consumer) {
-    throw new Error(`Unknown capability consumer: ${consumerAlias}`);
   }
 
   const providers = capabilityRegistry.listOperationProviders(operation);
@@ -252,11 +267,7 @@ export async function executeWebCapability({
     operationId: operation,
     provider: providerId ?? 'auto',
     input,
-    caller: {
-      type: 'plugin',
-      pluginName: consumer.identity.name,
-      alias: consumer.identity.alias,
-    },
+    caller,
   });
 
   if (result.status === 'missing') {

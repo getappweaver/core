@@ -586,6 +586,8 @@ export const WebBasePropsSchema = z.object({
   /** Placeholder for built-in filter inputs. */
   filterPlaceholder: z.string().optional(),
   defaultExpanded: z.boolean().optional(),
+  /** `treeItem`: focus this item on mount/replace (collapses non-ancestor tree items, expands ancestors and item, scrolls into view, and plays focus flash animation). */
+  focused: z.boolean().optional(),
   label: z.string().optional(),
   /** Accessible label when visible control text is intentionally compact or omitted. */
   ariaLabel: z.string().min(1).optional(),
@@ -823,30 +825,34 @@ export type WebElementNode = WebGenericElementNode | WebNostrPostElement;
 
 export type WebNode = WebTextNode | WebElementNode;
 
-export const WebElementNodeSchema: z.ZodType<WebElementNode> = z.lazy(() =>
-  z.union([
+const LazyWebNodeSchema: z.ZodType<WebNode> = z.lazy(() => WebNodeSchema);
+const OptionalWebNodeSchema = LazyWebNodeSchema.optional();
+const OptionalWebNodeChildrenSchema = z.array(LazyWebNodeSchema).optional();
+
+export const WebElementNodeSchema: z.ZodType<WebElementNode> =
+  z.discriminatedUnion('tag', [
     z.object({
       type: z.literal('element'),
       tag: z.literal('nostrPost'),
       renderKey: z.string().min(1).optional(),
       props: WebNostrPostElementPropsSchema.optional(),
-      summary: WebNodeSchema.optional(),
-      children: z.array(WebNodeSchema).optional(),
+      summary: OptionalWebNodeSchema,
+      children: OptionalWebNodeChildrenSchema,
     }),
     z.object({
       type: z.literal('element'),
       tag: WebGenericElementTagSchema,
       renderKey: z.string().min(1).optional(),
       props: WebBasePropsSchema.optional(),
-      summary: WebNodeSchema.optional(),
-      children: z.array(WebNodeSchema).optional(),
+      summary: OptionalWebNodeSchema,
+      children: OptionalWebNodeChildrenSchema,
     }),
-  ]),
-);
+  ]);
 
-export const WebNodeSchema: z.ZodType<WebNode> = z.lazy(() =>
-  z.union([WebTextNodeSchema, WebElementNodeSchema]),
-);
+export const WebNodeSchema: z.ZodType<WebNode> = z.union([
+  WebTextNodeSchema,
+  WebElementNodeSchema,
+]);
 
 export const WebRenderMetaSchema = z.object({
   command: z.string().min(1),
