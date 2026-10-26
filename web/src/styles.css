@@ -1079,10 +1079,7 @@ pre {
   margin-right: auto;
   display: flex;
   align-items: center;
-}
-
-.connect-btn.topbar-widget-right {
-  margin-right: 0.25rem;
+  gap: 0.45rem;
 }
 
 .story-walkthrough {

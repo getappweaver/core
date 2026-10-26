@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.13.1] - 2026-10-27
+
+- fix: adjust spacing in topbar icons (5e68506b)
+
 ## [v14.13.0] - 2026-10-26
 
-- feat: implement universal search capability with resource views and UI integration (f7d5e2a4)
+- feat: implement universal search capability with resource views and UI integration (765dc481)
 
 ## [v14.12.2] - 2026-10-26
 
