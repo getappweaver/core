@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -101,7 +101,15 @@ async function generateContent(): Promise<void> {
         })
       : [];
 
+    const landingAssetsDir = resolve(plugin.root, 'landing/assets');
+    const landingAssets = existsSync(landingAssetsDir)
+      ? readdirSync(landingAssetsDir, { withFileTypes: true })
+          .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+          .map((entry) => `landing/assets/${entry.name}`)
+      : [];
+
     const assets = [plugin.icon, definition.installScreenshot,
+      ...landingAssets,
       ...definition.assetAliases.map((asset) => asset.source),
       ...definition.demoStories.flatMap((story) =>
         story.variants.flatMap((variant) =>

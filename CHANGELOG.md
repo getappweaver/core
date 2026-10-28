@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.13.2] - 2026-10-28
+
+- fix: landing assets and documentation (98ebcf90)
+
 ## [v14.13.1] - 2026-10-27
 
-- fix: adjust spacing in topbar icons (5e68506b)
+- fix: adjust spacing in topbar icons (9092717c)
 
 ## [v14.13.0] - 2026-10-26
 
