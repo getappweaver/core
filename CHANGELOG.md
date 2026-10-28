@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.13.3] - 2026-10-28
+
+- chore: enhance README with logo and DeepWiki badge (a0908be7)
+
 ## [v14.13.2] - 2026-10-28
 
-- fix: landing assets and documentation (98ebcf90)
+- fix: landing assets and documentation (02d89f8e)
 
 ## [v14.13.1] - 2026-10-27
 

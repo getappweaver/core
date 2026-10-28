@@ -1,4 +1,13 @@
-# [AppWeaver](https://getappweaver.com)
+<h1 align="center">
+  <a href="https://getappweaver.com">
+    <img src="https://getappweaver.com/appweaver-logo-accent.svg" alt="" height="48" valign="middle" />
+  </a>
+  AppWeaver
+</h1>
+
+<p align="center">
+  <a href="https://deepwiki.com/getappweaver/core"><img src="https://getappweaver.com/deepwiki-badge.svg" alt="Ask DeepWiki" /></a>
+</p>
 
 Open-source app hub for running AI-powered tools from a project or workspace folder you control.
 
