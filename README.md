@@ -1,8 +1,8 @@
 <h1 align="center">
   <a href="https://getappweaver.com">
     <img src="https://getappweaver.com/appweaver-logo-accent.svg" alt="" height="48" valign="middle" />
+    AppWeaver
   </a>
-  AppWeaver
 </h1>
 
 <p align="center">
