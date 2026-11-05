@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.14.1] - 2026-11-05
+
+- fix: plugin release publish would fix the plugins.json repo field from local to remote (ee7c7d29)
+
 ## [v14.14.0] - 2026-11-05
 
-- feat: new fips capabilities (1af75d37)
+- feat: new fips capabilities (31b5e971)
 
 ## [v14.13.4] - 2026-10-29
 

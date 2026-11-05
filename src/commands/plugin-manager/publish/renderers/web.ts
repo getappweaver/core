@@ -5,6 +5,107 @@ import type {
   PluginsPublishPreviewRepresentation,
   PluginsPublishRepresentation,
 } from '../handler';
+import type { PublishRepositoryChoice } from '../repository';
+
+type RepositorySelectionViewProps = {
+  alias: string;
+  signerName: string;
+  choices: PublishRepositoryChoice[];
+  installedRepo: string;
+  publishedRepo: string | null;
+  fallbackRepo: string;
+  preferredRepo: string;
+};
+
+export function renderPublishRepositorySelection({
+  alias,
+  signerName,
+  choices,
+  installedRepo,
+  publishedRepo,
+  fallbackRepo,
+  preferredRepo,
+}: RepositorySelectionViewProps): WebNodeRoot {
+  const repos = [
+    ...new Set([
+      ...choices.map((choice) => choice.repo),
+      installedRepo,
+      publishedRepo,
+      fallbackRepo,
+    ]),
+  ].filter(
+    (repo): repo is string => Boolean(repo) && !repo?.startsWith('local://'),
+  );
+
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'plugins', subcommand: 'publish' },
+    tree: {
+      type: 'element',
+      tag: 'stack',
+      props: { gap: 'sm' },
+      children: [
+        textBlock(`Choose publication repository for ${alias}`),
+        textBlock(`Registered: ${installedRepo}`, 'muted'),
+        textBlock(`Catalog: ${publishedRepo ?? '(not published)'}`, 'muted'),
+        ...choices.map((choice) =>
+          textBlock(`${choice.name}: ${choice.repo}`, 'muted'),
+        ),
+        textBlock(
+          'Review the destination. Successful publication will register this repository in plugins.json.',
+          'warning',
+        ),
+        {
+          type: 'element',
+          tag: 'form',
+          props: {
+            formOptionFieldNames: ['repo'],
+            action: {
+              type: 'command',
+              command: 'plugins',
+              subcommand: 'publish',
+              arguments: { alias },
+              options: { signer: signerName },
+              recordInTimeline: false,
+            },
+          },
+          children: [
+            {
+              type: 'element',
+              tag: 'select',
+              props: {
+                formFieldName: 'repo',
+                value: preferredRepo,
+                choices: repos,
+                choiceLabels: Object.fromEntries(
+                  repos.map((repo) => [
+                    repo,
+                    `${
+                      choices
+                        .filter((choice) => choice.repo === repo)
+                        .map((choice) => choice.name)
+                        .join(', ') || 'registered / suggested'
+                    } — ${repo}`,
+                  ]),
+                ),
+              },
+            },
+            {
+              type: 'element',
+              tag: 'button',
+              props: {
+                label: 'Review selected repository',
+                htmlType: 'submit',
+                className: 'web-button',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
 
 const pluginsPublishStylesheet = {
   id: 'plugins-publish-web',
@@ -149,6 +250,7 @@ export function renderPluginsPublishPreviewWeb(
                       arguments: { alias: representation.alias },
                       options: {
                         signer: representation.signerName,
+                        repo: representation.repo,
                         confirm: true,
                       },
                       recordInTimeline: false,
@@ -274,14 +376,39 @@ export function renderPluginsPublishWeb(
                       type: 'element',
                       tag: 'badge',
                       props: {
-                        label: representation.status.replace('-', ' '),
-                        tone: statusTone(representation.status),
+                        label: representation.registrationError
+                          ? 'published · registration pending'
+                          : representation.status.replace('-', ' '),
+                        tone: representation.registrationError
+                          ? 'warning'
+                          : statusTone(representation.status),
                         size: 'sm',
                       },
                     },
                   ],
                 },
                 textBlock(representation.message, 'muted'),
+                ...(representation.registrationError &&
+                representation.registrationRepo
+                  ? [
+                      {
+                        type: 'element' as const,
+                        tag: 'button' as const,
+                        props: {
+                          label: 'Retry local registration update',
+                          className: 'web-button',
+                          action: {
+                            type: 'command' as const,
+                            command: 'plugins',
+                            subcommand: 'publish',
+                            arguments: { alias: representation.alias },
+                            options: { operation: 'registration-retry' },
+                            recordInTimeline: false,
+                          },
+                        },
+                      },
+                    ]
+                  : []),
                 ...(representation.eventId
                   ? [textBlock(`Event ID: ${representation.eventId}`, 'muted')]
                   : []),

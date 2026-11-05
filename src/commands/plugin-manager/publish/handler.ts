@@ -11,6 +11,7 @@ import {
   PluginCapabilityRelationsSchema,
 } from '@src/capabilities/relations';
 import type { RouteCommandContext } from '@src/commands/dispatch';
+import { getState, setState } from '@src/db';
 import { decodeNpub, verifyNip05 } from '@src/nostr/author-identity';
 import { bunkerSignEvent } from '@src/nostr/bunker';
 import { listConnections, type ConnectionRow } from '@src/nostr/connections';
@@ -49,7 +50,13 @@ import { renderPluginsPublishText } from './renderers/text';
 import {
   renderPluginsPublishPreviewWeb,
   renderPluginsPublishWeb,
+  renderPublishRepositorySelection,
 } from './renderers/web';
+import {
+  gitRepositoryChoices,
+  sameRepository,
+  selectPublicationRepository,
+} from './repository';
 
 const PLUGIN_KIND = 32107;
 
@@ -93,6 +100,8 @@ export type PluginsPublishRepresentation = {
   status: 'published' | 'already-published' | 'failed';
   message: string;
   relays: PublishRelayResult[];
+  registrationError: string | null;
+  registrationRepo: string | null;
 };
 
 export type PluginsPublishPreviewRepresentation = {
@@ -509,38 +518,17 @@ async function prepareFirstReleaseRepository({
     }
   }
 
-  const pushed = Bun.spawnSync(
-    ['git', 'push', 'origin', state.branch, '--tags'],
-    { cwd: pluginDir, stdout: 'pipe', stderr: 'pipe' },
-  );
+  const pushed = Bun.spawnSync(['git', 'push', repo, state.branch, '--tags'], {
+    cwd: pluginDir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
 
   if (pushed.exitCode !== 0) {
     throw new Error(
       `Failed to push initial Nostr release: ${pushed.stderr.toString().trim()}`,
     );
   }
-}
-
-function readGitRemote({
-  dmBotRoot,
-  alias,
-  fallbackRepo,
-}: {
-  dmBotRoot: string;
-  alias: string;
-  fallbackRepo: string;
-}): string {
-  const result = Bun.spawnSync(['git', 'remote', 'get-url', 'origin'], {
-    cwd: join(dmBotRoot, 'plugins', alias),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-
-  if (result.exitCode !== 0) {
-    return fallbackRepo;
-  }
-
-  return result.stdout.toString().trim() || fallbackRepo;
 }
 
 function firstPublishRepository({
@@ -800,6 +788,69 @@ async function publishEvent({
   }));
 }
 
+type RegistrationReceipt = {
+  alias: string;
+  pluginName: string;
+  versionTag: string;
+  eventId: string;
+  repo: string;
+  previousRepo: string;
+};
+
+function reconcileRegistration(
+  ctx: RouteCommandContext,
+  receipt: RegistrationReceipt,
+): string | null {
+  try {
+    // Retain proof of which successful publication this local-only retry belongs to.
+    setState(
+      ctx.seenDb,
+      `plugins.publication-registration.${receipt.alias}`,
+      JSON.stringify(receipt),
+    );
+
+    const current = readInstalledPlugins(ctx.dmBotRoot).find(
+      (entry) => entry.alias === receipt.alias,
+    );
+
+    if (
+      !current ||
+      (current.repo !== receipt.previousRepo &&
+        !sameRepository(current.repo, receipt.repo))
+    ) {
+      throw new Error(
+        'Plugin registration changed since publication. Reopen release review.',
+      );
+    }
+
+    if (!sameRepository(current.repo, receipt.repo)) {
+      setPluginRepository({
+        dmBotRoot: ctx.dmBotRoot,
+        alias: receipt.alias,
+        repo: receipt.repo,
+      });
+    }
+
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function requestedRepository(ctx: RouteCommandContext): string | null {
+  const index = ctx.args.indexOf('--repo');
+
+  if (index >= 0) {
+    return ctx.args[index + 1]?.trim() || null;
+  }
+
+  const payload = ctx.jsonPayload as { options?: { repo?: unknown } } | null;
+
+  return typeof payload?.options?.repo === 'string'
+    ? payload.options.repo.trim() || null
+    : null;
+}
+
 export async function handlePluginsPublish(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsPublishWeb> | string> {
@@ -819,6 +870,54 @@ export async function handlePluginsPublish(
   }
 
   const pkg = readPluginPackage({ dmBotRoot: ctx.dmBotRoot, alias });
+
+  if (publicationOperation(ctx) === 'registration-retry') {
+    const raw = getState(
+      ctx.seenDb,
+      `plugins.publication-registration.${alias}`,
+    );
+
+    if (!raw) {
+      throw new Error(
+        'No successful publication registration is available to retry.',
+      );
+    }
+
+    const receipt = JSON.parse(raw) as RegistrationReceipt;
+
+    if (
+      receipt.alias !== alias ||
+      receipt.pluginName !== pkg.name ||
+      !receipt.eventId ||
+      !receipt.repo ||
+      !receipt.previousRepo ||
+      !receipt.versionTag
+    ) {
+      throw new Error(
+        'Stored publication registration does not match this plugin.',
+      );
+    }
+
+    const error = reconcileRegistration(ctx, receipt);
+
+    const result = rememberPublishResult({
+      alias,
+      pluginName: receipt.pluginName,
+      versionTag: receipt.versionTag,
+      eventId: receipt.eventId,
+      status: 'already-published',
+      relays: [],
+      message: error
+        ? `Published; local registration update failed: ${error}`
+        : `Published release registered at ${receipt.repo}. No publication was repeated.`,
+      registrationError: error,
+      registrationRepo: receipt.repo,
+    });
+
+    return ctx.source === 'web'
+      ? renderPluginsPublishWeb(result)
+      : renderPluginsPublishText(result);
+  }
 
   const published = findPublishedPlugin({
     installed,
@@ -848,15 +947,35 @@ export async function handlePluginsPublish(
 
   const versionTag = `v${pkg.version}`;
 
-  const repo = published
-    ? readGitRemote({
-        dmBotRoot: ctx.dmBotRoot,
-        alias,
-        fallbackRepo: installed.repo,
-      })
-    : firstPublishRepository({ installed, connection });
-
   const pluginDir = join(ctx.dmBotRoot, 'plugins', alias);
+  const choices = gitRepositoryChoices(pluginDir);
+  const fallbackRepo = firstPublishRepository({ installed, connection });
+
+  const selected = selectPublicationRepository({
+    choices,
+    installedRepo: installed.repo,
+    publishedRepo: published?.repo ?? null,
+    fallbackRepo,
+    requestedRepo: requestedRepository(ctx),
+  });
+
+  const repo = selected.repo;
+
+  if (selected.needsSelection && !operation) {
+    if (ctx.source !== 'web') {
+      return `Choose a publication repository with --repo <URL>.\n${choices.map((choice) => `${choice.name}: ${choice.repo}`).join('\n')}\nRegistered: ${installed.repo}\nCatalog: ${published?.repo ?? '(none)'}`;
+    }
+
+    return renderPublishRepositorySelection({
+      alias,
+      signerName: connection.name,
+      choices,
+      installedRepo: installed.repo,
+      publishedRepo: published?.repo ?? null,
+      fallbackRepo,
+      preferredRepo: repo,
+    });
+  }
 
   const icon = pkg.iconPath
     ? readPluginSvgIcon({ pluginDir, iconPath: pkg.iconPath })
@@ -875,6 +994,7 @@ export async function handlePluginsPublish(
 
   if (
     published &&
+    sameRepository(published.repo, repo) &&
     versionAlreadyPublished &&
     refsEqual(published.refs, refsWithBackfilledChangelogs) &&
     pluginMetadataMatchesPackage({
@@ -883,7 +1003,30 @@ export async function handlePluginsPublish(
       published,
     })
   ) {
-    if (ctx.source === 'web' && !publishConfirmed(ctx)) {
+    const registrationError = reconcileRegistration(ctx, {
+      alias,
+      pluginName: pkg.name,
+      versionTag,
+      eventId: published.id,
+      repo,
+      previousRepo: installed.repo,
+    });
+
+    const representation = rememberPublishResult({
+      alias,
+      pluginName: pkg.name,
+      versionTag,
+      eventId: published.id,
+      status: 'already-published',
+      message: registrationError
+        ? `Published; local registration update failed: ${registrationError}`
+        : `${versionTag} is already present in the published ref history. Local repository registration is up to date.`,
+      relays: [],
+      registrationError,
+      registrationRepo: repo,
+    });
+
+    if (ctx.source === 'web' && !publishConfirmed(ctx) && !registrationError) {
       const relays = await fetchPluginPublishRelays({
         ctx,
         authorPubkey: published.pubkey,
@@ -897,16 +1040,6 @@ export async function handlePluginsPublish(
         relays,
       });
     }
-
-    const representation = rememberPublishResult({
-      alias,
-      pluginName: pkg.name,
-      versionTag,
-      eventId: published.id,
-      status: 'already-published',
-      message: `${versionTag} is already present in the published ref history.`,
-      relays: [],
-    });
 
     return ctx.source === 'web'
       ? renderPluginsPublishWeb(representation)
@@ -969,7 +1102,12 @@ export async function handlePluginsPublish(
   }
 
   if (published) {
-    await pushPluginRelease({ dmBotRoot: ctx.dmBotRoot, alias, versionTag });
+    await pushPluginRelease({
+      dmBotRoot: ctx.dmBotRoot,
+      alias,
+      versionTag,
+      repo,
+    });
   }
 
   if (!published) {
@@ -1019,13 +1157,15 @@ export async function handlePluginsPublish(
   const succeeded = relayResults.filter((result) => result.ok).length;
   let manifestUpdateError: string | null = null;
 
-  if (succeeded > 0 && isLocalPluginRepo(installed.repo)) {
-    try {
-      setPluginRepository({ dmBotRoot: ctx.dmBotRoot, alias, repo });
-    } catch (error) {
-      manifestUpdateError =
-        error instanceof Error ? error.message : String(error);
-    }
+  if (succeeded > 0) {
+    manifestUpdateError = reconcileRegistration(ctx, {
+      alias,
+      pluginName: pkg.name,
+      versionTag,
+      eventId: signed.id,
+      repo,
+      previousRepo: installed.repo,
+    });
   }
 
   const representation = rememberPublishResult({
@@ -1036,9 +1176,11 @@ export async function handlePluginsPublish(
     status: succeeded > 0 ? 'published' : 'failed',
     message:
       succeeded > 0
-        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s).${manifestUpdateError ? ` Update plugins.json manually to ${repo}: ${manifestUpdateError}` : ''}`
+        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s).${manifestUpdateError ? ` Published; local registration update failed: ${manifestUpdateError}` : ` Registered repository: ${repo}.`}`
         : `Failed to publish ${pkg.name} ${versionTag}.`,
     relays: relayResults,
+    registrationError: manifestUpdateError,
+    registrationRepo: succeeded > 0 ? repo : null,
   });
 
   return ctx.source === 'web'

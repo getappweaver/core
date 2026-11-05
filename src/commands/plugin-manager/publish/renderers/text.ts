@@ -12,6 +12,12 @@ export function renderPluginsPublishText(
     lines.push(`Event ID: ${representation.eventId}`);
   }
 
+  if (representation.registrationError) {
+    lines.push(
+      `Retry local registration: plugins publish ${representation.alias} --operation registration-retry`,
+    );
+  }
+
   if (representation.relays.length > 0) {
     lines.push('', 'Relays:');
 

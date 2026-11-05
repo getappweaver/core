@@ -6,6 +6,30 @@ for the shared plugin architecture.
 
 ## Catalog and payment offer publication
 
+Publication discovers all configured Git fetch remote names and URLs. Multiple
+remotes, or a mismatch between the manifest/catalog and Git destination, open a
+compact repository selector before release review. The manifest match is suggested
+first, then origin; selection is explicit when ambiguous. Text callers use
+`--repo <URL>`. The reviewed URL is included in the confirmation action and is
+used directly for push/tag verification and the catalog's `repo` tag; unrelated
+remotes are not implicitly pushed. Git push-url overrides are not used when
+pushing this explicit URL. First-publication repository registration still requires
+a Nostr repository and its matching author.
+
+After at least one relay accepts publication, the manager updates `plugins.json`
+to the selected repository. Already-published releases also reconcile local
+registration when the selected destination matches the catalog; they do not need
+another catalog publication to stop being local drafts. Nostr repository comparison
+uses the parsed owner/repository identity (relay hints do not change identity);
+other URLs normalize trailing slashes and `.git` suffixes conservatively.
+
+If publication succeeds but the local update fails, the result shows **published ·
+registration pending** with **Retry local registration update**. The publication
+receipt, selected URL, and prior registration are saved in core state under
+`plugins.publication-registration.<alias>`. Retry only updates the manifest: it
+does not push, upload, sign, or republish. It refuses to overwrite a registration
+changed since that publication. See the [implementation record](publish/implementation-plan.md).
+
 `/plugins publish <alias>` in the web UI opens the release review and author
 offer manager. It stays available when the current version is already published.
 For a pending release, the expanded release review contains optional offer

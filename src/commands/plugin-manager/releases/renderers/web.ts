@@ -177,14 +177,43 @@ function publishResult(entry: PluginReleaseEntry): WebNode[] {
               type: 'element',
               tag: 'badge',
               props: {
-                label: result.status.replace('-', ' '),
-                tone,
+                label: result.registrationError
+                  ? 'published · registration pending'
+                  : result.status.replace('-', ' '),
+                tone: result.registrationError ? 'warning' : tone,
                 size: 'sm',
               },
             },
             textBlock(result.message, 'muted'),
           ],
         },
+        ...(result.registrationError
+          ? [
+              {
+                type: 'element' as const,
+                tag: 'button' as const,
+                props: {
+                  label: 'Retry local registration update',
+                  className: 'web-button',
+                  action: {
+                    type: 'command' as const,
+                    command: 'plugins',
+                    subcommand: 'publish',
+                    arguments: { alias: result.alias },
+                    options: { operation: 'registration-retry' },
+                    recordInTimeline: false,
+                    refresh: {
+                      command: 'plugins',
+                      subcommand: 'releases',
+                      arguments: {},
+                      options: {},
+                      recordInTimeline: false,
+                    },
+                  },
+                },
+              },
+            ]
+          : []),
         ...(result.eventId
           ? [textBlock(`Event ID: ${result.eventId}`, 'muted')]
           : []),

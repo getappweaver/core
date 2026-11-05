@@ -27,6 +27,7 @@ export function getPluginsPublishSubcommandDefinition(
         'valid_until',
         'draft',
         'offer_id',
+        'repo',
       ].map((name) => ({
         name,
         summary: `Web publication form field: ${name}.`,

@@ -335,10 +335,12 @@ export async function pushPluginRelease({
   dmBotRoot,
   alias,
   versionTag,
+  repo,
 }: {
   dmBotRoot: string;
   alias: string;
   versionTag: string;
+  repo: string;
 }): Promise<void> {
   const pluginDir = join(dmBotRoot, 'plugins', alias);
   const state = await inspectPluginReleaseGit({ dmBotRoot, alias, versionTag });
@@ -357,44 +359,44 @@ export async function pushPluginRelease({
     throw new Error(`${versionTag} does not point at the current commit.`);
   }
 
-  for (const remote of state.remotes) {
-    if (!remote.configured) {
-      if (remote.required) {
-        throw new Error(
-          `Required git remote is not configured: ${remote.name}`,
-        );
-      }
+  const pushed = runGit(pluginDir, ['push', repo, state.branch, '--tags']);
 
-      continue;
-    }
-
-    const pushed = runGit(pluginDir, [
-      'push',
-      remote.name,
-      state.branch,
-      '--tags',
-    ]);
-
-    if (!pushed.ok) {
-      throw new Error(`Failed to push ${remote.name}: ${pushed.error}`);
-    }
+  if (!pushed.ok) {
+    throw new Error(`Failed to push ${repo}: ${pushed.error}`);
   }
 
   clearPluginReleaseRemoteCache();
+  const head = runGit(pluginDir, ['rev-parse', 'HEAD']);
+  const branchRef = `refs/heads/${state.branch}`;
+  const tagRef = `refs/tags/${versionTag}`;
 
-  const verified = await inspectPluginReleaseGit({
-    dmBotRoot,
-    alias,
-    versionTag,
-  });
+  const verified = await runGitAsync(pluginDir, [
+    'ls-remote',
+    repo,
+    branchRef,
+    tagRef,
+    `${tagRef}^{}`,
+  ]);
 
-  const incomplete = verified.remotes.filter(
-    (remote) => remote.configured && (!remote.branchReady || !remote.tagReady),
+  if (!head.ok || !verified.ok) {
+    throw new Error(`Cannot verify selected repository: ${repo}`);
+  }
+
+  const refs = new Map(
+    verified.stdout.split('\n').map((line) => {
+      const [hash, ref] = line.split(/\s+/, 2);
+
+      return [ref, hash];
+    }),
   );
 
-  if (incomplete.length > 0) {
+  if (
+    refs.get(branchRef) !== head.stdout ||
+    (refs.get(tagRef) !== head.stdout &&
+      refs.get(`${tagRef}^{}`) !== head.stdout)
+  ) {
     throw new Error(
-      `Remote verification failed: ${incomplete.map((remote) => remote.name).join(', ')}`,
+      `Selected repository branch/tag does not match the release commit: ${repo}`,
     );
   }
 }
