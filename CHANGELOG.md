@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.14.0] - 2026-11-05
+
+- feat: new fips capabilities (1af75d37)
+
 ## [v14.13.4] - 2026-10-29
 
-- fix: readme fix header link (0107a02a)
+- fix: readme fix header link (f4df1737)
 
 ## [v14.13.3] - 2026-10-28
 
