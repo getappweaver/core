@@ -156,6 +156,20 @@
   color: #00695c;
 }
 
+.chat-md a.chat-md__link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-card.assistant .chat-md a.chat-md__link {
+  color: var(--color-accent);
+}
+
+.chat-card.user .chat-md a.chat-md__link {
+  color: #0d47a1;
+}
+
 .chat-md__table {
   border-collapse: collapse;
   border-spacing: 0;

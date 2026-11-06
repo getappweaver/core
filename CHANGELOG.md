@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.15.0] - 2026-11-06
+
+- feat: render markdown links (36c757e2)
+
 ## [v14.14.1] - 2026-11-05
 
-- fix: plugin release publish would fix the plugins.json repo field from local to remote (ee7c7d29)
+- fix: plugin release publish would fix the plugins.json repo field from local to remote (819d80d8)
 
 ## [v14.14.0] - 2026-11-05
 

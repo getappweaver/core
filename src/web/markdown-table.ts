@@ -28,7 +28,7 @@ export type MarkdownLinesSegment = {
 
 export type MarkdownSegment = MarkdownLinesSegment | MarkdownTableSegment;
 
-function parseFenceMarker(
+export function parseFenceMarker(
   line: string,
 ): { char: '`' | '~'; length: number } | null {
   const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
@@ -47,7 +47,7 @@ function parseFenceMarker(
   return { char, length: fence.length };
 }
 
-function isClosingFence(
+export function isClosingFence(
   line: string,
   activeFence: { char: '`' | '~'; length: number },
 ): boolean {

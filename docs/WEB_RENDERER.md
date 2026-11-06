@@ -79,6 +79,11 @@ Authenticated core consumers use a reserved `consumerAlias` of `core:<component>
 other aliases resolve to installed plugins. These identify callers for registry
 routing/logging, not a plugin sandbox. Source discovery and search don't record
 timeline history. Encoded `#/resource/v1/...` links open after authentication.
+Markdown file previews and chat markdown render `[label](url)` and autolinks as
+real `<a href>` tags: `http(s)`/`mailto` open in a new tab, workspace-relative
+paths and `@folder/file.md` mentions use File `resource-view:v1` hashes, and
+`#heading` jumps to the matching ATX heading. The markdown source delimiters are
+dropped; only the label is shown.
 
 ### Backend interfaces
 - Local web server exists in `src/web/server.ts`, `src/web/routes.ts`, `src/web/command-catalog.ts`, `src/web/execute.ts`, `src/web/chat.ts`.

@@ -1,8 +1,22 @@
 import hljs from 'highlight.js/lib/core';
 import markdown from 'highlight.js/lib/languages/markdown';
 import xml from 'highlight.js/lib/languages/xml';
-import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  onCleanup,
+} from 'solid-js';
 
+import {
+  createMarkdownFenceTracker,
+  headingDomId,
+  indexMarkdownHeadings,
+  parseMarkdownInline,
+  resolveMarkdownLink,
+  WORKSPACE_FILE_RESOURCE_VIEW_PROVIDER_ID,
+} from '@src/web/markdown-link';
 import {
   parseMarkdownTableSegments,
   type MarkdownTableSegment,
@@ -36,12 +50,68 @@ function highlightMarkdownFragment(text: string): string {
   }
 }
 
-function renderMarkdownTableHtml(segment: MarkdownTableSegment): string {
+type RenderMarkdownInlineHtmlProps = {
+  text: string;
+  fileMentions: boolean;
+  headingHrefPrefix: string;
+};
+
+function escapeHtml(text: string): string {
+  return escapeHtmlForFallback(text);
+}
+
+function renderMarkdownInlineHtml({
+  text,
+  fileMentions,
+  headingHrefPrefix,
+}: RenderMarkdownInlineHtmlProps): string {
+  return parseMarkdownInline({ text, fileMentions })
+    .map((segment) => {
+      if (segment.type === 'text') {
+        return highlightMarkdownFragment(segment.text);
+      }
+
+      const resolved = resolveMarkdownLink({
+        destination: segment.destination,
+        currentPath: null,
+        pathBase: segment.pathBase,
+        fileResourceProviderId: WORKSPACE_FILE_RESOURCE_VIEW_PROVIDER_ID,
+        localHeadingHrefPrefix: headingHrefPrefix,
+      });
+
+      if (resolved === null) {
+        return highlightMarkdownFragment(segment.raw);
+      }
+
+      const extra = resolved.external
+        ? ' target="_blank" rel="noopener noreferrer"'
+        : '';
+
+      return `<a class="chat-md__link" href="${escapeHtml(resolved.href)}"${extra}>${escapeHtml(segment.label)}</a>`;
+    })
+    .join('');
+}
+
+type RenderMarkdownTableHtmlProps = {
+  segment: MarkdownTableSegment;
+  headingHrefPrefix: string;
+};
+
+function renderMarkdownTableHtml({
+  segment,
+  headingHrefPrefix,
+}: RenderMarkdownTableHtmlProps): string {
   const headerCellsHtml = segment.header.cells
     .map((cell, index) => {
       const align = segment.alignments[index] ?? 'left';
 
-      return `<th class="chat-md__cell chat-md__cell--head chat-md__cell--${align}">${highlightMarkdownFragment(cell)}</th>`;
+      return `<th class="chat-md__cell chat-md__cell--head chat-md__cell--${align}">${renderMarkdownInlineHtml(
+        {
+          text: cell,
+          fileMentions: true,
+          headingHrefPrefix,
+        },
+      )}</th>`;
     })
     .join('');
 
@@ -51,7 +121,13 @@ function renderMarkdownTableHtml(segment: MarkdownTableSegment): string {
         .map((cell, index) => {
           const align = segment.alignments[index] ?? 'left';
 
-          return `<td class="chat-md__cell chat-md__cell--${align}">${highlightMarkdownFragment(cell)}</td>`;
+          return `<td class="chat-md__cell chat-md__cell--${align}">${renderMarkdownInlineHtml(
+            {
+              text: cell,
+              fileMentions: true,
+              headingHrefPrefix,
+            },
+          )}</td>`;
         })
         .join('');
 
@@ -65,22 +141,58 @@ function renderMarkdownTableHtml(segment: MarkdownTableSegment): string {
   return `<table class="chat-md__table"><thead><tr class="chat-md__row chat-md__row--head">${headerCellsHtml}</tr></thead>${tbodyHtml}</table>`;
 }
 
-function highlightMarkdownWithTables(src: string): string {
+type HighlightMarkdownWithLinksProps = {
+  src: string;
+  headingHrefPrefix: string;
+};
+
+function highlightMarkdownWithLinks({
+  src,
+  headingHrefPrefix,
+}: HighlightMarkdownWithLinksProps): string {
   if (src.length === 0) {
     return '';
   }
 
   const segments = parseMarkdownTableSegments(src);
+  const headings = indexMarkdownHeadings(src);
+
+  const headingLines = new Map(
+    headings.map((entry) => [entry.lineNumber, entry.slug]),
+  );
+
+  const fence = createMarkdownFenceTracker();
 
   return segments
     .map((segment) => {
       if (segment.type === 'lines') {
-        const chunk = segment.lines.map((entry) => entry.text).join('\n');
+        return segment.lines
+          .map((entry) => {
+            const inFence = fence.consume(entry.text);
 
-        return highlightMarkdownFragment(chunk);
+            const html = inFence
+              ? highlightMarkdownFragment(entry.text)
+              : renderMarkdownInlineHtml({
+                  text: entry.text,
+                  fileMentions: true,
+                  headingHrefPrefix,
+                });
+
+            const slug = headingLines.get(entry.lineNumber);
+
+            if (slug === undefined) {
+              return html;
+            }
+
+            return `<span id="${escapeHtml(headingDomId(headingHrefPrefix, slug))}">${html}</span>`;
+          })
+          .join('\n');
       }
 
-      return renderMarkdownTableHtml(segment);
+      return renderMarkdownTableHtml({
+        segment,
+        headingHrefPrefix,
+      });
     })
     .join('');
 }
@@ -221,6 +333,7 @@ function textOffsetForRange(root: HTMLElement, target: Range): number | null {
 
 export function ChatMarkdown(props: ChatMarkdownProps) {
   const [codeEl, setCodeEl] = createSignal<HTMLElement | null>(null);
+  const headingHrefPrefix = `chat-md-${createUniqueId()}`;
 
   const speechSentences = createMemo(() => props.speechSentences ?? []);
 
@@ -235,7 +348,10 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
   const html = createMemo(() => {
     const src = props.text ?? '';
 
-    return highlightMarkdownWithTables(src);
+    return highlightMarkdownWithLinks({
+      src,
+      headingHrefPrefix,
+    });
   });
 
   createEffect(() => {
@@ -292,6 +408,10 @@ export function ChatMarkdown(props: ChatMarkdownProps) {
   });
 
   const handleClick = (event: MouseEvent): void => {
+    if (event.target instanceof Element && event.target.closest('a')) {
+      return;
+    }
+
     const el = codeEl();
     const sentences = speechSentences();
     const onClick = onSpeechSentenceClick();
