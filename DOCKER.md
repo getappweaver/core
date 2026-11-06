@@ -1,6 +1,8 @@
 # AppWeaver Docker Setup
 
-Docker is the recommended VPS deployment path. The Docker image is a runtime environment, not the source of truth for AppWeaver code. It includes Bun, OpenCode, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support.
+Docker is the recommended VPS deployment path. Application source and persistent state live in the mounted workspace. The full runtime image includes Bun, OpenCode, Chromium/Playwright dependencies, ngit, Piper, and optional VNC/noVNC support. For the reduced, SHA-pinned runtime, see [Alpine Docker setup](ALPINE_DOCKER.md).
+
+## Full Runtime Image
 
 Clone AppWeaver on the host if you have not already:
 

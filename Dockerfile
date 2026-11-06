@@ -67,11 +67,9 @@ RUN curl -fsSL https://bun.sh/install | bash \
     && node --version
 
 RUN bun install -g opencode-ai \
-    && curl https://cursor.com/install -fsS | bash \
     && curl -Ls https://ngit.dev/install.sh | bash \
     && curl -fsSL https://raw.githubusercontent.com/fiatjaf/nak/master/install.sh | sh \
     && opencode --version \
-    && agent --version \
     && ngit --version \
     && nak --version
 

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.0] - 2026-11-06
+
+- feat: enhance Alpine Docker setup with commit SHA verification (18df5076)
+
 ## [v14.15.0] - 2026-11-06
 
-- feat: render markdown links (36c757e2)
+- feat: render markdown links (666a53eb)
 
 ## [v14.14.1] - 2026-11-05
 

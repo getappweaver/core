@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Resolve checked-out source commit
+        id: source
+        shell: bash
+        run: echo "sha=$(git rev-parse --verify 'HEAD^{commit}')" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
@@ -48,6 +53,10 @@ jobs:
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          labels: |
+            ${{ steps.metadata.outputs.labels }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+          build-args: |
+            APPWEAVER_GIT_SHA=${{ steps.source.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
