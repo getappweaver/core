@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.3] - 2026-11-08
+
+- chore: bumped nostr-tools version up (4902a27f)
+
 ## [v14.16.2] - 2026-11-08
 
-- chore: removed unused nodejs dependency (d4dc2af3)
+- chore: removed unused nodejs dependency (37ca2162)
 
 ## [v14.16.1] - 2026-11-08
 
