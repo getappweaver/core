@@ -103,8 +103,6 @@ run_root apk add \
   curl \
   git \
   iproute2 \
-  nodejs \
-  npm \
   openssh-server \
   py3-flask \
   py3-pip \
