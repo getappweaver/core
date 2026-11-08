@@ -350,7 +350,10 @@ async function main() {
   initSkKeyEncryption(botKeyHex, botPubkey);
 
   // --- Databases ---
-  const pool = new SimplePool({ enablePing: true, enableReconnect: true });
+  // nostr-tools 2.24.1 dummy-REQ keepalives can miscount active subscriptions
+  // and idle-close live DM/FIPS connections. Disable relay keepalives while
+  // retaining automatic reconnection; revisit after a verified dependency fix.
+  const pool = new SimplePool({ enablePing: false, enableReconnect: true });
 
   activePool = pool;
   pool.allowConnectingToRelay = allowRelayOperation;

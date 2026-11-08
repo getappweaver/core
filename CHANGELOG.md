@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.1] - 2026-11-08
+
+- fix: temporarily set enablePing to false, and added retry mechanism to run-start (1dd18636)
+
 ## [v14.16.0] - 2026-11-06
 
-- feat: enhance Alpine Docker setup with commit SHA verification (18df5076)
+- feat: enhance Alpine Docker setup with commit SHA verification (324b34c6)
 
 ## [v14.15.0] - 2026-11-06
 

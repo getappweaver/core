@@ -17,9 +17,15 @@ const DM_BOT_DIR = join(import.meta.dir, '..');
 const INDEX_TS = join(DM_BOT_DIR, 'src', 'index.ts');
 const RESTART_FILE = join(DM_BOT_DIR, 'restart.requested');
 
+const RAPID_CRASH_WINDOW_MS = 5_000;
+const MAX_RAPID_CRASHES = 5;
+
 let botChild: ReturnType<typeof spawn> | null = null;
 let shuttingDown = false;
 let restartRequested = false;
+let rapidCrashCount = 0;
+let lastStartTime = 0;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
 function shouldShowSetup(): boolean {
   return process.argv.slice(2).includes('--setup');
@@ -128,6 +134,11 @@ function shutdownAll(): void {
 
   shuttingDown = true;
 
+  if (restartTimer !== null) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+
   try {
     botChild?.kill();
   } catch {
@@ -136,6 +147,7 @@ function shutdownAll(): void {
 }
 
 function startBot(): void {
+  lastStartTime = Date.now();
   botChild = runBot();
   botChild.exited.then((code) => exitOnChild(code));
 }
@@ -147,6 +159,8 @@ function exitOnChild(code: number | null): void {
 
   if (restartRequested) {
     restartRequested = false;
+    rapidCrashCount = 0;
+    console.log('\n[run-start] Restarting bot...\n');
     startBot();
 
     return;
@@ -163,9 +177,33 @@ function exitOnChild(code: number | null): void {
     process.exit(normalizedCode);
   }
 
-  console.error(`[run-start] bot exited with code ${normalizedCode}.`);
-  shutdownAll();
-  process.exit(normalizedCode);
+  const uptime = Date.now() - lastStartTime;
+
+  if (uptime < RAPID_CRASH_WINDOW_MS) {
+    rapidCrashCount++;
+  } else {
+    rapidCrashCount = 1;
+  }
+
+  if (rapidCrashCount >= MAX_RAPID_CRASHES) {
+    console.error(
+      `[run-start] ${MAX_RAPID_CRASHES} rapid crashes in a row. Stopping.`,
+    );
+
+    shutdownAll();
+    process.exit(normalizedCode);
+  }
+
+  const delayMs = 1000 * rapidCrashCount;
+
+  console.error(
+    `[run-start] Bot exited with code ${normalizedCode}. Restarting in ${delayMs}ms...`,
+  );
+
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    startBot();
+  }, delayMs);
 }
 
 function main(): void {
