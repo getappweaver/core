@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.4] - 2026-11-08
+
+- chore: new install scripts (0bf341ce)
+
 ## [v14.16.3] - 2026-11-08
 
-- chore: bumped nostr-tools version up (4902a27f)
+- chore: bumped nostr-tools version up (ec85816b)
 
 ## [v14.16.2] - 2026-11-08
 

@@ -1,5 +1,7 @@
 import { For, Show, createSignal, onCleanup } from 'solid-js';
 
+type Platform = 'unix' | 'windows';
+
 type AppWeaverInstallBlockProps = {
   title: string | null;
 };
@@ -10,10 +12,10 @@ type CopyableCommandBlockProps = {
   lines: string[];
 };
 
-const installCommandLines = [
-  'git clone --depth=1 https://github.com/getappweaver/core.git appweaver',
-  'cd appweaver && bun install && bun run start',
-];
+const installCommands: Record<Platform, string[]> = {
+  unix: ['curl -fsSL https://getappweaver.com/install.sh | sh'],
+  windows: ['irm https://getappweaver.com/install.ps1 | iex'],
+};
 
 function CopyIcon() {
   return (
@@ -96,16 +98,46 @@ function CopyableCommandBlock(props: CopyableCommandBlockProps) {
 }
 
 export function AppWeaverInstallBlock(props: AppWeaverInstallBlockProps) {
+  const isWindowsInitial =
+    typeof navigator !== 'undefined' && /win/i.test(navigator.userAgent || '');
+  const [platform, setPlatform] = createSignal<Platform>(
+    isWindowsInitial ? 'windows' : 'unix',
+  );
+
   return (
     <div class="hero-install-block">
       <Show when={props.title}>
         {(title) => <h3 class="hero-install-title">{title()}</h3>}
       </Show>
-      <div class="hero-install-label">Go to your project/workspace folder and run:</div>
+      <div class="hero-install-header">
+        <span class="hero-install-label">Go to your project/workspace folder and run:</span>
+        <div class="hero-install-tabs" role="tablist" aria-label="Select operating system">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={platform() === 'unix'}
+            class="hero-install-tab"
+            classList={{ 'is-active': platform() === 'unix' }}
+            onClick={() => setPlatform('unix')}
+          >
+            macOS / Linux
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={platform() === 'windows'}
+            class="hero-install-tab"
+            classList={{ 'is-active': platform() === 'windows' }}
+            onClick={() => setPlatform('windows')}
+          >
+            Windows
+          </button>
+        </div>
+      </div>
       <CopyableCommandBlock
         className="hero-install-command"
         ariaLabel="Install command"
-        lines={installCommandLines}
+        lines={installCommands[platform()]}
       />
       <div class="hero-actions">
         <a

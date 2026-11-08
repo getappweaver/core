@@ -81,7 +81,7 @@ async function generateContent(): Promise<void> {
     const entrypoint = resolve(plugin.root, 'landing.ts');
 
     if (!existsSync(entrypoint)) {
-      throw new Error(`Plugin ${plugin.alias} must export landingPage from landing.ts`);
+      continue;
     }
 
     const module = await import(pathToFileURL(entrypoint).href);

@@ -517,8 +517,9 @@ a {
 
 .command-copy-button {
   position: absolute;
-  top: -2rem;
-  right: 0.65rem;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
   display: grid;
   width: 1.85rem;
   height: 1.85rem;
@@ -2143,9 +2144,47 @@ a {
   line-height: 1.05;
 }
 
+.hero-install-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .hero-install-label {
   color: rgb(161 161 170);
   font-size: 0.85rem;
+}
+
+.hero-install-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.hero-install-tab {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgb(250 204 21 / 45%);
+  border-radius: 0;
+  background: #0a0d14;
+  color: rgb(250 204 21);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.hero-install-tab:hover {
+  border-color: rgb(250 204 21);
+  background: rgb(250 204 21 / 15%);
+}
+
+.hero-install-tab.is-active {
+  border-color: rgb(250 204 21);
+  background: rgb(250 204 21);
+  color: #0a0d14;
 }
 
 .hero-install-command {
@@ -2157,12 +2196,18 @@ a {
   max-width: 100%;
   margin-top: 0.65rem;
   margin-bottom: 0.65rem;
-  padding: 0.9rem 1rem 0.9rem 1rem;
+  padding: 0.9rem 3.5rem 0.9rem 1rem;
   background: rgb(13 28 37);
   color: white;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.82rem;
   line-height: 1.55rem;
+}
+
+.hero-install-command .command-copy-button {
+  top: 50%;
+  transform: translateY(-50%);
+  right: 0.75rem;
 }
 
 .hero-install-command code {

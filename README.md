@@ -43,6 +43,30 @@ AppWeaver is meant to live inside the project or workspace you want it to operat
 
 You can install AppWeaver natively, or use [Docker](DOCKER.md) if you want the runtime dependencies packaged for you.
 
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://getappweaver.com/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://getappweaver.com/install.ps1 | iex
+```
+
+The installer detects missing dependencies (`bun`, `opencode`, `ngit`, `git`), installs them, clones AppWeaver into `./appweaver`, and automatically starts AppWeaver.
+
+To start AppWeaver again later:
+
+```bash
+cd appweaver && bun run start
+```
+
+### Manual / Development Clone
+
+If you prefer to clone and set up dependencies manually:
+
 ```bash
 git clone --depth=1 https://github.com/getappweaver/core.git appweaver
 cd appweaver

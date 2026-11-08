@@ -488,7 +488,9 @@ export function generateDocs(): string[] {
     const route = `/docs/plugins/${alias}/`;
     const pluginRoot = pluginRoots.get(alias) ?? WORKSPACE_ROOT;
     const tree = renderDocTree({ items: entries, baseRoot: pluginRoot, isCore: false });
-    const body = `<h1>${escapeHtml(name)} documentation</h1><p><a href="${officialApps.find((app) => app.alias === alias)!.href}">App page</a></p>${tree}`;
+    const officialApp = officialApps.find((app) => app.alias === alias);
+    const appLink = officialApp ? `<p><a href="${officialApp.href}">App page</a></p>` : '';
+    const body = `<h1>${escapeHtml(name)} documentation</h1>${appLink}${tree}`;
     const breadcrumbHtml = buildBreadcrumb({ parts: ['plugins', alias.toLowerCase()], isFolderPage: true });
 
     writePage(route, renderPage({

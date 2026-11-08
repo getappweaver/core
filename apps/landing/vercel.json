@@ -33,9 +33,35 @@
           "value": "Content-Type"
         }
       ]
+    },
+    {
+      "source": "/install.sh",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/install.ps1",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        }
+      ]
     }
   ],
   "rewrites": [
+    {
+      "source": "/install",
+      "destination": "/install.sh"
+    },
+    {
+      "source": "/install-win",
+      "destination": "/install.ps1"
+    },
     {
       "source": "/.well-known/nostr.json",
       "destination": "/api/nostr-json"

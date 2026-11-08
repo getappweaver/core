@@ -112,7 +112,13 @@ function renderFooter(): string {
 function renderInstallBlock(title: string | null = null): string {
   return `<div class="hero-install-block">
       ${title ? `<h3 class="hero-install-title">${escapeHtml(title)}</h3>` : ''}
-      <div class="hero-install-label">Go to your project/workspace folder and run:</div>
+      <div class="hero-install-header">
+        <span class="hero-install-label">Go to your project/workspace folder and run:</span>
+        <div class="hero-install-tabs" role="tablist" aria-label="Select operating system">
+          <button type="button" role="tab" aria-selected="true" class="hero-install-tab is-active">macOS / Linux</button>
+          <button type="button" role="tab" aria-selected="false" class="hero-install-tab">Windows</button>
+        </div>
+      </div>
       <div class="hero-install-command command-copy-block" aria-label="Install command">
         <button
           type="button"
@@ -123,8 +129,7 @@ function renderInstallBlock(title: string | null = null): string {
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         </button>
         <div class="command-copy-lines">
-          <code>git clone --depth=1 https://github.com/getappweaver/core.git appweaver</code>
-          <code>cd appweaver &amp;&amp; bun install &amp;&amp; bun run start</code>
+          <code>curl -fsSL https://getappweaver.com/install.sh | sh</code>
         </div>
       </div>
       <div class="hero-actions">
@@ -745,6 +750,18 @@ export async function generateSite(): Promise<void> {
   const distRobots = join(DIST_ROOT, 'robots.txt');
   if (existsSync(publicRobots)) {
     await copyFile(publicRobots, distRobots);
+  }
+
+  const publicInstall = join(LANDING_ROOT, 'public/install.sh');
+  const distInstall = join(DIST_ROOT, 'install.sh');
+  if (existsSync(publicInstall)) {
+    await copyFile(publicInstall, distInstall);
+  }
+
+  const publicInstallPs1 = join(LANDING_ROOT, 'public/install.ps1');
+  const distInstallPs1 = join(DIST_ROOT, 'install.ps1');
+  if (existsSync(publicInstallPs1)) {
+    await copyFile(publicInstallPs1, distInstallPs1);
   }
 
   console.log('Static site generation complete!');
