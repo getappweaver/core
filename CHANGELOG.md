@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.2] - 2026-11-08
+
+- chore: removed unused nodejs dependency (d4dc2af3)
+
 ## [v14.16.1] - 2026-11-08
 
-- fix: temporarily set enablePing to false, and added retry mechanism to run-start (1dd18636)
+- fix: temporarily set enablePing to false, and added retry mechanism to run-start (41b5789e)
 
 ## [v14.16.0] - 2026-11-06
 

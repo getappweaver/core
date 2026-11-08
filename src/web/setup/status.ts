@@ -98,14 +98,6 @@ function setupDependencies(piperConfigured: boolean): SetupDependencyStatus[] {
       installCommand: null,
     }),
     dependencyStatus({
-      name: 'Node.js',
-      command: 'node',
-      required: true,
-      installHint: 'Install Node.js from https://nodejs.org/',
-      installUrl: 'https://nodejs.org/',
-      installCommand: null,
-    }),
-    dependencyStatus({
       name: 'Python',
       command: 'python3',
       required: false,

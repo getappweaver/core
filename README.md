@@ -73,7 +73,6 @@ Required:
 | Tool     | Why it matters                                |
 | -------- | --------------------------------------------- |
 | Bun      | Runtime, scripts, package install, web build  |
-| Node.js  | Required by parts of the AI/backend toolchain |
 | OpenCode | AI runtime and model/provider support         |
 | Git      | Core and app updates                          |
 | ngit     | Nostr Git remotes, app installs, app updates  |
@@ -89,7 +88,6 @@ Optional:
 Common install links:
 
 - Bun: [https://bun.sh/docs/installation](https://bun.sh/docs/installation)
-- Node.js: [https://nodejs.org/](https://nodejs.org/)
 - Git: [https://git-scm.com/downloads](https://git-scm.com/downloads)
 - ngit: [https://gitworkshop.dev/ngit](https://gitworkshop.dev/ngit)
 - OpenCode: [https://opencode.ai/](https://opencode.ai/)
