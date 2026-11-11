@@ -55,6 +55,15 @@ processes; configuration transitions must not depend on restarting the whole bot
 Source instances stay open until AppWeaver exits; an active count of zero alone
 does not trigger retirement.
 
+`opencode-sdk.ts` passes `APPWEAVER_PARENT_PID` and installs the standalone
+`appweaver-parent-watchdog.ts` plugin in every managed server, independently of
+intervention hooks and optional system logging. The child checks parent existence
+every two seconds and exits if the parent disappears; a permission error does not
+count as proof of disappearance. Its timer is unreferenced so it cannot itself keep
+the child alive. Normal shutdown still uses `disposeAllOpencodeSdks()`; this is a
+fallback for abrupt parent death, not replacement cleanup or a retroactive orphan
+sweep. Restart existing managed OpenCode servers to load updated plugin templates.
+
 Job scheduling may pin workspace/source/model options. Sticky sessions are
 opt-in and resume only while saved workspace and source bindings remain valid.
 Scheduler contracts remain versioned; older consumers retain their existing

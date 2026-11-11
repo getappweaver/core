@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.19.0] - 2026-11-11
+
+- feat: add opencode appweaver parent watchdog plugin that would kill itself if appweaver process is died (5ccae423)
+
 ## [v14.18.0] - 2026-11-11
 
-- feat: new clientAction `nostr.openSearchRelaysModal` (a2ce3de5)
+- feat: new clientAction `nostr.openSearchRelaysModal` (d3524225)
 
 ## [v14.17.0] - 2026-11-11
 

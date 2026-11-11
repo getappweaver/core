@@ -691,7 +691,18 @@ async function createLocalOpencodeSdk(
     join(pluginDir, 'appweaver-system-log.ts'),
   );
 
+  copyFileSync(
+    join(
+      dmBotRoot,
+      'templates',
+      'opencode-plugins',
+      'appweaver-parent-watchdog.ts',
+    ),
+    join(pluginDir, 'appweaver-parent-watchdog.ts'),
+  );
+
   const interventionPluginPath = join(pluginDir, 'appweaver-intervention.ts');
+  const watchdogPluginPath = join(pluginDir, 'appweaver-parent-watchdog.ts');
   const systemLogPluginPath = join(pluginDir, 'appweaver-system-log.ts');
   const systemLogEnabled = process.env.OPENCODE_SYSTEM_LOG === '1';
 
@@ -718,6 +729,7 @@ async function createLocalOpencodeSdk(
           },
           plugin: [
             ...(Array.isArray(inlineConfig.plugin) ? inlineConfig.plugin : []),
+            pathToFileURL(watchdogPluginPath).href,
             pathToFileURL(interventionPluginPath).href,
             ...(systemLogEnabled
               ? [pathToFileURL(systemLogPluginPath).href]
