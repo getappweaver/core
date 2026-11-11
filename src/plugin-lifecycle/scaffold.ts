@@ -21,8 +21,10 @@ export type CreatePluginScaffoldProps = {
   title: string;
   description: string;
   coreApiVersion: string;
-  createDraftCommands?: boolean;
+  createDraftCommands: boolean;
   runGenerator: boolean;
+  /** Explicit consent to configure hooks for future Git operations, not run them. */
+  configureGitHooks: boolean;
 };
 
 export type CreatePluginScaffoldResult = {
@@ -222,9 +224,20 @@ export function createPluginScaffold({
   title,
   description,
   coreApiVersion,
-  createDraftCommands = true,
+  createDraftCommands,
   runGenerator,
+  configureGitHooks,
 }: CreatePluginScaffoldProps): CreatePluginScaffoldResult {
+  if (
+    typeof createDraftCommands !== 'boolean' ||
+    typeof configureGitHooks !== 'boolean' ||
+    typeof runGenerator !== 'boolean'
+  ) {
+    throw new Error(
+      'createDraftCommands, configureGitHooks, and runGenerator must be booleans.',
+    );
+  }
+
   const normalizedAlias = alias.trim();
 
   if (!isPluginAlias(normalizedAlias)) {
@@ -290,11 +303,13 @@ export function createPluginScaffold({
     label: 'Failed to initialize plugin repository',
   });
 
-  runRequired({
-    command: ['git', 'config', 'core.hooksPath', '../../scripts'],
-    cwd: pluginDir,
-    label: 'Failed to configure plugin Git hooks',
-  });
+  if (configureGitHooks) {
+    runRequired({
+      command: ['git', 'config', 'core.hooksPath', '../../scripts'],
+      cwd: pluginDir,
+      label: 'Failed to configure plugin Git hooks',
+    });
+  }
 
   const manifestEntry = addLocalPluginManifestEntry({
     dmBotRoot,

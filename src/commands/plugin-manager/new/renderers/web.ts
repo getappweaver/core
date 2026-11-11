@@ -13,7 +13,8 @@ export type PluginsNewCreatedRepresentation = {
   description: string;
   pluginPath: string;
   repo: string;
-  createDraftCommands?: boolean;
+  createDraftCommands: boolean;
+  configureGitHooks: boolean;
 };
 
 export type PluginsNewRepresentation =
@@ -61,15 +62,14 @@ function formView(coreApiVersion: string): WebNode {
         'description',
         'core',
         'create_draft_commands',
+        'configure_git_hooks',
       ],
       action: {
         type: 'command',
         command: 'plugins',
         subcommand: 'new',
         arguments: {},
-        options: {
-          create_draft_commands: false,
-        },
+        options: {},
         recordInTimeline: false,
         pendingUi: { presentation: 'widget', label: 'Creating plugin...' },
       },
@@ -135,6 +135,32 @@ function formView(coreApiVersion: string): WebNode {
       },
       {
         type: 'element',
+        tag: 'row',
+        props: { gap: 'sm', itemAlign: 'center' },
+        children: [
+          {
+            type: 'element',
+            tag: 'checkbox',
+            props: {
+              formFieldName: 'configure_git_hooks',
+              checked: false,
+              value: 'true',
+              className: 'web-checkbox web-checkbox--retro',
+            },
+          },
+          {
+            type: 'element',
+            tag: 'text',
+            children: [textNode('Configure Git hooks')],
+          },
+        ],
+      },
+      textBlock(
+        'When enabled, sets this repository’s core.hooksPath to ../../scripts for future Git operations. Creating the plugin does not run those hooks.',
+        'muted',
+      ),
+      {
+        type: 'element',
         tag: 'button',
         props: {
           label: 'Create local app',
@@ -148,10 +174,9 @@ function formView(coreApiVersion: string): WebNode {
 }
 
 function createdView(representation: PluginsNewCreatedRepresentation): WebNode {
-  const preservingConvention =
-    representation.createDraftCommands !== false
-      ? ' while preserving the draft/review conventions.'
-      : '.';
+  const preservingConvention = representation.createDraftCommands
+    ? ' while preserving the draft/review conventions.'
+    : '.';
 
   const developmentPrompt = [
     `Develop the new AppWeaver plugin at ${representation.pluginPath}.`,
@@ -184,6 +209,12 @@ function createdView(representation: PluginsNewCreatedRepresentation): WebNode {
         ],
       },
       textBlock(`Created ${representation.pluginPath}`, 'muted'),
+      textBlock(
+        representation.configureGitHooks
+          ? 'Git hooks configured for future Git operations; no hooks were run.'
+          : 'Plugin Git hook configuration was left untouched.',
+        'muted',
+      ),
       textBlock(
         'The template AGENTS.md was preserved, the nested Git repository was initialized, and plugin registration was generated.',
         'muted',

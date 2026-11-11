@@ -28,6 +28,12 @@ form submission. With no connected account it explains how to connect; plugins
 may offer a separate manual `textField` fallback. Static `select` behavior is
 unchanged when `choiceSource` is omitted.
 
+Generic command forms render boolean options as checkboxes, using their web default
+or false. A single named boolean checkbox in a command `form` submits its checked
+state as a boolean, including false; repeated-name checkbox groups keep their
+value-array behavior.
+Optional false flags are omitted from the built-in text invocation bridge.
+
 Generic `details` and `summary` tags render native HTML disclosures, collapsed
 initially. Put a `summary` element first in a `details` element's children,
 followed by the expandable content. Native keyboard interaction applies; scoped

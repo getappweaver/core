@@ -4,6 +4,37 @@ The built-in plugin manager handles installation, local creation, release status
 and publication. See the [plugin system documentation](../../../docs/PLUGIN_SYSTEM.md)
 for the shared plugin architecture.
 
+## Local plugin creation
+
+`/plugins new` in the appweaver workspace opens the creation form. **Create draft
+commands?** is checked by default; **Configure Git hooks?** is unchecked. Adjust
+the checkboxes before creating the app.
+
+```text
+/plugins new --alias reminder
+/plugins new --alias reminder --no-create-draft-commands
+/plugins new --alias reminder --configure-git-hooks
+/plugins new --alias reminder --configure-git-hooks true
+/plugins new --alias reminder --configure-git-hooks false
+```
+
+The interactive `bun run plugin:new` script asks the same questions, defaulting
+draft commands to Yes and Git hook configuration to No. Press Enter to accept a
+default. The manager and script generate local registration after creation.
+
+Programmatic callers supply the scaffold options as booleans; UI/prompt defaults
+are resolved by the caller, not function parameter defaults.
+
+Omitting `--configure-git-hooks` leaves configuration disabled. The bare flag or
+`true` enables it; `false` disables it. The draft-command option accepts the same
+values and defaults to enabled. JSON/form options use boolean values directly.
+
+Choosing hook configuration sets only the new repository's `core.hooksPath` to
+`../../scripts`, enabling AppWeaver's hooks for future Git operations. Creation
+does not run those hooks. Choosing No leaves Git hook configuration untouched;
+it does not disable inherited Git configuration. See the
+[scaffolder contract](../../../PLUGINS.md#aits--aicli-tool-definitions).
+
 ## Catalog and payment offer publication
 
 Publication discovers all configured Git fetch remote names and URLs. Multiple

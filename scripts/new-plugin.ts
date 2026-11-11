@@ -27,6 +27,31 @@ function ask(question: string): Promise<string> {
   });
 }
 
+async function askBoolean(props: {
+  question: string;
+  initial: boolean;
+}): Promise<boolean> {
+  while (true) {
+    const answer = (
+      await ask(`${props.question} [${props.initial ? 'Y/n' : 'y/N'}]: `)
+    ).toLowerCase();
+
+    if (answer === '') {
+      return props.initial;
+    }
+
+    if (answer === 'y' || answer === 'yes') {
+      return true;
+    }
+
+    if (answer === 'n' || answer === 'no') {
+      return false;
+    }
+
+    console.log('Please answer yes or no.');
+  }
+}
+
 async function main(): Promise<void> {
   console.log('Create a new plugin from the AppWeaver template.\n');
 
@@ -53,12 +78,16 @@ async function main(): Promise<void> {
   const coreApiVersion =
     (await ask(`Core API version [${defaultCore}]: `)) || defaultCore;
 
-  const createDraftsAnswer = (
-    await ask('Create draft commands? [Y/n]: ')
-  ).toLowerCase();
+  const createDraftCommands = await askBoolean({
+    question: 'Create draft commands?',
+    initial: true,
+  });
 
-  const createDraftCommands =
-    createDraftsAnswer !== 'n' && createDraftsAnswer !== 'no';
+  const configureGitHooks = await askBoolean({
+    question:
+      'Configure AppWeaver Git hooks for future Git operations? This does not run hooks now.',
+    initial: false,
+  });
 
   const result = createPluginScaffold({
     dmBotRoot: ROOT,
@@ -67,6 +96,7 @@ async function main(): Promise<void> {
     description,
     coreApiVersion,
     createDraftCommands,
+    configureGitHooks,
     runGenerator: true,
   });
 
@@ -74,6 +104,12 @@ async function main(): Promise<void> {
 
   console.log(`\nPlugin created at plugins/${result.alias}/`);
   console.log(`Registered locally as ${result.repo}.`);
+
+  console.log(
+    configureGitHooks
+      ? 'Configured core.hooksPath for future Git operations; no hooks were run.'
+      : 'Plugin Git hook configuration was left untouched.',
+  );
 
   console.log(
     `Develop it with AI, then use /plugins releases to prepare its first publication.`,

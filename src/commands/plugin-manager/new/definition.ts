@@ -44,16 +44,30 @@ export function getPluginsNewSubcommandDefinition(
       {
         name: 'create_draft_commands',
         summary:
-          'Create draft and review commands with supporting storage (defaults to true).',
+          'Include draft and review commands with supporting storage (enabled by default).',
         flag: '--create-draft-commands',
         shortFlag: null,
         kind: 'boolean',
         required: false,
+        webDefaultValue: true,
+      },
+      {
+        name: 'configure_git_hooks',
+        summary:
+          'Configure AppWeaver Git hooks for this repository (off by default). Does not run hooks during creation.',
+        flag: '--configure-git-hooks',
+        shortFlag: null,
+        kind: 'boolean',
+        required: false,
+        webDefaultValue: false,
       },
     ],
     examples: [
       `${prefix}plugins new`,
       `${prefix}plugins new --alias reminder --title "Reminder app" --description "Manage reminders"`,
+      `${prefix}plugins new --alias reminder --configure-git-hooks`,
+      `${prefix}plugins new --alias reminder --configure-git-hooks true`,
+      `${prefix}plugins new --alias reminder --configure-git-hooks false`,
       `${prefix}plugins new --alias reminder --create-draft-commands false`,
       `${prefix}plugins new --alias reminder --no-create-draft-commands`,
     ],

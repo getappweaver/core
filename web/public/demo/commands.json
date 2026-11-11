@@ -950,7 +950,7 @@
       {
         "name": "new",
         "summary": "Create a local plugin from the AppWeaver template.",
-        "usage": "new [--alias <alias>] [--title <title>] [--description <description>] [--core <core>] [--create-draft-commands]",
+        "usage": "new [--alias <alias>] [--title <title>] [--description <description>] [--core <core>] [--create-draft-commands] [--configure-git-hooks]",
         "aliases": [
           "create"
         ],
@@ -990,16 +990,29 @@
           },
           {
             "name": "create_draft_commands",
-            "summary": "Create draft and review commands with supporting storage (defaults to true).",
+            "summary": "Include draft and review commands with supporting storage (enabled by default).",
             "flag": "--create-draft-commands",
             "shortFlag": null,
             "kind": "boolean",
-            "required": false
+            "required": false,
+            "webDefaultValue": true
+          },
+          {
+            "name": "configure_git_hooks",
+            "summary": "Configure AppWeaver Git hooks for this repository (off by default). Does not run hooks during creation.",
+            "flag": "--configure-git-hooks",
+            "shortFlag": null,
+            "kind": "boolean",
+            "required": false,
+            "webDefaultValue": false
           }
         ],
         "examples": [
           "/plugins new",
           "/plugins new --alias reminder --title \"Reminder app\" --description \"Manage reminders\"",
+          "/plugins new --alias reminder --configure-git-hooks",
+          "/plugins new --alias reminder --configure-git-hooks true",
+          "/plugins new --alias reminder --configure-git-hooks false",
           "/plugins new --alias reminder --create-draft-commands false",
           "/plugins new --alias reminder --no-create-draft-commands"
         ],

@@ -392,6 +392,28 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
       options: mergedOptions,
     };
 
+    // A single boolean checkbox carries checked state, including false when absent
+    // from FormData. Repeated-name checkbox groups keep their value-array semantics.
+    const checkboxes = Array.from(
+      formEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name]'),
+    );
+
+    for (const checkbox of checkboxes) {
+      if (
+        checkbox.disabled ||
+        checkbox.value !== 'true' ||
+        checkboxes.filter((other) => other.name === checkbox.name).length !== 1
+      ) {
+        continue;
+      }
+
+      const target = optionFieldNames.has(checkbox.name)
+        ? mergedOptions
+        : mergedArgs;
+
+      target[checkbox.name] = checkbox.checked;
+    }
+
     expandTreeItemsForAction(merged, expandedById, requestTreeItemExpansion);
 
     props.onRunAction?.(merged, {

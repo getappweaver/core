@@ -246,6 +246,16 @@ Plugins expose AI/CLI tool calls via:
 
 Plugins are allowed to differ in **which** tools they expose, how `<prefix><alias> ai` is implemented, and how `executeTool` applies domain rules. What must stay consistent is the **exports above** so `plugin:generate` and the CLI keep working. For **new** plugins, start from `bun run plugin:new` — `scripts/plugin-template/` is kept in sync with that contract.
 
+Programmatic scaffolding uses `createPluginScaffold` in `src/plugin-lifecycle/scaffold.ts`.
+Callers supply boolean values for `createDraftCommands`, `configureGitHooks`, and
+`runGenerator`; the function has no parameter defaults for these options.
+`/plugins new` provides checkboxes: draft commands enabled, Git hook configuration
+disabled. `bun run plugin:new` offers the same defaults in its prompts.
+Enabling hook configuration sets the new repository's `core.hooksPath` to
+`../../scripts` for future Git operations; leaving it disabled preserves existing
+configuration. Scaffolding does not execute those hooks.
+See the [plugin manager guide](src/commands/plugin-manager/README.md#local-plugin-creation).
+
 ### The draft/confirm flow
 
 Plugins that mutate data should use a draft/confirm pattern — the AI proposes a change, the user reviews and accepts it via a command. This prevents unintended modifications:

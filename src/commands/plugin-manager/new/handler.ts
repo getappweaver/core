@@ -17,6 +17,7 @@ type NewPluginFields = {
   description: string;
   coreApiVersion: string;
   createDraftCommands: boolean;
+  configureGitHooks: boolean;
 };
 
 function argumentOption(args: string[], flag: string): string {
@@ -47,29 +48,29 @@ function stringField(
   return typeof value === 'string' ? value.trim() : fallback;
 }
 
-function booleanField(
-  options: Record<string, unknown>,
-  args: string[],
-  name: string,
-  flag: string,
-  defaultValue: boolean,
-): boolean {
+type BooleanFieldProps = {
+  options: Record<string, unknown>;
+  args: string[];
+  name: string;
+  flag: string;
+  fallback: boolean;
+};
+
+function booleanField({
+  options,
+  args,
+  name,
+  flag,
+  fallback,
+}: BooleanFieldProps): boolean {
   const payloadValue = options[name];
 
   if (typeof payloadValue === 'boolean') {
     return payloadValue;
   }
 
-  if (typeof payloadValue === 'string') {
-    const trimmed = payloadValue.trim().toLowerCase();
-
-    if (trimmed === 'true' || trimmed === '1') {
-      return true;
-    }
-
-    if (trimmed === 'false' || trimmed === '0') {
-      return false;
-    }
+  if (payloadValue !== undefined) {
+    throw new Error(`${flag} must be a boolean.`);
   }
 
   const noFlag = flag.startsWith('--') ? `--no-${flag.slice(2)}` : null;
@@ -78,40 +79,33 @@ function booleanField(
     return false;
   }
 
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index];
+  const index = args.findIndex(
+    (arg) => arg === flag || arg.startsWith(`${flag}=`),
+  );
 
-    if (arg === flag) {
-      const next = args[index + 1]?.trim().toLowerCase();
-
-      if (next === 'false' || next === '0') {
-        return false;
-      }
-
-      if (next === 'true' || next === '1') {
-        return true;
-      }
-
-      return true;
-    }
-
-    if (arg.startsWith(`${flag}=`)) {
-      const val = arg
-        .slice(flag.length + 1)
-        .trim()
-        .toLowerCase();
-
-      if (val === 'false' || val === '0') {
-        return false;
-      }
-
-      if (val === 'true' || val === '1') {
-        return true;
-      }
-    }
+  if (index < 0) {
+    return fallback;
   }
 
-  return defaultValue;
+  const token = args[index];
+
+  const raw = token.startsWith(`${flag}=`)
+    ? token.slice(flag.length + 1)
+    : args[index + 1];
+
+  if (raw === undefined || raw.startsWith('--')) {
+    return true;
+  }
+
+  if (raw.toLowerCase() === 'true') {
+    return true;
+  }
+
+  if (raw.toLowerCase() === 'false') {
+    return false;
+  }
+
+  throw new Error(`${flag} expects true or false.`);
 }
 
 function newPluginFields(ctx: RouteCommandContext): NewPluginFields {
@@ -144,13 +138,20 @@ function newPluginFields(ctx: RouteCommandContext): NewPluginFields {
     coreApiVersion:
       stringField(options, 'core', argumentOption(ctx.args, '--core')) ||
       defaultCoreApiVersion(ctx.dmBotRoot),
-    createDraftCommands: booleanField(
+    createDraftCommands: booleanField({
       options,
-      ctx.args,
-      'create_draft_commands',
-      '--create-draft-commands',
-      true,
-    ),
+      args: ctx.args,
+      name: 'create_draft_commands',
+      flag: '--create-draft-commands',
+      fallback: true,
+    }),
+    configureGitHooks: booleanField({
+      options,
+      args: ctx.args,
+      name: 'configure_git_hooks',
+      flag: '--configure-git-hooks',
+      fallback: false,
+    }),
   };
 }
 
@@ -169,7 +170,7 @@ export async function handlePluginsNew(
           view: 'form',
           coreApiVersion: fields.coreApiVersion,
         })
-      : `Usage: ${ctx.prefix}plugins new --alias <alias> [--title <title>] [--description <description>] [--core <range>] [--create-draft-commands <boolean>]`;
+      : `Usage: ${ctx.prefix}plugins new --alias <alias> [--title <title>] [--description <description>] [--core <range>] [--create-draft-commands <true|false>] [--configure-git-hooks <true|false>].`;
   }
 
   const result = createPluginScaffold({
@@ -179,6 +180,7 @@ export async function handlePluginsNew(
     description: fields.description,
     coreApiVersion: fields.coreApiVersion,
     createDraftCommands: fields.createDraftCommands,
+    configureGitHooks: fields.configureGitHooks,
     runGenerator: true,
   });
 
@@ -198,12 +200,16 @@ export async function handlePluginsNew(
       pluginPath,
       repo: result.repo,
       createDraftCommands: fields.createDraftCommands,
+      configureGitHooks: fields.configureGitHooks,
     });
   }
 
   return [
     `Created ${pluginPath}.`,
     `Registered ${result.packageName} as local draft ${result.repo}.`,
+    fields.configureGitHooks
+      ? 'Configured core.hooksPath for future Git operations; no hooks were run.'
+      : 'Plugin Git hook configuration was left untouched.',
     `Develop it with AI, then run ${ctx.prefix}plugins releases.`,
   ].join('\n');
 }

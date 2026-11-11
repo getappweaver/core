@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.17.0] - 2026-11-11
+
+- feat: add new plugin scaffolding options --no-create-draft-commands and --configure-git-hooks (a4be2382)
+
 ## [v14.16.6] - 2026-11-11
 
-- chore: removing nodejs dependencies (842d39d9)
+- chore: removing nodejs dependencies (05331970)
 
 ## [v14.16.5] - 2026-11-08
 
