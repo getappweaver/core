@@ -284,6 +284,10 @@ function start(): void {
   botChild = runBot();
 
   botChild.exited.then((code) => {
+    if (shuttingDown) {
+      return;
+    }
+
     if (restartRequested) {
       restartRequested = false;
       rapidCrashCount = 0;
@@ -334,7 +338,11 @@ function start(): void {
 start();
 void ensureWebUiAfterBotReady();
 
+let shuttingDown = false;
+
 function shutdownAll(): void {
+  shuttingDown = true;
+
   try {
     botChild.kill();
   } catch {
@@ -350,14 +358,33 @@ function shutdownAll(): void {
   }
 }
 
-process.on('SIGINT', () => {
+async function shutdownAndExit(exitCode: number): Promise<void> {
+  const activeBot = botChild;
+  const activeWeb = webChild;
+
   shutdownAll();
-  process.exit(130);
+
+  await Promise.race([
+    Promise.all([
+      activeBot?.exited.catch(() => {}),
+      activeWeb?.exited.catch(() => {}),
+    ]),
+    sleep(3_000),
+  ]);
+
+  process.exit(exitCode);
+}
+
+process.on('SIGINT', () => {
+  void shutdownAndExit(130);
 });
 
 process.on('SIGTERM', () => {
-  shutdownAll();
-  process.exit(143);
+  void shutdownAndExit(143);
+});
+
+process.on('SIGHUP', () => {
+  void shutdownAndExit(129);
 });
 
 watch(DM_BOT_DIR, (_, filename) => {

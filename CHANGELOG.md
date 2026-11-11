@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.16.6] - 2026-11-11
+
+- chore: removing nodejs dependencies (842d39d9)
+
 ## [v14.16.5] - 2026-11-08
 
-- chore: removed nodejs and npm from alpine setup script (29e4bc94)
+- chore: removed nodejs and npm from alpine setup script (b1346c25)
 
 ## [v14.16.4] - 2026-11-08
 

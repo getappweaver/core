@@ -63,8 +63,7 @@ USER pwuser
 WORKDIR /workspace/appweaver
 
 RUN curl -fsSL https://bun.sh/install | bash \
-    && bun --version \
-    && node --version
+    && bun --version
 
 RUN bun install -g opencode-ai \
     && curl -Ls https://ngit.dev/install.sh | bash \

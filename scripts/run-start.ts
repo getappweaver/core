@@ -216,16 +216,31 @@ function main(): void {
   startBot();
 }
 
-process.on('SIGINT', () => {
+async function shutdownAndExit(exitCode: number): Promise<void> {
+  const activeChild = botChild;
+
   shutdownAll();
 
-  process.exit(130);
+  if (activeChild) {
+    await Promise.race([
+      activeChild.exited.catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
+    ]);
+  }
+
+  process.exit(exitCode);
+}
+
+process.on('SIGINT', () => {
+  void shutdownAndExit(130);
 });
 
 process.on('SIGTERM', () => {
-  shutdownAll();
+  void shutdownAndExit(143);
+});
 
-  process.exit(143);
+process.on('SIGHUP', () => {
+  void shutdownAndExit(129);
 });
 
 watch(DM_BOT_DIR, (_, filename) => {

@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
@@ -10,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 // backends/opencode-sdk.ts — OpenCode via @opencode-ai/sdk (managed servers)
 // ---------------------------------------------------------------------------
 import { createOpencodeClient } from '@opencode-ai/sdk/v2';
+import { spawn, spawnSync, type Subprocess } from 'bun';
 
 import type { AiModelRuntimeConfig } from '@src/capabilities/ai-model-source.v1';
 import { CORE_MODEL_SOURCE_PROVIDER_ID } from '@src/db/model-source';
@@ -108,26 +108,47 @@ type PortAvailability =
       error: string;
     };
 
-function stopOpencodeServerProcess(proc: ChildProcess): void {
+type OpencodeServerProcess = Subprocess<'ignore', 'pipe', 'pipe'>;
+
+const activeServerProcesses = new Set<OpencodeServerProcess>();
+let exitCleanupRegistered = false;
+
+function stopOpencodeServerProcess(proc: OpencodeServerProcess): void {
+  activeServerProcesses.delete(proc);
+
   if (proc.exitCode !== null || proc.signalCode !== null) {
     return;
   }
 
   if (proc.pid) {
-    const result = spawnSync('kill', ['-TERM', `-${proc.pid}`], {
-      stdio: 'ignore',
+    spawnSync(['pkill', '-TERM', '-P', String(proc.pid)], {
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
     });
-
-    if (result.status === 0 && !result.error) {
-      return;
-    }
-
-    debug(
-      `opencode-sdk: failed to stop server process group: ${result.error?.message ?? `kill exited ${result.status ?? 'unknown'}`}`,
-    );
   }
 
-  proc.kill('SIGTERM');
+  try {
+    proc.kill('SIGTERM');
+  } catch (err) {
+    debug(
+      `opencode-sdk: failed to stop server process: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function ensureProcessExitCleanupRegistered(): void {
+  if (exitCleanupRegistered) {
+    return;
+  }
+
+  exitCleanupRegistered = true;
+
+  process.once('exit', () => {
+    for (const proc of [...activeServerProcesses]) {
+      stopOpencodeServerProcess(proc);
+    }
+  });
 }
 
 function errorMessage(err: unknown): string {
@@ -292,16 +313,18 @@ async function checkPortAvailability(port: number): Promise<PortAvailability> {
 }
 
 function getPortProcessSummary(port: number): string | null {
-  const result = spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
+  const result = spawnSync(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], {
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'ignore',
   });
 
-  if (result.error || result.status !== 0) {
+  if (!result.success || result.exitCode !== 0) {
     return null;
   }
 
   const lines = result.stdout
+    .toString('utf8')
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
@@ -679,12 +702,12 @@ async function createLocalOpencodeSdk(
     `opencode-sdk: installed AppWeaver OpenCode plugins in ${pluginDir}`,
   );
 
+  ensureProcessExitCleanupRegistered();
+
   const proc = spawn(
-    'opencode',
-    ['serve', '--hostname=127.0.0.1', `--port=${port}`],
+    ['opencode', 'serve', '--hostname=127.0.0.1', `--port=${port}`],
     {
       cwd,
-      detached: true,
       env: {
         ...process.env,
         OPENCODE_CONFIG_CONTENT: JSON.stringify({
@@ -703,86 +726,120 @@ async function createLocalOpencodeSdk(
         }),
         OPENCODE_DB: database,
         APPWEAVER_ROOT: dmBotRoot,
+        APPWEAVER_PARENT_PID: String(process.pid),
         APPWEAVER_INTERVENTION_URL: intervention.callbackUrl,
         APPWEAVER_INTERVENTION_TOKEN: intervention.token,
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   );
 
+  activeServerProcesses.add(proc);
+
+  void proc.exited.finally(() => {
+    activeServerProcesses.delete(proc);
+  });
+
   const url = await new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {
-      cleanup();
+      settled = true;
       stopOpencodeServerProcess(proc);
       reject(new OpenCodeServerStartTimeoutError());
     }, SERVER_START_TIMEOUT_MS);
 
     let output = '';
-    let resolved = false;
+    let settled = false;
 
-    function cleanup(): void {
+    function finishResolve(serverUrl: string): void {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
       clearTimeout(timeout);
-      proc.stdout.off('data', onStdout);
-      proc.stderr.off('data', onStderr);
-      proc.off('exit', onExit);
-      proc.off('error', onError);
+      resolve(serverUrl);
     }
 
-    function onStdout(chunk: Buffer): void {
-      if (resolved) {
+    function finishReject(error: Error): void {
+      if (settled) {
         return;
       }
 
-      output += chunk.toString('utf8');
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    }
 
-      for (const line of output.split('\n')) {
-        if (!line.startsWith('opencode server listening')) {
-          continue;
+    async function consumeStream(
+      stream: ReadableStream<Uint8Array>,
+      isStdout: boolean,
+    ): Promise<void> {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          if (settled) {
+            continue;
+          }
+
+          output += decoder.decode(value, { stream: true });
+
+          if (!isStdout) {
+            continue;
+          }
+
+          for (const line of output.split('\n')) {
+            if (!line.startsWith('opencode server listening')) {
+              continue;
+            }
+
+            const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
+
+            if (!match) {
+              stopOpencodeServerProcess(proc);
+
+              finishReject(
+                new Error(`Failed to parse server url from output: ${line}`),
+              );
+
+              break;
+            }
+
+            finishResolve(match[1]);
+
+            break;
+          }
         }
-
-        const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
-
-        if (!match) {
-          cleanup();
-          stopOpencodeServerProcess(proc);
-          reject(new Error(`Failed to parse server url from output: ${line}`));
-
-          return;
+      } catch (err) {
+        if (!settled) {
+          finishReject(err instanceof Error ? err : new Error(String(err)));
         }
-
-        resolved = true;
-        cleanup();
-        resolve(match[1]);
-
-        return;
+      } finally {
+        reader.releaseLock();
       }
     }
 
-    function onStderr(chunk: Buffer): void {
-      output += chunk.toString('utf8');
-    }
+    void consumeStream(proc.stdout, true);
+    void consumeStream(proc.stderr, false);
 
-    function onExit(code: number | null): void {
-      cleanup();
-
-      reject(
+    void proc.exited.then((code) => {
+      finishReject(
         new Error(
           `Server exited with code ${code ?? 'unknown'}${
             output.trim() ? `\nServer output: ${output}` : ''
           }`,
         ),
       );
-    }
-
-    function onError(error: Error): void {
-      cleanup();
-      reject(error);
-    }
-
-    proc.stdout.on('data', onStdout);
-    proc.stderr.on('data', onStderr);
-    proc.on('exit', onExit);
-    proc.on('error', onError);
+    });
   });
 
   return {
@@ -793,12 +850,10 @@ async function createLocalOpencodeSdk(
       },
       async closeAndWait() {
         if (proc.exitCode !== null || proc.signalCode !== null) {
+          activeServerProcesses.delete(proc);
+
           return;
         }
-
-        const exited = new Promise<void>((resolveExit) => {
-          proc.once('exit', () => resolveExit());
-        });
 
         stopOpencodeServerProcess(proc);
 
@@ -806,17 +861,29 @@ async function createLocalOpencodeSdk(
 
         try {
           await Promise.race([
-            exited,
+            proc.exited.then(() => undefined),
             new Promise<never>((_, reject) => {
-              timeout = setTimeout(
-                () =>
-                  reject(
-                    new Error(
-                      'Managed OpenCode process did not exit after shutdown.',
-                    ),
+              timeout = setTimeout(() => {
+                if (proc.pid) {
+                  spawnSync(['pkill', '-KILL', '-P', String(proc.pid)], {
+                    stdin: 'ignore',
+                    stdout: 'ignore',
+                    stderr: 'ignore',
+                  });
+                }
+
+                try {
+                  proc.kill('SIGKILL');
+                } catch {
+                  // Ignore if already exited.
+                }
+
+                reject(
+                  new Error(
+                    'Managed OpenCode process did not exit after shutdown.',
                   ),
-                5_000,
-              );
+                );
+              }, 5_000);
             }),
           ]);
         } finally {
@@ -1266,9 +1333,22 @@ async function startNativeOpenCodeAuth({
 }> {
   return await new Promise((resolve, reject) => {
     const child = spawn(
-      'opencode',
-      ['auth', 'login', '--provider', providerID, '--method', methodLabel],
-      { cwd: directory, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
+      [
+        'opencode',
+        'auth',
+        'login',
+        '--provider',
+        providerID,
+        '--method',
+        methodLabel,
+      ],
+      {
+        cwd: directory,
+        env: process.env,
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
     );
 
     let output = '';
@@ -1311,8 +1391,8 @@ async function startNativeOpenCodeAuth({
       };
     }
 
-    function scan(chunk: Buffer): void {
-      output += chunk.toString('utf8');
+    function scan(textChunk: string): void {
+      output += textChunk;
       const result = parseOutput();
 
       if (result.url && (!isHeadless || result.code)) {
@@ -1322,6 +1402,31 @@ async function startNativeOpenCodeAuth({
             ? 'Open the authorization page, enter the one-time code, and complete sign-in. OpenCode will finish automatically.'
             : 'Complete authorization in your browser. OpenCode will finish automatically.',
         });
+      }
+    }
+
+    async function consumeAuthStream(
+      stream: ReadableStream<Uint8Array>,
+    ): Promise<void> {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          if (!settled) {
+            scan(decoder.decode(value, { stream: true }));
+          }
+        }
+      } catch (err) {
+        failAuth(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        reader.releaseLock();
       }
     }
 
@@ -1342,14 +1447,10 @@ async function startNativeOpenCodeAuth({
       });
     }, 8000);
 
-    child.stdout?.on('data', scan);
-    child.stderr?.on('data', scan);
+    void consumeAuthStream(child.stdout);
+    void consumeAuthStream(child.stderr);
 
-    child.on('error', (err) => {
-      failAuth(err);
-    });
-
-    child.on('exit', (code) => {
+    void child.exited.then((code) => {
       failAuth(new Error(`opencode_auth_login_failed:${code ?? 'unknown'}`));
     });
   });
@@ -1477,12 +1578,22 @@ export function disposeAllOpencodeSdks(): void {
   coreCanonicalRevisions.clear();
 
   disposeOpencodeSdk();
+
+  for (const proc of [...activeServerProcesses]) {
+    stopOpencodeServerProcess(proc);
+  }
 }
 
 export function disposeOpencodeSdk(): void {
   lastResolvedModels.clear();
 
+  if (sdkInitPromise) {
+    void sdkInitPromise.then((value) => value.server.close()).catch(() => {});
+  }
+
   if (!sdk) {
+    sdkInitPromise = null;
+
     return;
   }
 

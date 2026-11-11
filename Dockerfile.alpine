@@ -32,8 +32,6 @@ RUN printf '%s\n' "@testing ${TESTING_REPOSITORY}" >> /etc/apk/repositories \
       ca-certificates \
       curl \
       git \
-      nodejs \
-      npm \
       openssh-client \
       py3-flask \
       "py3-piper-tts@testing=${PIPER_VERSION}" \
@@ -73,7 +71,6 @@ RUN export HOME=/tmp \
       /opt/appweaver/.opencode/bin/opencode \
     && rm -rf /tmp/bun /tmp/bun.zip /tmp/opencode.tar.gz /tmp/ngit.tar.gz \
     && test "$(bun --version)" = "${BUN_VERSION}" \
-    && node --version \
     && test "$(opencode --version)" = "${OPENCODE_VERSION}" \
     && test "$(ngit --version)" = "ngit ${NGIT_VERSION}"
 

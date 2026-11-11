@@ -1,11 +1,20 @@
 #!/usr/bin/env bun
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 /** Repo making this commit (works when hooksPath points at another repo’s scripts). */
 function getAbsoluteGitDir() {
-  return execSync('git rev-parse --absolute-git-dir', { encoding: 'utf8' }).trim();
+  const result = Bun.spawnSync(['git', 'rev-parse', '--absolute-git-dir'], {
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'inherit',
+  });
+
+  if (result.exitCode !== 0) {
+    process.exit(result.exitCode ?? 1);
+  }
+
+  return result.stdout.toString('utf8').trim();
 }
 
 const commitMsgFile = process.argv[2];

@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from 'bun';
 
 import { buildActiveRuntimeContext } from '../backends/agent-runtime-context';
 import { createBackend } from '../backends/factory';
@@ -18,12 +18,14 @@ import { getAppWeaverSessionTitle, insertSessionMessage } from '../session';
 const POST_AGENT_LINT_PROMPT_PREFIX = '[Post-edit lint feedback]';
 
 function workingTreeFingerprint(cwd: string): string {
-  const result = spawnSync('git', ['diff', '--no-ext-diff', '--binary'], {
+  const result = spawnSync(['git', 'diff', '--no-ext-diff', '--binary'], {
     cwd,
-    encoding: 'utf8',
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'ignore',
   });
 
-  return result.status === 0 ? result.stdout : '';
+  return result.exitCode === 0 ? result.stdout.toString('utf8') : '';
 }
 
 export type RunAgentWithLintFollowUpProps = {
