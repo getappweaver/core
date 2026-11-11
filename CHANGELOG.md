@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.18.0] - 2026-11-11
+
+- feat: new clientAction `nostr.openSearchRelaysModal` (a2ce3de5)
+
 ## [v14.17.0] - 2026-11-11
 
-- feat: add new plugin scaffolding options --no-create-draft-commands and --configure-git-hooks (a4be2382)
+- feat: add new plugin scaffolding options --no-create-draft-commands and --configure-git-hooks (a2d76cea)
 
 ## [v14.16.6] - 2026-11-11
 

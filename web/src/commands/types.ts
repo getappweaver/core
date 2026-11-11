@@ -141,6 +141,7 @@ export type CommandsAdapters = {
   setTimeline: Setter<TimelineItem[]>;
   setComposerAiState: Setter<ComposerAiState | null>;
   appendSystemMessage: (text: string) => void;
+  openNostrSearchRelays: () => void;
   signEvent: (
     event: EventTemplate,
     options?: { title: string | null; allowedPubkeys?: string[] | null },

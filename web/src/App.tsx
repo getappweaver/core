@@ -2612,6 +2612,7 @@ function AppInner(): JSX.Element {
     setTimeline,
     setComposerAiState,
     appendSystemMessage,
+    openNostrSearchRelays: () => setNostrSearchRelaysOpen(true),
     signEvent: auth.signEvent,
     nip44DecryptSelf: auth.nip44DecryptSelf,
     createId,

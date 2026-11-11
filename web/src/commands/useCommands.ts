@@ -1593,6 +1593,8 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
             appendSystemMessage: adapters.appendSystemMessage,
           }),
         );
+      } else if (clientActionName === 'nostr.openSearchRelaysModal') {
+        adapters.openNostrSearchRelays();
       } else {
         adapters.appendSystemMessage(
           `Unknown client action: ${JSON.stringify(action.action)}`,
