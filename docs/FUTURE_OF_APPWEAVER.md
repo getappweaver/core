@@ -1,116 +1,223 @@
-# Future of AppWeaver: Peer-to-Peer Teams, FIPS Transport, and Immutable App Stores
+# AppWeaver: FIPS Networking and Local-First Team Apps
 
-This document captures the architectural direction for multi-user collaboration in AppWeaver—moving from a single-user local harness to **peer-to-peer team collaboration** powered by **FIPS**, **Capability Contracts**, and **`xitdb-ts`**.
+Status: reviewed architecture with core, FIPS and Teams Todo MVP code implemented
+and locally checked. Deployed network, portability and authenticated UI acceptance
+remain pending; see each implementation record. Updated on 2026-11-11.
 
----
+## Implementation records
 
-## 1. The Starting Point: AppWeaver Today
+Work is organized into reviewable increments. The user subsequently authorized
+implementing core, FIPS and then Teams Todo in one batch; push/publication remain
+user actions, not automatic agent steps.
 
-- **Local-first, single-owner instance:** Every AppWeaver instance has exactly **one `BOT_KEY`** (machine/daemon identity) and **one `BOT_MASTER_PUBKEY`** (human owner identity).
-- **Plugins run in-process** with core (Bun/Node) and collaborate through **versioned Capability Contracts** (`src/capabilities/`).
-- **Draft-based control:** Mutating operations create drafts that the human owner reviews and accepts/declines before state changes take effect.
-- **Personal apps (e.g. Todo):** Built around single-user SQLite storage.
+1. [Core peer-capability plan](PEER_CAPABILITIES_IMPLEMENTATION_PLAN.md).
+2. [FIPS grants, messaging and recovery plan](../plugins/fips/docs/peer-access-plan.md).
+3. [Teams Todo MVP plan](TEAMS_TODO_IMPLEMENTATION_PLAN.md).
 
----
+The [existing FIPS progress record](../plugins/fips/docs/implementation-plan.md)
+retains earlier implementation evidence and transport follow-ups. The plans above
+define the next phases. Revise the existing v1 contracts in place: this is beta /
+research, with no v2, compatibility bridge, dual wire format or coordinated-version
+rollout requirement. Implementation dependencies still determine phase order.
 
-## 2. Core Shift: Loose Peer-to-Peer Collaboration (Instead of a Central Hub)
+## 1. Current baseline
 
-Rather than forcing one user's instance to act as a centralized NIP-29-style server/hub for everyone else, AppWeaver keeps every instance equal and autonomous:
+- Core has one bot identity and one human master per AppWeaver instance. Plugins
+  run in-process and use versioned capability contracts.
+- FIPS has a separate encrypted-at-rest node identity. Multiple FIPS nodes can
+  share a human master. FIPS keys identify nodes; aliases are local display names.
+- Signed `fips2:` invitations bind owners to node keys. These pairing signatures
+  remain; the decision to drop signing applies to app-access grants only.
+- The plugin implements Nostr-signaled UDP NAT traversal, FMP/FSP encryption,
+  optional WebSocket seeds, a roster and manual ping. Cross-network encrypted ping
+  has been demonstrated; continuous recovery and routed mesh use need more work.
+- Node tree management, aliases and legacy unique-master migration are implemented.
+- Revised app sends address explicit FIPS keys and use protocol/topic plus text or
+  raw binary payloads. Soft-grant checks gate both directions; incoming messages
+  route only to the unique protocol owner. A send result is not a durable receipt.
+- Personal [Todo](../plugins/todo/README.md) remains a separate SQLite app. The new
+  [Teams Todo MVP](../plugins/teams-todo/README.md) uses xitdb source histories and
+  local-only SQLite control state; local simulated-peer checks passed.
 
-| Question | Architectural Decision |
-|---|---|
-| **Instance ownership** | Unchanged: 1 `BOT_KEY` + 1 `BOT_MASTER_PUBKEY` per AppWeaver instance. |
-| **How are peers reached?** | **FIPS** (Nostr-native mesh networking over `npub`s) + **WebSocket** channels between instances. No sticky IPs, DNS, or port forwarding required. |
-| **Connection vs. Author Identity** | A **plugin-generated FIPS node keypair** (`fips_pubkey`, encrypted at rest in the plugin DB) is used strictly for the machine-to-machine FIPS/WebSocket transport connection. **`master_pubkey`** is the human identity used for authorship, permissions, and signing application payloads. |
-| **Where do connections live?** | In a dedicated **FIPS / Peer Network plugin** that maintains the trusted peer book and active WebSocket tunnels. |
-| **How do Team Apps use peers?** | Team apps (like **Todo Teams**) consume the FIPS capability contract, let the user select which connected peers to collaborate with on a given project, and handle their own app-specific sync & merge logic. |
-| **How is app state stored & synced?** | Apps like Todo Teams use **`xitdb-ts`** (an immutable, append-only database) instead of SQLite—enabling transaction history, byte-stream replication of remote peer logs, and **Git-style review (accept / reject / revert)** of teammates' changes. |
+## 2. Terminology and layer boundaries
 
----
+| Term | Meaning / owner |
+| --- | --- |
+| FIPS node | A particular endpoint identified by its compressed FIPS public key |
+| Master | Human owner identity; not a unique network destination |
+| App | A locally registered plugin, keyed by its installed alias for this MVP |
+| Protocol | App-owned message protocol, e.g. `teams-todo.sync.v1` |
+| Topic | App-defined exact scope within a protocol, e.g. a board UUID |
+| Grant | Local database record allowing an app to communicate within a scope |
+| Subscription | App-owned request to receive a peer's updates on a protocol/topic |
+| Head | App-owned committed history position for a particular writer/log |
 
-## 3. Identity Model: Dedicated FIPS Key for Transport, Master Key for Authorship
+**Core** defines generic contracts, carries normal caller context and supports
+explicit owner-driven management surfaces. No FIPS or team-app branches belong
+in `src/` or `web/`.
 
-A single human (`master_pubkey`) may run multiple AppWeaver instances (laptop, home server, VPS), and their master private key lives in a browser extension (NIP-07) or bunker (NIP-46)—not in `.env`. Meanwhile, exposing `BOT_KEY` outside core is unnecessary when the `fips` plugin can generate and manage its own dedicated FIPS node keypair (`fips_pubkey`), encrypted at rest in the plugin's SQLite database.
+**FIPS** owns pairing, direct connections, connection health, text/binary message
+delivery, protocol routing and grant persistence/enforcement. It does not own
+subscription records, publication fan-out, project membership, databases, merges
+or review decisions.
 
-To solve both reachability and single-instance certainty:
+**Teams Todo** owns boards, membership, app messages, subscriptions, notifications,
+replication, durable acknowledgements, deduplication and conflict policy. Other
+`teams-*` apps may reuse a library once this first implementation reveals common
+behavior; no generic replication framework is required first.
 
-1. **Peer Roster Entry = `(master_pubkey, fips_pubkey)`:**
-   - `master_pubkey` identifies the **person** (teammate).
-   - `fips_pubkey` (33-byte compressed secp256k1 key) identifies the **specific AppWeaver instance** authorized to connect over FIPS for that teammate.
-2. **Pairing / Binding Handshake (Flow A — Copy/Paste Invite):**
-   - Each instance can generate an invite token containing `{ masterPubkey, fipsPubkey, seedUrls, timestamp, sig }`.
-   - The FIPS plugin only establishes/accepts machine-to-machine tunnels from authorized `fips_pubkey` endpoints, while mapping that connection to the peer's `master_pubkey`.
-3. **Message & Transaction Signing:**
-   - Transport frames are authenticated by the `fips_pubkey` FMP/FSP Noise tunnel.
-   - Application commits/requests carry the `master_pubkey` attribution/signature (signed via browser extension or an explicit bunker—never silently handed over to an autonomous agent without user control).
+## 3. Soft app-access grants
 
----
+Core currently exposes `PluginIdentity { name, alias, version }`, not a persistent
+installation UUID. Normal capability clients attach a caller containing package
+name and alias. Use the registered alias as the MVP app key; package name is
+additional context, not verified publisher identity. No new app-install ID,
+publisher verification, permission signing or Nostr grant events are required.
 
-## 4. Layer Separation: FIPS Plugin vs. Team Apps
+A grant contains:
 
-A critical boundary is keeping **sync and merge logic out of the FIPS plugin**.
+```text
+id
+appAlias
+localFipsPubkey
+remoteFipsPubkeys[]
+protocol
+topics[]
+createdAt / updatedAt
+```
 
-### Layer 1: The FIPS Plugin & Capability Contract (`peer-network:v1`)
-The FIPS plugin is **100% domain-agnostic**. It knows nothing about todos, `xitdb`, or application state.
+- One protocol, one or more explicit remote node keys, one or more exact topics.
+  Every listed peer is allowed for every listed topic; separate records express
+  different scopes. No direction, expiry, wildcard, prefix or all-future-topic rule.
+- Bidirectional application access; multiple grants are combined by union.
+- Deny by default for outgoing and incoming application messages. Pairing and
+  encrypted transport maintenance do not grant application access.
+- The owner reviews explicit access requests and clicks Allow / Save / Remove.
+  Apps request access but cannot approve or expand their own records through the
+  normal capability API. Background denials never open permission prompts.
+- Grant updates are regular atomic DB edits. Cancellation leaves the old record
+  unchanged. Deletion takes effect for future operations and queued delivery;
+  previously sent bytes cannot be recalled. No signed-import replay mechanism or
+  revocation tombstones are needed.
+- Do not delete, rewrite or reassign grants automatically when a node is unpaired,
+  a local identity changes, or an app is disabled/uninstalled. Display unavailable
+  references and let the owner manage them. Matching still requires the current
+  local FIPS key, a paired remote node and an active owning app/provider. Alias
+  reuse can match retained records; it is not a fresh-install identity guarantee.
+- Apps see their own grants through capabilities, never FIPS SQL. The owner-facing
+  FIPS UI sees all records. Explicit owner peer selection can include ungranted
+  nodes; ordinary app peer enumeration returns only authorized peers.
 
-**Responsibilities of the FIPS plugin:**
-- Manage the local **Peer Roster** (adding/removing trusted `(master_pubkey, bot_pubkey)` pairs, labels, connection status).
-- Manage the local FIPS mesh endpoint / daemon and establish encrypted WebSocket channels to online peers.
-- Authenticate incoming peer connections against the local roster.
-- Multiplex application messages over the peer WebSocket channel by `(channel / appNamespace)` so multiple team apps can share the same peer connection.
+These are **soft permissions**: trusted plugins share the process and may bypass
+normal APIs. A broker-supplied alias is useful context, not unforgeable isolation.
+Display this once in access management, without claiming a security sandbox.
+An isolated Safe Apps Runtime remains a separate future track.
 
-**What the Capability Contract exposes to other plugins (e.g., `peer-network:v1`):**
-- `list-peers`: Return known peers (`masterPubkey`, `botPubkey`, `displayName`, `status: 'online' | 'offline'`, `lastSeenAt`).
-- `send`: Send a payload or request to a specific peer (`peerMasterPubkey`, `channel`, `payload`) over the active WebSocket.
-- `broadcast` (or multi-peer send): Send a message to a subset of selected peers for a channel.
-- **Incoming message delivery:** Route incoming peer messages for a `channel` to the target consumer plugin (via capability handler or registered listener operation).
+## 4. Protocol routing and direct messages
 
-### Layer 2: Team Apps (e.g., `todo-teams`)
-Each collaborative app owns its storage engine, sync protocol, and review UX:
-- **Peer selection:** In `todo-teams`, the user selects which peers from `peer-network:v1` belong to a team project/board.
-- **Storage & Sync (`xitdb-ts`):** Handled entirely inside `todo-teams` over the raw message pipe provided by the FIPS capability.
-- **Git-style Review & Merge:** Handled entirely inside `todo-teams`.
+Revise `peer-network:v1` / `peer-channel:v1` without changing their capability names.
+Replace the old message `channel` field with `protocol` and add `topic`.
 
----
+- Consumer providers declare supported protocol names. Route incoming messages
+  only to the registered owner, not every provider. Reject conflicting local
+  claims. This is a soft local registry, not cryptographic namespace ownership.
+- Route to an explicit remote FIPS key, not the human master. Different aliases
+  on two machines may implement the same protocol; local aliases are not remote
+  wire addresses.
+- Support text and raw binary payloads. Preserve `Uint8Array` in-process; any
+  JSON-only boundary needs an explicit, validated byte encoding rather than
+  implicit object serialization. Advertise provider byte limits.
+- Remove the generic nullable signature field. If an app needs signed content,
+  its protocol carries and verifies it. Authenticated sender node/owner metadata
+  comes from the FIPS session and verified roster binding.
+- One send targets one peer and returns one transport result. A success is not
+  remote persistence, acceptance, merge, exactly-once delivery or a read receipt.
+- No durable hidden message queue, automatic application-message replay, ordering
+  promise, pub/sub operations or subscription DB in the networking capability.
+- Bound payloads, queues, concurrent operations and deadlines. Return distinguishable
+  permission, protocol, peer, size, overload, timeout and transport failures.
 
-## 5. App Storage & Git-Style Review with `xitdb-ts`
+## 5. App-owned subscriptions and implicit board groups
 
-Instead of SQLite, collaborative apps like **Todo Teams** can use [`xitdb-ts`](https://github.com/xit-vcs/xitdb-ts)—an embedded, pure-TypeScript immutable database built on Hash Array Mapped Tries (HAMT) and B+Trees.
+FIPS is bidirectional, but subscriptions are directional application messages:
 
-### Why `xitdb-ts` fits the Peer-to-Peer Model
-1. **Immutable History ("Moments"):**
-   - The root of a `xitdb` database is an `ArrayList` of moments. Every transaction appends a new snapshot while sharing unchanged structure with previous moments.
-   - Each transaction slot records metadata (`txId`, `authorMasterPubkey`, `signature`, `timestamp`, `summary`, `parentTxId`) alongside the state map.
-2. **Zero-Impedance Append-Only Replication:**
-   - Every peer is the single writer of their **own** local `xitdb` log (`local.xitdb`).
-   - When Peer A and Peer B connect over the FIPS WebSocket—even after being offline—Peer A replicates Peer B's committed bytes into a local tracking replica (`remotes/<peerB>.xitdb`) using `xitdb`'s built-in `replicaState()` / `readCommitted()` / `openReplicated()` protocol.
-3. **Git-Style Inspection, Accept/Reject, and Rollback:**
-   - Because Peer A has both `local.xitdb` and `remotes/<peerB>.xitdb` on disk, the app can inspect every unmerged transaction from Peer B.
-   - **Review Queue:** Just like `git fetch` + PR review (and matching AppWeaver's Draft UX), the user can inspect incoming peer transactions, see what changed, and **Accept (merge)** or **Reject** them.
-   - **Revert / Take Back:** Because all historical moments remain readable in `xitdb`, reverting to a previous moment or undoing a specific transaction is native to the data structure.
+```text
+A -> B: subscribe(protocol = teams-todo.sync.v1, topic = board-id)
+B: check membership; persist A in Teams Todo's DB; reply accepted/rejected
+B commits an update: send a notification separately to each subscriber
+```
 
----
+For board members A, B and C, each app requests subscriptions to the other two.
+This is implicit group behavior **inside Teams Todo**, implemented with explicit
+P2P subscriptions; no central topic host or channel server exists. Membership
+changes drive subscribe/unsubscribe and publication eligibility. A grant alone
+does not imply interest or project membership.
 
-## 6. Focused Roadmap: Phase 1 (FIPS & Capability Contract First)
+Every subscribe message, reply, notification and sync request is ordinary
+grant-checked application traffic. The app may retain blocked subscription intent
+after grant deletion, but FIPS will reject its use. Unsubscribe does not delete a
+grant. Reconnect restores app subscriptions through new exchanges; FIPS does not
+maintain a second authoritative subscription state.
 
-Before building `xitdb` sync or `todo-teams`, the first milestone is the **FIPS connectivity layer and core capability contract**:
+Commit locally before notifying. Debounce bursts and serialize/coalesce sync per
+board/writer. Notifications are hints: reconnect and periodic reconciliation, plus
+Sync now, recover missed hints. The app distinguishes durable receipt from applying
+or reviewing a change.
 
-1. **Define the Core Capability Contract (`src/capabilities/peer-network.v1.ts` or `fips.v1.ts`):**
-   - Operations for listing peers, inspecting connection health, sending/requesting messages over a named channel, and receiving inbound peer messages.
-2. **Build the `fips` Plugin:**
-   - SQLite/local table for the Peer Roster: `master_pubkey`, `bot_pubkey`, `alias/label`, `binding_proof`, `status`, `created_at`.
-   - Pairing flow to bind a teammate's `master_pubkey` + `bot_pubkey`.
-   - FIPS transport integration + authenticated WebSocket server/client between instances.
-   - CLI & Web UI commands to add peers, view online/offline status, and test ping/messaging between two AppWeaver instances.
-3. **Build Consumer Apps (`todo-teams` with `xitdb-ts`):**
-   - Select peers from the FIPS capability.
-   - Exchange `xitdb` replica state and transaction proposals over the FIPS channel.
-   - Present incoming peer changes in a Git-style review/merge UI.
+## 6. Storage and heads
 
----
+[`xitdb-ts`](https://github.com/xit-vcs/xitdb-ts#replication) is the first candidate,
+subject to an MVP feasibility check on a pinned version. It offers immutable
+moments and committed-byte replication, not automatic event sourcing, multi-writer
+merge, authorship verification or CRDT convergence.
 
-## 7. Orthogonal Track: Safe Apps Runtime
+- Each FIPS node is the single writer of its own board log. Keep separate,
+  read-only tracking replicas for other writers; never write directly to a replica.
+- A head is a position in one identified writer/log, not `updated_at`. The documented
+  replication state includes committed size and a latest-commit checksum; associate
+  it with the log identity and generation. It is not a cryptographic author proof.
+- Use the library's `replicaState`, `replicationStart`, `committedSize`,
+  `readCommitted`, and `openReplicated` mechanisms after verifying the pinned API.
+  Independently created databases with equivalent tasks need not have equal bytes.
+- Isolate board replication files: raw replication must not disclose other boards
+  or unrelated local app data. Handle file replacement/reset using staging files;
+  interrupted full replacement must preserve the last usable replica.
+- Transfer raw bytes in bounded app-level chunks. Verify cross-OS/architecture
+  portability and runtime responsiveness rather than assuming it from TypeScript.
+- Events, projections, causal metadata, conflicts, merge and Git-style review are
+  app responsibilities. Immutable snapshots alone do not implement those policies.
 
-*(Retained from earlier architecture notes as an independent future track)*
-- Keep `PluginContext` for trusted local plugins.
-- Add **`SafeAppContext`** for untrusted third-party/AI-generated apps, enforced by subprocess + OS sandbox + IPC capability broker (inspired by NIP-5D / `nostrapps`).
+## 7. Connection lifecycle and topology
+
+- Send can establish an authorized connection within a bounded deadline; explicit
+  connect is also available. Grants authorize apps, not arbitrary node probing.
+- Keep established paired connections reusable while AppWeaver runs; no initial
+  idle-disconnect policy. Consumer apps cannot tear down another app's physical link.
+- Connected requires fresh authenticated remote evidence. Sending UDP heartbeats
+  is insufficient. Expose unknown / connecting / connected / disconnected, last
+  confirmed activity and last error separately from app sync status.
+- FIPS retries failed established, still-paired links with bounded backoff/jitter
+  and repairs relay subscriptions. Apps retry messages and resume sync/subscriptions.
+  Connection-change callbacks are hints, backed by app reconciliation.
+- Direct links first. Vendored core supports routed datagrams and forwarding, but
+  forwarding is disabled by default and the plugin currently forces direct dials.
+  Routed mesh requires a separate policy and three-node verification milestone.
+- A third peer may courier fresh pairing invitations/acceptances; it cannot approve
+  another owner's pairing or grants. Completed invitations cannot be reused as
+  automatic introductions. Introduction UI is a later convenience feature.
+
+## 8. UI and product boundaries
+
+Use existing `tree` / `treeItem`, overflow menus and generic command/form primitives.
+FIPS lists nodes and all grants; team apps show their own grants with protocols,
+topics and exact peer keys. Identify the local endpoint as "My laptop (local FIPS
+node)" where appropriate. Do not show Direction, Validity, Verified installation
+or permission-signing controls.
+
+Teams Todo shows board membership, pending access, connection state, last sync and
+pending/error state separately. Normal edits work offline. The MVP borrows the
+personal Todo tree/menu/draft interaction style, not its full feature set.
+
+Paid `teams-*` apps are a possible product direction. Licensing, payments and
+purchase enforcement are not requirements for the first networking/sync MVP.
+Pairing grants no shell/filesystem or blanket project permissions.

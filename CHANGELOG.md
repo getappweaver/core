@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.21.0] - 2026-11-11
+
+- feat: implement peer capabilities with updated schemas and protocols for peer networking (a7b51e54)
+
 ## [v14.20.2] - 2026-11-11
 
-- chore: add tmux support for running AppWeaver in a persistent session (4a38e2b2)
+- chore: add tmux support for running AppWeaver in a persistent session (2eade4c2)
 
 ## [v14.20.1] - 2026-11-11
 
