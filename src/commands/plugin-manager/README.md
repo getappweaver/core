@@ -47,6 +47,10 @@ remotes are not implicitly pushed. Git push-url overrides are not used when
 pushing this explicit URL. First-publication repository registration still requires
 a Nostr repository and its matching author.
 
+The first-publication ngit account check supports both the older `active.npub`
+JSON output and ngit 3.x's `accounts` array, selecting the entry with `active: true`.
+The active account must match the selected bunker author in either format.
+
 After at least one relay accepts publication, the manager updates `plugins.json`
 to the selected repository. Already-published releases also reconcile local
 registration when the selected destination matches the catalog; they do not need

@@ -403,11 +403,14 @@ function activeNgitPubkey(pluginDir: string): string | null {
   try {
     const data = JSON.parse(result.stdout.toString()) as {
       active?: { npub?: unknown };
+      accounts?: { active?: unknown; npub?: unknown }[];
     };
 
-    return typeof data.active?.npub === 'string'
-      ? decodeNpub(data.active.npub)
-      : null;
+    const npub = Array.isArray(data.accounts)
+      ? data.accounts.find((account) => account?.active === true)?.npub
+      : data.active?.npub;
+
+    return typeof npub === 'string' ? decodeNpub(npub) : null;
   } catch {
     return null;
   }

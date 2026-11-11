@@ -18,3 +18,12 @@
 
 No catalog publication, Git push, or authenticated browser checks are performed
 as part of implementation verification. Existing offer management stays separate.
+
+## ngit account output compatibility
+
+- [x] Support ngit 3.x `accounts` output while retaining the older `active.npub`
+      format for the first-publication author check. Select only the active account.
+- [x] Targeted ESLint `--fix` passed. A one-off check of the actual lookup function
+      covered both formats, inactive-first selection, missing active accounts,
+      invalid npubs, malformed account entries, invalid JSON and command failure.
+- [ ] User retries first publication with ngit 3.0.5 after loading the fix.

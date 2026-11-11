@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.21.2] - 2026-11-11
+
+- fix: support both ngit 3.x.x and 2.x.x account JSON formats (ff147325)
+
 ## [v14.21.1] - 2026-11-11
 
-- chore: update sitemap.xml with new URLs for Teams Todo plugin documentation (72ffab67)
+- chore: update sitemap.xml with new URLs for Teams Todo plugin documentation (f30fd8d4)
 
 ## [v14.21.0] - 2026-11-11
 
