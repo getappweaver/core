@@ -261,6 +261,41 @@ export function getPluginByAlias(alias: string): BotPlugin | undefined {
   return byAlias.get(alias);
 }
 
+let stoppingPlugins: Promise<void> | null = null;
+
+/** Reverse registration order lets later consumers stop first; hooks have a deadline. */
+export function stopRegisteredPlugins(): Promise<void> {
+  stoppingPlugins ??= (async () => {
+    for (const plugin of [...byAlias.values()].reverse()) {
+      if (!plugin.onStop) {
+        continue;
+      }
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        await Promise.race([
+          Promise.resolve().then(() => plugin.onStop!()),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('Plugin shutdown timed out')),
+              5_000,
+            );
+          }),
+        ]);
+      } catch (error) {
+        log.warn(
+          `Plugin ${plugin.identity.alias} shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  })();
+
+  return stoppingPlugins;
+}
+
 export function getPluginPaymentApp(alias: string): PaymentApp | null {
   return paymentAppByAlias.get(alias) ?? null;
 }

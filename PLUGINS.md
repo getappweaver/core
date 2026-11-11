@@ -229,6 +229,8 @@ export const ExamplePlugin: BotPlugin = {
 ```
 
 - **onInit(ctx)** — called once at AppWeaver startup. Store `ctx` in a module-level variable; open your plugin DB (e.g. `plugins/<alias>/db.sqlite`) and run migrations. The core does not pass a database — you create and own it.
+- **onReady(ctx)** — optional async hook after all capability providers are registered and the registry is finalized. Start work requiring other apps/capabilities here rather than assuming registration order in `onInit`.
+- **onStop()** — optional async cleanup hook before host shutdown closes shared relay resources. Stop timers, reject/cancel pending work and close plugin-owned sockets/databases. Hooks run in reverse registration order with a five-second deadline each; failure is logged without preventing the remaining hooks. This does not introduce hot-unload support.
 - **handler(args, context)** — called for each `<prefix><alias> …` command. Use `PluginInvocationContext` (`source`, `runAgent`, optional `sendReply` / `promptFn`) together with the DB and stored `PluginContext`.
 - **helpText(alias, prefix)** — returns an array of help lines shown under the plugin in **`/help`** (using the user’s configured DM prefix). Identity `description` is used in the plugin list.
 - **commandDefinition** — structured subcommands for `parseCliInput` and global `help <alias>` integration.

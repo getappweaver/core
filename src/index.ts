@@ -63,6 +63,7 @@ import { createPluginAgentService } from './core/plugin-agent';
 import {
   executeRegisteredPluginTool,
   finalizePluginRegistration,
+  stopRegisteredPlugins,
 } from './core/registry';
 import { createCoreUpdateChecker } from './core/update-check';
 import {
@@ -245,15 +246,15 @@ async function startSetupOnlyMode(props: {
   log.info(`${C.bold}OpenCode auth:${C.reset} ${getOpenCodeAuthJsonPath()}`);
   startConfiguredPiperService();
 
-  process.once('SIGINT', () => {
+  function shutdownSetupMode(exitCode: number): void {
+    disposeAllOpencodeSdks();
     disposeNativePiperService();
-    process.exit(130);
-  });
+    process.exit(exitCode);
+  }
 
-  process.once('SIGTERM', () => {
-    disposeNativePiperService();
-    process.exit(143);
-  });
+  process.once('SIGINT', () => shutdownSetupMode(130));
+  process.once('SIGTERM', () => shutdownSetupMode(143));
+  process.once('SIGHUP', () => shutdownSetupMode(129));
 
   startLocalWebServer({
     prefix,
@@ -407,12 +408,14 @@ async function main() {
     shuttingDown = true;
     disposeAllOpencodeSdks();
     disposeNativePiperService();
+    await stopRegisteredPlugins();
     await closeActiveNostrResources();
     process.exit(exitCode);
   }
 
   process.once('SIGINT', () => void shutdown(130));
   process.once('SIGTERM', () => void shutdown(143));
+  process.once('SIGHUP', () => void shutdown(129));
 
   initializeWorkspaceSkills({
     db: seenDb,
@@ -831,6 +834,7 @@ main().catch(async (err) => {
   console.error(err);
   disposeAllOpencodeSdks();
   disposeNativePiperService();
+  await stopRegisteredPlugins();
   await closeActiveNostrResources();
   process.exit(1);
 });

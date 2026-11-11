@@ -335,6 +335,8 @@ export type BotPlugin = {
   identity: PluginIdentity;
   onInit: (ctx: PluginContext) => void;
   onReady?: (ctx: PluginContext) => void | Promise<void>;
+  /** Release long-lived timers, sockets and databases before shared host shutdown. */
+  onStop?: () => void | Promise<void>;
   handler: (
     args: string[],
     context: PluginInvocationContext,
