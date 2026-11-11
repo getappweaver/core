@@ -307,7 +307,7 @@
         "arguments": [
           {
             "name": "topic",
-            "summary": "Optional subcommand: manager or set.",
+            "summary": "Optional subcommand: manager, set, learn, save-custom, or delete-custom.",
             "kind": "string",
             "required": false,
             "variadic": false
@@ -316,7 +316,8 @@
         "options": [],
         "examples": [
           "/skills help",
-          "/skills help manager"
+          "/skills help manager",
+          "/skills help learn"
         ],
         "inferredWeb": {
           "generated": true,
@@ -415,6 +416,107 @@
         "options": [],
         "examples": [
           "/skills set appweaver-todo enable"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "learn",
+        "summary": "Create or refine a custom skill with AI using optional session context.",
+        "usage": "learn <name> [<instructions...>] [--session, -s <session>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name (e.g. relay-debug or custom-relay-debug).",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "instructions",
+            "summary": "Instructions on what the skill should teach or extract from the session.",
+            "kind": "string",
+            "choices": null,
+            "required": false,
+            "variadic": true,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "session",
+            "flag": "--session",
+            "shortFlag": "-s",
+            "summary": "Reference session ID (or \"current\" / \"none\") for context.",
+            "kind": "string",
+            "choices": null,
+            "webDefaultValue": "current",
+            "required": false,
+            "multiple": false
+          }
+        ],
+        "examples": [
+          "/skills learn relay-debug \"Extract the relay debugging workflow from this session\"",
+          "/skills learn relay-debug --session none \"Always check NIP-11 relay info first\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "save-custom",
+        "summary": "Save markdown for a custom skill.",
+        "usage": "save-custom <name> <markdown>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "markdown",
+            "summary": "Full SKILL.md markdown content.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete-custom",
+        "summary": "Delete a custom skill.",
+        "usage": "delete-custom <name>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "name",
+            "summary": "Custom skill name.",
+            "kind": "string",
+            "choices": null,
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/skills delete-custom custom-relay-debug"
         ],
         "inferredWeb": {
           "generated": true,
@@ -922,7 +1024,7 @@
       {
         "name": "install",
         "summary": "Discover or install plugins from the Nostr plugin catalog.",
-        "usage": "install [<target>]",
+        "usage": "install [<target>] [<signedEvent>] [--operation <operation>] [--identity <identity>] [--attempt <attempt>] [--challenge <challenge>]",
         "aliases": [
           "list"
         ],
@@ -934,9 +1036,50 @@
             "required": false,
             "variadic": false,
             "choices": null
+          },
+          {
+            "name": "signedEvent",
+            "summary": "Signed purchase request or restoration challenge from the web signer.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "choices": null
           }
         ],
-        "options": [],
+        "options": [
+          {
+            "name": "operation",
+            "summary": "Purchase flow field: operation.",
+            "flag": "--operation",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "identity",
+            "summary": "Purchase flow field: identity.",
+            "flag": "--identity",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "attempt",
+            "summary": "Purchase flow field: attempt.",
+            "flag": "--attempt",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "challenge",
+            "summary": "Purchase flow field: challenge.",
+            "flag": "--challenge",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          }
+        ],
         "examples": [
           "/plugins install",
           "/plugins install appweaver-todo-plugin",
@@ -984,8 +1127,8 @@
       },
       {
         "name": "publish",
-        "summary": "Publish the local plugin package version to the Nostr plugin catalog.",
-        "usage": "publish <alias> [--signer <signer>] [--confirm]",
+        "summary": "Publish plugin releases and manage author payment offers in the web UI.",
+        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--repo <repo>] [--signer <signer>] [--confirm]",
         "aliases": [],
         "arguments": [
           {
@@ -998,6 +1141,70 @@
           }
         ],
         "options": [
+          {
+            "name": "operation",
+            "summary": "Web publication form field: operation.",
+            "flag": "--operation",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "price",
+            "summary": "Web publication form field: price.",
+            "flag": "--price",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "lightning_address",
+            "summary": "Web publication form field: lightning_address.",
+            "flag": "--lightning-address",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "valid_from",
+            "summary": "Web publication form field: valid_from.",
+            "flag": "--valid-from",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "valid_until",
+            "summary": "Web publication form field: valid_until.",
+            "flag": "--valid-until",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "draft",
+            "summary": "Web publication form field: draft.",
+            "flag": "--draft",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "offer_id",
+            "summary": "Web publication form field: offer_id.",
+            "flag": "--offer-id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "repo",
+            "summary": "Web publication form field: repo.",
+            "flag": "--repo",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
           {
             "name": "signer",
             "summary": "Saved bunker connection used for a first publication.",

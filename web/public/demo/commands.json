@@ -1128,7 +1128,7 @@
       {
         "name": "publish",
         "summary": "Publish plugin releases and manage author payment offers in the web UI.",
-        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--signer <signer>] [--confirm]",
+        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--repo <repo>] [--signer <signer>] [--confirm]",
         "aliases": [],
         "arguments": [
           {
@@ -1193,6 +1193,14 @@
             "name": "offer_id",
             "summary": "Web publication form field: offer_id.",
             "flag": "--offer-id",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "repo",
+            "summary": "Web publication form field: repo.",
+            "flag": "--repo",
             "shortFlag": null,
             "kind": "string",
             "required": false
