@@ -76,7 +76,18 @@ Keep this command running until authentication finishes.
 
 ## Run
 
-Back in the Alpine SSH session, start AppWeaver:
+Back in the Alpine SSH session, start AppWeaver inside a persistent tmux session so it keeps running even after you disconnect or close your laptop:
+
+```bash
+. "$HOME/.profile"
+bun run start:tmux -- --host 127.0.0.1
+```
+
+- **Detach:** Press `Ctrl+B`, release, then press `D`. You can now safely disconnect SSH.
+- **Reattach:** Run `bun run start:tmux attach` (or `tmux attach -t appweaver`).
+- **Stop:** Run `bun run start:tmux stop` (or stop it from inside the tmux session with `Ctrl+C`).
+
+Alternatively, to run in the foreground without tmux:
 
 ```bash
 . "$HOME/.profile"

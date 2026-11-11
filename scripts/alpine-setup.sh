@@ -107,6 +107,7 @@ run_root apk add \
   py3-flask \
   py3-pip \
   py3-piper-tts@testing \
+  tmux \
   unzip
 
 info 'Configuring user PATH'
@@ -245,7 +246,11 @@ run_root rc-service sshd restart
 info 'Alpine setup complete'
 printf 'Before starting AppWeaver, open the authentication tunnel from a separate local terminal:\n\n'
 printf '  ssh -o ExitOnForwardFailure=yes -N -L 127.0.0.1:1455:127.0.0.1:1455 %s@%s\n\n' "$(id -un)" "$DOMAIN"
-printf 'Start AppWeaver from %s with:\n\n' "$APPWEAVER_DIR"
+printf 'Start AppWeaver from %s inside a persistent tmux session (recommended):\n\n' "$APPWEAVER_DIR"
 printf '  . "$HOME/.profile"\n'
+printf '  bun run start:tmux -- --host 127.0.0.1\n\n'
+printf 'Detach anytime with: Ctrl+b, then d\n'
+printf 'Reattach later with: bun run start:tmux attach (or tmux attach -t appweaver)\n\n'
+printf 'Alternatively, to run directly in foreground without tmux:\n\n'
 printf '  bun run scripts/run-start.ts --host 127.0.0.1\n\n'
 printf 'Then open the HTTPS setup URL printed by AppWeaver.\n'

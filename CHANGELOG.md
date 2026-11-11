@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.20.2] - 2026-11-11
+
+- chore: add tmux support for running AppWeaver in a persistent session (4a38e2b2)
+
 ## [v14.20.1] - 2026-11-11
 
-- chore: some forgotton files to commit (1a0d6d38)
+- chore: some forgotton files to commit (91dc675a)
 
 ## [v14.20.0] - 2026-11-11
 

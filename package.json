@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "14.20.1",
+  "version": "14.20.2",
   "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
   "type": "module",
   "workspaces": [
@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "start": "bun run scripts/run-start.ts",
+    "start:tmux": "bash scripts/run-tmux.sh",
     "watch": "bun run scripts/run-with-restart.ts",
     "web:dev": "bunx vite --config web/vite.config.ts",
     "web:build": "bun run web:pwa-icons && bunx vite build --config web/vite.config.ts",
