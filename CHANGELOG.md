@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.21.1] - 2026-11-11
+
+- chore: update sitemap.xml with new URLs for Teams Todo plugin documentation (72ffab67)
+
 ## [v14.21.0] - 2026-11-11
 
-- feat: implement peer capabilities with updated schemas and protocols for peer networking (a7b51e54)
+- feat: implement peer capabilities with updated schemas and protocols for peer networking (b66fc4bb)
 
 ## [v14.20.2] - 2026-11-11
 
