@@ -1,6 +1,6 @@
 {
   "name": "appweaver",
-  "version": "14.21.2",
+  "version": "14.21.3",
   "description": "Open-source app hub for running AI-powered tools from a project or workspace folder you control.",
   "type": "module",
   "workspaces": [
@@ -44,7 +44,6 @@
     "ripgrep": "^0.3.1",
     "solid-js": "^1.9.14",
     "web-push": "^3.6.7",
-    "xitdb": "0.30.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

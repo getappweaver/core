@@ -10,6 +10,15 @@ const OnSuccessCommandSchema = z.object({
   subcommand: z.string().min(1),
   arguments: z.record(z.string(), z.unknown()).default({}),
   options: z.record(z.string(), z.unknown()).default({}),
+  surface: z.enum(['timeline', 'modal']).optional(),
+  clientStatus: z
+    .object({
+      pending: z.string().optional(),
+      restarting: z.string().optional(),
+      success: z.string().optional(),
+      statusTargetId: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const SignEventPayloadSchema = z.object({
@@ -46,12 +55,7 @@ type SignEventDeps = {
 };
 
 export type SignEventResult = {
-  onSuccessCommand: {
-    command: string;
-    subcommand: string;
-    arguments: Record<string, unknown>;
-    options: Record<string, unknown>;
-  };
+  onSuccessCommand: z.infer<typeof OnSuccessCommandSchema>;
   signedEvent: string;
   runAt: string | null;
   date?: string;

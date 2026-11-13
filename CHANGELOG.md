@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.21.3] - 2026-11-13
+
+- fix: plugin installation/update was hanging on the UI (fbd1882e)
+
 ## [v14.21.2] - 2026-11-11
 
-- fix: support both ngit 3.x.x and 2.x.x account JSON formats (ff147325)
+- fix: support both ngit 3.x.x and 2.x.x account JSON formats (a6cd41ad)
 
 ## [v14.21.1] - 2026-11-11
 

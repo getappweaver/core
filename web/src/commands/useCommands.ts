@@ -1457,6 +1457,10 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               type: 'command',
               command: onSuccess.command,
               subcommand: onSuccess.subcommand,
+              ...(onSuccess.surface ? { surface: onSuccess.surface } : {}),
+              ...(onSuccess.clientStatus
+                ? { clientStatus: onSuccess.clientStatus }
+                : {}),
               arguments: {
                 ...onSuccess.arguments,
                 signedEvent: result.signedEvent,
@@ -1474,7 +1478,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
               uiExecutionPolicy: {
                 ...params?.uiExecutionPolicy,
                 recordInTimeline: false,
-                suppressSystemMessage: true,
+                suppressSystemMessage: Boolean(onSuccess.clientStatus),
               },
             },
           );
@@ -1861,8 +1865,34 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       return;
     }
 
+    function trackCommandClientStatus(
+      action: Extract<WebAction, { type: 'command' }>,
+    ): void {
+      if (action.clientStatus?.pending && !action.clientStatus.statusTargetId) {
+        adapters.appendSystemMessage(action.clientStatus.pending);
+      }
+
+      if (
+        action.command === 'plugins' &&
+        action.subcommand === 'install' &&
+        action.clientStatus?.restarting &&
+        action.clientStatus.success
+      ) {
+        beginPluginInstallRestartStatus({
+          title:
+            typeof action.arguments?.target === 'string'
+              ? action.arguments.target
+              : 'plugin',
+          restarting: action.clientStatus.restarting,
+          success: action.clientStatus.success,
+        });
+      }
+    }
+
     if (commandAction.surface === 'modal') {
       chromeModalOriginParams = params ?? null;
+
+      trackCommandClientStatus(commandAction);
 
       adapters.setChromeModal({
         command: commandAction.command,
@@ -1979,27 +2009,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
       }
     };
 
-    if (commandAction.clientStatus?.pending) {
-      if (!commandAction.clientStatus.statusTargetId) {
-        adapters.appendSystemMessage(commandAction.clientStatus.pending);
-      }
-    }
-
-    if (
-      commandAction.command === 'plugins' &&
-      commandAction.subcommand === 'install' &&
-      commandAction.clientStatus?.restarting &&
-      commandAction.clientStatus.success
-    ) {
-      beginPluginInstallRestartStatus({
-        title:
-          typeof commandAction.arguments?.target === 'string'
-            ? commandAction.arguments.target
-            : 'plugin',
-        restarting: commandAction.clientStatus.restarting,
-        success: commandAction.clientStatus.success,
-      });
-    }
+    trackCommandClientStatus(commandAction);
 
     const actionTargetsTaskbar =
       commandAction.surface !== 'timeline' &&

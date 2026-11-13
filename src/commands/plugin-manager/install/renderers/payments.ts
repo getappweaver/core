@@ -127,6 +127,7 @@ export function renderFreeVersionNotice(
   entry: PluginCatalogEntry,
 ): WebNodeRoot {
   const updating = entry.installedAlias !== null;
+  const title = entry.title || entry.name;
 
   return {
     kind: 'ui',
@@ -137,9 +138,7 @@ export function renderFreeVersionNotice(
       tag: 'stack',
       props: { gap: 'sm' },
       children: [
-        textBlock(
-          `${entry.title || entry.name} · ${entry.compatibleRef?.tag ?? ''}`,
-        ),
+        textBlock(`${title} · ${entry.compatibleRef?.tag ?? ''}`),
         textBlock(
           'This version is free. The author may charge for future releases. Your installed version will remain usable if pricing changes.',
           'muted',
@@ -161,12 +160,12 @@ export function renderFreeVersionNotice(
                   subcommand: 'install',
                   arguments: { target: entry.id },
                   options: { operation: 'free-confirm' },
-                  surface: 'modal',
-                  modalTitle: 'Free version notice',
+                  surface: 'timeline',
                   recordInTimeline: false,
                   clientStatus: {
-                    pending: updating ? 'Updating app...' : 'Installing app...',
+                    pending: `${updating ? 'Updating' : 'Installing'} ${title} plugin...`,
                     restarting: 'Restarting AppWeaver...',
+                    success: `${updating ? 'Updated' : 'Installed'} ${title} plugin.`,
                   },
                 },
               },
@@ -255,6 +254,13 @@ export function renderRestorationChallenge({
                         operation: 'restore',
                         identity: identity.id,
                         challenge: challenge.id,
+                      },
+                      surface: 'timeline',
+                      recordInTimeline: false,
+                      clientStatus: {
+                        pending: `Restoring ${entry.title || entry.name} plugin...`,
+                        restarting: 'Restarting AppWeaver...',
+                        success: `Restored ${entry.title || entry.name} plugin.`,
                       },
                     },
                   },

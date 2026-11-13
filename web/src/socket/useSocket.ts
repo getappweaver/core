@@ -1139,6 +1139,7 @@ export function useSocket(adapters: SocketAppAdapters) {
           setWebEntityPending({});
           adapters.setPaymentRequest(null);
           adapters.setPaymentStatus(null);
+          adapters.onSocketTeardown();
         },
         scheduleSocketReconnect: () => {
           if (adapters.auth.authState().status === 'connected') {
@@ -1359,7 +1360,7 @@ export function useSocket(adapters: SocketAppAdapters) {
       }
     });
 
-    socket.addEventListener('close', () => {
+    function handleSocketDisconnect(): void {
       markProcessRestartDisconnected();
 
       if (hasExpectedProcessRestart()) {
@@ -1371,25 +1372,20 @@ export function useSocket(adapters: SocketAppAdapters) {
       if (pluginInstallRestart) {
         adapters.appendSystemMessage(pluginInstallRestart);
       }
+    }
+
+    socket.addEventListener('close', () => {
+      handleSocketDisconnect();
     });
 
     socket.addEventListener('error', () => {
       setWsConnected(false);
-      markProcessRestartDisconnected();
+      handleSocketDisconnect();
 
-      if (hasExpectedProcessRestart()) {
-        return;
-      }
-
-      const pluginInstallRestart = consumePluginInstallRestartMessage();
-
-      if (pluginInstallRestart) {
-        adapters.appendSystemMessage(pluginInstallRestart);
-
-        return;
-      }
-
-      if (hasActivePluginInstallRestartStatus()) {
+      if (
+        hasExpectedProcessRestart() ||
+        hasActivePluginInstallRestartStatus()
+      ) {
         return;
       }
 

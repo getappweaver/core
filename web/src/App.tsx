@@ -72,7 +72,9 @@ import { resolveWidgetIconUrl } from './layout/widgetIcons';
 import { PaletteView } from './palette/PaletteView';
 import { usePalette } from './palette/usePalette';
 import { PaymentModal } from './payments/PaymentModal';
+import { hasExpectedProcessRestart } from './processRestartStatus';
 import { registerWebPushNotifications } from './register-web-push';
+import { hasActivePluginInstallRestartStatus } from './restartStatus';
 import { UniversalSearch } from './search/UniversalSearch';
 import { SetupView } from './setup/SetupView';
 import { useSocket } from './socket/useSocket';
@@ -597,6 +599,8 @@ function AppInner(): JSX.Element {
     manageTitle,
   } = connect;
 
+  let closeChromeModalRef: (() => void) | null = null;
+
   const {
     beginWebEntityPending,
     beginWebUiBusy,
@@ -723,6 +727,29 @@ function AppInner(): JSX.Element {
         chat.handleStreamSummary(requestId, id, text),
       handleStreamTextDelta: (requestId, deltaText) =>
         chat.handleStreamTextDelta(requestId, deltaText),
+    },
+    onSocketTeardown: () => {
+      if (
+        hasActivePluginInstallRestartStatus() ||
+        hasExpectedProcessRestart()
+      ) {
+        if (closeChromeModalRef) {
+          closeChromeModalRef();
+        } else {
+          chrome.setChromeModal(null);
+          chrome.setChromeLoading(false);
+          chrome.setChromeText(null);
+          chrome.setChromeWeb(null);
+          chrome.setChromeError(null);
+          chrome.setChromePromptSession(null);
+        }
+      } else if (chrome.chromeLoading()) {
+        chrome.setChromeLoading(false);
+
+        if (chrome.chromeModal()) {
+          chrome.setChromeError('Connection lost while running command.');
+        }
+      }
     },
   });
 
@@ -2630,6 +2657,8 @@ function AppInner(): JSX.Element {
     getTaskbarDockValues,
     setTaskbarDockResult,
   });
+
+  closeChromeModalRef = closeChromeModal;
 
   createEffect(() => {
     const sessionId = timelineId();

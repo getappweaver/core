@@ -106,6 +106,7 @@ export type SocketAppAdapters = {
     | 'handleStreamTextDelta'
     | 'handleStreamTool'
   >;
+  onSocketTeardown: () => void;
 };
 
 export type SocketState = {
