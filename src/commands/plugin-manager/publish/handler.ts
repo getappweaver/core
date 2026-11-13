@@ -13,7 +13,11 @@ import {
 import type { RouteCommandContext } from '@src/commands/dispatch';
 import { getState, setState } from '@src/db';
 import { decodeNpub, verifyNip05 } from '@src/nostr/author-identity';
-import { bunkerSignEvent } from '@src/nostr/bunker';
+import { extractSha256FromUrl } from '@src/nostr/blossom';
+import {
+  bunkerSignEventWithProgress,
+  type BunkerProgress,
+} from '@src/nostr/bunker';
 import { listConnections, type ConnectionRow } from '@src/nostr/connections';
 import {
   NIP65_RELAY_LIST_KIND,
@@ -36,6 +40,7 @@ import {
 } from '@src/plugin-lifecycle/manifest';
 import type { WebNodeRoot } from '@src/web/ui-schema';
 
+import { rememberCatalogDestinations } from '../catalog-destinations';
 import {
   type InstalledPluginEntry,
   type PluginCatalogEntry,
@@ -46,6 +51,7 @@ import {
 import { inspectPluginReleaseGit, pushPluginRelease } from '../release-git';
 
 import { managePaymentOffers, publicationOperation } from './offers';
+import { publicationProgress } from './progress';
 import { renderPluginsPublishText } from './renderers/text';
 import {
   renderPluginsPublishPreviewWeb,
@@ -102,6 +108,8 @@ export type PluginsPublishRepresentation = {
   relays: PublishRelayResult[];
   registrationError: string | null;
   registrationRepo: string | null;
+  discoveryError: string | null;
+  diagnostics: string | null;
 };
 
 export type PluginsPublishPreviewRepresentation = {
@@ -425,6 +433,24 @@ type PrepareFirstReleaseRepositoryProps = {
   authorPubkey: string;
 };
 
+type PublicationProcessProps = { args: string[]; cwd: string | null };
+
+async function publicationProcess({ args, cwd }: PublicationProcessProps) {
+  const process = Bun.spawn(args, {
+    ...(cwd ? { cwd } : {}),
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(process.stdout).text(),
+    new Response(process.stderr).text(),
+    process.exited,
+  ]);
+
+  return { stdout, stderr, exitCode };
+}
+
 async function prepareFirstReleaseRepository({
   dmBotRoot,
   alias,
@@ -471,10 +497,9 @@ async function prepareFirstReleaseRepository({
       throw new Error(`Invalid Nostr repository address: ${repo}`);
     }
 
-    const existingRemote = Bun.spawnSync(['git', 'ls-remote', repo], {
+    const existingRemote = await publicationProcess({
+      args: ['git', 'ls-remote', repo],
       cwd: pluginDir,
-      stdout: 'pipe',
-      stderr: 'pipe',
     });
 
     if (existingRemote.exitCode === 0) {
@@ -507,10 +532,9 @@ async function prepareFirstReleaseRepository({
         '--defaults',
       ];
 
-      const initialized = Bun.spawnSync(initArgs, {
+      const initialized = await publicationProcess({
+        args: initArgs,
         cwd: pluginDir,
-        stdout: 'pipe',
-        stderr: 'pipe',
       });
 
       if (initialized.exitCode !== 0) {
@@ -521,10 +545,9 @@ async function prepareFirstReleaseRepository({
     }
   }
 
-  const pushed = Bun.spawnSync(['git', 'push', repo, state.branch, '--tags'], {
+  const pushed = await publicationProcess({
+    args: ['git', 'push', repo, state.branch, '--tags'],
     cwd: pluginDir,
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
 
   if (pushed.exitCode !== 0) {
@@ -548,10 +571,10 @@ function firstPublishRepository({
   return `nostr://${nip19.npubEncode(connection.data.userPubkey)}/relay.ngit.dev/${installed.alias}`;
 }
 
-function remoteTags(repo: string): Set<string> {
-  const result = Bun.spawnSync(['git', 'ls-remote', '--tags', repo], {
-    stdout: 'pipe',
-    stderr: 'pipe',
+async function remoteTags(repo: string): Promise<Set<string>> {
+  const result = await publicationProcess({
+    args: ['git', 'ls-remote', '--tags', repo],
+    cwd: null,
   });
 
   if (result.exitCode !== 0) {
@@ -568,14 +591,14 @@ function remoteTags(repo: string): Set<string> {
   );
 }
 
-function verifyRemoteRefs({
+async function verifyRemoteRefs({
   repo,
   refs,
 }: {
   repo: string;
   refs: RefEntry[];
-}): void {
-  const tags = remoteTags(repo);
+}): Promise<void> {
+  const tags = await remoteTags(repo);
   const missing = refs.filter((ref) => !tags.has(ref.tag));
 
   if (missing.length > 0) {
@@ -585,11 +608,10 @@ function verifyRemoteRefs({
   }
 }
 
-function fetchLocalTags(pluginDir: string): void {
-  Bun.spawnSync(['git', 'fetch', '--tags'], {
+async function fetchLocalTags(pluginDir: string): Promise<void> {
+  await publicationProcess({
+    args: ['git', 'fetch', '--tags'],
     cwd: pluginDir,
-    stdout: 'pipe',
-    stderr: 'pipe',
   });
 }
 
@@ -765,23 +787,59 @@ function buildEventTemplate({
   };
 }
 
+type PublishEventProps = {
+  ctx: RouteCommandContext;
+  relays: string[];
+  event: NostrEvent;
+  connection: ConnectionRow;
+  progress: ReturnType<typeof publicationProgress>;
+};
+
 async function publishEvent({
   ctx,
   relays,
   event,
   connection,
-}: {
-  ctx: RouteCommandContext;
-  relays: string[];
-  event: NostrEvent;
-  connection: ConnectionRow;
-}): Promise<PublishRelayResult[]> {
+  progress,
+}: PublishEventProps): Promise<PublishRelayResult[]> {
   const results = await Promise.allSettled(
-    ctx.pool.publish(relays, event, {
-      onauth(authEvent) {
-        return bunkerSignEvent(ctx.pool, connection.data, authEvent);
-      },
-    }),
+    ctx.pool
+      .publish(relays, event, {
+        onauth(authEvent) {
+          return bunkerSignEventWithProgress({
+            pool: ctx.pool,
+            data: connection.data,
+            event: authEvent,
+            onProgress: (message, severity) =>
+              progress.update({
+                state: 'pending',
+                diagnostic: severity === 'info' ? null : severity,
+                message: `Catalog relay authentication (kind ${authEvent.kind}): ${message}`,
+              }),
+          });
+        },
+      })
+      .map(async (promise, index) => {
+        try {
+          const result = await promise;
+
+          progress.update({
+            state: 'pending',
+            message: `Catalog ${relays[index]}: accepted ${event.id}`,
+            diagnostic: null,
+          });
+
+          return result;
+        } catch (error) {
+          progress.update({
+            state: 'pending',
+            message: `Catalog ${relays[index]}: ${String(error)}`,
+            diagnostic: 'warning',
+          });
+
+          throw error;
+        }
+      }),
   );
 
   return results.map((result, index) => ({
@@ -857,6 +915,51 @@ function requestedRepository(ctx: RouteCommandContext): string | null {
 export async function handlePluginsPublish(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsPublishWeb> | string> {
+  const progress = publicationProgress(ctx, publishConfirmed(ctx));
+  const alias = ctx.args[1]?.trim() ?? '';
+
+  if (publishConfirmed(ctx)) {
+    latestPublishResults.delete(alias);
+  }
+
+  try {
+    const result = await handlePluginsPublishAttempt(ctx, progress);
+
+    if (ctx.source === 'web' && typeof result === 'string') {
+      throw new Error(result);
+    }
+
+    return result;
+  } catch (error) {
+    const message = `Publication incomplete during ${progress.currentMessage()}: ${error instanceof Error ? error.message : String(error)}. Git push or icon upload may already have completed; review diagnostics before retrying.`;
+    progress.update({ state: 'error', message, diagnostic: 'error' });
+
+    const result = rememberPublishResult({
+      alias,
+      pluginName: alias,
+      versionTag: '',
+      eventId: null,
+      status: 'failed',
+      message,
+      relays: [],
+      registrationError: null,
+      registrationRepo: null,
+      discoveryError: null,
+      diagnostics: progress.history(),
+    });
+
+    return ctx.source === 'web'
+      ? renderPluginsPublishWeb(result)
+      : renderPluginsPublishText(result);
+  } finally {
+    await progress.stop();
+  }
+}
+
+async function handlePluginsPublishAttempt(
+  ctx: RouteCommandContext,
+  progress: ReturnType<typeof publicationProgress>,
+): Promise<ReturnType<typeof renderPluginsPublishWeb> | string> {
   const alias = ctx.args[1]?.trim() ?? '';
   const signerName = requestedSignerName(ctx.args);
 
@@ -915,6 +1018,8 @@ export async function handlePluginsPublish(
         : `Published release registered at ${receipt.repo}. No publication was repeated.`,
       registrationError: error,
       registrationRepo: receipt.repo,
+      discoveryError: null,
+      diagnostics: null,
     });
 
     return ctx.source === 'web'
@@ -922,12 +1027,30 @@ export async function handlePluginsPublish(
       : renderPluginsPublishText(result);
   }
 
+  progress.update({
+    state: 'pending',
+    message: 'Loading current catalog and author identity',
+    diagnostic: null,
+  });
+
   const published = findPublishedPlugin({
     installed,
-    catalog: await queryPluginCatalog(ctx),
+    catalog: await queryPluginCatalog(ctx, undefined, undefined, {
+      skipIcons: true,
+    }),
   });
 
   const connection = findAuthorConnection({ ctx, published, signerName });
+
+  const report = (message: string) =>
+    progress.update({ state: 'pending', message, diagnostic: null });
+
+  const reportSigning: BunkerProgress = (message, severity) =>
+    progress.update({
+      state: 'pending',
+      message,
+      diagnostic: severity === 'info' ? null : severity,
+    });
 
   const operation = publicationOperation(ctx);
 
@@ -984,7 +1107,8 @@ export async function handlePluginsPublish(
     ? readPluginSvgIcon({ pluginDir, iconPath: pkg.iconPath })
     : null;
 
-  fetchLocalTags(pluginDir);
+  report('Fetching Git tags for release review');
+  await fetchLocalTags(pluginDir);
 
   const refsWithBackfilledChangelogs = refsWithCommitChangelogs({
     pluginDir,
@@ -1027,6 +1151,8 @@ export async function handlePluginsPublish(
       relays: [],
       registrationError,
       registrationRepo: repo,
+      discoveryError: null,
+      diagnostics: null,
     });
 
     if (ctx.source === 'web' && !publishConfirmed(ctx) && !registrationError) {
@@ -1105,6 +1231,8 @@ export async function handlePluginsPublish(
   }
 
   if (published) {
+    report(`Pushing Git release ${versionTag} to ${repo}`);
+
     await pushPluginRelease({
       dmBotRoot: ctx.dmBotRoot,
       alias,
@@ -1114,6 +1242,8 @@ export async function handlePluginsPublish(
   }
 
   if (!published) {
+    report(`Preparing first Git release ${versionTag} at ${repo}`);
+
     await prepareFirstReleaseRepository({
       dmBotRoot: ctx.dmBotRoot,
       alias,
@@ -1124,15 +1254,44 @@ export async function handlePluginsPublish(
     });
   }
 
-  verifyRemoteRefs({ repo, refs });
+  report('Verifying remote Git tags');
+  await verifyRemoteRefs({ repo, refs });
+  report(`Git release ${versionTag} pushed and verified`);
 
-  const iconUrl = icon
-    ? await uploadPluginIcon({
-        pool: ctx.pool,
-        bunkerData: connection.data,
-        icon,
-      })
-    : published?.iconUrl || null;
+  report(
+    `Signing account: bunker ${connection.name} · ${nip19.npubEncode(connection.data.userPubkey)}; signer ${connection.data.remoteSignerPubkey}`,
+  );
+
+  const iconHash = icon
+    ? new Bun.CryptoHasher('sha256').update(icon.data).digest('hex')
+    : null;
+
+  const reuseIcon = !!(
+    icon &&
+    published?.iconUrl &&
+    published.iconSource === icon.path &&
+    extractSha256FromUrl(published.iconUrl) === iconHash
+  );
+
+  report(
+    reuseIcon
+      ? 'Reusing unchanged published icon; no icon authorization needed'
+      : 'Preparing icon upload and Blossom authorization',
+  );
+
+  const iconUrl =
+    icon && !reuseIcon
+      ? await uploadPluginIcon({
+          pool: ctx.pool,
+          bunkerData: connection.data,
+          icon,
+          onProgress: (message, severity) =>
+            reportSigning(
+              `Bunker ${connection.name} (${nip19.npubEncode(connection.data.userPubkey)}): ${message}`,
+              severity,
+            ),
+        })
+      : published?.iconUrl || null;
 
   const template = buildEventTemplate({
     pkg,
@@ -1143,7 +1302,20 @@ export async function handlePluginsPublish(
       published?.catalogEvent?.tags.find((tag) => tag[0] === 'offer') ?? null,
   });
 
-  const signed = await bunkerSignEvent(ctx.pool, connection.data, template);
+  report('Waiting for catalog signature (kind 32107) via NIP-46');
+
+  const signed = await bunkerSignEventWithProgress({
+    pool: ctx.pool,
+    data: connection.data,
+    event: template,
+    onProgress: (message, severity) =>
+      reportSigning(
+        `Bunker ${connection.name} (${nip19.npubEncode(connection.data.userPubkey)}) · catalog signature (kind 32107): ${message}`,
+        severity,
+      ),
+  });
+
+  report('Discovering catalog publication destinations');
 
   const relays = await fetchPluginPublishRelays({
     ctx,
@@ -1155,12 +1327,51 @@ export async function handlePluginsPublish(
     relays,
     event: signed,
     connection,
+    progress,
   });
 
   const succeeded = relayResults.filter((result) => result.ok).length;
   let manifestUpdateError: string | null = null;
+  let discoveryError: string | null = null;
 
   if (succeeded > 0) {
+    const acceptingRelays = relayResults
+      .filter((result) => result.ok)
+      .map((result) => result.relay);
+
+    try {
+      rememberCatalogDestinations(ctx.seenDb, acceptingRelays);
+    } catch (error) {
+      discoveryError = `Could not save catalog destinations: ${String(error)}`;
+    }
+
+    report(`Verifying exact catalog event ${signed.id} on accepting relays`);
+    try {
+      const found = await ctx.pool.get(
+        acceptingRelays,
+        { ids: [signed.id] },
+        { maxWait: 5000 },
+      );
+
+      if (found?.id !== signed.id) {
+        discoveryError = [
+          discoveryError,
+          'Relays accepted the catalog, but read-back did not find the exact event within 5s.',
+        ]
+          .filter(Boolean)
+          .join(' ');
+      } else {
+        report(`Catalog read-back verified: ${signed.id}`);
+      }
+    } catch (error) {
+      discoveryError = [
+        discoveryError,
+        `Catalog accepted; read-back failed: ${String(error)}`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
+
     manifestUpdateError = reconcileRegistration(ctx, {
       alias,
       pluginName: pkg.name,
@@ -1179,12 +1390,29 @@ export async function handlePluginsPublish(
     status: succeeded > 0 ? 'published' : 'failed',
     message:
       succeeded > 0
-        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s).${manifestUpdateError ? ` Published; local registration update failed: ${manifestUpdateError}` : ` Registered repository: ${repo}.`}`
+        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s). ${discoveryError ?? 'Exact catalog event read-back verified.'}${manifestUpdateError ? ` Published; local registration update failed: ${manifestUpdateError}` : ` Registered repository: ${repo}.`}`
         : `Failed to publish ${pkg.name} ${versionTag}.`,
     relays: relayResults,
     registrationError: manifestUpdateError,
     registrationRepo: succeeded > 0 ? repo : null,
+    discoveryError,
+    diagnostics: progress.history(),
   });
+
+  const outcomeState =
+    succeeded === 0
+      ? 'error'
+      : discoveryError || manifestUpdateError || succeeded < relayResults.length
+        ? 'warning'
+        : 'success';
+
+  progress.update({
+    state: outcomeState,
+    diagnostic: outcomeState === 'success' ? null : outcomeState,
+    message: representation.message,
+  });
+
+  representation.diagnostics = progress.history();
 
   return ctx.source === 'web'
     ? renderPluginsPublishWeb(representation)

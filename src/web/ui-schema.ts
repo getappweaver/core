@@ -857,6 +857,12 @@ export const WebNodeSchema: z.ZodType<WebNode> = z.union([
 export const WebRenderMetaSchema = z.object({
   command: z.string().min(1),
   subcommand: z.string().min(1),
+  outcome: z
+    .object({
+      state: z.enum(['success', 'warning', 'error']),
+      message: z.string(),
+    })
+    .optional(),
   arguments: z.record(z.string(), z.unknown()).optional(),
   options: z.record(z.string(), z.unknown()).optional(),
 });

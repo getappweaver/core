@@ -26,7 +26,7 @@ import type { BunkerSignerData } from './storage';
 
 const NIP46_KIND = 24133;
 const DEFAULT_PERMS = 'sign_event,get_public_key';
-const REQUEST_TIMEOUT_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 5 * 60_000;
 /** Default max wait for remote signer to open `nostrconnect://` and complete handshake. */
 const NOSTR_CONNECT_WAIT_MS = 300_000;
 

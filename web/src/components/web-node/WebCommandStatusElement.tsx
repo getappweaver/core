@@ -28,7 +28,7 @@ export function WebCommandStatusElement(
         when={status()}
         fallback={
           <div class="web-commandStatus__empty">
-            Background fetch progress will appear here.
+            Command progress will appear here.
           </div>
         }
       >
@@ -36,7 +36,10 @@ export function WebCommandStatusElement(
           <div class="web-commandStatus__body">
             <div class="web-commandStatus__header">
               <span class="web-commandStatus__dot" aria-hidden="true" />
-              <span class="web-commandStatus__message">
+              <span
+                class="web-commandStatus__message"
+                title={current().message ?? undefined}
+              >
                 {current().message ?? current().state}
               </span>
             </div>
@@ -54,7 +57,10 @@ export function WebCommandStatusElement(
             </Show>
             <Show when={current().output}>
               {(output) => (
-                <pre class="web-commandStatus__output">{output()}</pre>
+                <details>
+                  <summary>Diagnostic history</summary>
+                  <pre class="web-commandStatus__output">{output()}</pre>
+                </details>
               )}
             </Show>
           </div>

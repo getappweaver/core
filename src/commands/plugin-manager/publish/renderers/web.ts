@@ -345,7 +345,21 @@ export function renderPluginsPublishWeb(
   return {
     kind: 'ui',
     version: 1,
-    meta: { command: 'plugins', subcommand: 'publish' },
+    meta: {
+      command: 'plugins',
+      subcommand: 'publish',
+      outcome: {
+        state:
+          representation.status === 'failed'
+            ? 'error'
+            : representation.registrationError ||
+                representation.discoveryError ||
+                representation.relays.some((relay) => !relay.ok)
+              ? 'warning'
+              : 'success',
+        message: representation.message,
+      },
+    },
     tree: {
       type: 'element',
       tag: 'stack',
@@ -378,16 +392,38 @@ export function renderPluginsPublishWeb(
                       props: {
                         label: representation.registrationError
                           ? 'published · registration pending'
-                          : representation.status.replace('-', ' '),
-                        tone: representation.registrationError
-                          ? 'warning'
-                          : statusTone(representation.status),
+                          : representation.discoveryError
+                            ? 'published · discovery pending'
+                            : representation.status.replace('-', ' '),
+                        tone:
+                          representation.registrationError ||
+                          representation.discoveryError ||
+                          (representation.status !== 'failed' &&
+                            representation.relays.some((relay) => !relay.ok))
+                            ? 'warning'
+                            : statusTone(representation.status),
                         size: 'sm',
                       },
                     },
                   ],
                 },
                 textBlock(representation.message, 'muted'),
+                ...(representation.diagnostics
+                  ? [
+                      {
+                        type: 'element' as const,
+                        tag: 'details' as const,
+                        children: [
+                          {
+                            type: 'element' as const,
+                            tag: 'summary' as const,
+                            children: [textNode('Diagnostic history')],
+                          },
+                          textBlock(representation.diagnostics, 'muted'),
+                        ],
+                      },
+                    ]
+                  : []),
                 ...(representation.registrationError &&
                 representation.registrationRepo
                   ? [

@@ -10,7 +10,10 @@ import {
   uploadBufferToServer,
   type BlossomBlobDescriptor,
 } from '@src/nostr/blossom';
-import { bunkerSignEvent } from '@src/nostr/bunker';
+import {
+  bunkerSignEventWithProgress,
+  type BunkerProgress,
+} from '@src/nostr/bunker';
 import type { BunkerSignerData } from '@src/nostr/connections';
 import { fetchNip65WriteRelays } from '@src/nostr/nip65';
 
@@ -64,16 +67,18 @@ type UploadPluginIconProps = {
   pool: SimplePool;
   bunkerData: BunkerSignerData;
   icon: PluginSvgIcon;
+  onProgress: BunkerProgress | null;
 };
 
 export async function uploadPluginIcon({
   pool,
   bunkerData,
   icon,
+  onProgress,
 }: UploadPluginIconProps): Promise<string> {
   const relayUrls = await fetchNip65WriteRelays({
     pool,
-    authorPubkey: bunkerData.remoteSignerPubkey,
+    authorPubkey: bunkerData.userPubkey,
   });
 
   const servers = await fetchBlossomServerUrls({
@@ -81,6 +86,11 @@ export async function uploadPluginIcon({
     relayUrls,
     authorPubkey: bunkerData.userPubkey,
   });
+
+  onProgress?.(
+    `Blossom destinations: ${servers.join(', ') || '(none)'}`,
+    'info',
+  );
 
   if (servers.length === 0) {
     throw new Error(
@@ -94,13 +104,37 @@ export async function uploadPluginIcon({
     action: 'upload',
     xTags: [hashHex],
     expirationSeconds: null,
-    signEvent: (template) => bunkerSignEvent(pool, bunkerData, template),
+    signEvent: (template) =>
+      bunkerSignEventWithProgress({
+        pool,
+        data: bunkerData,
+        event: template,
+        onProgress: (message, severity) =>
+          onProgress?.(
+            `Icon upload authorization (kind ${template.kind}): ${message}`,
+            severity,
+          ),
+      }),
   });
 
   const results = await Promise.allSettled(
-    servers.map((server) =>
-      uploadBufferToServer(server, icon.data, 'image/svg+xml', auth),
-    ),
+    servers.map(async (server) => {
+      try {
+        const uploaded = await uploadBufferToServer(
+          server,
+          icon.data,
+          'image/svg+xml',
+          auth,
+        );
+
+        onProgress?.(`Blossom ${server}: uploaded`, 'info');
+
+        return uploaded;
+      } catch (error) {
+        onProgress?.(`Blossom ${server}: ${String(error)}`, 'warning');
+        throw error;
+      }
+    }),
   );
 
   const uploaded = results.find(

@@ -41,6 +41,8 @@ import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import type { RouteCommandContext } from '../../dispatch';
 
+import { catalogDestinations } from '../catalog-destinations';
+
 import {
   attachPluginPayments,
   gatePluginPayment,
@@ -1358,6 +1360,7 @@ export async function queryPluginCatalog(
 
       const relays = uniqueRelays([
         ...(options?.relays ?? []),
+        ...catalogDestinations(ctx.seenDb),
         ...PLUGIN_QUERY_RELAYS,
       ]);
 

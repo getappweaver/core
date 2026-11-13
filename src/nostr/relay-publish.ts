@@ -44,6 +44,20 @@ export async function publishSignedEventToRelays(
   relays: string[],
   signed: VerifiedEvent,
 ): Promise<RelayResult[]> {
+  return publishSignedEventWithProgress({ relays, signed, onResult: null });
+}
+
+type PublishSignedEventWithProgressProps = {
+  relays: string[];
+  signed: VerifiedEvent;
+  onResult: ((result: RelayResult) => void) | null;
+};
+
+export async function publishSignedEventWithProgress({
+  relays,
+  signed,
+  onResult,
+}: PublishSignedEventWithProgressProps): Promise<RelayResult[]> {
   return Promise.all(
     relays.map(async (relay) => {
       const r = new Relay(relay);
@@ -53,21 +67,29 @@ export async function publishSignedEventToRelays(
 
         const result = await r.publish(signed);
 
-        return {
+        const outcome: RelaySuccess = {
           relay,
           result: {
             type: 'success' as const,
             result,
           },
         };
+
+        onResult?.(outcome);
+
+        return outcome;
       } catch (err) {
-        return {
+        const outcome: RelayFailure = {
           relay,
           result: {
             type: 'error' as const,
             message: err instanceof Error ? err.message : String(err),
           },
         };
+
+        onResult?.(outcome);
+
+        return outcome;
       } finally {
         r.close();
       }

@@ -27,3 +27,50 @@ as part of implementation verification. Existing offer management stays separate
       covered both formats, inactive-first selection, missing active accounts,
       invalid npubs, malformed account entries, invalid JSON and command failure.
 - [ ] User retries first publication with ngit 3.0.5 after loading the fix.
+
+## Publication diagnostics and discovery
+
+- [x] Propagate structured outcomes to background command status, including partial
+      success; replace stale publication results after failed attempts.
+- [x] Stream stages, elapsed signing waits, account/purpose, signing transport
+      acknowledgements and catalog relay outcomes without exposing credentials.
+- [x] Verify the exact published catalog event and distinguish relay acceptance
+      from discovery; retain publication destinations for future catalog queries.
+- [x] Reuse the existing icon URL when its published source and SHA-256 match;
+      use the publishing account for Blossom relay discovery. Publication catalog
+      lookup skips unnecessary icon downloads; network Git operations yield while
+      progress updates stream.
+- [x] Update feature and shared renderer documentation; targeted ESLint `--fix`,
+      web TypeScript and whitespace checks pass.
+- [ ] Repository-wide lint passes: currently blocked by unused `NostrEvent` in
+      `plugins/nr/db/evaluation-queue.ts` and unused `settings` in
+      `plugins/translate/service.ts`, outside this change.
+- [ ] Root TypeScript passes: still blocked by the three previously documented
+      FIPS vendor errors (ProjectivePoint and two WebRTC string/byte mismatches).
+- [ ] User verification with authenticated Amber publication and timeout recovery.
+
+## NIP-46 response-side diagnostics
+
+- [x] Report per-relay reply connection setup, requested subscriptions, closures,
+      and received responses independently; one failed relay must not stop others.
+- [x] Distinguish unmatched, undecryptable and malformed responses without logging
+      decrypted payloads; include send/listen counts in timeout diagnostics.
+- [x] Complete targeted ESLint `--fix` and whitespace checks; document the
+      diagnostic semantics. Root TypeScript still reports only the three FIPS
+      vendor errors above. No live signing requests were sent for verification.
+- [ ] User retries with Amber to establish whether replies reach the backend.
+
+## Warning/error-only diagnostics
+
+- [x] Keep routine publication stages in live status while retaining only explicitly
+      classified warnings/errors in streamed and refreshed diagnostic histories.
+- [x] Preserve terminal warning/error summaries in refreshed release results.
+- [x] Update documentation; targeted ESLint `--fix` and whitespace checks pass.
+      Root TypeScript reports only the same three existing FIPS vendor errors.
+
+## Longer signer approval window
+
+- [x] Extend backend and browser NIP-46 request and bunker connection waits from
+      one minute to five minutes; derive publication wait/timeout messages from
+      the configured duration and update the feature documentation.
+- [x] Targeted ESLint `--fix` and whitespace verification passed.

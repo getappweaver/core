@@ -61,6 +61,7 @@ import {
   getCommandDefinitionForWeb,
   listAllCommandsDetailForWeb,
 } from './command-catalog';
+import { BACKGROUND_COMMAND_STATUS_MARKER } from './command-status';
 import { getComposerAiState, type ComposerAiState } from './composer-ai-state';
 import { executeBuiltinCommand, executeBuiltinJsonCommand } from './execute';
 import { verifyNip98Authorization } from './nip98-verify';
@@ -1064,7 +1065,7 @@ async function handleRunCommand(params: {
     sendReply: async (reply) => {
       let timelineEventId: string | undefined;
 
-      if (recordTl) {
+      if (recordTl && !reply.startsWith(BACKGROUND_COMMAND_STATUS_MARKER)) {
         timelineEventId = insertTimelineEvent(ctx.seenDb, {
           timelineId: message.timelineId,
           sessionId: message.timelineId,

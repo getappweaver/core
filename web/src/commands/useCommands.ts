@@ -57,6 +57,7 @@ import { getResultSubcommandTag, summarizeInvocation } from '../utils';
 import { downloadTextFile, parseCommandDownload } from '../utils/download';
 
 import {
+  backgroundCommandStatus,
   parseBackgroundCommandStatus,
   setBackgroundCommandStatus,
 } from './backgroundStatus';
@@ -2060,6 +2061,7 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     let finalRefreshDispatchAttempted = false;
     let userPendingEnded = false;
     let backgroundOutputText: string | null = null;
+    let receivedTerminalStatus = false;
 
     const refreshHighlightTargetIds = [
       ...(commandAction.refresh?.highlightTargetIds ?? []),
@@ -2326,6 +2328,37 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
     adapters.pendingRequests.set(requestId, {
       recordInTimeline: recordTl,
       onCommandResult: (message) => {
+        if (typeof message.output === 'string') {
+          const statusUpdate = parseBackgroundCommandStatus(message.output);
+
+          if (statusUpdate) {
+            if (statusUpdate.id === statusTargetId) {
+              receivedTerminalStatus = ['success', 'warning', 'error'].includes(
+                statusUpdate.state,
+              );
+            }
+
+            setBackgroundCommandStatus(statusUpdate);
+
+            return;
+          }
+        } else if (
+          message.output.kind === 'ui' &&
+          message.output.meta.outcome &&
+          statusTargetId
+        ) {
+          const outcome = message.output.meta.outcome;
+          receivedTerminalStatus = true;
+
+          setBackgroundCommandStatus({
+            id: statusTargetId,
+            state: outcome.state,
+            message: outcome.message,
+            output: backgroundCommandStatus(statusTargetId)?.output ?? null,
+            progress: 1,
+          });
+        }
+
         if (sessionId !== adapters.timelineId()) {
           endUserPendingOnce();
           finishBrowserTrace('ok');
@@ -2336,16 +2369,6 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
         if (!commandRoundTripEnded) {
           commandRoundTripEnded = true;
           commandRoundTrip?.end();
-        }
-
-        if (typeof message.output === 'string') {
-          const statusUpdate = parseBackgroundCommandStatus(message.output);
-
-          if (statusUpdate) {
-            setBackgroundCommandStatus(statusUpdate);
-
-            return;
-          }
         }
 
         const output = splitCommandOutput(message.output);
@@ -2523,7 +2546,11 @@ export function useCommands(adapters: CommandsAdapters): CommandsHook {
 
         dispatchRefreshOnce({ refreshStage: 'final' });
 
-        if (runsInBackground && commandAction.clientStatus?.success) {
+        if (
+          runsInBackground &&
+          commandAction.clientStatus?.success &&
+          !receivedTerminalStatus
+        ) {
           const successText = commandAction.clientStatus.success;
 
           const outputText =

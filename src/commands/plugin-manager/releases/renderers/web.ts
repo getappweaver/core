@@ -156,11 +156,15 @@ function publishResult(entry: PluginReleaseEntry): WebNode[] {
   }
 
   const tone =
-    result.status === 'published'
-      ? ('success' as const)
-      : result.status === 'failed'
-        ? ('danger' as const)
-        : ('warning' as const);
+    result.status === 'failed'
+      ? ('danger' as const)
+      : result.registrationError ||
+          result.discoveryError ||
+          result.relays.some((relay) => !relay.ok)
+        ? ('warning' as const)
+        : result.status === 'published'
+          ? ('success' as const)
+          : ('warning' as const);
 
   return [
     {
@@ -179,7 +183,9 @@ function publishResult(entry: PluginReleaseEntry): WebNode[] {
               props: {
                 label: result.registrationError
                   ? 'published · registration pending'
-                  : result.status.replace('-', ' '),
+                  : result.discoveryError
+                    ? 'published · discovery pending'
+                    : result.status.replace('-', ' '),
                 tone: result.registrationError ? 'warning' : tone,
                 size: 'sm',
               },
@@ -211,6 +217,22 @@ function publishResult(entry: PluginReleaseEntry): WebNode[] {
                     },
                   },
                 },
+              },
+            ]
+          : []),
+        ...(result.diagnostics
+          ? [
+              {
+                type: 'element' as const,
+                tag: 'details' as const,
+                children: [
+                  {
+                    type: 'element' as const,
+                    tag: 'summary' as const,
+                    children: [textNode('Diagnostic history')],
+                  },
+                  textBlock(result.diagnostics, 'muted'),
+                ],
               },
             ]
           : []),

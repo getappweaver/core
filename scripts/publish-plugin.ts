@@ -402,7 +402,13 @@ async function main(): Promise<void> {
 
   if (icon) {
     try {
-      iconUrl = await uploadPluginIcon({ pool, bunkerData, icon });
+      iconUrl = await uploadPluginIcon({
+        pool,
+        bunkerData,
+        icon,
+        onProgress: null,
+      });
+
       console.log(`Icon URL:       ${iconUrl}`);
     } catch (err) {
       console.error(`Icon upload failed: ${String(err)}`);

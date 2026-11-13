@@ -1,7 +1,12 @@
 import { createSignal } from 'solid-js';
 
+import {
+  BACKGROUND_COMMAND_STATUS_MARKER,
+  BackgroundCommandUpdateSchema,
+} from '@src/web/command-status';
+
 export type BackgroundCommandStatus = {
-  state: 'idle' | 'pending' | 'success' | 'error';
+  state: 'idle' | 'pending' | 'success' | 'warning' | 'error';
   activeTargetId: string | null;
   message: string | null;
   output: string | null;
@@ -9,7 +14,7 @@ export type BackgroundCommandStatus = {
   updatedAt: number;
 };
 
-export const BACKGROUND_COMMAND_STATUS_MARKER = '__WEB_COMMAND_STATUS__';
+export { BACKGROUND_COMMAND_STATUS_MARKER } from '@src/web/command-status';
 
 const [statuses, setStatuses] = createSignal<
   Record<string, BackgroundCommandStatus>
@@ -90,24 +95,11 @@ export function parseBackgroundCommandStatus(
   }
 
   try {
-    const parsed = JSON.parse(
-      value.slice(BACKGROUND_COMMAND_STATUS_MARKER.length),
-    ) as Partial<Parameters<typeof setBackgroundCommandStatus>[0]>;
+    const parsed = BackgroundCommandUpdateSchema.safeParse(
+      JSON.parse(value.slice(BACKGROUND_COMMAND_STATUS_MARKER.length)),
+    );
 
-    if (!parsed.id || !parsed.state) {
-      return null;
-    }
-
-    return {
-      id: parsed.id,
-      state: parsed.state,
-      message: parsed.message ?? null,
-      output: parsed.output ?? null,
-      progress:
-        typeof parsed.progress === 'number'
-          ? Math.max(0, Math.min(1, parsed.progress))
-          : null,
-    };
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }

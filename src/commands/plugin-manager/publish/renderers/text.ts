@@ -12,6 +12,10 @@ export function renderPluginsPublishText(
     lines.push(`Event ID: ${representation.eventId}`);
   }
 
+  if (representation.diagnostics) {
+    lines.push('', 'Diagnostic history:', representation.diagnostics);
+  }
+
   if (representation.registrationError) {
     lines.push(
       `Retry local registration: plugins publish ${representation.alias} --operation registration-retry`,

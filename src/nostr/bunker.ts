@@ -23,7 +23,10 @@ import { bytesToHex, hexToBytes } from 'nostr-tools/utils';
 
 import { debug } from '@src/logger';
 
-import { isRelaySuccess, publishSignedEventToRelays } from './relay-publish';
+import {
+  isRelaySuccess,
+  publishSignedEventWithProgress,
+} from './relay-publish';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,7 +34,7 @@ import { isRelaySuccess, publishSignedEventToRelays } from './relay-publish';
 
 const NIP46_KIND = 24133;
 const DEFAULT_PERMS = 'sign_event,get_public_key,nip44_encrypt,nip44_decrypt';
-const REQUEST_TIMEOUT_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 5 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -107,7 +110,13 @@ function decryptContent(
   }
 }
 
-async function sendNip46Request(params: {
+export type BunkerProgressSeverity = 'info' | 'warning' | 'error';
+export type BunkerProgress = (
+  message: string,
+  severity: BunkerProgressSeverity,
+) => void;
+
+type SendNip46RequestProps = {
   pool: SimplePool;
   relays: string[];
   ephemeralSecret: Uint8Array;
@@ -115,7 +124,12 @@ async function sendNip46Request(params: {
   remoteSignerPubkey: string;
   method: string;
   params: string[];
-}): Promise<Nip46ResponsePayload> {
+  onProgress: BunkerProgress | null;
+};
+
+async function sendNip46Request(
+  params: SendNip46RequestProps,
+): Promise<Nip46ResponsePayload> {
   const {
     pool,
     relays,
@@ -141,10 +155,47 @@ async function sendNip46Request(params: {
 
   const signedEvent = finalizeEvent(template, ephemeralSecret);
 
+  params.onProgress?.(
+    `NIP-46 ${method}: waiting up to ${REQUEST_TIMEOUT_MS / 1000}s; transport relays: ${relays.join(', ')}`,
+    'info',
+  );
+
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const subscriptions: { close: (reason?: string) => void }[] = [];
+    const listeningRelays = new Set<string>();
+    const acceptingRelays = new Set<string>();
+    const seenResponses = new Set<string>();
+
+    const report = (message: string, severity: BunkerProgressSeverity) => {
+      if (!settled) {
+        params.onProgress?.(message, severity);
+      }
+    };
+
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(timer);
+      for (const sub of subscriptions) {
+        sub.close('NIP-46 request settled');
+      }
+    };
+
+    const fail = (error: Error) => {
+      if (settled) {
+        return;
+      }
+
+      cleanup();
+      reject(error);
+    };
+
     const timer = setTimeout(() => {
-      sub.close();
-      reject(new Error(`NIP-46 request timed out (${method})`));
+      fail(
+        new Error(
+          `NIP-46 request timed out (${method}) after ${REQUEST_TIMEOUT_MS / 1000}s; no matching signer response. Request accepted by ${acceptingRelays.size}/${relays.length} relay(s); reply subscriptions requested and not reported closed on ${listeningRelays.size}/${relays.length} relay(s). Transport relays: ${relays.join(', ')}`,
+        ),
+      );
     }, REQUEST_TIMEOUT_MS);
 
     const subscriptionFilter = {
@@ -156,55 +207,166 @@ async function sendNip46Request(params: {
 
     debug('Subscribing to: ', subscriptionFilter, 'Relays: ', relays);
 
-    const sub = pool.subscribe(relays, subscriptionFilter, {
-      onevent: (event) => {
-        if (event.kind !== NIP46_KIND || event.pubkey !== remoteSignerPubkey) {
-          return;
-        }
+    const handleResponse = (event: NostrEvent, relay: string) => {
+      if (settled) {
+        return;
+      }
 
-        const decrypted = decryptContent(
-          event.content,
-          event.pubkey,
-          ephemeralSecret,
+      if (event.kind !== NIP46_KIND || event.pubkey !== remoteSignerPubkey) {
+        return;
+      }
+
+      if (seenResponses.has(event.id)) {
+        return;
+      }
+
+      seenResponses.add(event.id);
+
+      report(
+        `Reply transport ${relay}: received signer event ${event.id}`,
+        'info',
+      );
+
+      const decrypted = decryptContent(
+        event.content,
+        event.pubkey,
+        ephemeralSecret,
+      );
+
+      if (!decrypted) {
+        report(
+          `Reply transport ${relay}: ignored undecryptable event; continuing to wait for this request`,
+          'warning',
         );
 
-        if (!decrypted) {
-          clearTimeout(timer);
-          sub.close();
-          reject(new Error('Failed to decrypt NIP-46 response'));
+        return;
+      }
+
+      let parsed: Nip46ResponsePayload;
+      try {
+        const value: unknown = JSON.parse(decrypted);
+
+        if (
+          !value ||
+          typeof value !== 'object' ||
+          typeof (value as Nip46ResponsePayload).id !== 'string'
+        ) {
+          report(
+            `Reply transport ${relay}: ignored malformed response envelope`,
+            'warning',
+          );
 
           return;
         }
 
-        let parsed: Nip46ResponsePayload;
-        try {
-          parsed = JSON.parse(decrypted) as Nip46ResponsePayload;
-        } catch (e) {
-          clearTimeout(timer);
-          sub.close();
-          reject(e);
+        parsed = value as Nip46ResponsePayload;
+      } catch {
+        report(
+          `Reply transport ${relay}: ignored malformed response JSON`,
+          'warning',
+        );
 
+        return;
+      }
+
+      if (parsed.id !== id) {
+        report(
+          `Reply transport ${relay}: response belongs to another request; continuing to wait`,
+          'info',
+        );
+
+        return;
+      }
+
+      report(
+        `Reply transport ${relay}: response matches active ${method} request`,
+        'info',
+      );
+
+      if (parsed.error) {
+        fail(new Error(parsed.error));
+
+        return;
+      }
+
+      report(`NIP-46 ${method}: matching signer response received`, 'info');
+
+      cleanup();
+      resolve(parsed);
+    };
+
+    for (const relay of relays) {
+      report(`Reply transport ${relay}: connecting independently`, 'info');
+
+      void pool
+        .ensureRelay(relay, { connectionTimeout: 10_000 })
+        .then(() => {
+          if (settled) {
+            return;
+          }
+
+          report(
+            `Reply transport ${relay}: connected; requesting response subscription (REQ, not a server acknowledgement)`,
+            'info',
+          );
+
+          listeningRelays.add(relay);
+
+          const sub = pool.subscribe([relay], subscriptionFilter, {
+            onevent: (event) => handleResponse(event, relay),
+            oninvalidevent: () =>
+              report(
+                `Reply transport ${relay}: invalid event ignored by relay client`,
+                'warning',
+              ),
+            onclose: (reasons) => {
+              if (settled) {
+                return;
+              }
+
+              listeningRelays.delete(relay);
+
+              report(
+                `Reply transport ${relay}: response subscription closed: ${reasons.map((item) => item.reason).join('; ') || 'no reason supplied'}`,
+                'warning',
+              );
+            },
+          });
+
+          subscriptions.push(sub);
+
+          if (settled) {
+            sub.close('NIP-46 request already settled');
+          }
+        })
+        .catch((error) => {
+          listeningRelays.delete(relay);
+
+          report(
+            `Reply transport ${relay}: connection/subscription failed: ${error instanceof Error ? error.message : String(error)}; other relays continue`,
+            'warning',
+          );
+        });
+    }
+
+    void publishSignedEventWithProgress({
+      relays,
+      signed: signedEvent,
+      onResult: (result) => {
+        if (settled) {
           return;
         }
 
-        if (parsed.id !== id) {
-          return;
+        if (isRelaySuccess(result)) {
+          acceptingRelays.add(result.relay);
         }
 
-        clearTimeout(timer);
-        sub.close();
-
-        if (parsed.error) {
-          reject(new Error(parsed.error));
-
-          return;
-        }
-
-        resolve(parsed);
+        report(
+          `Signing transport ${result.relay}: ${isRelaySuccess(result) ? 'request accepted (delivery to signer not confirmed)' : result.result.message}`,
+          isRelaySuccess(result) ? 'info' : 'warning',
+        );
       },
-    });
-
-    void publishSignedEventToRelays(relays, signedEvent)
+    })
       .then((publishOutcomes) => {
         const acceptedRelays = publishOutcomes
           .filter(isRelaySuccess)
@@ -217,9 +379,7 @@ async function sendNip46Request(params: {
         debug('NIP-46 sign request published to relays: ', acceptedRelays);
       })
       .catch((err) => {
-        clearTimeout(timer);
-        sub.close();
-        reject(err instanceof Error ? err : new Error(String(err)));
+        fail(err instanceof Error ? err : new Error(String(err)));
       });
   });
 }
@@ -354,6 +514,7 @@ export function connectBunker(
                 remoteSignerPubkey,
                 method: 'get_public_key',
                 params: [],
+                onProgress: null,
               });
 
               const userPubkey = response.result?.trim() ?? '';
@@ -406,6 +567,22 @@ export async function bunkerSignEvent(
   data: BunkerSignerData,
   event: EventTemplate,
 ): Promise<VerifiedEvent> {
+  return bunkerSignEventWithProgress({ pool, data, event, onProgress: null });
+}
+
+type BunkerSignEventWithProgressProps = {
+  pool: SimplePool;
+  data: BunkerSignerData;
+  event: EventTemplate;
+  onProgress: BunkerProgress | null;
+};
+
+export async function bunkerSignEventWithProgress({
+  pool,
+  data,
+  event,
+  onProgress,
+}: BunkerSignEventWithProgressProps): Promise<VerifiedEvent> {
   const ephemeralSecret = hexToBytes(data.ephemeralSecret);
 
   const response = await sendNip46Request({
@@ -416,6 +593,7 @@ export async function bunkerSignEvent(
     remoteSignerPubkey: data.remoteSignerPubkey,
     method: 'sign_event',
     params: [JSON.stringify(event)],
+    onProgress,
   });
 
   const signed = JSON.parse(response.result ?? 'null') as NostrEvent;
@@ -449,6 +627,7 @@ export async function bunkerNip44Encrypt(props: {
     remoteSignerPubkey: props.data.remoteSignerPubkey,
     method: 'nip44_encrypt',
     params: [props.pubkey, props.plaintext],
+    onProgress: null,
   });
 
   const encrypted = response.result?.trim() ?? '';
@@ -476,6 +655,7 @@ export async function bunkerNip44Decrypt(props: {
     remoteSignerPubkey: props.data.remoteSignerPubkey,
     method: 'nip44_decrypt',
     params: [props.pubkey, props.ciphertext],
+    onProgress: null,
   });
 
   const plaintext = response.result ?? '';

@@ -250,11 +250,13 @@ a.web-button:focus-visible {
   white-space: nowrap;
 }
 
-[data-state='pending'] .web-commandStatus__body {
+[data-state='pending'] .web-commandStatus__body,
+[data-state='warning'] .web-commandStatus__body {
   border-left-color: var(--color-warning);
 }
 
-[data-state='pending'] .web-commandStatus__dot {
+[data-state='pending'] .web-commandStatus__dot,
+[data-state='warning'] .web-commandStatus__dot {
   background: var(--color-warning);
 }
 

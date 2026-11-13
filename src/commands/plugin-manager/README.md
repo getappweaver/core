@@ -79,6 +79,57 @@ verified recent offer history are displayed. Publication requires a saved bunker
 connection matching the catalog author. First publish the app's catalog using the
 existing release flow; then use **Manage catalog & offers** to configure payments.
 
+### Publication progress and outcomes
+
+Release publication streams a compact live status with total elapsed time and an
+expandable warning/error diagnostic history. Routine stages appear only in the
+live status, not the history. Stages distinguish Git push/tag verification,
+Blossom discovery/upload and its authorization signature (kind `24242`), catalog
+signing (kind `32107`), relay authentication, relay acceptance, and catalog read-back.
+Live signing status identifies the saved bunker connection, publishing account npub,
+signer server public key and signing transport relays; warning/error entries retain
+the relevant context. Diagnostics never include signer secrets,
+encrypted request payloads, or authorization tokens. NIP-46 waits are bounded to
+five minutes (300 seconds), including initial bunker connection approval; each signing
+transport relay's acceptance/error is reported separately.
+Acceptance is not proof that Amber received the request or displayed a notification.
+
+Reply transport diagnostics separately report per-relay connection setup,
+subscription requests and subscription closures. Connections and request sends
+proceed independently for each relay; a failed relay does not block another.
+“Connected; requesting response subscription” describes the client operation,
+not a server acknowledgement (Nostr provides no positive REQ acknowledgement).
+Live status identifies incoming signer events by event ID and classifies them as matching,
+belonging to another request, undecryptable or malformed; decrypted contents are
+never logged. Expected responses belonging to other requests remain informational;
+unreadable/malformed responses and unexpected subscription closures produce warning
+entries. Stale/unreadable events do not terminate the remaining reply wait.
+Timeouts summarize how many relays accepted the outgoing request and how many
+reply subscriptions were requested without a reported closure. Only a matching
+signer reply establishes end-to-end success; those transport counts alone do not.
+
+The client uses the structured operation outcome, rather than command completion,
+to report success, partial success or failure. Failed attempts replace the previous
+in-memory result for that alias; refreshed release cards retain the latest attempt's
+diagnostic history until the host restarts. A signing failure can occur after Git
+push or icon upload, so it is reported as an incomplete publication, not a rollback.
+Git release publication alone does not update the Nostr catalog version.
+
+After at least one relay accepts a catalog event, the manager reads back that exact
+event ID from accepting destinations with a five-second query budget. Failed
+read-back produces **published · discovery pending**, preserving relay acceptance
+and local registration; it does not claim that publication failed. Rejected relay
+destinations or failed local registration also produce a warning outcome. Successful
+destination relays are retained in core SQLite state (`plugins.catalog-destinations`,
+bounded to 32 unique URLs) and included in later install/release/publication catalog
+queries alongside the default discovery relays. This is destination discovery, not
+a cache that substitutes a locally signed event for a relay response.
+
+When the published icon's source path and URL SHA-256 match the local icon bytes,
+the existing URL is reused, avoiding another Blossom upload and NIP-46 authorization
+request. Changed icons use the publishing user's NIP-65 write relays to discover
+their Blossom server list, rather than the signer server's identity.
+
 New offers accept an exact positive-integer price in sats, a Lightning address,
 and inclusive/exclusive validity bounds selected with native local date/time
 pickers. The browser submits timezone-qualified instants; signed offer tags still
