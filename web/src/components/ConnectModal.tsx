@@ -18,6 +18,20 @@ import {
 } from '../nostr/bunker';
 import { nostrConnectUriToQrSvg } from '../nostr/connect-qr';
 import { getPublicKeyViaNip55 } from '../nostr/nip55';
+import {
+  APPWEAVER_PROFILE_NAME,
+  authenticateWithGooglePopup,
+  computeDefaultThreshold,
+  DEFAULT_POMEGRANATE_CENTRAL,
+  ensureAppWeaverProfile,
+  fetchPomegranateAccount,
+  massagePomegranateUrl,
+  pickDefaultOperators,
+  publishSetupAnnouncementViaBunker,
+  runPomegranateDkg,
+  searchSetupAnnouncement,
+  type PomegranateExistingAnnouncement,
+} from '../nostr/pomegranate';
 
 import { WebButton } from './WebButton';
 
@@ -25,7 +39,8 @@ import { WebButton } from './WebButton';
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = 'nip07' | 'bunker' | 'nostrconnect' | 'nip55' | 'nip49';
+type Tab =
+  'nip07' | 'pomegranate' | 'bunker' | 'nostrconnect' | 'nip55' | 'nip49';
 
 type ConnectModalProps = {
   onClose: () => void;
@@ -136,6 +151,26 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
+  const [pomegranateCentral, setPomegranateCentral] = createSignal(
+    DEFAULT_POMEGRANATE_CENTRAL,
+  );
+
+  const [pomegranateOperatorsText, setPomegranateOperatorsText] = createSignal(
+    pickDefaultOperators(3).join('\n'),
+  );
+
+  const [pomegranateShowAdvanced, setPomegranateShowAdvanced] =
+    createSignal(false);
+
+  const [pomegranateStatus, setPomegranateStatus] = createSignal<string | null>(
+    null,
+  );
+
+  const [pomegranateExistingCentral, setPomegranateExistingCentral] =
+    createSignal<PomegranateExistingAnnouncement | null>(null);
+
+  let pomegranateAbort: AbortController | null = null;
+
   function clearTabChrome(): void {
     stopNip49QrScanner();
     setError(null);
@@ -144,6 +179,14 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
     setNostrConnectCopied(false);
     setNcryptsecField('');
     setNip49Password('');
+
+    if (pomegranateAbort) {
+      pomegranateAbort.abort();
+      pomegranateAbort = null;
+    }
+
+    setPomegranateStatus(null);
+    setPomegranateExistingCentral(null);
   }
 
   function isNip07Available(): boolean {
@@ -278,6 +321,11 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
 
   onCleanup(() => {
     stopNip49QrScanner();
+
+    if (pomegranateAbort) {
+      pomegranateAbort.abort();
+      pomegranateAbort = null;
+    }
   });
 
   function isExtensionConnectionError(error: unknown): boolean {
@@ -316,6 +364,145 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  type HandlePomegranateConnectProps = {
+    centralUrlOverride: string | null;
+    skipDiscovery: boolean;
+  };
+
+  async function handlePomegranateConnect(
+    connectProps: HandlePomegranateConnectProps,
+  ): Promise<void> {
+    if (pomegranateAbort) {
+      pomegranateAbort.abort();
+      pomegranateAbort = null;
+    }
+
+    pomegranateAbort = new AbortController();
+    const signal = pomegranateAbort.signal;
+
+    setError(null);
+    setLoading(true);
+    setPomegranateExistingCentral(null);
+
+    try {
+      const targetCentral =
+        connectProps.centralUrlOverride ?? pomegranateCentral();
+
+      const centralOrigin = massagePomegranateUrl(targetCentral);
+
+      if (connectProps.centralUrlOverride) {
+        setPomegranateCentral(centralOrigin);
+      }
+
+      setPomegranateStatus('Opening Google sign-in…');
+
+      const { token, email } = await authenticateWithGooglePopup({
+        centralUrl: centralOrigin,
+        timeoutMs: 120000,
+        signal,
+      });
+
+      setPomegranateStatus('Checking Pomegranate account…');
+      let account = await fetchPomegranateAccount({
+        centralUrl: centralOrigin,
+        token,
+        signal,
+      });
+
+      let isNewlyCreated = false;
+
+      if (!account) {
+        if (!connectProps.skipDiscovery) {
+          setPomegranateStatus('Looking for existing setup on Nostr relays…');
+
+          const existing = await searchSetupAnnouncement({
+            email,
+            timeoutMs: 4500,
+          });
+
+          if (existing && existing.centralUrl !== centralOrigin) {
+            setPomegranateExistingCentral(existing);
+            setLoading(false);
+            setPomegranateStatus(null);
+
+            return;
+          }
+        }
+
+        const rawOps = pomegranateOperatorsText()
+          .split('\n')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        const validOps = Array.from(
+          new Set(rawOps.map((op) => massagePomegranateUrl(op))),
+        );
+
+        if (validOps.length < 2) {
+          throw new Error(
+            'At least 2 valid operator URLs are required for FROST threshold signing',
+          );
+        }
+
+        const threshold = computeDefaultThreshold(validOps.length);
+
+        setPomegranateStatus(
+          `Generating ${threshold}-of-${validOps.length} threshold key (FROST DKG)…`,
+        );
+
+        account = await runPomegranateDkg({
+          centralUrl: centralOrigin,
+          token,
+          operators: validOps,
+          threshold,
+          signal,
+        });
+
+        isNewlyCreated = true;
+      }
+
+      setPomegranateStatus('Provisioning AppWeaver bunker profile…');
+
+      const { bunkerUrl: profileBunkerUrl } = await ensureAppWeaverProfile({
+        centralUrl: centralOrigin,
+        token,
+        profileName: APPWEAVER_PROFILE_NAME,
+        signal,
+      });
+
+      setPomegranateStatus('Connecting NIP-46 remote signer…');
+      const bunkerData = await connectBunker(profileBunkerUrl);
+
+      if (isNewlyCreated) {
+        void publishSetupAnnouncementViaBunker({
+          account,
+          centralUrl: centralOrigin,
+          bunkerData,
+        }).catch((err) => {
+          console.warn(
+            '[Pomegranate] Failed to publish setup announcement:',
+            err,
+          );
+        });
+      }
+
+      props.auth.connect({ method: 'bunker', bunkerData });
+      clearTabChrome();
+      props.onClose();
+    } catch (err) {
+      if (signal.aborted) {
+        return;
+      }
+
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (pomegranateAbort?.signal === signal) {
+        setLoading(false);
+        setPomegranateStatus(null);
+      }
     }
   }
 
@@ -560,6 +747,16 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
             </button>
             <button
               type="button"
+              class={`modal-tab${tab() === 'pomegranate' ? ' active' : ''}`}
+              onClick={() => {
+                setTab('pomegranate');
+                clearTabChrome();
+              }}
+            >
+              Google (FROST)
+            </button>
+            <button
+              type="button"
               class={`modal-tab${tab() === 'bunker' ? ' active' : ''}`}
               onClick={() => {
                 setTab('bunker');
@@ -647,6 +844,214 @@ export function ConnectModal(props: ConnectModalProps): JSX.Element {
                   </WebButton>
                 </div>
               </Show>
+            </Show>
+
+            <Show when={tab() === 'pomegranate'}>
+              <p
+                class="muted"
+                style={{ 'font-size': '0.9rem', 'margin-bottom': '0.65rem' }}
+              >
+                Sign in with Google using a decentralized FROST multisig key
+                (Pomegranate). Your private key is sharded across independent
+                operator servers via ChillDKG and never exists in full on any
+                single machine.
+              </p>
+
+              <Show when={pomegranateStatus()}>
+                {(statusText) => (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      'margin-bottom': '0.75rem',
+                      background: 'rgba(234, 179, 8, 0.1)',
+                      border: '1px solid rgba(234, 179, 8, 0.25)',
+                      'border-radius': '6px',
+                      color: '#eab308',
+                      'font-size': '0.82rem',
+                      'font-family': 'monospace',
+                    }}
+                  >
+                    {statusText()}
+                  </div>
+                )}
+              </Show>
+
+              <Show when={pomegranateExistingCentral()}>
+                {(existing) => (
+                  <div
+                    style={{
+                      padding: '0.75rem',
+                      'margin-bottom': '0.75rem',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      'border-radius': '6px',
+                      color: '#ededf2',
+                      'font-size': '0.82rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        'font-weight': 600,
+                        'margin-bottom': '0.35rem',
+                      }}
+                    >
+                      Existing Account Found!
+                    </div>
+                    <div class="muted" style={{ 'margin-bottom': '0.65rem' }}>
+                      An existing setup announcement for this account was found
+                      on coordinator <code>{existing().centralUrl}</code>.
+                    </div>
+                    <div
+                      class="actions-row"
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        'flex-wrap': 'wrap',
+                      }}
+                    >
+                      <WebButton
+                        type="button"
+                        class="web-button"
+                        disabled={loading()}
+                        onClick={() =>
+                          void handlePomegranateConnect({
+                            centralUrlOverride: existing().centralUrl,
+                            skipDiscovery: true,
+                          })
+                        }
+                      >
+                        Switch to {existing().centralUrl} &amp; Connect
+                      </WebButton>
+                      <WebButton
+                        type="button"
+                        class="web-button"
+                        style={{ opacity: 0.8 }}
+                        disabled={loading()}
+                        onClick={() =>
+                          void handlePomegranateConnect({
+                            centralUrlOverride: null,
+                            skipDiscovery: true,
+                          })
+                        }
+                      >
+                        Create new key on current coordinator anyway
+                      </WebButton>
+                    </div>
+                  </div>
+                )}
+              </Show>
+
+              <div class="actions-row" style={{ 'margin-bottom': '0.75rem' }}>
+                <WebButton
+                  type="button"
+                  class="web-button"
+                  disabled={loading()}
+                  onClick={() =>
+                    void handlePomegranateConnect({
+                      centralUrlOverride: null,
+                      skipDiscovery: false,
+                    })
+                  }
+                >
+                  {loading() ? 'Connecting…' : 'Sign in with Google (FROST)'}
+                </WebButton>
+              </div>
+
+              <div style={{ 'margin-top': '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPomegranateShowAdvanced(!pomegranateShowAdvanced())
+                  }
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#8ab4ff',
+                    cursor: 'pointer',
+                    padding: 0,
+                    'font-size': '0.8rem',
+                    'text-decoration': 'underline',
+                  }}
+                >
+                  {pomegranateShowAdvanced()
+                    ? 'Hide coordinator & operator settings ▲'
+                    : 'Advanced coordinator & operators ▼'}
+                </button>
+
+                <Show when={pomegranateShowAdvanced()}>
+                  <div
+                    style={{
+                      'margin-top': '0.65rem',
+                      padding: '0.75rem',
+                      background: '#101016',
+                      border: '1px solid #31313d',
+                      'border-radius': '6px',
+                    }}
+                  >
+                    <div style={{ 'margin-bottom': '0.65rem' }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          'font-size': '0.78rem',
+                          color: '#a0a0b0',
+                          'margin-bottom': '0.25rem',
+                        }}
+                      >
+                        Coordinator (Central URL):
+                      </label>
+                      <input
+                        type="text"
+                        value={pomegranateCentral()}
+                        onInput={(e) =>
+                          setPomegranateCentral(e.currentTarget.value)
+                        }
+                        disabled={loading()}
+                        style={{
+                          width: '100%',
+                          border: '1px solid #31313d',
+                          'border-radius': '4px',
+                          background: '#0a0a0f',
+                          color: '#ededf2',
+                          padding: '0.4rem 0.5rem',
+                          font: 'inherit',
+                          'font-size': '0.82rem',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          'font-size': '0.78rem',
+                          color: '#a0a0b0',
+                          'margin-bottom': '0.25rem',
+                        }}
+                      >
+                        FROST Operators (one per line, min 2):
+                      </label>
+                      <textarea
+                        value={pomegranateOperatorsText()}
+                        onInput={(e) =>
+                          setPomegranateOperatorsText(e.currentTarget.value)
+                        }
+                        rows={4}
+                        disabled={loading()}
+                        style={{
+                          width: '100%',
+                          resize: 'vertical',
+                          border: '1px solid #31313d',
+                          'border-radius': '4px',
+                          background: '#0a0a0f',
+                          color: '#ededf2',
+                          padding: '0.4rem 0.5rem',
+                          font: 'inherit',
+                          'font-size': '0.82rem',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </Show>
+              </div>
             </Show>
 
             <Show when={tab() === 'nip55'}>

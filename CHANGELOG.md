@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.22.0] - 2026-11-14
+
+- feat: integrate Pomegranate Google-FROST authentication and connection flow (2e54cb66)
+
 ## [v14.21.4] - 2026-11-14
 
-- fix: plugin publication process with progress tracking and diagnostics (d563065e)
+- fix: plugin publication process with progress tracking and diagnostics (12d40a15)
 
 ## [v14.21.3] - 2026-11-13
 
