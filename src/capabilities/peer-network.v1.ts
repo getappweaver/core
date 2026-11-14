@@ -137,6 +137,17 @@ export const PeerNetworkV1 = defineCapability({
   capability: { name: 'peer-network', version: 1 },
   addedInCoreVersion: '14.13.4',
   operations: {
+    'select-members': {
+      id: 'capability:v1:peer-network.select-members',
+      required: false,
+      inputSchema: z.object({
+        protocol: PeerProtocolSchema,
+        topics: z.array(PeerTopicSchema).min(1).max(128),
+      }),
+      outputSchema: z.object({
+        managementCommand: PeerManagementCommandV1Schema,
+      }),
+    },
     'list-peers': {
       id: 'capability:v1:peer-network.list-peers',
       required: true,
