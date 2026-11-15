@@ -314,7 +314,7 @@ function renderElement({
         <details
           class={elementClass(element)}
           style={elementStyle(element)}
-          open={element.props?.open}
+          open={element.props?.open || undefined}
         >
           <For each={element.children ?? []}>{renderChild}</For>
         </details>
