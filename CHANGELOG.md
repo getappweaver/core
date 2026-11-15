@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.23.0] - 2026-11-15
+
+- feat: enhance peer capabilities with invitation management (f27a4525)
+
 ## [v14.22.1] - 2026-11-15
 
-- fix: forgot select-members of peer-network (9d2b64df)
+- fix: forgot select-members of peer-network (c54a496f)
 
 ## [v14.22.0] - 2026-11-14
 

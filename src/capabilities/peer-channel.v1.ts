@@ -7,6 +7,8 @@ import {
   PeerProtocolSchema,
   PeerStatusV1Schema,
   PeerTopicSchema,
+  PeerInvitationV1Schema,
+  PeerManagementCommandV1Schema,
 } from './peer-network.v1';
 import { defineCapability } from './types';
 
@@ -31,6 +33,24 @@ export const PeerChannelV1 = defineCapability({
       inputSchema: z.object({}),
       outputSchema: z.object({
         protocols: z.array(PeerProtocolSchema).max(64),
+        invitationProtocols: z
+          .array(PeerProtocolSchema)
+          .max(64)
+          .optional()
+          .default([]),
+      }),
+      webResult: () => null,
+    },
+    'invitation-received': {
+      id: 'capability:v1:peer-channel.invitation-received',
+      required: false,
+      inputSchema: z.object({
+        invitation: PeerInvitationV1Schema,
+        fromMasterPubkey: z.string().regex(/^[0-9a-f]{64}$/),
+      }),
+      outputSchema: z.object({
+        accepted: z.boolean(),
+        completionCommand: PeerManagementCommandV1Schema.nullable(),
       }),
       webResult: () => null,
     },

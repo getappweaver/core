@@ -106,6 +106,52 @@ export const PeerManagementCommandV1Schema = z.object({
   arguments: z.record(z.string(), z.unknown()),
   options: z.record(z.string(), z.unknown()),
 });
+/** Small app-owned onboarding metadata, never a task/history transfer channel. */
+export const PeerInvitationDraftV1Schema = z
+  .object({
+    label: z.string().trim().min(1).max(500),
+    body: z
+      .string()
+      .max(4096)
+      .refine(
+        (value) => new TextEncoder().encode(value).length <= 4096,
+        'Invitation metadata exceeds 4 KiB',
+      ),
+    expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    completionCommand: PeerManagementCommandV1Schema.optional(),
+  })
+  .strict();
+export const PeerInvitationV1Schema = PeerInvitationDraftV1Schema.omit({
+  completionCommand: true,
+}).extend({
+  id: z.string().uuid(),
+  protocol: PeerProtocolSchema,
+  topic: PeerTopicSchema,
+  fromFipsPubkey: FipsPubkeySchema,
+  toFipsPubkey: FipsPubkeySchema,
+  createdAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+});
+export const PeerInvitationRecordV1Schema = z.object({
+  invitation: PeerInvitationV1Schema,
+  direction: z.enum(['incoming', 'outgoing']),
+  state: z.enum([
+    'queued',
+    'delivered',
+    'accepted',
+    'declined',
+    'expired',
+    'failed',
+  ]),
+  remoteLabel: z.string(),
+  remoteMasterPubkey: z.string().regex(/^[0-9a-f]{64}$/),
+  error: z.string().nullable(),
+  accessReady: z.boolean(),
+  reviewCommand: PeerManagementCommandV1Schema.nullable(),
+});
+export type PeerInvitationV1 = z.infer<typeof PeerInvitationV1Schema>;
+export type PeerInvitationRecordV1 = z.infer<
+  typeof PeerInvitationRecordV1Schema
+>;
 export const PeerNetworkListPeersInputV1Schema = z.object({});
 export const PeerNetworkListPeersOutputV1Schema = z.object({
   localMasterPubkey: z.string().regex(/^[0-9a-f]{64}$/),
@@ -143,10 +189,31 @@ export const PeerNetworkV1 = defineCapability({
       inputSchema: z.object({
         protocol: PeerProtocolSchema,
         topics: z.array(PeerTopicSchema).min(1).max(128),
+        invitation: PeerInvitationDraftV1Schema.optional(),
       }),
       outputSchema: z.object({
         managementCommand: PeerManagementCommandV1Schema,
       }),
+    },
+    'list-invitations': {
+      id: 'capability:v1:peer-network.list-invitations',
+      required: false,
+      inputSchema: z.object({ protocol: PeerProtocolSchema }),
+      outputSchema: z.object({
+        invitations: z.array(PeerInvitationRecordV1Schema).max(1024),
+      }),
+    },
+    'decline-invitation': {
+      id: 'capability:v1:peer-network.decline-invitation',
+      required: false,
+      inputSchema: z.object({ id: z.string().uuid() }),
+      outputSchema: z.object({ declined: z.boolean() }),
+    },
+    'retry-invitation': {
+      id: 'capability:v1:peer-network.retry-invitation',
+      required: false,
+      inputSchema: z.object({ id: z.string().uuid() }),
+      outputSchema: z.object({ queued: z.boolean() }),
     },
     'list-peers': {
       id: 'capability:v1:peer-network.list-peers',
