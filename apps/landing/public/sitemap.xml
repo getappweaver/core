@@ -1641,6 +1641,11 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://getappweaver.com/docs/plugins/fips/app-invitations/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://getappweaver.com/docs/plugins/fips/architecture/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -1691,12 +1696,47 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/architecture-simulation-superseded/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/architecture-xitdb-superseded/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://getappweaver.com/docs/plugins/teams-todo/architecture/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/command-locality-plan/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://getappweaver.com/docs/plugins/teams-todo/implementation-plan/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/initial-mvp-and-superseded-plan/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/schema-foundation/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/simulation-ui-superseded/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://getappweaver.com/docs/plugins/teams-todo/ux-and-sync-review/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
