@@ -1024,7 +1024,7 @@
       {
         "name": "install",
         "summary": "Discover or install plugins from the Nostr plugin catalog.",
-        "usage": "install [<target>] [<signedEvent>] [--operation <operation>] [--identity <identity>] [--attempt <attempt>] [--challenge <challenge>]",
+        "usage": "install [<target>] [<signedEvent>] [--operation <operation>] [--identity <identity>] [--attempt <attempt>] [--challenge <challenge>] [--tag <tag>]",
         "aliases": [
           "list"
         ],
@@ -1078,6 +1078,14 @@
             "shortFlag": null,
             "kind": "string",
             "required": false
+          },
+          {
+            "name": "tag",
+            "summary": "Filter catalog plugins by tag.",
+            "flag": "--tag",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
           }
         ],
         "examples": [
@@ -1128,7 +1136,7 @@
       {
         "name": "publish",
         "summary": "Publish plugin releases and manage author payment offers in the web UI.",
-        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--repo <repo>] [--signer <signer>] [--confirm]",
+        "usage": "publish <alias> [--operation <operation>] [--price <price>] [--lightning-address <lightning_address>] [--valid-from <valid_from>] [--valid-until <valid_until>] [--draft <draft>] [--offer-id <offer_id>] [--repo <repo>] [--title <title>] [--website <website>] [--description <description>] [--tags <tags>] [--signer <signer>] [--confirm]",
         "aliases": [],
         "arguments": [
           {
@@ -1201,6 +1209,38 @@
             "name": "repo",
             "summary": "Web publication form field: repo.",
             "flag": "--repo",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "title",
+            "summary": "Web publication form field: title.",
+            "flag": "--title",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "website",
+            "summary": "Web publication form field: website.",
+            "flag": "--website",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "summary": "Web publication form field: description.",
+            "flag": "--description",
+            "shortFlag": null,
+            "kind": "string",
+            "required": false
+          },
+          {
+            "name": "tags",
+            "summary": "Web publication form field: tags.",
+            "flag": "--tags",
             "shortFlag": null,
             "kind": "string",
             "required": false
@@ -3265,10 +3305,12 @@
           "executionMode": "runnable_default"
         },
         "webWidget": {
-          "placement": "header",
+          "placement": "right",
           "surface": "modal",
           "label": "Browser",
-          "modalTitle": "Browser tasks"
+          "modalTitle": "Browser tasks",
+          "icon": "./commands/list/renderers/browser.svg",
+          "order": 5
         }
       },
       {
@@ -4069,6 +4111,436 @@
         "inferredWeb": {
           "generated": true,
           "executionMode": "runnable_customizable"
+        }
+      }
+    ]
+  },
+  {
+    "name": "fips",
+    "summary": "Manage FIPS mesh identity, Nostr UDP NAT traversal, and peer connections for team apps.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "fips",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Show command help for fips or one of its subcommands.",
+        "usage": "help [<topic>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "topic",
+            "summary": "Optional subcommand: status, invite, ping, seeds, add, list, show, alias, delete",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips help",
+          "/fips help status",
+          "/fips help invite",
+          "/fips help ping",
+          "/fips help list",
+          "/fips help add"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "status",
+        "summary": "Show local FIPS node identity, runtime status, configured seed URLs, and peer counts.",
+        "usage": "status",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/fips status"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "access",
+        "summary": "Owner-managed app access grants and stored access-request review.",
+        "usage": "access [<action>] [--invitation <invitation>] [--selection <selection>] [--members <members>] [--view <view>] [--request <request>] [--requests <requests>] [--peer <peer>] [--id <id>] [--app <app>] [--protocol <protocol>] [--peers <peers>] [--topics <topics>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "action",
+            "summary": "list, save, remove, allow or decline. Only explicit owner commands change grants.",
+            "kind": "string",
+            "required": false,
+            "variadic": false
+          }
+        ],
+        "options": [
+          {
+            "name": "invitation",
+            "summary": "Stored incoming app invitation to review, accept or decline.",
+            "flag": "--invitation",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "selection",
+            "summary": "Stored app-scoped owner member-selection context.",
+            "flag": "--selection",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "members",
+            "summary": "Explicitly selected paired FIPS key; repeat for each node.",
+            "flag": "--members",
+            "kind": "string",
+            "required": false,
+            "multiple": true,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "view",
+            "summary": "Stored caller-scoped management context.",
+            "flag": "--view",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "request",
+            "summary": "Stored access request ID to review.",
+            "flag": "--request",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "requests",
+            "summary": "JSON array of stored request IDs for an atomic allow-batch action. Review each visible request scope first.",
+            "flag": "--requests",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "peer",
+            "summary": "Filter by exact remote FIPS key.",
+            "flag": "--peer",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "id",
+            "summary": "Grant record ID to edit or remove.",
+            "flag": "--id",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "app",
+            "summary": "Installed app alias (owner all-grants context only).",
+            "flag": "--app",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "protocol",
+            "summary": "Single exact protocol ID.",
+            "flag": "--protocol",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "peers",
+            "summary": "JSON array of explicit remote FIPS keys.",
+            "flag": "--peers",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "topics",
+            "summary": "JSON array of exact topic IDs; no wildcards.",
+            "flag": "--topics",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/fips access",
+          "/fips access --request <requestId>"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "invite",
+        "summary": "Create a master-signed, expiring FIPS invitation using an explicit signaling relay.",
+        "usage": "invite <relay> [<signedEvent>] [--recipient <recipient>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "relay",
+            "summary": "Signaling relay (wss://).",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "signedEvent",
+            "summary": "Signer callback; leave empty.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "recipient",
+            "flag": "--recipient",
+            "summary": "Optional intended recipient master public key (64-character hex).",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/fips invite wss://relay.example.com"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "ping",
+        "summary": "Send an end-to-end encrypted FIPS ping to a configured peer (triggering Nostr UDP NAT hole-punching if needed).",
+        "usage": "ping <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Peer ID from /fips list.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips ping 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "seeds",
+        "summary": "View or set the FIPS WebSocket seed URLs (wss://... or ws://127.0.0.1:...). Both peers must share a common seed.",
+        "usage": "seeds [<urls...>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "urls",
+            "summary": "Optional space-separated seed URLs (or \"clear\" to remove all).",
+            "kind": "string",
+            "required": false,
+            "variadic": true
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips seeds",
+          "/fips seeds wss://fips-seed.example.com"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Verify a signed invitation or acceptance and explicitly pair network identities.",
+        "usage": "add <text> [<signedEvent>] [--alias <alias>] [--confirm]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "text",
+            "summary": "Signed fips2: invitation or acceptance code.",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "webInput": "textarea"
+          },
+          {
+            "name": "signedEvent",
+            "summary": "Signer callback; leave empty.",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "webInput": "textarea"
+          }
+        ],
+        "options": [
+          {
+            "name": "alias",
+            "flag": "--alias",
+            "summary": "Optional local name for the remote instance (1–80 characters).",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          },
+          {
+            "name": "confirm",
+            "flag": "--confirm",
+            "summary": "Confirm a verified acceptance after checking its master identity.",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "shortFlag": null,
+            "choices": null
+          }
+        ],
+        "examples": [
+          "/fips add fips2:..."
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "Manage FIPS instances in a web tree, or list the roster in text clients.",
+        "usage": "list",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [
+          "/fips list"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Show one fips row by id.",
+        "usage": "show <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Row id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips show 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "alias",
+        "summary": "Set a local display alias for a FIPS instance.",
+        "usage": "alias <id> <name>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Instance row ID.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          },
+          {
+            "name": "name",
+            "summary": "Local instance alias (1–80 characters).",
+            "kind": "string",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips alias 1 \"My VPS\""
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a fips row by id.",
+        "usage": "delete <id>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "id",
+            "summary": "Row id.",
+            "kind": "integer",
+            "required": true,
+            "variadic": false
+          }
+        ],
+        "options": [],
+        "examples": [
+          "/fips delete 1"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       }
     ]
@@ -7944,6 +8416,1047 @@
     ]
   },
   {
+    "name": "teams-todo",
+    "summary": "Local-first collaborative boards over FIPS with explicit incoming review.",
+    "aliases": [],
+    "source": "plugin",
+    "pluginAlias": "teams-todo",
+    "subcommands": [
+      {
+        "name": "help",
+        "summary": "Commands and current local behavior",
+        "usage": "help",
+        "aliases": [],
+        "arguments": [],
+        "options": [],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_default"
+        }
+      },
+      {
+        "name": "list",
+        "summary": "List local SQLite boards and todo counts",
+        "usage": "list [--identity <identity>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "runnable_customizable"
+        },
+        "webWidget": {
+          "placement": "right",
+          "surface": "timeline_singleton",
+          "label": "Teams Todo",
+          "modalTitle": "Teams Todo",
+          "icon": "icon.svg"
+        }
+      },
+      {
+        "name": "show",
+        "summary": "Local todos, FIPS incoming review and event activity",
+        "usage": "show <board> [--identity <identity>] [--pick <pick>] [--page <page>] [--status <status>] [--flat] [--champion] [--board-details] [--recent-activity]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "pick",
+            "flag": "--pick",
+            "shortFlag": null,
+            "summary": "Show row-based winner picking for a parent UUID, or off to leave picking mode",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "page",
+            "flag": "--page",
+            "shortFlag": null,
+            "summary": "Incoming review page (zero-based, 200 items per page)",
+            "kind": "integer",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "status",
+            "flag": "--status",
+            "shortFlag": null,
+            "summary": "Filter todos by status (pending, in_progress, done, all)",
+            "kind": "string",
+            "required": false,
+            "multiple": true,
+            "choices": [
+              "pending",
+              "in_progress",
+              "done",
+              "all"
+            ]
+          },
+          {
+            "name": "flat",
+            "flag": "--flat",
+            "shortFlag": null,
+            "summary": "Render todos as a flat list",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "champion",
+            "flag": "--champion",
+            "shortFlag": null,
+            "summary": "Show only branch champions and the priority winner",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "boardDetails",
+            "flag": "--board-details",
+            "shortFlag": null,
+            "summary": "Show board details section",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "recentActivity",
+            "flag": "--recent-activity",
+            "shortFlag": null,
+            "summary": "Show recent activity section",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "new",
+        "summary": "Create a local SQLite board immediately",
+        "usage": "new <title...> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "title",
+            "summary": "Board title",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "update",
+        "summary": "Open a title/details editor; --save applies changed fields atomically",
+        "usage": "update <board> <task> [--identity <identity>] [--save] [--title <title>] [--details <details>] [--revision <revision>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "save",
+            "flag": "--save",
+            "shortFlag": null,
+            "summary": "Save the complete title/details form (empty details clears them)",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "title",
+            "flag": "--title",
+            "shortFlag": null,
+            "summary": "Updated title",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "details",
+            "flag": "--details",
+            "shortFlag": null,
+            "summary": "Updated details",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null,
+            "webInput": "textarea"
+          },
+          {
+            "name": "revision",
+            "flag": "--revision",
+            "shortFlag": null,
+            "summary": "Reviewed item revision for stale-save protection",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "details",
+        "summary": "Open todo details/editor from one peer",
+        "usage": "details <board> <task> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "add",
+        "summary": "Save a SQLite todo and creation event locally",
+        "usage": "add <board> <title...> [--identity <identity>] [--parent <parent>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "title",
+            "summary": "Title",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "parent",
+            "flag": "--parent",
+            "shortFlag": null,
+            "summary": "Parent SQLite todo UUID in this board",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "title",
+        "summary": "Save a title change and semantic event locally",
+        "usage": "title <board> <task> <title...> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "title",
+            "summary": "Title",
+            "kind": "string",
+            "required": true,
+            "variadic": true,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "status",
+        "summary": "Save a SQLite todo status event",
+        "usage": "status <board> <task> <status> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "status",
+            "summary": "Todo status",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": [
+              "pending",
+              "in_progress",
+              "done"
+            ]
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "done",
+        "summary": "Save todo done and its semantic event locally",
+        "usage": "done <board> <task> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "undone",
+        "summary": "Save todo undone and its semantic event locally",
+        "usage": "undone <board> <task> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "delete",
+        "summary": "Save todo delete and its semantic event locally",
+        "usage": "delete <board> <task> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "task",
+            "summary": "Exact todo UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "order",
+        "summary": "Save personal root order without shared events",
+        "usage": "order <board> [--identity <identity>] --revision <revision> --items <items>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "revision",
+            "flag": "--revision",
+            "shortFlag": null,
+            "summary": "Reviewed root-order revision",
+            "kind": "string",
+            "required": true,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "items",
+            "flag": "--items",
+            "shortFlag": null,
+            "summary": "Active root UUID in desired order (repeat)",
+            "kind": "string",
+            "required": true,
+            "multiple": true,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "winner",
+        "summary": "Choose or keep a personal branch winner",
+        "usage": "winner <board> <parent> <winner> [--identity <identity>] --snapshot <snapshot>",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "parent",
+            "summary": "Parent UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "winner",
+            "summary": "Chosen child UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "snapshot",
+            "flag": "--snapshot",
+            "shortFlag": null,
+            "summary": "Reviewed branch snapshot",
+            "kind": "string",
+            "required": true,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "send",
+        "summary": "Release own-origin events and trigger automatic inbox delivery",
+        "usage": "send <board> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "sync",
+        "summary": "Manually check/retry delivery to the separate review inbox",
+        "usage": "sync <board> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "accept",
+        "summary": "Apply one separately staged incoming event",
+        "usage": "accept <board> <event> [--identity <identity>] [--reviewed <reviewed>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "event",
+            "summary": "Incoming event UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "reviewed",
+            "flag": "--reviewed",
+            "shortFlag": null,
+            "summary": "Explicitly accepted staged context event UUID (repeat for each listed event)",
+            "kind": "string",
+            "required": false,
+            "multiple": true,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "decline",
+        "summary": "Decline one separately staged incoming event",
+        "usage": "decline <board> <event> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "event",
+            "summary": "Incoming event UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "resolve",
+        "summary": "Explicitly accept a competing branch and record your chosen title/details/status resolution",
+        "usage": "resolve <board> <event> [<value>] [--identity <identity>] [--clear] --heads <heads> [--resolution <resolution>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "event",
+            "summary": "Conflicting incoming event UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          },
+          {
+            "name": "value",
+            "summary": "Final title, details or status",
+            "kind": "string",
+            "required": false,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "clear",
+            "flag": "--clear",
+            "shortFlag": null,
+            "summary": "Explicitly resolve details to empty",
+            "kind": "boolean",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          },
+          {
+            "name": "heads",
+            "flag": "--heads",
+            "shortFlag": null,
+            "summary": "Reviewed local head UUID (repeat for every head shown)",
+            "kind": "string",
+            "required": true,
+            "multiple": true,
+            "choices": null
+          },
+          {
+            "name": "resolution",
+            "flag": "--resolution",
+            "shortFlag": null,
+            "summary": "Resolution UUID for safe retries; generated when omitted",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "decline-invite",
+        "summary": "Decline a board invitation without granting access",
+        "usage": "decline-invite <invitation> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "invitation",
+            "summary": "Invitation UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "retry-invite",
+        "summary": "Retry delivery of an existing invitation",
+        "usage": "retry-invite <invitation> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "invitation",
+            "summary": "Invitation UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      },
+      {
+        "name": "share",
+        "summary": "Share or join an exact board topic through owner-reviewed FIPS access",
+        "usage": "share <board> [--identity <identity>]",
+        "aliases": [],
+        "arguments": [
+          {
+            "name": "board",
+            "summary": "Exact board UUID",
+            "kind": "string",
+            "required": true,
+            "variadic": false,
+            "choices": null
+          }
+        ],
+        "options": [
+          {
+            "name": "identity",
+            "flag": "--identity",
+            "shortFlag": null,
+            "summary": "Captured local FIPS identity; rejects stale actions, never switches identities",
+            "kind": "string",
+            "required": false,
+            "multiple": false,
+            "choices": null
+          }
+        ],
+        "examples": [],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
+        }
+      }
+    ]
+  },
+  {
     "name": "todo",
     "summary": "Todo management with nested tasks, AI drafts, and ranking.",
     "aliases": [],
@@ -8222,9 +9735,9 @@
         }
       },
       {
-        "name": "duel",
-        "summary": "Rank sibling todos by pairwise comparison.",
-        "usage": "duel [<parentId>] [<duelArgs...>] [--reset]",
+        "name": "pick",
+        "summary": "Pick a branch winner or run a comparison.",
+        "usage": "pick [<parentId>] [<duelArgs...>] [--reset]",
         "aliases": [],
         "arguments": [
           {
@@ -8234,7 +9747,7 @@
           },
           {
             "name": "duelArgs",
-            "summary": "Internal web duel action tokens.",
+            "summary": "Internal web pick action tokens.",
             "kind": "string",
             "variadic": true
           }
@@ -8242,15 +9755,15 @@
         "options": [
           {
             "name": "reset",
-            "summary": "Reset comparisons before starting the duel.",
+            "summary": "Reset comparisons before starting.",
             "flag": "--reset",
             "kind": "boolean"
           }
         ],
         "examples": [
-          "/todo duel",
-          "/todo duel 12",
-          "/todo duel --reset"
+          "/todo pick",
+          "/todo pick 12",
+          "/todo pick --reset"
         ],
         "inferredWeb": {
           "generated": true,
@@ -8341,7 +9854,7 @@
       {
         "name": "list",
         "summary": "List todos in the current scope or a selected subtree.",
-        "usage": "list [<rootId>] [--status <status>] [--flat] [--champion] [--desc] [--level <level>]",
+        "usage": "list [<rootId>] [--status <status>] [--flat] [--champion] [--desc] [--level <level>] [--prioritize]",
         "aliases": [],
         "arguments": [
           {
@@ -8387,6 +9900,12 @@
             "summary": "Limit output to a tree depth.",
             "flag": "--level",
             "kind": "integer"
+          },
+          {
+            "name": "prioritize",
+            "summary": "Render root items with drag handles for reordering.",
+            "flag": "--prioritize",
+            "kind": "boolean"
           }
         ],
         "examples": [
@@ -8407,6 +9926,68 @@
           "modalTitle": "Todo list",
           "icon": "/plugins/todo/commands/list/renderers/list.svg",
           "order": 20
+        }
+      },
+      {
+        "name": "order",
+        "summary": "Reorder active root todos.",
+        "usage": "order --revision <revision> --items <items> [--status <status>] [--champion] [--desc] [--level <level>]",
+        "aliases": [],
+        "arguments": [],
+        "options": [
+          {
+            "name": "revision",
+            "summary": "Reviewed root-order revision.",
+            "flag": "--revision",
+            "kind": "string",
+            "required": true
+          },
+          {
+            "name": "items",
+            "summary": "Active root todo IDs in desired order (repeat).",
+            "flag": "--items",
+            "kind": "string",
+            "required": true,
+            "multiple": true
+          },
+          {
+            "name": "status",
+            "summary": "Filter by status: done|in_progress|pending|all.",
+            "flag": "--status",
+            "kind": "string",
+            "multiple": true,
+            "choices": [
+              "done",
+              "in_progress",
+              "pending",
+              "all"
+            ]
+          },
+          {
+            "name": "champion",
+            "summary": "Show only branch champions and the priority winner.",
+            "flag": "--champion",
+            "kind": "boolean"
+          },
+          {
+            "name": "desc",
+            "summary": "Include descriptions.",
+            "flag": "--desc",
+            "kind": "boolean"
+          },
+          {
+            "name": "level",
+            "summary": "Limit output to a tree depth.",
+            "flag": "--level",
+            "kind": "integer"
+          }
+        ],
+        "examples": [
+          "/todo order --revision <rev> --items 3 --items 1 --items 2"
+        ],
+        "inferredWeb": {
+          "generated": true,
+          "executionMode": "requires_input"
         }
       },
       {
@@ -8539,7 +10120,7 @@
       {
         "name": "update",
         "summary": "Update a todo field such as title, status, or description.",
-        "usage": "update <id> <field> <value...>",
+        "usage": "update <id> <field> [<value...>]",
         "aliases": [],
         "arguments": [
           {
@@ -8556,9 +10137,9 @@
           },
           {
             "name": "value",
-            "summary": "New value for the selected field.",
+            "summary": "New value for the selected field (optional for description to clear it).",
             "kind": "string",
-            "required": true,
+            "required": false,
             "variadic": true
           }
         ],
@@ -8566,7 +10147,8 @@
         "examples": [
           "/todo update 42 todo buy oat milk",
           "/todo update 42 status in_progress",
-          "/todo update 42 description blocked on review"
+          "/todo update 42 description blocked on review",
+          "/todo update 42 description"
         ],
         "inferredWeb": {
           "generated": true,
@@ -8610,7 +10192,7 @@
       {
         "name": "settings",
         "summary": "Show or update AI translation settings.",
-        "usage": "settings [--backend <backend>] [--model <model>] [--reset]",
+        "usage": "settings [--backend <backend>] [--model-source <modelSource>] [--model <model>] [--reset]",
         "aliases": [
           "config"
         ],
@@ -8628,16 +10210,23 @@
             ]
           },
           {
+            "name": "modelSource",
+            "flag": "--model-source",
+            "summary": "AI model-source override (provider id or alias). Use default/reset for current.",
+            "kind": "string",
+            "required": false
+          },
+          {
             "name": "model",
             "flag": "--model",
-            "summary": "AI model override.",
+            "summary": "AI model override. Use default/reset for current.",
             "kind": "string",
             "required": false
           },
           {
             "name": "reset",
             "flag": "--reset",
-            "summary": "Clear backend and model overrides.",
+            "summary": "Clear backend, model-source, and model overrides.",
             "kind": "boolean",
             "required": false
           }
@@ -8645,7 +10234,8 @@
         "examples": [
           "/translate settings",
           "/translate settings --backend opencode --model openai/gpt-5",
-          "/translate settings --backend default --model reset",
+          "/translate settings --model-source ppq --model openai/gpt-5",
+          "/translate settings --backend default --model-source reset --model reset",
           "/translate settings --reset"
         ],
         "inferredWeb": {
