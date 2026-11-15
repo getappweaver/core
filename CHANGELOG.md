@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.26.0] - 2026-11-15
+
+- feat: add tag filtering UI for publish and app install screens (f7e54296)
+
 ## [v14.25.1] - 2026-11-15
 
-- chore: added new documents (bc8a1f34)
+- chore: added new documents (6c39529d)
 
 ## [v14.25.0] - 2026-11-15
 

@@ -28,6 +28,10 @@ export function getPluginsPublishSubcommandDefinition(
         'draft',
         'offer_id',
         'repo',
+        'title',
+        'website',
+        'description',
+        'tags',
       ].map((name) => ({
         name,
         summary: `Web publication form field: ${name}.`,

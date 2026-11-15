@@ -84,6 +84,12 @@ const pluginsInstallStylesheet = {
     .web-link.plugins-install-source-link {
       width: fit-content;
     }
+
+    .web-row.plugins-install-tag-bar {
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+    }
   `,
 } as const;
 
@@ -607,13 +613,24 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
           },
           ...(entry.description ? [textBlock(entry.description, 'muted')] : []),
           ...(source ? [source] : []),
-          ...(capabilities.length > 0
+          ...(capabilities.length > 0 || entry.tags.length > 0
             ? [
                 {
                   type: 'element' as const,
                   tag: 'row' as const,
                   props: { gap: 'xs' as const },
-                  children: capabilities,
+                  children: [
+                    ...entry.tags.map((tag) => ({
+                      type: 'element' as const,
+                      tag: 'badge' as const,
+                      props: {
+                        label: `#${tag}`,
+                        size: 'sm' as const,
+                        tone: 'muted' as const,
+                      },
+                    })),
+                    ...capabilities,
+                  ],
                 },
               ]
             : []),
@@ -640,9 +657,73 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   };
 }
 
+function tagFilterAction({
+  filter,
+  tag,
+}: {
+  filter: string | null;
+  tag: string | null;
+}): WebAction {
+  return {
+    type: 'command',
+    command: 'plugins',
+    subcommand: 'install',
+    arguments: filter ? { target: filter } : {},
+    options: tag ? { tag } : {},
+    recordInTimeline: false,
+  };
+}
+
+function tagFilterBar(
+  representation: PluginsInstallRepresentation,
+): WebNode | null {
+  if (representation.allTags.length === 0) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'row',
+    props: { className: 'plugins-install-tag-bar' },
+    children: [
+      {
+        type: 'element',
+        tag: 'button',
+        props: {
+          label: 'All',
+          className: 'web-button',
+          tone: representation.selectedTag === null ? 'warning' : 'default',
+          action: tagFilterAction({
+            filter: representation.filter,
+            tag: null,
+          }),
+        },
+      },
+      ...representation.allTags.map((tag) => ({
+        type: 'element' as const,
+        tag: 'button' as const,
+        props: {
+          label: `#${tag}`,
+          className: 'web-button',
+          tone:
+            representation.selectedTag === tag
+              ? ('warning' as const)
+              : ('default' as const),
+          action: tagFilterAction({
+            filter: representation.filter,
+            tag: representation.selectedTag === tag ? null : tag,
+          }),
+        },
+      })),
+    ],
+  };
+}
+
 export function renderPluginsInstallWeb(
   representation: PluginsInstallRepresentation,
 ): WebNodeRoot {
+  const tagsRow = tagFilterBar(representation);
+
   const updates = representation.entries.filter(
     (entry) => entry.updateAvailable,
   );
@@ -651,11 +732,22 @@ export function renderPluginsInstallWeb(
     (entry) => !entry.updateAvailable && entry.blockedUpdateRef !== null,
   );
 
-  const others = representation.entries.filter(
-    (entry) => !entry.updateAvailable && entry.blockedUpdateRef === null,
+  const catalogEntries = representation.entries.filter(
+    (entry) =>
+      !entry.updateAvailable &&
+      entry.blockedUpdateRef === null &&
+      entry.installedAlias === null,
   );
 
-  const hasAnyUpdates = updates.length > 0 || blockedUpdates.length > 0;
+  const installedApps = representation.entries.filter(
+    (entry) =>
+      !entry.updateAvailable &&
+      entry.blockedUpdateRef === null &&
+      entry.installedAlias !== null,
+  );
+
+  const hasOtherSections =
+    updates.length > 0 || blockedUpdates.length > 0 || installedApps.length > 0;
 
   const listNodes: WebNode[] =
     representation.entries.length === 0
@@ -723,7 +815,7 @@ export function renderPluginsInstallWeb(
                 ),
               ]
             : []),
-          ...(hasAnyUpdates && others.length > 0
+          ...(hasOtherSections && catalogEntries.length > 0
             ? [
                 {
                   type: 'element' as const,
@@ -736,9 +828,27 @@ export function renderPluginsInstallWeb(
                 },
               ]
             : []),
-          ...others.map((entry) =>
+          ...catalogEntries.map((entry) =>
             pluginCard(entry, representation.coreVersion),
           ),
+          ...(installedApps.length > 0
+            ? [
+                {
+                  type: 'element' as const,
+                  tag: 'text' as const,
+                  props: {
+                    weight: 'semibold' as const,
+                    tone: 'muted' as const,
+                  },
+                  children: [
+                    textNode(`Installed Apps (${installedApps.length}):`),
+                  ],
+                },
+                ...installedApps.map((entry) =>
+                  pluginCard(entry, representation.coreVersion),
+                ),
+              ]
+            : []),
         ];
 
   return {
@@ -757,9 +867,10 @@ export function renderPluginsInstallWeb(
           children: [textNode('Plugin Catalog')],
         },
         textBlock(
-          `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}`,
+          `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}${representation.selectedTag ? ` Tag: #${representation.selectedTag}.` : ''}`,
           'muted',
         ),
+        ...(tagsRow ? [tagsRow] : []),
         ...listNodes,
       ],
     },

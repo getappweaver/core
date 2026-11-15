@@ -27,14 +27,24 @@ export function getPluginsInstallSubcommandDefinition(
         choices: null,
       },
     ],
-    options: ['operation', 'identity', 'attempt', 'challenge'].map((name) => ({
-      name,
-      summary: `Purchase flow field: ${name}.`,
-      flag: `--${name}`,
-      shortFlag: null,
-      kind: 'string' as const,
-      required: false,
-    })),
+    options: [
+      ...['operation', 'identity', 'attempt', 'challenge'].map((name) => ({
+        name,
+        summary: `Purchase flow field: ${name}.`,
+        flag: `--${name}`,
+        shortFlag: null,
+        kind: 'string' as const,
+        required: false,
+      })),
+      {
+        name: 'tag',
+        summary: 'Filter catalog plugins by tag.',
+        flag: '--tag',
+        shortFlag: null,
+        kind: 'string',
+        required: false,
+      },
+    ],
     examples: [
       `${prefix}plugins install`,
       `${prefix}plugins install appweaver-todo-plugin`,

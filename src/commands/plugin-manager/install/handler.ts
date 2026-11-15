@@ -100,6 +100,7 @@ export type PluginCatalogEntry = {
   coreUpdateCanUnlockBlockedRef: boolean;
   changelogRefs: RefEntry[];
   updateAvailable: boolean;
+  tags: string[];
   capabilities: PluginCapabilityRelations;
 };
 
@@ -161,6 +162,8 @@ export type PluginsInstallRepresentation = {
   relays: string[];
   entries: PluginCatalogEntry[];
   filter: string | null;
+  allTags: string[];
+  selectedTag: string | null;
 };
 
 function tagValue(tags: string[][], name: string): string {
@@ -194,6 +197,15 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
 
   const iconTag = event.tags.find((tag) => tag[0] === 'icon');
 
+  const tags = [
+    ...new Set(
+      event.tags
+        .filter((tag) => tag[0] === 't' && tag[1]?.trim())
+        .map((tag) => tag[1].trim().toLowerCase())
+        .filter((tag) => tag !== 'appweaver-plugin'),
+    ),
+  ];
+
   return {
     catalogEvent: event,
     id: event.id,
@@ -221,6 +233,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     coreUpdateCanUnlockBlockedRef: false,
     changelogRefs: [],
     updateAvailable: false,
+    tags,
     capabilities: parseCapabilityRelationTags(event.kind, event.tags),
   };
 }
@@ -1380,7 +1393,13 @@ async function attachInstalledState({
 
   return attached.sort((a, b) => {
     const rank = (entry: PluginCatalogEntry): number =>
-      entry.updateAvailable ? 0 : entry.blockedUpdateRef ? 1 : 2;
+      entry.updateAvailable
+        ? 0
+        : entry.blockedUpdateRef
+          ? 1
+          : entry.installedAlias === null
+            ? 2
+            : 3;
 
     const diff = rank(a) - rank(b);
 
@@ -1517,6 +1536,26 @@ export async function queryPluginCatalog(
   });
 }
 
+function requestedTag(ctx: RouteCommandContext): string | null {
+  const index = ctx.args.indexOf('--tag');
+
+  if (index >= 0) {
+    return ctx.args[index + 1]?.trim().toLowerCase() || null;
+  }
+
+  const payload = ctx.jsonPayload as { options?: { tag?: unknown } } | null;
+
+  return typeof payload?.options?.tag === 'string'
+    ? payload.options.tag.trim().toLowerCase() || null
+    : null;
+}
+
+function collectCatalogTags(entries: PluginCatalogEntry[]): string[] {
+  return [...new Set(entries.flatMap((entry) => entry.tags))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
 export async function handlePluginsInstall(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsInstallWeb> | string> {
@@ -1556,10 +1595,14 @@ export async function handlePluginsInstall(
       relays: PLUGIN_QUERY_RELAYS,
       entries: await attachPluginPayments(ctx, entries),
       filter: null,
+      allTags: collectCatalogTags(entries),
+      selectedTag: null,
     });
   }
 
-  const entries = await attachInstalledState({
+  const selectedTag = requestedTag(ctx);
+
+  const allEntries = await attachInstalledState({
     entries: await queryPluginCatalog(
       ctx,
       undefined,
@@ -1571,12 +1614,20 @@ export async function handlePluginsInstall(
     dmBotRoot: ctx.dmBotRoot,
   });
 
+  const allTags = collectCatalogTags(allEntries);
+
+  const filteredEntries = selectedTag
+    ? allEntries.filter((entry) => entry.tags.includes(selectedTag))
+    : allEntries;
+
   const representation: PluginsInstallRepresentation = {
     coreVersion,
     coreUpdate,
     relays: PLUGIN_QUERY_RELAYS,
-    entries: await attachPluginPayments(ctx, entries),
+    entries: await attachPluginPayments(ctx, filteredEntries),
     filter: capabilityFilter ? target : null,
+    allTags,
+    selectedTag,
   };
 
   if (ctx.source === 'web') {

@@ -134,6 +134,13 @@ export type PluginsPublishPreviewRepresentation = {
   relays: string[];
   firstPublish: boolean;
   offerManagement: WebNodeRoot | null;
+  catalogEditor: {
+    title: string;
+    website: string;
+    description: string;
+    tags: string[];
+    existingCatalogTags: string[];
+  } | null;
 };
 
 const latestPublishResults = new Map<string, PluginsPublishRepresentation>();
@@ -757,38 +764,66 @@ async function fetchPluginPublishRelays({
   ]);
 }
 
+function parseCatalogTags(raw: unknown): string[] {
+  if (typeof raw !== 'string') {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim().toLowerCase().replace(/^#+/, ''))
+        .filter((item) => item.length > 0 && item !== 'appweaver-plugin'),
+    ),
+  ];
+}
+
 function buildEventTemplate({
   pkg,
   repos,
   refs,
   iconUrl,
   offerTag,
+  tags,
+  titleOverride,
+  websiteOverride,
+  descriptionOverride,
 }: {
   pkg: PluginPackage;
   repos: string[];
   refs: RefEntry[];
   iconUrl: string | null;
   offerTag: string[] | null;
+  tags: string[];
+  titleOverride: string | null;
+  websiteOverride: string | null;
+  descriptionOverride: string | null;
 }): EventTemplate {
+  const title = titleOverride ?? pkg.title;
+  const website = websiteOverride ?? pkg.website ?? '';
+  const description = descriptionOverride ?? pkg.description;
+
   return {
     kind: PLUGIN_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ['d', pkg.name],
-      ['title', pkg.title],
+      ['title', title],
       ...(iconUrl
         ? [['icon', iconUrl, ...(pkg.iconPath ? [pkg.iconPath] : [])]]
         : []),
-      ...(pkg.website ? [['website', pkg.website]] : []),
+      ...(website ? [['website', website]] : []),
       ...repos.map((repo) => ['repo', repo]),
       ['version', `v${pkg.version}`],
       ['coreApiVersion', pkg.coreApiVersion],
       ['t', 'appweaver-plugin'],
+      ...tags.map((tag) => ['t', tag]),
       ...(offerTag ? [offerTag] : []),
       ...capabilityRelationTags(pkg.capabilities),
       ...refs.map((ref) => ['ref', ref.tag, ref.coreApiVersion, ref.changelog]),
     ],
-    content: pkg.description,
+    content: description,
   };
 }
 
@@ -1038,12 +1073,18 @@ async function handlePluginsPublishAttempt(
     diagnostic: null,
   });
 
+  const catalog = await queryPluginCatalog(ctx, undefined, undefined, {
+    skipIcons: true,
+  });
+
   const published = findPublishedPlugin({
     installed,
-    catalog: await queryPluginCatalog(ctx, undefined, undefined, {
-      skipIcons: true,
-    }),
+    catalog,
   });
+
+  const existingCatalogTags = [
+    ...new Set(catalog.flatMap((entry) => entry.tags)),
+  ].sort((a, b) => a.localeCompare(b));
 
   const connection = findAuthorConnection({ ctx, published, signerName });
 
@@ -1061,7 +1102,7 @@ async function handlePluginsPublishAttempt(
 
   if (operation) {
     if (ctx.source !== 'web' || !published) {
-      return 'Offer management requires an existing published catalog and the web UI.';
+      return 'Catalog and offer management require an existing published catalog and the web UI.';
     }
 
     if (
@@ -1070,10 +1111,138 @@ async function handlePluginsPublishAttempt(
         'offer-publish',
         'offer-select',
         'offer-cancel',
+        'catalog-update',
       ].includes(operation)
     ) {
       return 'Unknown publication operation.';
     }
+  }
+
+  if (operation === 'catalog-update' && published) {
+    const formOptions = publicationOptions(ctx);
+
+    const title =
+      typeof formOptions.title === 'string' && formOptions.title.trim()
+        ? formOptions.title.trim()
+        : published.title || pkg.title;
+
+    const website =
+      typeof formOptions.website === 'string'
+        ? formOptions.website.trim()
+        : published.website;
+
+    const description =
+      typeof formOptions.description === 'string' &&
+      formOptions.description.trim()
+        ? formOptions.description.trim()
+        : published.description || pkg.description;
+
+    const tags =
+      formOptions.tags !== undefined
+        ? parseCatalogTags(formOptions.tags)
+        : published.tags;
+
+    const existingEvent = published.catalogEvent;
+
+    const template: EventTemplate = {
+      kind: PLUGIN_KIND,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ['d', published.name],
+        ['title', title],
+        ...(published.iconUrl
+          ? [
+              [
+                'icon',
+                published.iconUrl,
+                ...(published.iconSource ? [published.iconSource] : []),
+              ],
+            ]
+          : []),
+        ...(website ? [['website', website]] : []),
+        ...published.repos.map((entryRepo) => ['repo', entryRepo]),
+        ['version', published.version],
+        ['coreApiVersion', published.coreApiVersion],
+        ['t', 'appweaver-plugin'],
+        ...tags.map((tag) => ['t', tag]),
+        ...(existingEvent?.tags.find((tag) => tag[0] === 'offer')
+          ? [existingEvent.tags.find((tag) => tag[0] === 'offer')!]
+          : []),
+        ...capabilityRelationTags(published.capabilities),
+        ...published.refs.map((ref) => [
+          'ref',
+          ref.tag,
+          ref.coreApiVersion,
+          ref.changelog,
+        ]),
+      ],
+      content: description,
+    };
+
+    report('Waiting for catalog signature (kind 32107) via NIP-46');
+
+    const signed = await bunkerSignEventWithProgress({
+      pool: ctx.pool,
+      data: connection.data,
+      event: template,
+      onProgress: (message, severity) =>
+        reportSigning(
+          `Bunker ${connection.name} (${nip19.npubEncode(connection.data.userPubkey)}) · catalog signature (kind 32107): ${message}`,
+          severity,
+        ),
+    });
+
+    const relays = await fetchPluginPublishRelays({
+      ctx,
+      authorPubkey: connection.data.userPubkey,
+    });
+
+    const relayResults = await publishEvent({
+      ctx,
+      relays,
+      event: signed,
+      connection,
+      progress,
+    });
+
+    const succeeded = relayResults.filter((result) => result.ok).length;
+
+    const representation = rememberPublishResult({
+      alias,
+      pluginName: published.name,
+      versionTag: published.version,
+      eventId: signed.id,
+      status: succeeded > 0 ? 'published' : 'failed',
+      message:
+        succeeded > 0
+          ? `Updated catalog for ${published.name} on ${succeeded}/${relayResults.length} relay(s).`
+          : `Failed to update catalog for ${published.name}.`,
+      relays: relayResults,
+      registrationError: null,
+      registrationRepo: null,
+      discoveryError: null,
+      diagnostics: progress.history(),
+    });
+
+    progress.update({
+      state:
+        succeeded === 0
+          ? 'error'
+          : succeeded < relayResults.length
+            ? 'warning'
+            : 'success',
+      diagnostic:
+        succeeded === 0
+          ? 'error'
+          : succeeded < relayResults.length
+            ? 'warning'
+            : null,
+      message: representation.message,
+    });
+
+    representation.diagnostics = progress.history();
+
+    return renderPluginsPublishWeb(representation);
   }
 
   const versionTag = `v${pkg.version}`;
@@ -1232,6 +1401,15 @@ async function handlePluginsPublishAttempt(
       relays,
       firstPublish: published === null,
       offerManagement,
+      catalogEditor: published
+        ? {
+            title: published.title || pkg.title,
+            website: published.website || pkg.website || '',
+            description: published.description || pkg.description,
+            tags: published.tags,
+            existingCatalogTags,
+          }
+        : null,
     });
   }
 
@@ -1375,6 +1553,10 @@ async function handlePluginsPublishAttempt(
     iconUrl,
     offerTag:
       published?.catalogEvent?.tags.find((tag) => tag[0] === 'offer') ?? null,
+    tags: published?.tags ?? [],
+    titleOverride: null,
+    websiteOverride: null,
+    descriptionOverride: null,
   });
 
   report('Waiting for catalog signature (kind 32107) via NIP-46');

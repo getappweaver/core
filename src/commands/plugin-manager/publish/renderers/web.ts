@@ -139,8 +139,177 @@ const pluginsPublishStylesheet = {
     .web-stack.plugins-publish-preview {
       gap: 0.35rem;
     }
+
+    .web-stack.plugins-publish-catalog {
+      gap: 0.45rem;
+      padding-top: 0.35rem;
+    }
+
+    .web-text.plugins-publish-catalog-heading {
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+    }
+
+    .web-details.plugins-publish-catalog-details {
+      border-left: 2px solid var(--color-border, currentColor);
+      padding-left: 0.55rem;
+    }
+
+    .web-stack.plugins-publish-catalog-body {
+      gap: 0.35rem;
+      padding-top: 0.35rem;
+    }
   `,
 } as const;
+
+function renderCatalogEditor(
+  representation: PluginsPublishPreviewRepresentation,
+): WebNode | null {
+  const catalog = representation.catalogEditor;
+
+  if (!catalog) {
+    return null;
+  }
+
+  return {
+    type: 'element',
+    tag: 'stack',
+    props: { className: 'plugins-publish-catalog' },
+    children: [
+      {
+        type: 'element',
+        tag: 'text',
+        props: {
+          className: 'plugins-publish-catalog-heading',
+          weight: 'bold',
+        },
+        children: [textNode('CATALOG')],
+      },
+      {
+        type: 'element',
+        tag: 'form',
+        props: {
+          className: 'web-form web-form--stacked',
+          formOptionFieldNames: ['title', 'website', 'description', 'tags'],
+          action: {
+            type: 'command',
+            command: 'plugins',
+            subcommand: 'publish',
+            arguments: { alias: representation.alias },
+            options: {
+              operation: 'catalog-update',
+              signer: representation.signerName,
+            },
+            recordInTimeline: false,
+            pendingUi: {
+              presentation: 'widget',
+              label: 'Updating catalog…',
+            },
+          },
+        },
+        children: [
+          {
+            type: 'element',
+            tag: 'details',
+            props: { className: 'plugins-publish-catalog-details' },
+            children: [
+              {
+                type: 'element',
+                tag: 'summary',
+                children: [textNode('Fields')],
+              },
+              {
+                type: 'element',
+                tag: 'stack',
+                props: { className: 'plugins-publish-catalog-body' },
+                children: [
+                  textBlock('Title', 'muted'),
+                  {
+                    type: 'element',
+                    tag: 'textField',
+                    props: {
+                      formFieldName: 'title',
+                      value: catalog.title,
+                      ariaLabel: 'Catalog title',
+                    },
+                  },
+                  textBlock('Website', 'muted'),
+                  {
+                    type: 'element',
+                    tag: 'textField',
+                    props: {
+                      formFieldName: 'website',
+                      value: catalog.website,
+                      inputPlaceholder: 'https://...',
+                      ariaLabel: 'Catalog website',
+                    },
+                  },
+                  textBlock('Description', 'muted'),
+                  {
+                    type: 'element',
+                    tag: 'textArea',
+                    props: {
+                      formFieldName: 'description',
+                      value: catalog.description,
+                      ariaLabel: 'Catalog description',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'element',
+            tag: 'details',
+            props: { className: 'plugins-publish-catalog-details' },
+            children: [
+              {
+                type: 'element',
+                tag: 'summary',
+                children: [textNode('Tags')],
+              },
+              {
+                type: 'element',
+                tag: 'stack',
+                props: { className: 'plugins-publish-catalog-body' },
+                children: [
+                  textBlock('Tags (comma-separated)', 'muted'),
+                  {
+                    type: 'element',
+                    tag: 'textField',
+                    props: {
+                      formFieldName: 'tags',
+                      value: catalog.tags.join(', '),
+                      inputPlaceholder: 'productivity, tasks, nostr',
+                      ariaLabel: 'Catalog tags',
+                    },
+                  },
+                  ...(catalog.existingCatalogTags.length > 0
+                    ? [
+                        textBlock(
+                          `Catalog tags: ${catalog.existingCatalogTags.join(', ')}`,
+                          'muted',
+                        ),
+                      ]
+                    : []),
+                ],
+              },
+            ],
+          },
+          {
+            type: 'element',
+            tag: 'button',
+            props: {
+              label: 'Update catalog',
+              htmlType: 'submit',
+              className: 'web-button',
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
 
 export function renderPluginsPublishPreviewWeb(
   representation: PluginsPublishPreviewRepresentation,
@@ -148,6 +317,8 @@ export function renderPluginsPublishPreviewWeb(
   const confirmButtonId = `plugins-publish-confirm-${representation.alias}`;
   const publishStatusId = `plugins-publish-status-${representation.alias}`;
   const cardHighlightId = `plugins-release-card-${representation.alias}`;
+
+  const catalogEditor = renderCatalogEditor(representation);
 
   return {
     kind: 'ui',
@@ -225,6 +396,7 @@ export function renderPluginsPublishPreviewWeb(
             ...(representation.offerManagement
               ? [representation.offerManagement.tree]
               : [textBlock('Publication terms: Free · No offer', 'muted')]),
+            ...(catalogEditor ? [catalogEditor] : []),
             {
               type: 'element',
               tag: 'commandStatus',
