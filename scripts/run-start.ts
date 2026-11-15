@@ -161,6 +161,11 @@ function exitOnChild(code: number | null): void {
     restartRequested = false;
     rapidCrashCount = 0;
     console.log('\n[run-start] Restarting bot...\n');
+
+    if (isWebUiEnabled()) {
+      ensureWebDistBuilt();
+    }
+
     startBot();
 
     return;

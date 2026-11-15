@@ -368,7 +368,6 @@ export function useChat(adapters: ChatAdapters): ChatHook {
     reasoningStreamByRequestId.delete(requestId);
     reasoningSegmentIndexByRequestId.delete(requestId);
     pendingStreamTextByRequestId.delete(requestId);
-    logChatDebug('request.clear', { requestId });
   }
 
   function sendPromptAnswer(requestId: string, answer: string): void {

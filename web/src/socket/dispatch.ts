@@ -351,11 +351,6 @@ export function handleServerMessage(params: {
 
       return;
     case 'done':
-      logChatDebug('socket.done', {
-        requestId: message.requestId,
-        hasPending: pending !== undefined,
-      });
-
       pending?.onDone?.(message);
       pendingRequests.delete(message.requestId);
       adapters.chat.clearRequest(message.requestId);
