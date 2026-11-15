@@ -371,7 +371,10 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                 : 'No saved bunker identity matches this repository owner.',
             'muted',
           ),
-          ...(canPublish || reviewChanges || prepareWithAi
+          ...(canPublish ||
+          reviewChanges ||
+          prepareWithAi ||
+          (entry.published && entry.authorSigner)
             ? [
                 {
                   type: 'element' as const,
@@ -532,6 +535,29 @@ function releaseCard(entry: PluginReleaseEntry): WebNode {
                             },
                           ]
                         : []),
+                    ...(entry.published && entry.authorSigner
+                      ? [
+                          {
+                            type: 'element' as const,
+                            tag: 'button' as const,
+                            props: {
+                              label: 'Update catalog',
+                              className: 'web-button',
+                              action: {
+                                type: 'command' as const,
+                                command: 'plugins',
+                                subcommand: 'publish',
+                                arguments: { alias: entry.installed.alias },
+                                options: { operation: 'catalog-edit' },
+                                surface: 'modal' as const,
+                                modalTitle: `Update catalog · ${entry.installed.alias}`,
+                                recordInTimeline: false,
+                                pendingUi: { presentation: 'none' as const },
+                              },
+                            },
+                          },
+                        ]
+                      : []),
                   ],
                 },
               ]

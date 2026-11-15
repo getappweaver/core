@@ -81,12 +81,16 @@ export function WebFormElement(props: WebFormElementProps): JSX.Element {
     const revealId = props.element.props?.revealId;
 
     if (
-      revealId &&
-      props.element.props?.hiddenUntilRevealed === true &&
-      revealContext?.isRevealed(revealId) === true
+      !revealId ||
+      props.element.props?.hiddenUntilRevealed !== true ||
+      revealContext?.isRevealed(revealId) !== true
     ) {
-      revealContext.hideReveal(revealId);
+      // Persistent editors retain their draft until a command returns a replacement
+      // root. Submission itself must not clear them while saving or after an error.
+      return;
     }
+
+    revealContext.hideReveal(revealId);
 
     // Reset text fields so reopening the same inline form starts empty.
     form.reset();

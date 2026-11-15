@@ -1717,3 +1717,55 @@ a.web-button:focus-visible {
   padding: 0.5rem 0.55rem;
   outline: 0;
 }
+
+.web-tag-filter {
+  gap: 0.5rem;
+}
+
+.web-tag-filter-bar {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.web-button.web-tag-filter-chip {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  font-weight: 600;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--color-surface-alt) 85%, transparent);
+  color: var(--color-text);
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+}
+
+.web-button.web-tag-filter-chip:active {
+  transform: none;
+  box-shadow: none;
+}
+
+.web-button.web-tag-filter-chip:not(:disabled):not(.is-selected):hover,
+.web-button.web-tag-filter-chip:not(:disabled):not(.is-selected):focus-visible {
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
+  border-color: var(--color-warning);
+  color: var(--color-text);
+}
+
+.web-button.web-tag-filter-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.web-button.web-tag-filter-chip.is-selected {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #000;
+  font-weight: 700;
+}
+
+.web-button.web-tag-filter-chip.is-selected:hover,
+.web-button.web-tag-filter-chip.is-selected:focus-visible {
+  background: color-mix(in srgb, var(--color-accent) 82%, transparent);
+  border-color: var(--color-accent);
+  color: #000;
+}

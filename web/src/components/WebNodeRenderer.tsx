@@ -58,6 +58,7 @@ import {
 } from './web-node/WebFormElement';
 import { WebNostrPostElement } from './web-node/WebNostrPostElement';
 import { WebTabsElement } from './web-node/WebTabsElement';
+import { WebTagFilterElement } from './web-node/WebTagFilterElement';
 import { WebTimestampElement } from './web-node/WebTimestampElement';
 import { WebTreeElement, WebTreeItemElement } from './web-node/WebTreeElement';
 import { WebTreeTimeFilterStatusElement } from './web-node/WebTreeTimeFilterStatusElement';
@@ -476,6 +477,10 @@ function renderElement({
           onRunAction={props.onRunAction}
           renderChild={renderChild}
         />
+      </Match>
+
+      <Match when={element.tag === 'tagFilter'}>
+        <WebTagFilterElement element={element} renderChild={renderChild} />
       </Match>
 
       <Match when={element.tag === 'treeItem'}>

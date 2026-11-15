@@ -84,12 +84,6 @@ const pluginsInstallStylesheet = {
     .web-link.plugins-install-source-link {
       width: fit-content;
     }
-
-    .web-row.plugins-install-tag-bar {
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.35rem;
-    }
   `,
 } as const;
 
@@ -575,6 +569,7 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
       id: `plugin-${entry.id}`,
       padding: 'md',
       className: 'plugins-install-card',
+      filterTags: entry.tags,
     },
     children: [
       {
@@ -657,73 +652,9 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   };
 }
 
-function tagFilterAction({
-  filter,
-  tag,
-}: {
-  filter: string | null;
-  tag: string | null;
-}): WebAction {
-  return {
-    type: 'command',
-    command: 'plugins',
-    subcommand: 'install',
-    arguments: filter ? { target: filter } : {},
-    options: tag ? { tag } : {},
-    recordInTimeline: false,
-  };
-}
-
-function tagFilterBar(
-  representation: PluginsInstallRepresentation,
-): WebNode | null {
-  if (representation.allTags.length === 0) {
-    return null;
-  }
-
-  return {
-    type: 'element',
-    tag: 'row',
-    props: { className: 'plugins-install-tag-bar' },
-    children: [
-      {
-        type: 'element',
-        tag: 'button',
-        props: {
-          label: 'All',
-          className: 'web-button',
-          tone: representation.selectedTag === null ? 'warning' : 'default',
-          action: tagFilterAction({
-            filter: representation.filter,
-            tag: null,
-          }),
-        },
-      },
-      ...representation.allTags.map((tag) => ({
-        type: 'element' as const,
-        tag: 'button' as const,
-        props: {
-          label: `#${tag}`,
-          className: 'web-button',
-          tone:
-            representation.selectedTag === tag
-              ? ('warning' as const)
-              : ('default' as const),
-          action: tagFilterAction({
-            filter: representation.filter,
-            tag: representation.selectedTag === tag ? null : tag,
-          }),
-        },
-      })),
-    ],
-  };
-}
-
 export function renderPluginsInstallWeb(
   representation: PluginsInstallRepresentation,
 ): WebNodeRoot {
-  const tagsRow = tagFilterBar(representation);
-
   const updates = representation.entries.filter(
     (entry) => entry.updateAvailable,
   );
@@ -749,106 +680,145 @@ export function renderPluginsInstallWeb(
   const hasOtherSections =
     updates.length > 0 || blockedUpdates.length > 0 || installedApps.length > 0;
 
-  const listNodes: WebNode[] =
-    representation.entries.length === 0
-      ? [textBlock('No plugins found on the queried relays.', 'muted')]
-      : [
-          ...(updates.length > 0
-            ? [
-                {
-                  type: 'element' as const,
-                  tag: 'text' as const,
-                  props: {
-                    weight: 'semibold' as const,
-                    tone: 'warning' as const,
-                  },
-                  children: [
-                    textNode(`Updates Available (${updates.length}):`),
-                  ],
+  const sections: WebNode[] = [
+    ...(updates.length > 0
+      ? [
+          {
+            type: 'element' as const,
+            tag: 'stack' as const,
+            props: { gap: 'md' as const },
+            children: [
+              {
+                type: 'element' as const,
+                tag: 'text' as const,
+                props: {
+                  weight: 'semibold' as const,
+                  tone: 'warning' as const,
                 },
-                ...updates.map((entry) =>
-                  pluginCard(entry, representation.coreVersion),
-                ),
-              ]
-            : []),
-          ...(blockedUpdates.length > 0
-            ? [
-                {
-                  type: 'element' as const,
-                  tag: 'row' as const,
-                  props: { gap: 'sm' as const, align: 'center' as const },
-                  children: [
+                children: [textNode(`Updates Available (${updates.length}):`)],
+              },
+              ...updates.map((entry) =>
+                pluginCard(entry, representation.coreVersion),
+              ),
+            ],
+          },
+        ]
+      : []),
+    ...(blockedUpdates.length > 0
+      ? [
+          {
+            type: 'element' as const,
+            tag: 'stack' as const,
+            props: { gap: 'md' as const },
+            children: [
+              {
+                type: 'element' as const,
+                tag: 'row' as const,
+                props: { gap: 'sm' as const, align: 'center' as const },
+                children: [
+                  {
+                    type: 'element' as const,
+                    tag: 'text' as const,
+                    props: {
+                      weight: 'semibold' as const,
+                      tone: 'warning' as const,
+                    },
+                    children: [
+                      textNode(`Blocked Updates (${blockedUpdates.length}):`),
+                    ],
+                  },
+                  {
+                    type: 'element' as const,
+                    tag: 'button' as const,
+                    props: {
+                      label: 'Check for system updates',
+                      className: 'web-button--link',
+                      action: {
+                        type: 'command' as const,
+                        command: 'bot',
+                        subcommand: 'update-check',
+                        arguments: {},
+                        options: {},
+                        presentation: 'run' as const,
+                        surface: 'modal' as const,
+                        modalTitle: 'System updates',
+                        recordInTimeline: false,
+                      },
+                    },
+                  },
+                ],
+              },
+              ...blockedUpdates.map((entry) =>
+                pluginCard(entry, representation.coreVersion),
+              ),
+            ],
+          },
+        ]
+      : []),
+    ...(catalogEntries.length > 0
+      ? [
+          {
+            type: 'element' as const,
+            tag: 'stack' as const,
+            props: { gap: 'md' as const },
+            children: [
+              ...(hasOtherSections
+                ? [
                     {
                       type: 'element' as const,
                       tag: 'text' as const,
                       props: {
                         weight: 'semibold' as const,
-                        tone: 'warning' as const,
+                        tone: 'muted' as const,
                       },
-                      children: [
-                        textNode(`Blocked Updates (${blockedUpdates.length}):`),
-                      ],
+                      children: [textNode('Catalog:')],
                     },
-                    {
-                      type: 'element' as const,
-                      tag: 'button' as const,
-                      props: {
-                        label: 'Check for system updates',
-                        className: 'web-button--link',
-                        action: {
-                          type: 'command' as const,
-                          command: 'bot',
-                          subcommand: 'update-check',
-                          arguments: {},
-                          options: {},
-                          presentation: 'run' as const,
-                          surface: 'modal' as const,
-                          modalTitle: 'System updates',
-                          recordInTimeline: false,
-                        },
-                      },
-                    },
-                  ],
+                  ]
+                : []),
+              ...catalogEntries.map((entry) =>
+                pluginCard(entry, representation.coreVersion),
+              ),
+            ],
+          },
+        ]
+      : []),
+    ...(installedApps.length > 0
+      ? [
+          {
+            type: 'element' as const,
+            tag: 'stack' as const,
+            props: { gap: 'md' as const },
+            children: [
+              {
+                type: 'element' as const,
+                tag: 'text' as const,
+                props: {
+                  weight: 'semibold' as const,
+                  tone: 'muted' as const,
                 },
-                ...blockedUpdates.map((entry) =>
-                  pluginCard(entry, representation.coreVersion),
-                ),
-              ]
-            : []),
-          ...(hasOtherSections && catalogEntries.length > 0
-            ? [
-                {
-                  type: 'element' as const,
-                  tag: 'text' as const,
-                  props: {
-                    weight: 'semibold' as const,
-                    tone: 'muted' as const,
-                  },
-                  children: [textNode('Catalog:')],
-                },
-              ]
-            : []),
-          ...catalogEntries.map((entry) =>
-            pluginCard(entry, representation.coreVersion),
-          ),
-          ...(installedApps.length > 0
-            ? [
-                {
-                  type: 'element' as const,
-                  tag: 'text' as const,
-                  props: {
-                    weight: 'semibold' as const,
-                    tone: 'muted' as const,
-                  },
-                  children: [
-                    textNode(`Installed Apps (${installedApps.length}):`),
-                  ],
-                },
-                ...installedApps.map((entry) =>
-                  pluginCard(entry, representation.coreVersion),
-                ),
-              ]
-            : []),
+                children: [
+                  textNode(`Installed Apps (${installedApps.length}):`),
+                ],
+              },
+              ...installedApps.map((entry) =>
+                pluginCard(entry, representation.coreVersion),
+              ),
+            ],
+          },
+        ]
+      : []),
+  ];
+
+  const listNodes: WebNode[] =
+    representation.entries.length === 0
+      ? [textBlock('No plugins found on the queried relays.', 'muted')]
+      : [
+          {
+            type: 'element',
+            tag: 'tagFilter',
+            props: { gap: 'md' },
+            children: sections,
+          },
         ];
 
   return {
@@ -870,7 +840,6 @@ export function renderPluginsInstallWeb(
           `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}${representation.selectedTag ? ` Tag: #${representation.selectedTag}.` : ''}`,
           'muted',
         ),
-        ...(tagsRow ? [tagsRow] : []),
         ...listNodes,
       ],
     },

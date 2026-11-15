@@ -554,6 +554,8 @@ export const WebBasePropsSchema = z.object({
   refreshable: z.literal(true).optional(),
   /** Text searched by a parent filter; plugins choose the fields included here. */
   filterText: z.string().optional(),
+  /** Tags matched by a parent `tagFilter` element for client-side multi-tag filtering. */
+  filterTags: z.array(z.string()).optional(),
   /** Stable display name for structured filtering/glob matching. */
   filterName: z.string().optional(),
   /** Stable path/key for structured filtering/glob matching. */
@@ -754,6 +756,8 @@ export const WebElementTagSchema = z.enum([
   'tabs',
   /** Panel inside `tabs`; `label` is shown in the tab button. */
   'tabPanel',
+  /** Client-side multi-tag filter container; collects `filterTags` from descendants. */
+  'tagFilter',
   /** One-line text input; use `formFieldName` with parent `form`. */
   'textField',
   /** Dropdown/select input; use `formFieldName` with parent `form`. */
@@ -801,6 +805,7 @@ export const WebGenericElementTagSchema = z.enum([
   'treeItem',
   'tabs',
   'tabPanel',
+  'tagFilter',
   'textField',
   'select',
   'choiceField',

@@ -1556,13 +1556,40 @@ function collectCatalogTags(entries: PluginCatalogEntry[]): string[] {
   );
 }
 
+function requestedTarget(ctx: RouteCommandContext): string {
+  const payload = ctx.jsonPayload as {
+    arguments?: { target?: unknown };
+  } | null;
+
+  if (typeof payload?.arguments?.target === 'string') {
+    return payload.arguments.target.trim();
+  }
+
+  for (let i = 1; i < ctx.args.length; i += 1) {
+    const arg = ctx.args[i]?.trim() ?? '';
+
+    if (!arg) {
+      continue;
+    }
+
+    if (arg.startsWith('--')) {
+      i += 1;
+      continue;
+    }
+
+    return arg;
+  }
+
+  return '';
+}
+
 export async function handlePluginsInstall(
   ctx: RouteCommandContext,
 ): Promise<ReturnType<typeof renderPluginsInstallWeb> | string> {
   const coreVersion = readCoreVersion(ctx.dmBotRoot);
   const coreUpdate = (await ctx.coreUpdateChecker?.checkNow()) ?? null;
   const installedPlugins = readInstalledPlugins(ctx.dmBotRoot);
-  const target = ctx.args[1]?.trim() ?? '';
+  const target = requestedTarget(ctx);
   const capabilityFilter = parseCapabilityCatalogFilter(target);
 
   if (target && !capabilityFilter) {

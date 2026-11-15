@@ -54,10 +54,15 @@ import {
   type PushRemoteResult,
 } from '../release-git';
 
-import { managePaymentOffers, publicationOperation } from './offers';
+import {
+  managePaymentOffers,
+  publicationOperation,
+  publicationOptions,
+} from './offers';
 import { publicationProgress } from './progress';
 import { renderPluginsPublishText } from './renderers/text';
 import {
+  renderCatalogEditWeb,
   renderPluginsPublishPreviewWeb,
   renderPluginsPublishWeb,
   renderPublishRepositorySelection,
@@ -1111,11 +1116,26 @@ async function handlePluginsPublishAttempt(
         'offer-publish',
         'offer-select',
         'offer-cancel',
+        'catalog-edit',
         'catalog-update',
       ].includes(operation)
     ) {
       return 'Unknown publication operation.';
     }
+  }
+
+  if (operation === 'catalog-edit' && published) {
+    return renderCatalogEditWeb({
+      alias,
+      signerName: connection.name,
+      catalog: {
+        title: published.title || pkg.title,
+        website: published.website || pkg.website || '',
+        description: published.description || pkg.description,
+        tags: published.tags,
+        existingCatalogTags,
+      },
+    });
   }
 
   if (operation === 'catalog-update' && published) {

@@ -162,15 +162,15 @@ const pluginsPublishStylesheet = {
   `,
 } as const;
 
-function renderCatalogEditor(
-  representation: PluginsPublishPreviewRepresentation,
-): WebNode | null {
-  const catalog = representation.catalogEditor;
-
-  if (!catalog) {
-    return null;
-  }
-
+function renderCatalogEditor({
+  alias,
+  signerName,
+  catalog,
+}: {
+  alias: string;
+  signerName: string;
+  catalog: NonNullable<PluginsPublishPreviewRepresentation['catalogEditor']>;
+}): WebNode {
   return {
     type: 'element',
     tag: 'stack',
@@ -195,10 +195,10 @@ function renderCatalogEditor(
             type: 'command',
             command: 'plugins',
             subcommand: 'publish',
-            arguments: { alias: representation.alias },
+            arguments: { alias },
             options: {
               operation: 'catalog-update',
-              signer: representation.signerName,
+              signer: signerName,
             },
             recordInTimeline: false,
             pendingUi: {
@@ -311,6 +311,29 @@ function renderCatalogEditor(
   };
 }
 
+export function renderCatalogEditWeb({
+  alias,
+  signerName,
+  catalog,
+}: {
+  alias: string;
+  signerName: string;
+  catalog: NonNullable<PluginsPublishPreviewRepresentation['catalogEditor']>;
+}): WebNodeRoot {
+  return {
+    kind: 'ui',
+    version: 1,
+    meta: { command: 'plugins', subcommand: 'publish' },
+    tree: {
+      type: 'element',
+      tag: 'box',
+      props: { padding: 'md', className: 'plugins-publish-card' },
+      children: [renderCatalogEditor({ alias, signerName, catalog })],
+    },
+    stylesheets: [pluginsPublishStylesheet],
+  };
+}
+
 export function renderPluginsPublishPreviewWeb(
   representation: PluginsPublishPreviewRepresentation,
 ): WebNodeRoot {
@@ -318,7 +341,13 @@ export function renderPluginsPublishPreviewWeb(
   const publishStatusId = `plugins-publish-status-${representation.alias}`;
   const cardHighlightId = `plugins-release-card-${representation.alias}`;
 
-  const catalogEditor = renderCatalogEditor(representation);
+  const catalogEditor = representation.catalogEditor
+    ? renderCatalogEditor({
+        alias: representation.alias,
+        signerName: representation.signerName,
+        catalog: representation.catalogEditor,
+      })
+    : null;
 
   return {
     kind: 'ui',

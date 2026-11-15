@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.27.0] - 2026-11-15
+
+- feat: filterTags is introduced and implemented in plugins install (68749138)
+
 ## [v14.26.2] - 2026-11-15
 
-- chore: updated landing page demo (8ea73d3d)
+- chore: updated landing page demo (1fdd71bf)
 
 ## [v14.26.1] - 2026-11-15
 

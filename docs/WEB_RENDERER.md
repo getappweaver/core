@@ -41,6 +41,13 @@ state as a boolean, including false; repeated-name checkbox groups keep their
 value-array behavior.
 Optional false flags are omitted from the built-in text invocation bridge.
 
+Persistent command forms keep their field values on submission, including while a
+request is pending or fails. Automatic hide/reset is limited to forms with both a
+`revealId` and `hiddenUntilRevealed: true` that are currently revealed. Editor Save
+actions rely on the returned root to supply saved values or a retained error draft.
+Plugins should parse web `PluginInvocationContext.jsonPayload` as structured arguments/
+options; the display-oriented CLI bridge does not preserve scalar whitespace boundaries.
+
 Generic `details` and `summary` tags render native HTML disclosures, collapsed
 initially. Put a `summary` element first in a `details` element's children,
 followed by the expandable content. Native keyboard interaction applies; scoped
