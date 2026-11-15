@@ -23,6 +23,7 @@ import {
   cardHeadTreeExpandAllIcon,
   cardHeadTreeRefreshIcon,
 } from '../timeline/timelineCardHeadIcons';
+import { WebShadowUiBusyContext } from '../web-shadow-ui-busy-context';
 import { WebButton } from '../WebButton';
 
 import type { TreeBulkExpandState, TreeExpandRequest } from './contexts';
@@ -39,6 +40,7 @@ import {
   TreeWidgetBulkExpandContext,
   TreeDirectChildCountContext,
   TreeRootItemCountContext,
+  TreeReorderGutterContext,
   TreeFilterStateContext,
   TreeTimeFilterStateContext,
   WebRootUpdateEpochContext,
@@ -57,8 +59,10 @@ import {
   normalizedFilterQuery,
   EMPTY_TREE_FILTER_INDEX,
 } from './tree-filter';
+import { createTreeReorder } from './tree-reorder';
 import {
   applyFocusedTreeExpansion,
+  expandTreeItemOnce,
   collectFocusedTreeItemExpansion,
   runLocalWebAction,
   setTreeItemsExpanded,
@@ -87,6 +91,8 @@ type WebTreeItemProps = {
 };
 
 export function WebTreeItemElement(props: WebTreeItemProps) {
+  const getBusy = useContext(WebShadowUiBusyContext);
+  const reorderGutter = useContext(TreeReorderGutterContext);
   const children = () => props.element.children ?? [];
   const summary = () => props.element.summary ?? children()[0] ?? null;
 
@@ -137,6 +143,21 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
 
   const [expanded, setExpanded] = createSignal(initialExpanded());
   const [lazyLoading, setLazyLoading] = createSignal(false);
+  const autoExpandedById = expandedById ?? new Map<string, boolean>();
+
+  createEffect(() => {
+    const id = treeItemId();
+    const key = props.element.props?.expandOnceKey;
+
+    if (
+      id &&
+      key &&
+      expandTreeItemOnce({ id, key, expandedById: autoExpandedById })
+    ) {
+      setExpanded(true);
+      loadLazyChildrenIfNeeded();
+    }
+  });
 
   const directTreeItemCount = () =>
     body().filter(
@@ -274,6 +295,7 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
           class={elementClass(props.element)}
           data-ui={elementUi(props.element)}
           data-web-node-id={treeItemId() ?? undefined}
+          data-web-reorder-key={props.element.props?.reorderKey}
           ref={(el) => setupWebElementRef({ element: props.element, el })}
         >
           <div
@@ -318,6 +340,28 @@ export function WebTreeItemElement(props: WebTreeItemProps) {
                 {expanded() ? '▾' : '▸'}
               </button>
             </Show>
+            <Show
+              when={props.element.props?.reorderKey}
+              fallback={
+                <Show when={reorderGutter()}>
+                  <span class="web-reorder-spacer" aria-hidden="true" />
+                </Show>
+              }
+            >
+              {(key) => (
+                <button
+                  type="button"
+                  class="web-reorder-handle"
+                  data-web-reorder-handle={key()}
+                  disabled={getBusy() || hasActiveTextFilter()}
+                  aria-label={`Drag ${props.element.props?.filterText ?? 'item'} to reorder.`}
+                  title="Drag to reorder"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  ⠿
+                </button>
+              )}
+            </Show>
             <Show when={summary()}>{(node) => props.renderChild(node())}</Show>
           </div>
           <Show when={!hasActiveTextFilter() && (!hasChildren() || expanded())}>
@@ -361,6 +405,7 @@ type WebTreeElementProps = {
 };
 
 export function WebTreeElement(props: WebTreeElementProps) {
+  const getBusy = useContext(WebShadowUiBusyContext);
   const parentBulk = useContext(TreeBulkExpandContext);
   const renderMeta = useWebRenderMeta();
   const renderSurface = useContext(WebRenderSurfaceContext);
@@ -405,6 +450,15 @@ export function WebTreeElement(props: WebTreeElementProps) {
   let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   const filterEnabled = () => props.element.props?.filterable === true;
   const hasFilterValue = () => normalizedFilterQuery(filterInput()).length > 0;
+
+  const reorder = createTreeReorder({
+    element: () => props.element,
+    busy: getBusy,
+    filtered: hasFilterValue,
+    run: props.onRunAction,
+    onReplaceRoot: props.onReplaceRoot,
+    promptRequestId: props.promptRequestId,
+  });
 
   const showInlineHeader = () => {
     const surface = renderSurface?.() ?? null;
@@ -639,12 +693,20 @@ export function WebTreeElement(props: WebTreeElementProps) {
   if (parentBulk !== undefined) {
     return (
       <div
+        ref={reorder.ref}
+        onPointerDown={reorder.pointerDown}
         class={elementClass(props.element)}
         data-ui={elementUi(props.element)}
         style={elementStyle(props.element)}
       >
         <For each={props.element.children ?? []}>
-          {(child) => props.renderChild(child)}
+          {(child) => (
+            <TreeReorderGutterContext.Provider
+              value={() => Boolean(props.element.props?.reorder)}
+            >
+              {props.renderChild(child)}
+            </TreeReorderGutterContext.Provider>
+          )}
         </For>
       </div>
     );
@@ -668,6 +730,8 @@ export function WebTreeElement(props: WebTreeElementProps) {
                 value={directRootTreeItemCount}
               >
                 <div
+                  ref={reorder.ref}
+                  onPointerDown={reorder.pointerDown}
                   class={elementClass(props.element)}
                   data-ui={elementUi(props.element)}
                   style={elementStyle(props.element)}
@@ -761,7 +825,13 @@ export function WebTreeElement(props: WebTreeElementProps) {
                     </div>
                   </Show>
                   <For each={props.element.children ?? []}>
-                    {(child) => props.renderChild(child)}
+                    {(child) => (
+                      <TreeReorderGutterContext.Provider
+                        value={() => Boolean(props.element.props?.reorder)}
+                      >
+                        {props.renderChild(child)}
+                      </TreeReorderGutterContext.Provider>
+                    )}
                   </For>
                 </div>
               </TreeRootItemCountContext.Provider>

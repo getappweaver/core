@@ -84,6 +84,11 @@ export const WebTreeHeaderElCallbackContext = createContext<
 // Tree item expanded state
 // ---------------------------------------------------------------------------
 
+/** Reserve the same handle gutter on all descendants of an opted-in reorder tree. */
+export const TreeReorderGutterContext = createContext<Accessor<boolean>>(
+  () => false,
+);
+
 export const TreeItemExpandedStateContext = createContext<Map<
   string,
   boolean

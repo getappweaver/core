@@ -28,6 +28,13 @@ form submission. With no connected account it explains how to connect; plugins
 may offer a separate manual `textField` fallback. Static `select` behavior is
 unchanged when `choiceSource` is omitted.
 
+Static `select` elements may also supply a command `action` to run immediately on
+selection, without a containing form or submit button. `formFieldName` identifies
+the selected scalar argument; include that name in `formOptionFieldNames` to put
+it in command options instead. The selected value replaces that one action field,
+preserving other arguments/options and normal root replacement. Without `action`,
+selects retain their ordinary form-input behavior. `ariaLabel` labels the native input.
+
 Generic command forms render boolean options as checkboxes, using their web default
 or false. A single named boolean checkbox in a command `form` submits its checked
 state as a boolean, including false; repeated-name checkbox groups keep their
@@ -39,6 +46,35 @@ initially. Put a `summary` element first in a `details` element's children,
 followed by the expandable content. Native keyboard interaction applies; scoped
 stylesheets can style the heading and body without introducing custom actions.
 
+`treeItem.expandOnceKey` requests additive expansion once per item/key within a widget's
+saved tree state. Mark ancestors too when a nested item must become visible. Repeated
+renders/polls preserve subsequent manual collapses; a new context key expands again.
+Unrelated expansion states are preserved, with no focus/scroll or collapse-all behavior.
+Lazy branches invoke their existing load action on that first expansion when needed.
+
+### Keyed tree reordering
+
+A `tree` can opt into `props.reorder: { action, field, target }`, where `action` is a
+command and `target` is `arguments` or `options`. Only direct `treeItem` children with
+a nonempty `props.reorderKey` participate. Unkeyed rows, diagnostics and descendants
+remain outside the movable set. Keys must be unique. This is sibling ordering, not
+reparenting or cross-tree dragging.
+
+Keyed items render a small pointer-drag handle. The drop marker indicates before/after the target summary. Only a
+completed changed move invokes one command, replacing `action[target][field]` with the
+full ordered key array and preserving the caller's other arguments/options. No command
+runs during pointer movement. Escape, pointer cancellation, window blur, root updates
+and unmount cancel the gesture and remove listeners/markers. Reordering is blocked
+while busy or filtered; unknown/cross-tree targets are ignored. Ordinary unconfigured
+trees retain their existing behavior.
+
+The command owner must validate membership and include/check a revision or snapshot
+to reject stale actions; the renderer does not persist order or infer domain policies.
+There are no built-in keyboard movement shortcuts.
+Descendants and unkeyed rows within an opted-in tree reserve a fixed-width, noninteractive
+handle gutter matching the drag handle. This keeps hierarchical indentation visible
+when only the root rows are movable. Nested trees establish their own gutter setting.
+
 The generic browser `nostr.signEvent` client action accepts
 `signingMode: "immediate"` for current-time signing with an
 `onSuccessCommand` handoff. Its default remains `"scheduled"`, preserving the
@@ -49,6 +85,23 @@ to the intended account(s); a returned signature from another author is rejected
 before the `onSuccessCommand` handoff. Omit it to keep unrestricted signing.
 
 Backend/web
+
+### Background command outcomes and diagnostics
+
+`WebNodeRoot.meta.outcome` optionally supplies `{ state: "success" | "warning" |
+"error", message: string }`. Background actions apply this outcome to their
+`clientStatus.statusTargetId`; a normal command completion cannot overwrite an
+explicit outcome with the action's default success message. Outcomes remain
+request-scoped even when the user switches sessions during a running command.
+
+Handlers can stream transient status via `sendReply(encodeCommandStatus(update))`
+using [the shared command status contract](../src/web/command-status.ts). Updates
+carry the target `id`, state, message, diagnostic output and nullable progress.
+`commandStatus` renders an indeterminate bar for pending work without a numeric
+fraction, and an expandable diagnostic history for output. Terminal streamed
+statuses are also preserved on command completion. These transport updates are
+not persisted as timeline events. Keep credentials and private request content
+out of diagnostic messages.
 
 ### Bot restart notifications
 

@@ -1329,6 +1329,26 @@ a.web-button:focus-visible {
   min-width: 0;
 }
 
+.web-reorder-handle {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0 0.2rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+}
+.web-reorder-handle,
+.web-reorder-spacer { box-sizing: border-box; width: 1.25rem; flex: 0 0 1.25rem; }
+.web-reorder-handle:hover,
+.web-reorder-handle:focus-visible { color: var(--color-warning); }
+.web-reorder-handle:focus-visible { outline: 1px solid var(--color-warning); }
+.web-reorder-handle:disabled { opacity: 0.35; cursor: default; }
+[data-web-reorder-key].is-reordering { opacity: 0.5; }
+.web-reorder-before > .web-tree-item-summary { box-shadow: 0 -2px 0 var(--color-warning); }
+.web-reorder-after > .web-tree-item-summary { box-shadow: 0 2px 0 var(--color-warning); }
+
 .web-tree-item-summary > .web-node {
   flex: 1;
   min-width: 0;

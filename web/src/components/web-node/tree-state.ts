@@ -71,6 +71,37 @@ export type FocusedTreeExpansionPlan = {
   allIds: Set<string>;
 };
 
+const expandedOnce = new WeakMap<Map<string, boolean>, Set<string>>();
+type ExpandOnceInput = {
+  id: string;
+  key: string;
+  expandedById: Map<string, boolean>;
+};
+/** Additive and widget-local: repeated polling must not undo a user's later collapse. */
+export function expandTreeItemOnce({
+  id,
+  key,
+  expandedById,
+}: ExpandOnceInput): boolean {
+  let consumed = expandedOnce.get(expandedById);
+
+  if (!consumed) {
+    consumed = new Set();
+    expandedOnce.set(expandedById, consumed);
+  }
+
+  const token = JSON.stringify([id, key]);
+
+  if (consumed.has(token)) {
+    return false;
+  }
+
+  consumed.add(token);
+  expandedById.set(id, true);
+
+  return true;
+}
+
 export function collectFocusedTreeItemExpansion(
   node: WebNode,
 ): FocusedTreeExpansionPlan {

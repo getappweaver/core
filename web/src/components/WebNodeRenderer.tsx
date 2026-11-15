@@ -544,7 +544,13 @@ function renderElement({
       </Match>
 
       <Match when={element.tag === 'select'}>
-        <WebSelectNode element={element} />
+        <WebSelectNode
+          element={element}
+          onRunAction={props.onRunAction}
+          onReplaceRoot={props.onReplaceRoot}
+          onError={props.onError}
+          promptRequestId={props.promptRequestId}
+        />
       </Match>
 
       <Match when={element.tag === 'choiceField'}>

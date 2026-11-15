@@ -723,7 +723,13 @@ export function WebTextAreaNode(props: WebTextFieldNodeProps): JSX.Element {
   );
 }
 
-export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
+type WebSelectNodeProps = WebTextFieldNodeProps &
+  Pick<
+    WebFormElementProps,
+    'onRunAction' | 'onReplaceRoot' | 'onError' | 'promptRequestId'
+  >;
+
+export function WebSelectNode(props: WebSelectNodeProps): JSX.Element {
   if (props.element.props?.choiceSource === 'nostrAccounts') {
     return <WebNostrAccountSelectNode element={props.element} />;
   }
@@ -765,10 +771,49 @@ export function WebSelectNode(props: WebTextFieldNodeProps): JSX.Element {
         }}
         class="web-select__input"
         name={name()}
+        aria-label={props.element.props?.ariaLabel}
         disabled={props.element.props?.disabled === true || getBusy() === true}
         value={
           props.element.props?.value ?? props.element.props?.choices?.[0] ?? ''
         }
+        onChange={(event) => {
+          const action = props.element.props?.action;
+
+          if (!action) {
+            return;
+          }
+
+          event.stopPropagation();
+          const field = name();
+
+          if (action.type !== 'command' || !field) {
+            props.onError?.(
+              'Select actions require a command and formFieldName.',
+            );
+
+            return;
+          }
+
+          const target = props.element.props?.formOptionFieldNames?.includes(
+            field,
+          )
+            ? 'options'
+            : 'arguments';
+
+          props.onRunAction?.(
+            {
+              ...action,
+              [target]: {
+                ...action[target],
+                [field]: event.currentTarget.value,
+              },
+            },
+            {
+              onReplaceRoot: props.onReplaceRoot,
+              promptRequestId: props.promptRequestId,
+            },
+          );
+        }}
       >
         <For each={props.element.props?.choices ?? []}>
           {(choice) => (

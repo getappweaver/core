@@ -586,6 +586,8 @@ export const WebBasePropsSchema = z.object({
   /** Placeholder for built-in filter inputs. */
   filterPlaceholder: z.string().optional(),
   defaultExpanded: z.boolean().optional(),
+  /** `treeItem`: expand once per item/key in this widget, preserving other expansion state. Change the key for a new review/context. */
+  expandOnceKey: z.string().min(1).optional(),
   /** `treeItem`: focus this item on mount/replace (collapses non-ancestor tree items, expands ancestors and item, scrolls into view, and plays focus flash animation). */
   focused: z.boolean().optional(),
   label: z.string().optional(),
@@ -676,8 +678,21 @@ export const WebBasePropsSchema = z.object({
   disabledUntilFormFieldPositiveInteger: z.string().min(1).optional(),
   /** `button`: disable submit until this form field differs from its initial value. */
   disabledUntilFormFieldChanged: z.string().min(1).optional(),
-  /** `form`: fields with these names merge into command `options` instead of positional `arguments`. */
+  /** `form` / command-action `select`: fields with these names merge into command `options` instead of positional `arguments`. */
   formOptionFieldNames: z.array(z.string().min(1)).optional(),
+  /** `tree`: reorder only direct treeItem children carrying reorderKey, in one command. */
+  reorder: z
+    .strictObject({
+      action: WebActionSchema.refine(
+        (action) => action.type === 'command',
+        'Reordering requires a command action',
+      ),
+      field: z.string().min(1),
+      target: z.enum(['arguments', 'options']),
+    })
+    .optional(),
+  /** `treeItem`: stable key included in its direct parent tree's reordered key list. */
+  reorderKey: z.string().min(1).max(160).optional(),
   /** Optional plain text that generic clients may expose through read-aloud controls. */
   ttsText: z.string().optional(),
   /** Remove this node after an optimistic removal leaves it with no direct `treeItem` children. */

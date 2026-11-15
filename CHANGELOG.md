@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.24.0] - 2026-11-15
+
+- feat: implement tree item reordering and expand-once functionality (4223dae1)
+
 ## [v14.23.1] - 2026-11-15
 
-- fix: multi-repo plugin support and improved error handling (e3237d1e)
+- fix: multi-repo plugin support and improved error handling (89f21052)
 
 ## [v14.23.0] - 2026-11-15
 
