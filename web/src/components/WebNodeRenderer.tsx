@@ -311,7 +311,11 @@ function renderElement({
       </Match>
 
       <Match when={element.tag === 'details'}>
-        <details class={elementClass(element)} style={elementStyle(element)}>
+        <details
+          class={elementClass(element)}
+          style={elementStyle(element)}
+          open={element.props?.open}
+        >
           <For each={element.children ?? []}>{renderChild}</For>
         </details>
       </Match>

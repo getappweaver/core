@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.27.2] - 2026-11-16
+
+- fix: improve plugins install UI (045bb586)
+
 ## [v14.27.1] - 2026-11-16
 
-- chore: remove debug logging from chat and socket handling (e4edf889)
+- chore: remove debug logging from chat and socket handling (ead301d6)
 
 ## [v14.27.0] - 2026-11-15
 

@@ -562,6 +562,8 @@ export const WebBasePropsSchema = z.object({
   filterPath: z.string().optional(),
   /** `treeItem`: when set, only clicks matching this selector toggle the item. */
   toggleSelector: z.string().min(1).optional(),
+  /** `details`: whether the disclosure element is initially expanded. */
+  open: z.boolean().optional(),
   /** `tabs`: initially selected tab panel id. */
   defaultActiveTabId: z.string().min(1).optional(),
   /** Cache key for a client-built filter index. */

@@ -84,6 +84,62 @@ const pluginsInstallStylesheet = {
     .web-link.plugins-install-source-link {
       width: fit-content;
     }
+
+    details.plugins-install-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    summary.plugins-install-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      margin: 0.45rem 0;
+      padding: 0.1rem 0.75rem;
+      border: none;
+      background: color-mix(in srgb, var(--color-fg, #e5e7eb) 10%, transparent);
+      color: var(--color-muted, currentColor);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      transition: background-color 0.12s ease;
+    }
+
+    summary.plugins-install-section-header:hover {
+      background: color-mix(in srgb, var(--color-fg, #e5e7eb) 16%, transparent);
+    }
+
+    summary.plugins-install-section-header::-webkit-details-marker {
+      display: none;
+    }
+
+    summary.plugins-install-section-header::after {
+      content: '▸';
+      font-size: 0.7rem;
+      opacity: 0.7;
+    }
+
+    details.plugins-install-section[open] > summary.plugins-install-section-header::after {
+      content: '▾';
+    }
+
+    summary.plugins-install-section-header--warning {
+      color: var(--color-warning, currentColor);
+      background: color-mix(in srgb, var(--color-warning, currentColor) 12%, transparent);
+    }
+
+    summary.plugins-install-section-header--warning:hover {
+      background: color-mix(in srgb, var(--color-warning, currentColor) 18%, transparent);
+    }
+
+    .web-row.plugins-install-blocked-bar {
+      justify-content: flex-end;
+    }
   `,
 } as const;
 
@@ -652,6 +708,37 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
   };
 }
 
+function pluginSection(
+  title: string,
+  children: WebNode[],
+  tone?: 'warning',
+): WebNode {
+  const headerClass =
+    tone === 'warning'
+      ? 'plugins-install-section-header plugins-install-section-header--warning'
+      : 'plugins-install-section-header';
+
+  return {
+    type: 'element',
+    tag: 'details',
+    props: { open: true, className: 'plugins-install-section' },
+    children: [
+      {
+        type: 'element',
+        tag: 'summary',
+        props: { className: headerClass },
+        children: [textNode(title)],
+      },
+      {
+        type: 'element',
+        tag: 'stack',
+        props: { gap: 'md' },
+        children,
+      },
+    ],
+  };
+}
+
 export function renderPluginsInstallWeb(
   representation: PluginsInstallRepresentation,
 ): WebNodeRoot {
@@ -677,70 +764,45 @@ export function renderPluginsInstallWeb(
       entry.installedAlias !== null,
   );
 
-  const hasOtherSections =
-    updates.length > 0 || blockedUpdates.length > 0 || installedApps.length > 0;
-
   const sections: WebNode[] = [
     ...(updates.length > 0
       ? [
-          {
-            type: 'element' as const,
-            tag: 'stack' as const,
-            props: { gap: 'md' as const },
-            children: [
-              {
-                type: 'element' as const,
-                tag: 'text' as const,
-                props: {
-                  weight: 'semibold' as const,
-                  tone: 'warning' as const,
-                },
-                children: [textNode(`Updates Available (${updates.length}):`)],
-              },
-              ...updates.map((entry) =>
-                pluginCard(entry, representation.coreVersion),
-              ),
-            ],
-          },
+          pluginSection(
+            `UPDATES AVAILABLE (${updates.length})`,
+            updates.map((entry) =>
+              pluginCard(entry, representation.coreVersion),
+            ),
+            'warning',
+          ),
         ]
       : []),
     ...(blockedUpdates.length > 0
       ? [
-          {
-            type: 'element' as const,
-            tag: 'stack' as const,
-            props: { gap: 'md' as const },
-            children: [
+          pluginSection(
+            `BLOCKED UPDATES (${blockedUpdates.length})`,
+            [
               {
-                type: 'element' as const,
-                tag: 'row' as const,
-                props: { gap: 'sm' as const, align: 'center' as const },
+                type: 'element',
+                tag: 'row',
+                props: {
+                  align: 'center',
+                  className: 'plugins-install-blocked-bar',
+                },
                 children: [
                   {
-                    type: 'element' as const,
-                    tag: 'text' as const,
-                    props: {
-                      weight: 'semibold' as const,
-                      tone: 'warning' as const,
-                    },
-                    children: [
-                      textNode(`Blocked Updates (${blockedUpdates.length}):`),
-                    ],
-                  },
-                  {
-                    type: 'element' as const,
-                    tag: 'button' as const,
+                    type: 'element',
+                    tag: 'button',
                     props: {
                       label: 'Check for system updates',
                       className: 'web-button--link',
                       action: {
-                        type: 'command' as const,
+                        type: 'command',
                         command: 'bot',
                         subcommand: 'update-check',
                         arguments: {},
                         options: {},
-                        presentation: 'run' as const,
-                        surface: 'modal' as const,
+                        presentation: 'run',
+                        surface: 'modal',
                         modalTitle: 'System updates',
                         recordInTimeline: false,
                       },
@@ -752,59 +814,28 @@ export function renderPluginsInstallWeb(
                 pluginCard(entry, representation.coreVersion),
               ),
             ],
-          },
+            'warning',
+          ),
         ]
       : []),
     ...(catalogEntries.length > 0
       ? [
-          {
-            type: 'element' as const,
-            tag: 'stack' as const,
-            props: { gap: 'md' as const },
-            children: [
-              ...(hasOtherSections
-                ? [
-                    {
-                      type: 'element' as const,
-                      tag: 'text' as const,
-                      props: {
-                        weight: 'semibold' as const,
-                        tone: 'muted' as const,
-                      },
-                      children: [textNode('Catalog:')],
-                    },
-                  ]
-                : []),
-              ...catalogEntries.map((entry) =>
-                pluginCard(entry, representation.coreVersion),
-              ),
-            ],
-          },
+          pluginSection(
+            `CATALOG (${catalogEntries.length})`,
+            catalogEntries.map((entry) =>
+              pluginCard(entry, representation.coreVersion),
+            ),
+          ),
         ]
       : []),
     ...(installedApps.length > 0
       ? [
-          {
-            type: 'element' as const,
-            tag: 'stack' as const,
-            props: { gap: 'md' as const },
-            children: [
-              {
-                type: 'element' as const,
-                tag: 'text' as const,
-                props: {
-                  weight: 'semibold' as const,
-                  tone: 'muted' as const,
-                },
-                children: [
-                  textNode(`Installed Apps (${installedApps.length}):`),
-                ],
-              },
-              ...installedApps.map((entry) =>
-                pluginCard(entry, representation.coreVersion),
-              ),
-            ],
-          },
+          pluginSection(
+            `INSTALLED APPS (${installedApps.length})`,
+            installedApps.map((entry) =>
+              pluginCard(entry, representation.coreVersion),
+            ),
+          ),
         ]
       : []),
   ];
@@ -830,12 +861,6 @@ export function renderPluginsInstallWeb(
       tag: 'stack',
       props: { gap: 'md', className: 'plugins-install-layout' },
       children: [
-        {
-          type: 'element',
-          tag: 'text',
-          props: { weight: 'bold' },
-          children: [textNode('Plugin Catalog')],
-        },
         textBlock(
           `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}${representation.selectedTag ? ` Tag: #${representation.selectedTag}.` : ''}`,
           'muted',
