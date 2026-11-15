@@ -1378,7 +1378,14 @@ async function attachInstalledState({
     });
   }
 
-  return attached;
+  return attached.sort((a, b) => {
+    const rank = (entry: PluginCatalogEntry): number =>
+      entry.updateAvailable ? 0 : entry.blockedUpdateRef ? 1 : 2;
+
+    const diff = rank(a) - rank(b);
+
+    return diff !== 0 ? diff : a.name.localeCompare(b.name);
+  });
 }
 
 export async function queryPluginCatalog(

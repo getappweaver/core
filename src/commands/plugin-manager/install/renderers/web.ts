@@ -643,6 +643,104 @@ function pluginCard(entry: PluginCatalogEntry, coreVersion: string): WebNode {
 export function renderPluginsInstallWeb(
   representation: PluginsInstallRepresentation,
 ): WebNodeRoot {
+  const updates = representation.entries.filter(
+    (entry) => entry.updateAvailable,
+  );
+
+  const blockedUpdates = representation.entries.filter(
+    (entry) => !entry.updateAvailable && entry.blockedUpdateRef !== null,
+  );
+
+  const others = representation.entries.filter(
+    (entry) => !entry.updateAvailable && entry.blockedUpdateRef === null,
+  );
+
+  const hasAnyUpdates = updates.length > 0 || blockedUpdates.length > 0;
+
+  const listNodes: WebNode[] =
+    representation.entries.length === 0
+      ? [textBlock('No plugins found on the queried relays.', 'muted')]
+      : [
+          ...(updates.length > 0
+            ? [
+                {
+                  type: 'element' as const,
+                  tag: 'text' as const,
+                  props: {
+                    weight: 'semibold' as const,
+                    tone: 'warning' as const,
+                  },
+                  children: [
+                    textNode(`Updates Available (${updates.length}):`),
+                  ],
+                },
+                ...updates.map((entry) =>
+                  pluginCard(entry, representation.coreVersion),
+                ),
+              ]
+            : []),
+          ...(blockedUpdates.length > 0
+            ? [
+                {
+                  type: 'element' as const,
+                  tag: 'row' as const,
+                  props: { gap: 'sm' as const, align: 'center' as const },
+                  children: [
+                    {
+                      type: 'element' as const,
+                      tag: 'text' as const,
+                      props: {
+                        weight: 'semibold' as const,
+                        tone: 'warning' as const,
+                      },
+                      children: [
+                        textNode(`Blocked Updates (${blockedUpdates.length}):`),
+                      ],
+                    },
+                    {
+                      type: 'element' as const,
+                      tag: 'button' as const,
+                      props: {
+                        label: 'Check for system updates',
+                        className: 'web-button--link',
+                        action: {
+                          type: 'command' as const,
+                          command: 'bot',
+                          subcommand: 'update-check',
+                          arguments: {},
+                          options: {},
+                          presentation: 'run' as const,
+                          surface: 'modal' as const,
+                          modalTitle: 'System updates',
+                          recordInTimeline: false,
+                        },
+                      },
+                    },
+                  ],
+                },
+                ...blockedUpdates.map((entry) =>
+                  pluginCard(entry, representation.coreVersion),
+                ),
+              ]
+            : []),
+          ...(hasAnyUpdates && others.length > 0
+            ? [
+                {
+                  type: 'element' as const,
+                  tag: 'text' as const,
+                  props: {
+                    weight: 'semibold' as const,
+                    tone: 'muted' as const,
+                  },
+                  children: [textNode('Catalog:')],
+                },
+              ]
+            : []),
+          ...others.map((entry) =>
+            pluginCard(entry, representation.coreVersion),
+          ),
+        ];
+
   return {
     kind: 'ui',
     version: 1,
@@ -662,11 +760,7 @@ export function renderPluginsInstallWeb(
           `Fetched ${representation.entries.length} plugin(s) from ${representation.relays.length} relays. Bot core: ${representation.coreVersion}.${representation.filter ? ` Filter: ${representation.filter}.` : ''}`,
           'muted',
         ),
-        ...(representation.entries.length === 0
-          ? [textBlock('No plugins found on the queried relays.', 'muted')]
-          : representation.entries.map((entry) =>
-              pluginCard(entry, representation.coreVersion),
-            )),
+        ...listNodes,
       ],
     },
     stylesheets: [pluginsInstallStylesheet],
