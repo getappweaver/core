@@ -88,6 +88,7 @@ export type PluginCatalogEntry = {
   version: string;
   coreApiVersion: string;
   repo: string;
+  repos: string[];
   author: AuthorIdentity;
   refs: RefEntry[];
   installedAlias: string | null;
@@ -168,7 +169,16 @@ function tagValue(tags: string[][], name: string): string {
 
 function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
   const name = tagValue(event.tags, 'd');
-  const repo = tagValue(event.tags, 'repo');
+
+  const repos = [
+    ...new Set(
+      event.tags
+        .filter((tag) => tag[0] === 'repo' && tag[1]?.trim())
+        .map((tag) => tag[1].trim()),
+    ),
+  ];
+
+  const repo = repos[0] ?? '';
 
   if (!name || !repo) {
     return null;
@@ -199,6 +209,7 @@ function parsePluginEvent(event: NostrEvent): PluginCatalogEntry | null {
     version: tagValue(event.tags, 'version'),
     coreApiVersion: tagValue(event.tags, 'coreApiVersion'),
     repo,
+    repos,
     author: fallbackAuthorIdentity(event.pubkey),
     refs,
     installedAlias: null,
@@ -932,11 +943,29 @@ function updateInstalledCatalogEntry({
     };
   }
 
-  const fetchResult = Bun.spawnSync(['git', 'fetch', '--tags'], {
+  let fetchResult = Bun.spawnSync(['git', 'fetch', '--tags'], {
     cwd: pluginDir,
     stdout: 'pipe',
     stderr: 'pipe',
   });
+
+  if (fetchResult.exitCode !== 0) {
+    for (const mirrorRepo of entry.repos) {
+      const mirrorFetch = Bun.spawnSync(
+        ['git', 'fetch', '--tags', mirrorRepo],
+        {
+          cwd: pluginDir,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+
+      if (mirrorFetch.exitCode === 0) {
+        fetchResult = mirrorFetch;
+        break;
+      }
+    }
+  }
 
   if (fetchResult.exitCode !== 0) {
     throw new Error(
@@ -1072,7 +1101,7 @@ async function installCatalogEntry({
         pluginDir,
         entry,
         acceptedRepos: [
-          entry.repo,
+          ...entry.repos,
           ...(resolvedTarget ? [resolvedTarget.repoAddress] : []),
         ],
       });
@@ -1108,29 +1137,41 @@ async function installCatalogEntry({
       pluginDir: destDir,
       entry,
       acceptedRepos: [
-        entry.repo,
+        ...entry.repos,
         ...(resolvedTarget ? [resolvedTarget.repoAddress] : []),
       ],
     });
   } else {
-    const cloneResult = Bun.spawnSync(
-      [
-        'git',
-        'clone',
-        '--branch',
-        entry.compatibleRef.tag,
-        '--depth',
-        '1',
-        entry.repo,
-        destDir,
-      ],
-      { stdout: 'pipe', stderr: 'pipe' },
-    );
+    const cloneErrors: string[] = [];
+    let cloned = false;
 
-    if (cloneResult.exitCode !== 0) {
-      throw new Error(
-        `git clone failed:\n${cloneResult.stdout.toString()}${cloneResult.stderr.toString()}`,
+    for (const candidateRepo of entry.repos) {
+      const cloneResult = Bun.spawnSync(
+        [
+          'git',
+          'clone',
+          '--branch',
+          entry.compatibleRef.tag,
+          '--depth',
+          '1',
+          candidateRepo,
+          destDir,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' },
       );
+
+      if (cloneResult.exitCode === 0) {
+        cloned = true;
+        break;
+      }
+
+      cloneErrors.push(
+        `${candidateRepo}: ${cloneResult.stdout.toString()}${cloneResult.stderr.toString()}`.trim(),
+      );
+    }
+
+    if (!cloned) {
+      throw new Error(`git clone failed:\n${cloneErrors.join('\n')}`);
     }
   }
 

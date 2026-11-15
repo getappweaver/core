@@ -107,6 +107,21 @@ export function selectPublicationRepository({
     );
   }
 
+  const installedInChoices =
+    !installedRepo.startsWith('local://') &&
+    choices.some((choice) => sameRepository(choice.repo, installedRepo));
+
+  if (
+    requestedRepo === null &&
+    installedInChoices &&
+    (publishedRepo === null || sameRepository(publishedRepo, installedRepo))
+  ) {
+    return {
+      repo: installedRepo,
+      needsSelection: false,
+    };
+  }
+
   const repo = requestedRepo ?? preferred;
 
   const mismatch =
@@ -119,4 +134,32 @@ export function selectPublicationRepository({
     repo,
     needsSelection: requestedRepo === null && (choices.length > 1 || mismatch),
   };
+}
+
+export function collectPublishRemotes({
+  choices,
+  primaryRepo,
+}: {
+  choices: PublishRepositoryChoice[];
+  primaryRepo: string;
+}): string[] {
+  const seen = new Set<string>([repositoryKey(primaryRepo)]);
+  const remotes = [primaryRepo];
+
+  for (const choice of choices) {
+    if (choice.repo.startsWith('local://')) {
+      continue;
+    }
+
+    const key = repositoryKey(choice.repo);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    remotes.push(choice.repo);
+  }
+
+  return remotes;
 }

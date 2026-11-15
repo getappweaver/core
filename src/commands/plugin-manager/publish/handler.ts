@@ -48,7 +48,11 @@ import {
   readInstalledPlugins,
   suggestedAlias,
 } from '../install/handler';
-import { inspectPluginReleaseGit, pushPluginRelease } from '../release-git';
+import {
+  inspectPluginReleaseGit,
+  pushPluginRelease,
+  type PushRemoteResult,
+} from '../release-git';
 
 import { managePaymentOffers, publicationOperation } from './offers';
 import { publicationProgress } from './progress';
@@ -59,6 +63,7 @@ import {
   renderPublishRepositorySelection,
 } from './renderers/web';
 import {
+  collectPublishRemotes,
   gitRepositoryChoices,
   sameRepository,
   selectPublicationRepository,
@@ -754,13 +759,13 @@ async function fetchPluginPublishRelays({
 
 function buildEventTemplate({
   pkg,
-  repo,
+  repos,
   refs,
   iconUrl,
   offerTag,
 }: {
   pkg: PluginPackage;
-  repo: string;
+  repos: string[];
   refs: RefEntry[];
   iconUrl: string | null;
   offerTag: string[] | null;
@@ -775,7 +780,7 @@ function buildEventTemplate({
         ? [['icon', iconUrl, ...(pkg.iconPath ? [pkg.iconPath] : [])]]
         : []),
       ...(pkg.website ? [['website', pkg.website]] : []),
-      ['repo', repo],
+      ...repos.map((repo) => ['repo', repo]),
       ['version', `v${pkg.version}`],
       ['coreApiVersion', pkg.coreApiVersion],
       ['t', 'appweaver-plugin'],
@@ -1230,15 +1235,25 @@ async function handlePluginsPublishAttempt(
     });
   }
 
-  if (published) {
-    report(`Pushing Git release ${versionTag} to ${repo}`);
+  const allRemotes = collectPublishRemotes({ choices, primaryRepo: repo });
+  const pushResults: PushRemoteResult[] = [];
 
-    await pushPluginRelease({
-      dmBotRoot: ctx.dmBotRoot,
-      alias,
-      versionTag,
-      repo,
-    });
+  if (published) {
+    report(
+      allRemotes.length > 1
+        ? `Pushing to ${allRemotes.length} remotes`
+        : `Pushing Git release ${versionTag} to ${repo}`,
+    );
+
+    pushResults.push(
+      ...(await pushPluginRelease({
+        dmBotRoot: ctx.dmBotRoot,
+        alias,
+        versionTag,
+        primaryRepo: repo,
+        repos: allRemotes,
+      })),
+    );
   }
 
   if (!published) {
@@ -1252,11 +1267,71 @@ async function handlePluginsPublishAttempt(
       versionTag,
       authorPubkey: connection.data.userPubkey,
     });
+
+    pushResults.push({ repo, ok: true, error: null });
+
+    if (allRemotes.length > 1) {
+      const mirrors = allRemotes.slice(1);
+      report(`Pushing to ${mirrors.length} mirror remote(s)`);
+
+      pushResults.push(
+        ...(await pushPluginRelease({
+          dmBotRoot: ctx.dmBotRoot,
+          alias,
+          versionTag,
+          primaryRepo: null,
+          repos: mirrors,
+        })),
+      );
+    }
   }
 
   report('Verifying remote Git tags');
   await verifyRemoteRefs({ repo, refs });
-  report(`Git release ${versionTag} pushed and verified`);
+
+  const verifiedRepos: string[] = [repo];
+  const mirrorWarnings: string[] = [];
+
+  for (const result of pushResults) {
+    if (result.repo === repo) {
+      continue;
+    }
+
+    if (!result.ok) {
+      const warning = `${result.repo}: ${result.error ?? 'push failed'}`;
+      mirrorWarnings.push(warning);
+
+      progress.update({
+        state: 'pending',
+        diagnostic: 'warning',
+        message: `Mirror push failed (continuing): ${warning}`,
+      });
+
+      continue;
+    }
+
+    try {
+      await verifyRemoteRefs({ repo: result.repo, refs });
+      verifiedRepos.push(result.repo);
+    } catch (error) {
+      const warning = `${result.repo}: ${error instanceof Error ? error.message : String(error)}`;
+      mirrorWarnings.push(warning);
+
+      progress.update({
+        state: 'pending',
+        diagnostic: 'warning',
+        message: `Mirror tag check failed (excluding from catalog): ${warning}`,
+      });
+    }
+  }
+
+  if (allRemotes.length > 1) {
+    report(
+      `Git release ${versionTag} pushed to ${verifiedRepos.length}/${allRemotes.length} remotes`,
+    );
+  } else {
+    report(`Git release ${versionTag} pushed and verified`);
+  }
 
   report(
     `Signing account: bunker ${connection.name} · ${nip19.npubEncode(connection.data.userPubkey)}; signer ${connection.data.remoteSignerPubkey}`,
@@ -1295,7 +1370,7 @@ async function handlePluginsPublishAttempt(
 
   const template = buildEventTemplate({
     pkg,
-    repo,
+    repos: verifiedRepos,
     refs,
     iconUrl,
     offerTag:
@@ -1382,6 +1457,11 @@ async function handlePluginsPublishAttempt(
     });
   }
 
+  const mirrorWarningSuffix =
+    mirrorWarnings.length > 0
+      ? ` Mirror warnings (${mirrorWarnings.length}): ${mirrorWarnings.join('; ')}.`
+      : '';
+
   const representation = rememberPublishResult({
     alias,
     pluginName: pkg.name,
@@ -1390,7 +1470,7 @@ async function handlePluginsPublishAttempt(
     status: succeeded > 0 ? 'published' : 'failed',
     message:
       succeeded > 0
-        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s). ${discoveryError ?? 'Exact catalog event read-back verified.'}${manifestUpdateError ? ` Published; local registration update failed: ${manifestUpdateError}` : ` Registered repository: ${repo}.`}`
+        ? `Published ${pkg.name} ${versionTag} to ${succeeded}/${relayResults.length} relay(s) (${verifiedRepos.length}/${allRemotes.length} remote(s)). ${discoveryError ?? 'Exact catalog event read-back verified.'}${manifestUpdateError ? ` Published; local registration update failed: ${manifestUpdateError}` : ` Registered repository: ${repo}.`}${mirrorWarningSuffix}`
         : `Failed to publish ${pkg.name} ${versionTag}.`,
     relays: relayResults,
     registrationError: manifestUpdateError,
@@ -1402,7 +1482,10 @@ async function handlePluginsPublishAttempt(
   const outcomeState =
     succeeded === 0
       ? 'error'
-      : discoveryError || manifestUpdateError || succeeded < relayResults.length
+      : discoveryError ||
+          manifestUpdateError ||
+          mirrorWarnings.length > 0 ||
+          succeeded < relayResults.length
         ? 'warning'
         : 'success';
 

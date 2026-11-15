@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.23.1] - 2026-11-15
+
+- fix: multi-repo plugin support and improved error handling (e3237d1e)
+
 ## [v14.23.0] - 2026-11-15
 
-- feat: enhance peer capabilities with invitation management (f27a4525)
+- feat: enhance peer capabilities with invitation management (404c754e)
 
 ## [v14.22.1] - 2026-11-15
 
