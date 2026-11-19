@@ -48,6 +48,33 @@ must not be returned as public capability data or persisted in generated JSON.
 
 ## Lifecycle and structural changes
 
+### Interactive permissions
+
+OpenCode `permission.asked` requests are shown in authenticated Web UI timelines
+with only deduplicated requested/remembered paths or patterns and **Allow once**,
+**Always allow**, and **Reject** actions (the permission name is a fallback when
+there are no patterns). Decisions go to the originating SDK server and
+workspace; AppWeaver does not automatically approve requests or change permission
+configuration. **Always allow** uses OpenCode's session-scoped remembered rules
+rather than granting blanket filesystem access.
+
+`src/backends/opencode-permissions.ts` tracks requests for active streaming and
+non-streaming runs. It processes permission events and reconciles the pending SDK
+list every second to recover missed events and externally resolved requests.
+Authenticated browser timeline loads replay the current snapshot, including after
+reconnection. Resolved/cancelled requests and completed/aborted runs remove their
+prompts; stale or duplicate decisions are rejected. Requests remain scoped to their
+session, and demo connections cannot receive or answer them. Non-web callers can
+use the authenticated Web UI to answer a pending request; DM approval commands are
+not provided.
+
+Manual verification requires an authenticated browser: trigger an external-directory
+read, try each decision on separate requests, reconnect/switch timelines while a
+request is pending, and cancel a waiting run. Confirm resolved prompts disappear
+in other tabs and that source-specific model runtimes receive their own replies.
+
+### Managed processes
+
 The managed runtime controller tracks active runs for each source instance.
 Credential rotation and structural configuration updates coordinate affected
 in-flight requests. The host bot is distinct from managed `opencode serve`

@@ -121,6 +121,23 @@ export function handleServerMessage(params: {
   const pending = pendingRequests.get(message.requestId);
 
   switch (message.type) {
+    case 'agent_permissions':
+      if (message.sessionId !== adapters.timelineId()) {
+        return;
+      }
+
+      adapters.setTimeline((items) => [
+        ...items.filter((item) => !item.id.startsWith('opencode-permission:')),
+        ...message.permissions.map(({ requestId, prompt }) => ({
+          id: requestId,
+          type: 'prompt' as const,
+          requestId,
+          text: null,
+          web: prompt,
+        })),
+      ]);
+
+      return;
     case 'session_run_state':
       adapters.setComposerAiState((state) =>
         state?.currentSessionId === message.sessionId

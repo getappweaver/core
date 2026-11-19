@@ -50,6 +50,7 @@ export type PendingRequest = {
 };
 
 export type IncomingServerMessage =
+  | import('@src/web/ws-schema').AgentPermissionsServerMessage
   | import('@src/web/ws-schema').SessionRunStateServerMessage
   | import('@src/web/ws-schema').ChatStartedServerMessage
   | CommandsResultServerMessage

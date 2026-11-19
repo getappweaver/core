@@ -590,6 +590,7 @@ export type ChatStartedServerMessage = {
 };
 
 export type WebSocketServerMessage =
+  | AgentPermissionsServerMessage
   | SessionRunStateServerMessage
   | ChatStartedServerMessage
   | CommandsResultServerMessage
@@ -608,6 +609,13 @@ export type WebSocketServerMessage =
   | PaymentStatusServerMessage
   | DoneServerMessage
   | ErrorServerMessage;
+
+export type AgentPermissionsServerMessage = {
+  type: 'agent_permissions';
+  requestId: string;
+  sessionId: string;
+  permissions: import('../backends/opencode-permissions').OpenCodePermissionPrompt[];
+};
 
 export function createCapabilityProvidersResultMessage(params: {
   requestId: string;

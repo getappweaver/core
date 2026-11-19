@@ -10,6 +10,11 @@ import {
   type InterventionBridge,
 } from '@src/backends/opencode-intervention';
 import {
+  listOpenCodePermissionPrompts,
+  replyOpenCodePermission,
+  watchOpenCodePermissions,
+} from '@src/backends/opencode-permissions';
+import {
   OpenCodeAbortCleanupError,
   replyOpencodeSdkQuestion,
   summarizeOpencodeSdkSession,
@@ -129,6 +134,26 @@ function isTimelineEventOutput(
   output: WebHandlerResult,
 ): output is TimelineEventOutput {
   return typeof output !== 'string' && output.kind === 'timeline_event';
+}
+
+function sendPermissionPrompts(
+  ws: Bun.ServerWebSocket<WebSocketData>,
+  sessionId: string,
+): void {
+  if (
+    !ws.data.nip98Authenticated ||
+    ws.data.demoAuthenticated ||
+    ws.readyState !== 1
+  ) {
+    return;
+  }
+
+  sendMessage(ws, {
+    type: 'agent_permissions',
+    requestId: 'agent-permissions',
+    sessionId,
+    permissions: listOpenCodePermissionPrompts(sessionId),
+  });
 }
 
 function insertCommandOutputTimelineEvent(props: {
@@ -1756,10 +1781,19 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
   let stopWatchingTitles: (() => void) | null = null;
   let stopWatchingRestarts: (() => void) | null = null;
   let stopWatchingRuns: (() => void) | null = null;
+  let stopWatchingPermissions: (() => void) | null = null;
 
   return {
     open(ws: Bun.ServerWebSocket<WebSocketData>): void {
       connections.add(ws);
+
+      if (!stopWatchingPermissions && !isDemoMode()) {
+        stopWatchingPermissions = watchOpenCodePermissions((sessionId) => {
+          for (const connection of connections) {
+            sendPermissionPrompts(connection, sessionId);
+          }
+        });
+      }
 
       if (!stopWatchingRuns && !isDemoMode()) {
         stopWatchingRuns = watchSessionRuns((sessionId) => {
@@ -1832,6 +1866,8 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
       }
 
       if (connections.size === 0) {
+        stopWatchingPermissions?.();
+        stopWatchingPermissions = null;
         stopWatchingRuns?.();
         stopWatchingRuns = null;
         stopWatchingRestarts?.();
@@ -2090,6 +2126,7 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
 
             case 'load_timeline': {
               await handleLoadTimeline({ ws, ctx, message });
+              sendPermissionPrompts(ws, message.timelineId);
 
               return;
             }
@@ -2168,6 +2205,15 @@ export function createWebSocketHandler(ctx: WebRouteContext) {
             }
 
             case 'prompt_answer': {
+              if (message.requestId.startsWith('opencode-permission:')) {
+                await replyOpenCodePermission(
+                  message.requestId,
+                  message.answer,
+                );
+
+                return;
+              }
+
               const resolved =
                 ws.data.promptSession.resolvePromptAnswer(message);
 

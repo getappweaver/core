@@ -816,7 +816,6 @@ export function mapOpencodeSsePayloadToChunk(
     'workspace.',
     'todo.',
     'question.',
-    'permission.',
     'command.',
     'session.next.',
   ];

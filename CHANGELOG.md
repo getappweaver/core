@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v14.27.4] - 2026-11-19
+
+- fix: removed permission from ignore list to handle opencode folder permissions properly (45e8760f)
+
 ## [v14.27.3] - 2026-11-16
 
-- fix: ensure details element opens correctly by handling undefined props (cbf04723)
+- fix: ensure details element opens correctly by handling undefined props (35af74cc)
 
 ## [v14.27.2] - 2026-11-16
 

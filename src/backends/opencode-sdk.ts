@@ -40,6 +40,7 @@ import {
   segmentsToOutputs,
   unwrapOpenCodeEventRecord,
 } from './opencode-parts';
+import { trackOpenCodePermissions } from './opencode-permissions';
 import {
   createStreamDebugMetrics,
   logStreamDebugSummary,
@@ -2388,6 +2389,12 @@ export function createOpencodeSDKBackend({
       if (!useEventStream) {
         let result: Awaited<ReturnType<typeof client.session.prompt>>;
 
+        const permissions = trackOpenCodePermissions({
+          client,
+          sessionId,
+          cwd,
+        });
+
         try {
           result = await client.session.prompt(promptParams);
         } catch (err) {
@@ -2398,6 +2405,8 @@ export function createOpencodeSDKBackend({
           });
 
           throw err;
+        } finally {
+          permissions.stop();
         }
 
         debug(
@@ -2520,6 +2529,7 @@ export function createOpencodeSDKBackend({
       };
 
       const sse = await client.global.event();
+      const permissions = trackOpenCodePermissions({ client, sessionId, cwd });
 
       const stream = sse.stream;
       let stopConsumer = false;
@@ -2527,6 +2537,8 @@ export function createOpencodeSDKBackend({
       let externalAbortPromise: Promise<void> | null = null;
 
       const onExternalAbort = (): void => {
+        permissions.stop();
+
         debug('opencode-sdk stream: external abort received', {
           sessionId,
           stopConsumer,
@@ -2632,6 +2644,10 @@ export function createOpencodeSDKBackend({
           for await (const evt of stream) {
             if (stopConsumer || streamAbortSignal.aborted) {
               break;
+            }
+
+            if (permissions.handleEvent(evt)) {
+              continue;
             }
 
             const questionRequest = parseQuestionAskedEvent(evt, sessionId);
@@ -2854,6 +2870,7 @@ export function createOpencodeSDKBackend({
           response: messagesResult?.response,
         } as Awaited<ReturnType<typeof client.session.prompt>>;
       } finally {
+        permissions.stop();
         stopConsumer = true;
         resolveStreamComplete();
         streamAbortSignal.removeEventListener('abort', onExternalAbort);
